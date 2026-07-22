@@ -97,6 +97,33 @@ DB connection for tests is *not* overridden to sqlite in-memory (those lines are
 in `phpunit.xml`) — tests run against whatever `DB_CONNECTION`/`DB_DATABASE` is set in `.env`
 unless you uncomment/override that.
 
+## Architecture layers (enforced by PROMPTS.md)
+
+| Layer | Responsibility | Forbidden |
+|-------|---------------|-----------|
+| Controller | Receive Request → call Service → return Response | Business logic, direct DB calls |
+| Service | Core business logic and orchestration | HTTP request handling |
+| Repository | All DB operations and complex queries; conditions wrapped in `Criteria` (`app/Criteria/`) | ad-hoc `where` scattered around; Service calling `Model::where(...)` directly |
+| Model | Relations, Mutators/Accessors, Scopes | Business logic |
+
+## Coding rules (enforced by PROMPTS.md)
+
+- **No `SELECT *`** — always specify columns explicitly
+- **Eliminate N+1** — use eager loading
+- **Short-circuit** — config/cache checks before object instantiation or DB queries
+- **Early Return** — no deeply nested `if/else`
+- **String interpolation** — use `"{$var}"` syntax
+- **Ajax routes** — name with `ajax-` prefix (see `routes/web.php`)
+- **Controller params** — wrap request input in a `$params` array; use only `$params` inside the method
+- **Null checks** — use `filled($a)` instead of `$a !== null`
+- **PHP 7.4 compat** — no arrow functions (`fn`), use `collect(function ...)` instead of `collect fn`
+- **DB Transactions** — required for multi-table writes/updates
+- **Logging** — log external input or API response anomalies
+- **New interfaces** — add permission keyword + route to `config/permissionMap.php`, add lang files (`resources/lang/*`: tw → cn → en sync)
+- **New Requests** — add validation file in `app/Http/Requests/*` and `config/rules.php`
+- **New Responses** — add resource file in `app/Http/Resources/*`
+- **PHPDoc** — required for complex arrays and ambiguous types
+
 ## Code style
 
 Code style follows the `laravel` preset via StyleCI (`.styleci.yml`), with the
