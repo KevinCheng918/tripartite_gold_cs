@@ -37,5 +37,9 @@ class Handler extends ExceptionHandler
         $this->reportable(function (Throwable $e) {
             //
         });
+
+        $this->renderable(function (RoleInUseException $e, $request) {
+            return response()->json(['message' => __('role.delete_blocked_in_use')], 422);
+        });
     }
 }

@@ -9,6 +9,7 @@
 | 文件 | 內容 |
 |------|------|
 | [domain/payment-flow.md](domain/payment-flow.md) | 三方金流主系統的代收/代付四層架構、群組單規則 — 客服對話與工單判斷會用到 |
+| [domain/dev-environment.md](domain/dev-environment.md) | 本機 laradock 環境的坑：nginx vhost 要手動 reload、.env host 要用 service name、webpack 版本 pin、config 快取會讓測試環境覆寫失效 |
 
 ## 功能規劃（features/）
 
@@ -16,8 +17,8 @@
 
 | 文件 | 功能 | 狀態 |
 |------|------|------|
-| [features/rbac.md](features/rbac.md) | 分帳號、權限管理 | 規劃中 |
-| [features/scheduling.md](features/scheduling.md) | 排班申請與審核 | 規劃中 |
+| [features/rbac.md](features/rbac.md) | 分帳號、權限管理（含最小登入/登出） | 已完成 |
+| [features/scheduling.md](features/scheduling.md) | 排班申請與審核 | 規劃中（依賴 RBAC，可開始） |
 | [features/telegram-chat.md](features/telegram-chat.md) | 客服對話窗（Telegram 整合） | 規劃中 |
 | [features/attendance.md](features/attendance.md) | 打卡出勤 | 規劃中 |
 | [features/changelog.md](features/changelog.md) | 版本紀錄（左下角變更日誌） | 規劃中 |
