@@ -11,6 +11,11 @@
         <form method="POST" action="{{ route('login') }}" class="login-form">
             @csrf
 
+            <div class="login-form__brand">
+                <span class="login-form__mark"></span>
+                <span>{{ config('app.name') }}</span>
+            </div>
+
             <h1>{{ __('login.title') }}</h1>
 
             @if ($errors->any())
@@ -21,11 +26,15 @@
                 </div>
             @endif
 
-            <label for="email">{{ __('login.email') }}</label>
-            <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus>
+            <div class="form-group">
+                <label for="email">{{ __('login.email') }}</label>
+                <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus autocomplete="username">
+            </div>
 
-            <label for="password">{{ __('login.password') }}</label>
-            <input id="password" type="password" name="password" required>
+            <div class="form-group">
+                <label for="password">{{ __('login.password') }}</label>
+                <input id="password" type="password" name="password" required autocomplete="current-password">
+            </div>
 
             <label class="login-form__remember">
                 <input type="checkbox" name="remember"> {{ __('login.remember') }}
