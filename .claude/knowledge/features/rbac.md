@@ -25,7 +25,7 @@ app/Http/Controllers/Auth/LoginController.php
 app/Http/Requests/{Account,Role}/*.php
 app/Http/Resources/{AccountResource,RoleResource,PermissionMapResource}.php
 app/Exceptions/RoleInUseException.php（角色仍有帳號使用時刪除會擋下，422）
-database/seeders/{CreateAdminSeeder,CreateNewAdminSeeder,SetPermissionSeeder}.php
+database/seeders/{CreateAdminSeeder,SetPermissionSeeder}.php
 resources/views/{layouts/app,auth/login,admin/accounts/index,admin/roles/index}.blade.php
 resources/js/admin/{accounts,roles}.js（純 vanilla fetch，無框架）
 ```
@@ -42,10 +42,6 @@ resources/js/admin/{accounts,roles}.js（純 vanilla fetch，無框架）
 - **ADMIN_EMAIL/ADMIN_PASSWORD 走 `config('admin.*')`，不要直接 `env()`**：`env()` 在 config 被 cache 後於 config 檔案以外的地方會回傳 null，`config/admin.php` 是這兩個值的唯一合法讀取入口。
 - 建這個功能時發現本機 laradock 環境的 nginx 沒有載入 `tripartite_gold_cs.conf`（container 已跑很久，vhost 檔案較新），需要 `docker exec laradock-nginx-1 nginx -s reload` 才會生效；另外 `.env` 的 `DB_HOST`/`REDIS_HOST`/`MEMCACHED_HOST` 原本是 `127.0.0.1`，在 workspace/php-fpm container 內連不到，已改成 service name（`mariadb`/`redis`/`memcached`）。DB 也從不存在的 `laravel` 改成新建的 `tripartite_gold_cs`（帳密 `root`/`root`，見 laradock 的 `MARIADB_ROOT_PASSWORD`）。
 - `package.json` 新增了 `webpack: 5.76.0` 的明確 pin——`laravel-mix ^6.0.6` 宣告相容 `webpack ^5.60.0`，但 npm 實際解析到的最新 5.108.4 移除了 mix 依賴的內部模組（`webpack/lib/SizeFormatHelpers`），導致 `npm run dev` 直接炸掉。
-
-## 額外帳號
-
-`CreateNewAdminSeeder`——比照 `CreateAdminSeeder` 的模式，額外建一個 admin 角色帳號，帳密走 `config('admin.new_admin_email')`/`config('admin.new_admin_password')`（對應 `.env` 的 `NEW_ADMIN_EMAIL`/`NEW_ADMIN_PASSWORD`）。**密碼沒有預設值**——`.env` 沒設定 `NEW_ADMIN_PASSWORD` 時 seeder 會直接中止，避免真實密碼被寫進 `config/admin.php`/`.env.example` 等有進 git 的檔案。**沒有**掛進 `DatabaseSeeder` 的自動呼叫清單，要另外手動跑 `php artisan db:seed --class=CreateNewAdminSeeder`。
 
 ## 驗證方式
 
