@@ -2,37 +2,53 @@
 
 namespace Database\Seeders;
 
-use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 
+/**
+ * 建立初始管理員帳號
+ *
+ * 參考主系統 tripartite_gold 的 CreateAdminSeeder 模式：
+ * - 帳號不存在 → 新建（level=ADMIN）
+ * - 帳號已存在 → 重置密碼
+ */
 class CreateAdminSeeder extends Seeder
 {
+    /** @var string 預設管理員帳號 */
+    private $account = '';
+
+    /** @var string 預設管理員密碼 */
+    private $password = '';
+
     /**
-     * Seed the initial admin role and admin account.
-     *
      * @return void
      */
     public function run()
     {
+        $this->account = config('admin.account', 'admin');
+        $this->password = config('admin.password', 'qwqw1212');
+
         DB::transaction(function () {
-            $role = Role::query()->firstOrCreate(
-                ['name' => Role::ADMIN_ROLE_NAME],
-                ['display_name' => 'Administrator', 'is_active' => true, 'sort' => 0]
-            );
+            $user = User::query()
+                ->where('account', $this->account)
+                ->first();
 
-            $user = User::query()->firstOrCreate(
-                ['email' => config('admin.email')],
-                [
-                    'name' => 'Admin',
-                    'password' => Hash::make(config('admin.password')),
-                    'status' => User::STATUS_ACTIVE,
-                ]
-            );
+            if (blank($user)) {
+                User::query()->create([
+                    'account' => $this->account,
+                    'password' => $this->password,
+                    'nickname' => 'Admin',
+                    'status' => config('constants.USER.STATUS.NORMAL'),
+                    'level' => config('constants.USER.LEVEL.ADMIN'),
+                ]);
 
-            $user->roles()->syncWithoutDetaching([$role->id]);
+                $this->command->info("成功新增：{$this->account} // {$this->password}。");
+            } else {
+                $user->update(['password' => $this->password]);
+
+                $this->command->error("已重置管理者：{$this->account} // {$this->password}。");
+            }
         });
     }
 }

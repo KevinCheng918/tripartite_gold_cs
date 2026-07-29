@@ -18,4 +18,4 @@ node : 10.16.*
 8. php artisan migrate
 9. php artisan db:seed --class=CreateAdminSeeder
 10. php artisan db:seed --class=SetPermissionSeeder
-11. php artisan db:seed --class=CategorySeeder
+11. php artisan db:seed --class=ShiftSeeder

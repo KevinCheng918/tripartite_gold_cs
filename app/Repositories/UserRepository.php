@@ -4,19 +4,30 @@ namespace App\Repositories;
 
 use App\Criteria\CriteriaInterface;
 use App\Models\User;
+use App\Models\UserPermission;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * 使用者 Repository
+ *
+ * 負責 user 表及 user_permissions 表的所有 DB 操作。
+ */
 class UserRepository
 {
-    private const LIST_COLUMNS = ['id', 'name', 'email', 'status', 'created_at'];
+    /** @var array 列表查詢欄位 */
+    private const LIST_COLUMNS = ['id', 'account', 'nickname', 'status', 'level', 'created_at'];
 
     /**
-     * @param array<int, CriteriaInterface> $criteria
+     * 依條件分頁查詢使用者
+     *
+     * @param array $criteria
+     * @param int   $perPage
+     * @return LengthAwarePaginator
      */
-    public function paginate(array $criteria = [], int $perPage = 20): LengthAwarePaginator
+    public function paginate($criteria = [], $perPage = 20)
     {
-        $query = User::query()->select(self::LIST_COLUMNS)->with('roles');
+        $query = User::query()->select(self::LIST_COLUMNS)->with('permissions');
 
         foreach ($criteria as $criterion) {
             $query = $criterion->apply($query);
@@ -25,37 +36,130 @@ class UserRepository
         return $query->orderByDesc('id')->paginate($perPage);
     }
 
-    public function find(int $id): ?User
+    /**
+     * 依 ID 查詢使用者
+     *
+     * @param int $id
+     * @return User|null
+     */
+    public function find($id)
     {
-        return User::query()->select(self::LIST_COLUMNS)->with('roles')->find($id);
+        return User::query()->select(self::LIST_COLUMNS)->with('permissions')->find($id);
     }
 
-    public function findByEmail(string $email): ?User
+    /**
+     * 依帳號查詢使用者
+     *
+     * @param string $account
+     * @return User|null
+     */
+    public function findByAccount($account)
     {
-        return User::query()->where('email', $email)->first();
+        return User::query()->where('account', $account)->first();
     }
 
-    public function create(array $attributes): User
+    /**
+     * 新增使用者
+     *
+     * @param array $attributes
+     * @return User
+     */
+    public function create($attributes)
     {
         return User::query()->create($attributes);
     }
 
-    public function update(User $user, array $attributes): User
+    /**
+     * 更新使用者
+     *
+     * @param User  $user
+     * @param array $attributes
+     * @return User
+     */
+    public function update(User $user, $attributes)
     {
         $user->update($attributes);
 
         return $user;
     }
 
-    public function softDelete(User $user): bool
+    /**
+     * 軟刪除使用者
+     *
+     * @param User $user
+     * @return bool
+     */
+    public function softDelete(User $user)
     {
         return (bool) $user->delete();
     }
 
-    public function syncRoles(User $user, array $roleIds): void
+    /**
+     * 同步帳號權限（全部取代）
+     *
+     * @param User  $user
+     * @param array $keywords 權限 keyword 陣列
+     * @return void
+     */
+    public function syncPermissions(User $user, $keywords)
     {
-        DB::transaction(function () use ($user, $roleIds) {
-            $user->roles()->sync($roleIds);
+        DB::transaction(function () use ($user, $keywords) {
+            UserPermission::query()->where('user_id', $user->id)->delete();
+
+            if (empty($keywords)) {
+                return;
+            }
+
+            $rows = array_map(function ($keyword) use ($user) {
+                return [
+                    'user_id' => $user->id,
+                    'permission_keyword' => $keyword,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }, $keywords);
+
+            UserPermission::query()->insert($rows);
         });
+    }
+
+    /**
+     * 取得所有客服帳號（含停用，用於統計）
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getAllCsUsers()
+    {
+        return User::query()
+            ->select(['id', 'account', 'nickname', 'status'])
+            ->where('level', config('constants.USER.LEVEL.CS'))
+            ->orderBy('nickname')
+            ->get();
+    }
+
+    /**
+     * 取得所有客服帳號（排除停用）
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getCsUsers()
+    {
+        return User::query()
+            ->select(['id', 'account', 'nickname', 'status'])
+            ->where('level', config('constants.USER.LEVEL.CS'))
+            ->where('status', '!=', config('constants.USER.STATUS.DEACTIVATE'))
+            ->orderBy('nickname')
+            ->get();
+    }
+
+    /**
+     * 取得帳號的權限 keyword 清單
+     *
+     * @param User $user
+     * @return array
+     */
+    public function getPermissionKeywords(User $user)
+    {
+        return $user->permissions()->pluck('permission_keyword')->all();
     }
 }

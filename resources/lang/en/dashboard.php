@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'nav_label'          => 'Home',
+    'page_title'         => 'Dashboard',
+    'subtitle'           => 'Overview',
+    'total_cs'           => 'Total CS',
+    'status_normal'      => 'Normal',
+    'status_lock'        => 'Locked',
+    'status_deactivate'  => 'Deactivated',
+    'today_shift'        => 'Today\'s Shifts',
+    'today_no_shift'     => 'No shifts today',
+    'week_overview'      => 'Weekly Overview',
+    'week_total'         => 'Total Shifts This Week',
+    'week_shift_count'   => 'shifts',
+    'my_today_shift'     => 'My Shift Today',
+    'my_week_shift'      => 'My Shifts This Week',
+    'my_no_shift'        => 'No shifts',
+    'field_date'         => 'Date',
+    'field_shift'        => 'Shift',
+    'field_time'         => 'Time',
+    'field_user'         => 'Staff',
+    'field_shift_count'  => 'Shifts',
+    'rank'               => 'Rank',
+    'now_on_duty'        => 'On Duty',
+];
