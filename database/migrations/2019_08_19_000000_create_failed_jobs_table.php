@@ -4,15 +4,20 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * 建立失敗佇列表（failed_jobs）
+ */
 class CreateFailedJobsTable extends Migration
 {
     /**
-     * Run the migrations.
-     *
      * @return void
      */
     public function up()
     {
+        if (Schema::hasTable('failed_jobs')) {
+            return;
+        }
+
         Schema::create('failed_jobs', function (Blueprint $table) {
             $table->id();
             $table->string('uuid')->unique();
@@ -25,12 +30,14 @@ class CreateFailedJobsTable extends Migration
     }
 
     /**
-     * Reverse the migrations.
-     *
      * @return void
      */
     public function down()
     {
+        if (!Schema::hasTable('failed_jobs')) {
+            return;
+        }
+
         Schema::dropIfExists('failed_jobs');
     }
 }

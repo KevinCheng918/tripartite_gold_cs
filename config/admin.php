@@ -14,7 +14,7 @@
 
 return [
 
-    'email' => env('ADMIN_EMAIL', 'admin@example.com'),
-    'password' => env('ADMIN_PASSWORD', 'password'),
+    'account' => env('ADMIN_ACCOUNT', 'admin'),
+    'password' => env('ADMIN_PASSWORD', 'qwqw1212'),
 
 ];
