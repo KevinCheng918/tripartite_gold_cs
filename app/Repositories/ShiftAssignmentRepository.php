@@ -93,23 +93,6 @@ class ShiftAssignmentRepository
     }
 
     /**
-     * 檢查員工在該日是否已有同一班別
-     *
-     * @param int    $userId
-     * @param string $date
-     * @param int    $shiftId
-     * @return bool
-     */
-    public function existsByUserDateAndShift($userId, $date, $shiftId)
-    {
-        return ShiftAssignment::query()
-            ->where('user_id', $userId)
-            ->where('date', $date)
-            ->where('shift_id', $shiftId)
-            ->exists();
-    }
-
-    /**
      * 新增排班紀錄
      *
      * @param array $attributes
@@ -203,20 +186,6 @@ class ShiftAssignmentRepository
         return ShiftSwap::query()
             ->with(['requester', 'target', 'requesterAssignment.shift', 'targetAssignment.shift'])
             ->find($id);
-    }
-
-    /**
-     * 查詢所有換班請求（管理者用）
-     *
-     * @param int $perPage
-     * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
-     */
-    public function paginateAllSwaps($perPage = 20)
-    {
-        return ShiftSwap::query()
-            ->with(['requester', 'target', 'requesterAssignment.shift', 'targetAssignment.shift'])
-            ->orderByDesc('id')
-            ->paginate($perPage);
     }
 
     /**

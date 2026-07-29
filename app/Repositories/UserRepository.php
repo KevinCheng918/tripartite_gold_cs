@@ -59,20 +59,6 @@ class UserRepository
     }
 
     /**
-     * 依帳號查詢使用者（含密碼，登入驗證用）
-     *
-     * @param string $account
-     * @return User|null
-     */
-    public function findByAccountForLogin($account)
-    {
-        return User::query()
-            ->select(['id', 'account', 'password', 'status'])
-            ->where('account', $account)
-            ->first();
-    }
-
-    /**
      * 新增使用者
      *
      * @param array $attributes
@@ -175,61 +161,5 @@ class UserRepository
     public function getPermissionKeywords(User $user)
     {
         return $user->permissions()->pluck('permission_keyword')->all();
-    }
-
-    /**
-     * 儲存 Web Push 訂閱資訊
-     *
-     * @param User   $user
-     * @param string $endpoint
-     * @param string $p256dhKey
-     * @param string $authToken
-     * @return User
-     */
-    public function savePushSubscription(User $user, $endpoint, $p256dhKey, $authToken)
-    {
-        $user->update([
-            'push_endpoint'    => $endpoint,
-            'push_p256dh_key'  => $p256dhKey,
-            'push_auth_token'  => $authToken,
-        ]);
-
-        return $user;
-    }
-
-    /**
-     * 清除 Web Push 訂閱資訊
-     *
-     * @param User $user
-     * @return User
-     */
-    public function clearPushSubscription(User $user)
-    {
-        $user->update([
-            'push_endpoint'    => null,
-            'push_p256dh_key'  => null,
-            'push_auth_token'  => null,
-        ]);
-
-        return $user;
-    }
-
-    /**
-     * 取得所有已訂閱 Web Push 的使用者
-     *
-     * @param int|null $excludeId 排除的使用者 ID
-     * @return \Illuminate\Database\Eloquent\Collection
-     */
-    public function getSubscribedUsers($excludeId = null)
-    {
-        $query = User::query()
-            ->select(['id', 'push_endpoint', 'push_p256dh_key', 'push_auth_token'])
-            ->whereNotNull('push_endpoint');
-
-        if (filled($excludeId)) {
-            $query->where('id', '!=', $excludeId);
-        }
-
-        return $query->get();
     }
 }

@@ -22,7 +22,6 @@ return [
     'field_date' => '日期',
     'field_shift' => '班別',
     'field_user' => '員工',
-    'allday_shift'  => '全天班（所有班別）',
     'action_assign' => '排班',
     'swap_my_assignment' => '我的排班 ID',
     'swap_target_assignment' => '對方排班 ID',
@@ -35,7 +34,6 @@ return [
     'assignment_detail' => '排班資訊',
     'action_delete_assignment' => '刪除排班',
     'already_assigned' => '該日已有排班，無法重複報班',
-    'already_assigned_same_shift' => '該日已有相同班別的排班',
     'locked_cannot_assign' => '帳號已鎖定，無法自行報班，請聯繫管理者',
     'locked_cannot_swap' => '帳號已鎖定，無法自行換班，請聯繫管理者',
 

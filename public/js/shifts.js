@@ -69,12 +69,12 @@
 
     function openModal(id) {
         var el = document.getElementById(id);
-        if (el) { new bootstrap.Modal(el).show(); }
+        if (el) { el.style.display = 'flex'; }
     }
 
     function closeModal(id) {
         var el = document.getElementById(id);
-        if (el) { var inst = bootstrap.Modal.getInstance(el); if (inst) { inst.hide(); } }
+        if (el) { el.style.display = 'none'; }
     }
 
     function showMessage(message) {
@@ -93,6 +93,19 @@
         return error.message || 'Failed';
     }
 
+    function bindModalCloseButtons() {
+        document.querySelectorAll('[data-modal-close]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var overlay = btn.closest('.modal-overlay');
+                if (overlay) { overlay.style.display = 'none'; }
+            });
+        });
+        document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
+            overlay.addEventListener('click', function (e) {
+                if (e.target === overlay) { overlay.style.display = 'none'; }
+            });
+        });
+    }
 
     // ---------------------------------------------------------------
     //  狀態
@@ -106,9 +119,9 @@
     var currentMonday = getMonday();
 
     var swapStatusMap = {};
-    swapStatusMap[0] = { text: i18n.status_pending, css: 'bg-warning text-dark' };
-    swapStatusMap[1] = { text: i18n.status_approved, css: 'bg-success' };
-    swapStatusMap[2] = { text: i18n.status_rejected, css: 'bg-danger' };
+    swapStatusMap[0] = { text: i18n.status_pending, css: 'badge--pending' };
+    swapStatusMap[1] = { text: i18n.status_approved, css: 'badge--approved' };
+    swapStatusMap[2] = { text: i18n.status_rejected, css: 'badge--rejected' };
 
     // ---------------------------------------------------------------
     //  日期工具
@@ -197,16 +210,16 @@
         // 只顯示有權限的 Tab
         var tabs = allTabs.filter(function (t) { return hasPerm(t.perm); });
 
-        var html = '<ul class="nav nav-tabs mb-3">';
+        var html = '<div class="tabs">';
         tabs.forEach(function (tab) {
             var cls = tab.key === activeTab ? 'active' : '';
-            html += '<li class="nav-item"><button class="nav-link ' + cls + '" data-tab="' + tab.key + '">' + tab.label + '</button></li>';
+            html += '<button class="' + cls + '" data-tab="' + tab.key + '">' + tab.label + '</button>';
         });
-        html += '</ul><div id="tab-content"></div>';
+        html += '</div><div id="tab-content"></div>';
 
         root.innerHTML = html;
 
-        root.querySelectorAll('.nav-tabs .nav-link').forEach(function (btn) {
+        root.querySelectorAll('.tabs button').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 activeTab = btn.dataset.tab;
                 renderTabs();
@@ -306,14 +319,11 @@
 
         /**
          * 為某日某小時建立所有需要顯示的色塊
-         * 同班別合併成一個色塊，人名用頓號連接
+         * 每個色塊是 { type: 'shift'|'cover', cls, label, dataId }
          */
         function buildCellBlocks(date, hour) {
             var blocks = [];
             if (!lookup[date]) { return blocks; }
-
-            // 先收集這個小時所有匹配的排班，按 shift.name 分組
-            var shiftGroups = {};  // key: shift.name → { shift, users: [], assignmentIds: [], covers: [] }
 
             lookup[date].forEach(function (a) {
                 if (!a.shift) { return; }
@@ -321,6 +331,8 @@
                 if (!inRange) { return; }
 
                 var covers = coverLookup[a.id] || [];
+
+                // 檢查這個小時是否在某個代班時段內
                 var coveredBy = null;
                 covers.forEach(function (c) {
                     if (isTimeInRange(c.cover_start, c.cover_end, hour)) {
@@ -329,7 +341,7 @@
                 });
 
                 if (coveredBy) {
-                    // 代班獨立處理
+                    // 代班人色塊
                     var coverName = coveredBy.cover_user ? coveredBy.cover_user.nickname : '';
                     var originalName = a.user ? a.user.nickname : '';
                     var coverKey = date + '_cover_' + coveredBy.id;
@@ -343,38 +355,21 @@
                     }
                     blocks.push({ cls: 'tt-shift-cover', label: coverLabel, dataId: a.id });
                 } else {
-                    // 按班別分組
-                    var key = a.shift.name;
-                    if (!shiftGroups[key]) {
-                        shiftGroups[key] = { shift: a.shift, users: [], assignmentIds: [] };
-                    }
+                    // 原班人色塊
+                    var shiftCls = 'tt-shift-' + a.shift.name;
                     var userName = a.user ? a.user.nickname : '';
-                    if (userName && shiftGroups[key].users.indexOf(userName) === -1) {
-                        shiftGroups[key].users.push(userName);
+                    var shiftName = a.shift.display_name || '';
+                    var labelKey = date + '_' + a.id;
+                    var label = '';
+                    if (!labelRendered[labelKey]) {
+                        labelRendered[labelKey] = true;
+                        label = '<div class="tt-block-info">' +
+                            '<div class="tt-block-name">' + shiftName + '</div>' +
+                            '<div class="tt-block-user">' + userName + '</div>' +
+                            '</div>';
                     }
-                    shiftGroups[key].assignmentIds.push(a.id);
+                    blocks.push({ cls: shiftCls, label: label, dataId: a.id });
                 }
-            });
-
-            // 把分組後的班別轉成色塊（同班別一個色塊）
-            Object.keys(shiftGroups).forEach(function (key) {
-                var group = shiftGroups[key];
-                var shiftCls = 'tt-shift-' + group.shift.name;
-                var shiftName = group.shift.display_name || '';
-                var usersStr = group.users.join('、');
-                var labelKey = date + '_shift_' + key;
-                var label = '';
-
-                if (!labelRendered[labelKey]) {
-                    labelRendered[labelKey] = true;
-                    label = '<div class="tt-block-info">' +
-                        '<div class="tt-block-name">' + shiftName + '</div>' +
-                        '<div class="tt-block-user">' + usersStr + '</div>' +
-                        '</div>';
-                }
-
-                // dataId 用第一個 assignment 的 ID（點擊用）
-                blocks.push({ cls: shiftCls, label: label, dataId: group.assignmentIds[0] });
             });
 
             return blocks;
@@ -453,12 +448,6 @@
         var assignBtn = document.getElementById('js-open-assign');
         if (assignBtn) {
             assignBtn.addEventListener('click', function () {
-                // 重置全天班 checkbox
-                var alldayCb = document.getElementById('assign-allday');
-                if (alldayCb) { alldayCb.checked = false; }
-                var shiftGroup = document.getElementById('assign-shift-group');
-                if (shiftGroup) { shiftGroup.style.display = ''; }
-
                 populateAssignShiftSelect();
                 if (isAdmin) { populateAssignUserSelect(); }
                 openModal('modal-assign');
@@ -538,24 +527,9 @@
                 '<td><span class="tt-legend" style="background:' + color.bg + ';border-color:' + color.border + ';color:' + color.text + '">' + shift.display_name + '</span></td>' +
                 '<td>' + shift.start_time + '</td>' +
                 '<td>' + shift.end_time + '</td>' +
-                '<td>' + (shift.is_active ? '<span class="badge bg-success">' + i18n.field_is_active + '</span>' : '<span class="badge bg-secondary">-</span>') + '</td>' +
+                '<td>' + (shift.is_active ? '<span class="badge badge--active">' + i18n.field_is_active + '</span>' : '<span class="badge badge--disabled">-</span>') + '</td>' +
                 '<td><button class="btn-sm js-edit-shift">' + i18n.modal_edit_shift_title + '</button></td>' +
                 '</tr>'
-            );
-        }).join('');
-
-        var cards = shifts.map(function (shift) {
-            var color = shiftColors[shift.name] || defaultColor;
-            return (
-                '<div class="shift-card" data-id="' + shift.id + '">' +
-                '<div class="shift-card__header">' +
-                '<span class="tt-legend" style="background:' + color.bg + ';border-color:' + color.border + ';color:' + color.text + '">' + shift.display_name + '</span>' +
-                (shift.is_active ? '<span class="badge bg-success">' + i18n.field_is_active + '</span>' : '<span class="badge bg-secondary">-</span>') +
-                '</div>' +
-                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_start_time + '</span><span>' + shift.start_time + '</span></div>' +
-                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_end_time + '</span><span>' + shift.end_time + '</span></div>' +
-                '<div class="shift-card__actions"><button class="btn-sm js-edit-shift">' + i18n.modal_edit_shift_title + '</button></div>' +
-                '</div>'
             );
         }).join('');
 
@@ -566,15 +540,14 @@
             '<th>' + i18n.field_end_time + '</th>' +
             '<th>' + i18n.field_is_active + '</th>' +
             '<th></th>' +
-            '</tr></thead><tbody>' + rows + '</tbody></table>' +
-            '<div class="shift-cards">' + cards + '</div>';
+            '</tr></thead><tbody>' + rows + '</tbody></table>';
 
         document.getElementById('tab-content').innerHTML = html;
 
         root.querySelectorAll('.js-edit-shift').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                var row = btn.closest('tr') || btn.closest('.shift-card');
-                var id = parseInt(row.dataset.id, 10);
+                var tr = btn.closest('tr');
+                var id = parseInt(tr.dataset.id, 10);
                 var shift = shiftsData.filter(function (s) { return s.id === id; })[0];
                 if (shift) { openEditShiftModal(shift); }
             });
@@ -607,10 +580,8 @@
         var rows = swaps.map(function (swap) {
             var requester = swap.requester ? swap.requester.nickname : '-';
             var target = swap.target ? swap.target.nickname : '-';
-            var reqDate = swap.requester_assignment ? swap.requester_assignment.date : '-';
             var reqShift = swap.requester_assignment && swap.requester_assignment.shift
                 ? swap.requester_assignment.shift.display_name : '-';
-            var tgtDate = swap.target_assignment ? swap.target_assignment.date : '-';
             var tgtShift = swap.target_assignment && swap.target_assignment.shift
                 ? swap.target_assignment.shift.display_name : '-';
             var statusInfo = swapStatusMap[swap.status] || { text: '-', css: '' };
@@ -625,10 +596,8 @@
             return (
                 '<tr>' +
                 '<td>' + requester + '</td>' +
-                '<td>' + reqDate + '</td>' +
                 '<td>' + reqShift + '</td>' +
                 '<td>' + target + '</td>' +
-                '<td>' + tgtDate + '</td>' +
                 '<td>' + tgtShift + '</td>' +
                 '<td><span class="badge ' + statusInfo.css + '">' + statusInfo.text + '</span></td>' +
                 '<td>' + actions + '</td>' +
@@ -636,48 +605,12 @@
             );
         }).join('');
 
-        var swapCards = swaps.map(function (swap) {
-            var requester = swap.requester ? swap.requester.nickname : '-';
-            var target = swap.target ? swap.target.nickname : '-';
-            var reqDate = swap.requester_assignment ? swap.requester_assignment.date : '-';
-            var reqShift = swap.requester_assignment && swap.requester_assignment.shift
-                ? swap.requester_assignment.shift.display_name : '-';
-            var tgtDate = swap.target_assignment ? swap.target_assignment.date : '-';
-            var tgtShift = swap.target_assignment && swap.target_assignment.shift
-                ? swap.target_assignment.shift.display_name : '-';
-            var statusInfo = swapStatusMap[swap.status] || { text: '-', css: '' };
-
-            var actions = '';
-            if (swap.status === 0 && swap.target_id === currentUserId) {
-                actions =
-                    '<div class="shift-card__actions">' +
-                    '<button class="btn-primary btn-sm js-respond-swap" data-id="' + swap.id + '" data-status="1">' + i18n.action_approve + '</button>' +
-                    '<button class="btn-sm js-respond-swap" data-id="' + swap.id + '" data-status="2">' + i18n.action_reject + '</button>' +
-                    '</div>';
-            }
-
-            return (
-                '<div class="shift-card">' +
-                '<div class="shift-card__header">' +
-                '<span class="shift-card__title">' + requester + ' ↔ ' + target + '</span>' +
-                '<span class="badge ' + statusInfo.css + '">' + statusInfo.text + '</span>' +
-                '</div>' +
-                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_user + '（發起）</span><span>' + requester + '</span></div>' +
-                '<div class="shift-card__row"><span class="shift-card__label"></span><span>' + reqDate + ' ' + reqShift + '</span></div>' +
-                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_user + '（對方）</span><span>' + target + '</span></div>' +
-                '<div class="shift-card__row"><span class="shift-card__label"></span><span>' + tgtDate + ' ' + tgtShift + '</span></div>' +
-                actions +
-                '</div>'
-            );
-        }).join('');
-
         var html =
             '<table><thead><tr>' +
-            '<th>' + i18n.field_user + '（發起方）</th><th>' + (i18n.field_date || '日期') + '</th><th>' + i18n.field_shift + '</th>' +
-            '<th>' + i18n.field_user + '（對方）</th><th>' + (i18n.field_date || '日期') + '</th><th>' + i18n.field_shift + '</th>' +
+            '<th>' + i18n.field_user + '（發起方）</th><th>' + i18n.field_shift + '</th>' +
+            '<th>' + i18n.field_user + '（對方）</th><th>' + i18n.field_shift + '</th>' +
             '<th>狀態</th><th></th>' +
-            '</tr></thead><tbody>' + rows + '</tbody></table>' +
-            '<div class="shift-cards">' + swapCards + '</div>';
+            '</tr></thead><tbody>' + rows + '</tbody></table>';
 
         document.getElementById('tab-content').innerHTML = html;
 
@@ -712,38 +645,21 @@
         }).join('');
     }
 
-    /** 填充 Admin 排班 Modal 的客服 checkbox 列表 */
+    /** 填充 Admin 排班 Modal 的客服選單 */
     function populateAssignUserSelect() {
-        var container = document.getElementById('assign-user-list');
-        if (!container) { return; }
+        var select = document.getElementById('assign-user');
+        if (!select) { return; }
 
         if (csUsersData.length > 0) {
-            fillUserCheckboxes(container, csUsersData);
+            fillUserSelect(select, csUsersData);
             return;
         }
 
         apiFetch('/admin/shifts/ajax-cs-users')
             .then(function (body) {
                 csUsersData = body;
-                fillUserCheckboxes(container, csUsersData);
+                fillUserSelect(select, csUsersData);
             });
-    }
-
-    /**
-     * 填充客服 checkbox 列表（多選）
-     *
-     * @param {HTMLElement} container
-     * @param {Array} users
-     */
-    function fillUserCheckboxes(container, users) {
-        container.innerHTML = users.map(function (u) {
-            var label = u.nickname + '（' + u.account + '）';
-            var lockTag = u.status === 2 ? ' <span style="color:#dc2626">— 鎖定</span>' : '';
-            return '<label class="assign-user-cb">' +
-                '<input type="checkbox" name="user_ids[]" value="' + u.id + '">' +
-                '<span>' + label + lockTag + '</span>' +
-                '</label>';
-        }).join('');
     }
 
     /**
@@ -826,55 +742,18 @@
     function submitAssign(e) {
         e.preventDefault();
         var form = document.getElementById('form-assign');
-        var date = form.querySelector('[name="date"]').value;
-        var isAllday = document.getElementById('assign-allday') && document.getElementById('assign-allday').checked;
+        var data = {
+            shift_id: parseInt(form.querySelector('[name="shift_id"]').value, 10),
+            date: form.querySelector('[name="date"]').value,
+        };
 
-        // 全天班：取得所有啟用班別的 ID
-        var shiftIds = [];
-        if (isAllday) {
-            shiftIds = shiftsData.filter(function (s) { return s.is_active; }).map(function (s) { return s.id; });
-        } else {
-            shiftIds = [parseInt(form.querySelector('[name="shift_id"]').value, 10)];
+        // Admin 帶上指定的客服 user_id
+        var userSelect = form.querySelector('[name="user_id"]');
+        if (userSelect) {
+            data.user_id = parseInt(userSelect.value, 10);
         }
 
-        // Admin 多選：收集勾選的 user_id
-        var checkboxes = form.querySelectorAll('[name="user_ids[]"]:checked');
-        var userIds = [];
-        checkboxes.forEach(function (cb) { userIds.push(parseInt(cb.value, 10)); });
-
-        var promises = [];
-
-        if (userIds.length > 0) {
-            // Admin：每個人 × 每個班別
-            userIds.forEach(function (uid) {
-                shiftIds.forEach(function (sid) {
-                    promises.push(apiFetch('/admin/shifts/ajax-assign', {
-                        method: 'POST',
-                        body: JSON.stringify({ shift_id: sid, date: date, user_id: uid }),
-                    }));
-                });
-            });
-
-            Promise.all(promises)
-                .then(function () {
-                    closeModal('modal-assign');
-                    var msg = i18n.assigned + '（' + userIds.length + ' 人' + (isAllday ? '，全天班' : '') + '）';
-                    showMessage(msg);
-                    if (activeTab === 'timetable') { loadTimetable(); }
-                })
-                .catch(function (error) { showMessage(getErrorMessage(error)); });
-            return;
-        }
-
-        // 客服自己報班
-        var selfPromises = shiftIds.map(function (sid) {
-            return apiFetch('/admin/shifts/ajax-assign', {
-                method: 'POST',
-                body: JSON.stringify({ shift_id: sid, date: date }),
-            });
-        });
-
-        Promise.all(selfPromises)
+        apiFetch('/admin/shifts/ajax-assign', { method: 'POST', body: JSON.stringify(data) })
             .then(function () {
                 closeModal('modal-assign');
                 showMessage(i18n.assigned);
@@ -976,14 +855,14 @@
 
     /** 代班狀態 badge 對應 */
     var coverStatusMap = {};
-    coverStatusMap[0] = { text: coverI18n.status_pending || '待確認', css: 'bg-warning text-dark' };
-    coverStatusMap[1] = { text: coverI18n.status_approved || '已同意', css: 'bg-success' };
-    coverStatusMap[2] = { text: coverI18n.status_rejected || '已拒絕', css: 'bg-danger' };
+    coverStatusMap[0] = { text: coverI18n.status_pending || '待確認', css: 'badge--pending' };
+    coverStatusMap[1] = { text: coverI18n.status_approved || '已同意', css: 'badge--approved' };
+    coverStatusMap[2] = { text: coverI18n.status_rejected || '已拒絕', css: 'badge--rejected' };
 
     var adminStatusMap = {};
-    adminStatusMap[0] = { text: coverI18n.admin_pending || '待審核', css: 'bg-warning text-dark' };
-    adminStatusMap[1] = { text: coverI18n.admin_approved || '已核准', css: 'bg-success' };
-    adminStatusMap[2] = { text: coverI18n.admin_rejected || '已駁回', css: 'bg-danger' };
+    adminStatusMap[0] = { text: coverI18n.admin_pending || '待審核', css: 'badge--pending' };
+    adminStatusMap[1] = { text: coverI18n.admin_approved || '已核准', css: 'badge--approved' };
+    adminStatusMap[2] = { text: coverI18n.admin_rejected || '已駁回', css: 'badge--rejected' };
 
     /**
      * 開啟代班申請 Modal
@@ -1096,49 +975,6 @@
             );
         }).join('');
 
-        var coverCards = covers.map(function (c) {
-            var requester = c.requester ? c.requester.nickname : '-';
-            var coverUser = c.cover_user ? c.cover_user.nickname : '-';
-            var shiftName = c.assignment && c.assignment.shift ? c.assignment.shift.display_name : '-';
-            var shiftDate = c.assignment ? c.assignment.date : '-';
-            var coverTime = c.cover_start + ' - ' + c.cover_end;
-            var coverStatus = coverStatusMap[c.cover_user_status] || { text: '-', css: '' };
-            var aStatus = adminStatusMap[c.admin_status] || { text: '-', css: '' };
-
-            var actions = '';
-            if (c.cover_user_status === 0 && c.cover_user_id === currentUserId) {
-                actions =
-                    '<div class="shift-card__actions">' +
-                    '<button class="btn-primary btn-sm js-cover-respond" data-id="' + c.id + '" data-status="1">' + (coverI18n.action_approve || '同意') + '</button>' +
-                    '<button class="btn-sm js-cover-respond" data-id="' + c.id + '" data-status="2">' + (coverI18n.action_reject || '拒絕') + '</button>' +
-                    '</div>';
-            }
-            if (isAdmin && c.cover_user_status === 1 && c.admin_status === 0) {
-                actions =
-                    '<div class="shift-card__actions">' +
-                    '<button class="btn-primary btn-sm js-cover-admin" data-id="' + c.id + '" data-status="1">' + (coverI18n.action_admin_approve || '核准') + '</button>' +
-                    '<button class="btn-sm js-cover-admin" data-id="' + c.id + '" data-status="2">' + (coverI18n.action_admin_reject || '駁回') + '</button>' +
-                    '</div>';
-            }
-
-            return (
-                '<div class="shift-card">' +
-                '<div class="shift-card__header">' +
-                '<span class="shift-card__title">' + shiftDate + ' ' + shiftName + '</span>' +
-                '</div>' +
-                '<div class="shift-card__row"><span class="shift-card__label">' + (coverI18n.field_requester || '原班人') + '</span><span>' + requester + '</span></div>' +
-                '<div class="shift-card__row"><span class="shift-card__label">' + (coverI18n.field_cover_user || '代班人') + '</span><span>' + coverUser + '</span></div>' +
-                '<div class="shift-card__row"><span class="shift-card__label">' + (coverI18n.field_cover_time || '代班時段') + '</span><span>' + coverTime + '</span></div>' +
-                (c.reason ? '<div class="shift-card__row"><span class="shift-card__label">' + (coverI18n.field_reason || '原因') + '</span><span>' + c.reason + '</span></div>' : '') +
-                '<div class="shift-card__badges">' +
-                '<span class="badge ' + coverStatus.css + '">' + (coverI18n.field_cover_status || '代班人') + '：' + coverStatus.text + '</span>' +
-                '<span class="badge ' + aStatus.css + '">' + (coverI18n.field_admin_status || '管理者') + '：' + aStatus.text + '</span>' +
-                '</div>' +
-                actions +
-                '</div>'
-            );
-        }).join('');
-
         var html =
             '<table><thead><tr>' +
             '<th>' + (coverI18n.field_date || '日期') + '</th>' +
@@ -1150,61 +986,23 @@
             '<th>' + (coverI18n.field_cover_status || '代班人') + '</th>' +
             '<th>' + (coverI18n.field_admin_status || '管理者') + '</th>' +
             '<th></th>' +
-            '</tr></thead><tbody>' + rows + '</tbody></table>' +
-            '<div class="shift-cards">' + coverCards + '</div>';
+            '</tr></thead><tbody>' + rows + '</tbody></table>';
 
         document.getElementById('tab-content').innerHTML = html;
 
-        // 綁定代班人回應按鈕（含二次確認）
+        // 綁定代班人回應按鈕
         root.querySelectorAll('.js-cover-respond').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                var coverId = parseInt(btn.dataset.id, 10);
-                var status = parseInt(btn.dataset.status, 10);
-                var actionLabel = status === 1 ? (coverI18n.action_approve || '同意') : (coverI18n.action_reject || '拒絕');
-                showCoverConfirm(actionLabel, status === 2, function () {
-                    respondCoverUser(coverId, status);
-                });
+                respondCoverUser(parseInt(btn.dataset.id, 10), parseInt(btn.dataset.status, 10));
             });
         });
 
-        // 綁定管理者審核按鈕（含二次確認）
+        // 綁定管理者審核按鈕
         root.querySelectorAll('.js-cover-admin').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                var coverId = parseInt(btn.dataset.id, 10);
-                var status = parseInt(btn.dataset.status, 10);
-                var actionLabel = status === 1 ? (coverI18n.action_admin_approve || '核准') : (coverI18n.action_admin_reject || '駁回');
-                showCoverConfirm(actionLabel, status === 2, function () {
-                    respondCoverAdmin(coverId, status);
-                });
+                respondCoverAdmin(parseInt(btn.dataset.id, 10), parseInt(btn.dataset.status, 10));
             });
         });
-    }
-
-    // ---------------------------------------------------------------
-    //  代班二次確認
-    // ---------------------------------------------------------------
-
-    var pendingCoverAction = null;
-
-    /**
-     * 顯示代班操作二次確認彈窗
-     *
-     * @param {string}   actionLabel 操作名稱（如「同意」「駁回」）
-     * @param {boolean}  isDanger    是否為拒絕/駁回類操作
-     * @param {function} onConfirm   確認後執行的 callback
-     */
-    function showCoverConfirm(actionLabel, isDanger, onConfirm) {
-        var body = document.getElementById('modal-cover-confirm-body');
-        var actionCls = isDanger ? 'att-confirm-action--out' : 'att-confirm-action--in';
-
-        body.innerHTML =
-            '<div class="att-confirm-content">' +
-            '<div class="att-confirm-action ' + actionCls + '">' + actionLabel + '</div>' +
-            '<p class="att-confirm-hint">' + (coverI18n.confirm_hint || '此操作無法撤回，請確認') + '</p>' +
-            '</div>';
-
-        pendingCoverAction = onConfirm;
-        openModal('modal-cover-confirm');
     }
 
     /**
@@ -1243,31 +1041,9 @@
     //  初始化
     // ---------------------------------------------------------------
 
-
-    // 綁定代班確認 Modal 的確認按鈕
-    var coverConfirmBtn = document.getElementById('btn-cover-confirm-ok');
-    if (coverConfirmBtn) {
-        coverConfirmBtn.addEventListener('click', function () {
-            closeModal('modal-cover-confirm');
-            if (pendingCoverAction) {
-                pendingCoverAction();
-                pendingCoverAction = null;
-            }
-        });
-    }
+    bindModalCloseButtons();
 
     document.getElementById('form-assign').addEventListener('submit', submitAssign);
-
-    // 全天班 checkbox — 勾選時隱藏班別選單
-    var alldayCheckbox = document.getElementById('assign-allday');
-    if (alldayCheckbox) {
-        alldayCheckbox.addEventListener('change', function () {
-            var shiftGroup = document.getElementById('assign-shift-group');
-            if (shiftGroup) {
-                shiftGroup.style.display = alldayCheckbox.checked ? 'none' : '';
-            }
-        });
-    }
     document.getElementById('form-swap').addEventListener('submit', submitSwap);
     document.getElementById('form-edit-shift').addEventListener('submit', submitEditShift);
 

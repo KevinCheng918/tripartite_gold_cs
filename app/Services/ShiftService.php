@@ -79,7 +79,7 @@ class ShiftService
             'is_active'    => array_key_exists('is_active', $params) ? $params['is_active'] : null,
             'sort'         => array_key_exists('sort', $params) ? $params['sort'] : null,
         ], function ($value) {
-            return filled($value);
+            return $value !== null;
         });
 
         return DB::transaction(function () use ($shift, $attributes) {
@@ -137,10 +137,10 @@ class ShiftService
             ]);
         }
 
-        // 檢查該員工當天是否已有同一班別（同天可排多個不同班別）
-        if ($this->assignmentRepository->existsByUserDateAndShift((int) $params['user_id'], $params['date'], (int) $params['shift_id'])) {
+        // 檢查該員工當天是否已有排班
+        if ($this->assignmentRepository->existsByUserAndDate((int) $params['user_id'], $params['date'])) {
             throw ValidationException::withMessages([
-                'shift_id' => [trans('shift.already_assigned_same_shift')],
+                'date' => [trans('shift.already_assigned')],
             ]);
         }
 
@@ -265,7 +265,7 @@ class ShiftService
     }
 
     /**
-     * 執行換班：在 Transaction 中互換雙方 user_id 並更新狀態
+     * 執行換班：在 Transaction 中互換雙方 shift_id 並更新狀態
      *
      * @param ShiftSwap $swap
      * @return ShiftSwap
@@ -276,15 +276,15 @@ class ShiftService
             $requesterAssignment = $this->assignmentRepository->find((int) $swap->requester_assignment_id);
             $targetAssignment = $this->assignmentRepository->find((int) $swap->target_assignment_id);
 
-            // 互換 user_id（你上我的班，我上你的班）
-            $tempUserId = $requesterAssignment->user_id;
+            // 互換 shift_id
+            $tempShiftId = $requesterAssignment->shift_id;
 
             $this->assignmentRepository->update($requesterAssignment, [
-                'user_id' => $targetAssignment->user_id,
+                'shift_id' => $targetAssignment->shift_id,
             ]);
 
             $this->assignmentRepository->update($targetAssignment, [
-                'user_id' => $tempUserId,
+                'shift_id' => $tempShiftId,
             ]);
 
             return $this->assignmentRepository->updateSwapStatus($swap, ShiftSwap::STATUS_APPROVED);
@@ -298,22 +298,8 @@ class ShiftService
      * @param int $perPage
      * @return LengthAwarePaginator
      */
-    /**
-     * 查詢換班請求
-     *
-     * Admin 查看全部，客服只查自己相關的。
-     *
-     * @param int  $userId
-     * @param bool $isAdmin
-     * @param int  $perPage
-     * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
-     */
-    public function listSwaps($userId, $isAdmin, $perPage = 20)
+    public function listSwapsByUser($userId, $perPage = 20)
     {
-        if ($isAdmin) {
-            return $this->assignmentRepository->paginateAllSwaps($perPage);
-        }
-
         return $this->assignmentRepository->paginateSwapsByUser($userId, $perPage);
     }
 }

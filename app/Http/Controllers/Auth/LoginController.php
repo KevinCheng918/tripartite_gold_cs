@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Repositories\UserRepository;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
@@ -17,13 +17,6 @@ use Illuminate\Support\Facades\Log;
  */
 class LoginController extends Controller
 {
-    private $userRepository;
-
-    public function __construct(UserRepository $userRepository)
-    {
-        $this->userRepository = $userRepository;
-    }
-
     /**
      * 顯示登入頁面
      *
@@ -51,7 +44,10 @@ class LoginController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $user = $this->userRepository->findByAccountForLogin($params['account']);
+        $user = User::query()
+            ->select(['id', 'account', 'password', 'status'])
+            ->where('account', $params['account'])
+            ->first();
 
         if (!$user || !$this->verifyPassword($params['password'], $user->password)) {
             Log::warning('Failed login attempt', ['account' => $params['account'], 'ip' => $request->ip()]);

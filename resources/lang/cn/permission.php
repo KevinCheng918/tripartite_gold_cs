@@ -4,9 +4,6 @@ return [
     'group' => [
         'account' => '账号管理',
         'shift' => '排班管理',
-        'attendance' => '打卡出勤',
-        'station' => '站台管理',
-        'telegram_chat' => 'Telegram 客服',
     ],
     'account' => [
         'view' => '查看账号',
@@ -23,20 +20,5 @@ return [
         'delete' => '删除排班',
         'cover' => '申请代班',
         'cover_review' => '审核代班',
-    ],
-    'attendance' => [
-        'view' => '查看出勤',
-        'clock' => '打卡',
-        'report' => '月报表',
-    ],
-    'station' => [
-        'view'   => '查看站台',
-        'create' => '新增站台',
-        'update' => '编辑站台',
-    ],
-    'telegram_chat' => [
-        'reply'     => '回复消息',
-        'assign'    => '指派值班',
-        'broadcast' => '群发公告',
     ],
 ];

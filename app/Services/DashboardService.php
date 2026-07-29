@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Repositories\ShiftAssignmentRepository;
-use App\Repositories\ShiftRepository;
 use App\Repositories\UserRepository;
 
 /**
@@ -15,16 +14,13 @@ class DashboardService
 {
     private $userRepository;
     private $assignmentRepository;
-    private $shiftRepository;
 
     public function __construct(
         UserRepository $userRepository,
-        ShiftAssignmentRepository $assignmentRepository,
-        ShiftRepository $shiftRepository
+        ShiftAssignmentRepository $assignmentRepository
     ) {
         $this->userRepository = $userRepository;
         $this->assignmentRepository = $assignmentRepository;
-        $this->shiftRepository = $shiftRepository;
     }
 
     /**
@@ -47,26 +43,19 @@ class DashboardService
         $lockCs = $allCsUsers->where('status', config('constants.USER.STATUS.LOCK'))->count();
         $deactivateCs = $allCsUsers->where('status', config('constants.USER.STATUS.DEACTIVATE'))->count();
 
-        // 今日排班 — 固定三欄：早班、午班、晚班（依 shifts 表的 sort 排序）
+        // 今日排班 — 依班別分組（早班是誰、午班是誰、晚班是誰）
         $todayAssignments = $this->assignmentRepository->getByDateRange($today, $today);
-        $allShifts = $this->shiftRepository->allActive();
 
-        $todayByShift = collect();
-        foreach ($allShifts as $shift) {
-            $users = $todayAssignments
-                ->where('shift_id', $shift->id)
-                ->map(function ($a) {
+        $todayByShift = $todayAssignments->groupBy(function ($a) {
+            return $a->shift ? $a->shift->display_name : '-';
+        })->map(function ($group) {
+            return [
+                'shift'    => $group->first()->shift,
+                'users'    => $group->map(function ($a) {
                     return $a->user ? $a->user->nickname : '-';
-                })
-                ->unique()
-                ->values()
-                ->all();
-
-            $todayByShift->put($shift->display_name, [
-                'shift' => $shift,
-                'users' => $users,
-            ]);
-        }
+                })->values()->all(),
+            ];
+        });
 
         // 本週排班 — 依員工班次數排名（最多班的人排最前面）
         $weekAssignments = $this->assignmentRepository->getByDateRange($weekStart, $weekEnd);
@@ -96,48 +85,10 @@ class DashboardService
         $weekStart = now()->startOfWeek()->format('Y-m-d');
         $weekEnd = now()->endOfWeek()->format('Y-m-d');
 
-        // 今日排班（全員，跟 admin 一樣）
-        $todayAllAssignments = $this->assignmentRepository->getByDateRange($today, $today);
-        $allShifts = $this->shiftRepository->allActive();
-
-        $todayByShift = collect();
-        foreach ($allShifts as $shift) {
-            $users = $todayAllAssignments
-                ->where('shift_id', $shift->id)
-                ->map(function ($a) {
-                    return $a->user ? $a->user->nickname : '-';
-                })
-                ->unique()
-                ->values()
-                ->all();
-
-            $todayByShift->put($shift->display_name, [
-                'shift' => $shift,
-                'users' => $users,
-            ]);
-        }
-
-        // 本週自己的排班
+        $todayAssignments = $this->assignmentRepository->getByUserAndDateRange($userId, $today, $today);
         $weekAssignments = $this->assignmentRepository->getByUserAndDateRange($userId, $weekStart, $weekEnd);
         $weekTotal = $weekAssignments->count();
 
-        // 取得所有啟用班別數量，用來判斷是否全天班
-        $activeShiftCount = $allShifts->count();
-
-        // 依日期分組，若同一天班別數 = 啟用班別數 → 全天班
-        $weekByDate = $weekAssignments->sortBy('date')->groupBy(function ($a) {
-            return $a->date->format('Y-m-d');
-        })->map(function ($group) use ($activeShiftCount) {
-            $shiftIds = $group->pluck('shift_id')->unique()->count();
-            $isAllday = $shiftIds >= $activeShiftCount;
-
-            return [
-                'date'      => $group->first()->date,
-                'is_allday' => $isAllday,
-                'items'     => $isAllday ? collect() : $group,
-            ];
-        });
-
-        return compact('todayByShift', 'weekTotal', 'weekByDate');
+        return compact('todayAssignments', 'weekAssignments', 'weekTotal');
     }
 }

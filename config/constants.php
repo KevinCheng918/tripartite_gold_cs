@@ -21,30 +21,6 @@ return [
         ],
     ],
 
-    'TELEGRAM' => [
-        'DIRECTION' => [
-            'INBOUND'  => 1, // 從 Telegram 群組收到的訊息
-            'OUTBOUND' => 2, // 從後台發送到 Telegram 的訊息
-        ],
-        'GROUP_STATUS' => [
-            'ACTIVE'   => 1,
-            'ARCHIVED' => 0,
-        ],
-        'ALERT' => [
-            'WEEKDAY_MINUTES' => 5,  // 週一至週五未回覆告警閾值
-            'WEEKEND_MINUTES' => 30, // 週六日未回覆告警閾值
-        ],
-        'TTL_DAYS' => 7, // 訊息保留天數
-    ],
-
-    'STATION' => [
-        'STATUS' => [
-            'ACTIVE'   => 1, // 啟用
-            'FROZEN'   => 2, // 凍結
-            'DISABLED' => 0, // 停用
-        ],
-    ],
-
     'PAGINATION' => [
         'USER' => 20,
     ],
