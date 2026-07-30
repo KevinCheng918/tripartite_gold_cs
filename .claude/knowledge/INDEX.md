@@ -18,7 +18,7 @@
 | 文件 | 功能 | 狀態 |
 |------|------|------|
 | [features/rbac.md](features/rbac.md) | 分帳號、權限管理（含最小登入/登出） | 已完成 |
-| [features/scheduling.md](features/scheduling.md) | 排班申請與審核 | 規劃中（依賴 RBAC，可開始） |
+| [features/scheduling.md](features/scheduling.md) | 排班（報班/換班/三班制） | 已完成 |
 | [features/telegram-chat.md](features/telegram-chat.md) | 客服對話窗（Telegram 整合） | 規劃中 |
 | [features/attendance.md](features/attendance.md) | 打卡出勤 | 規劃中 |
 | [features/changelog.md](features/changelog.md) | 版本紀錄（左下角變更日誌） | 規劃中 |

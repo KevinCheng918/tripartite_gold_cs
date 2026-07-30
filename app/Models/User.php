@@ -2,65 +2,116 @@
 
 namespace App\Models;
 
-use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
+/**
+ * 使用者 Model
+ *
+ * 對齊主系統 tripartite_gold 的命名慣例，表名為 `user`，
+ * 以 account 作為登入帳號，密碼以 Crypt::encrypt 加密。
+ * level 欄位區分身份（見 config/constants.php）。
+ *
+ * @property int         $id
+ * @property string      $account    登入帳號
+ * @property string      $nickname   顯示暱稱
+ * @property string      $password   密碼（Crypt::encrypt 加密）
+ * @property int         $status     狀態（見 constants.USER.STATUS）
+ * @property int         $level      身份（見 constants.USER.LEVEL）
+ * @property string|null $deleted_at 軟刪除時間
+ */
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
-    public const STATUS_ACTIVE = 1;
-    public const STATUS_DISABLED = 0;
+    protected $table = 'user';
+    protected $guarded = ['id'];
+    protected $hidden = ['password', 'remember_token'];
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
-    protected $fillable = [
-        'name',
-        'email',
-        'password',
-        'status',
-    ];
-
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
-     */
-    protected $hidden = [
-        'password',
-        'remember_token',
-    ];
-
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
     protected $casts = [
-        'email_verified_at' => 'datetime',
         'status' => 'integer',
+        'level' => 'integer',
     ];
 
-    public function roles(): BelongsToMany
+    /**
+     * 密碼寫入時自動以 Crypt::encrypt 加密
+     *
+     * @param string $password
+     */
+    public function setPasswordAttribute($password)
     {
-        return $this->belongsToMany(Role::class, 'role_user')->withTimestamps()->select(['roles.id', 'roles.name', 'roles.display_name', 'roles.is_active']);
+        $this->attributes['password'] = \Crypt::encrypt($password);
     }
 
-    public function hasRole(string $name): bool
+    /**
+     * 是否為管理者
+     *
+     * @return bool
+     */
+    public function isAdmin()
     {
-        return app(\App\Services\PermissionService::class)->userHasRole($this, $name);
+        return $this->level == config('constants.USER.LEVEL.ADMIN');
     }
 
-    public function hasPermission(string $keyword): bool
+    /**
+     * 是否為客服
+     *
+     * @return bool
+     */
+    public function isCs()
     {
-        return app(\App\Services\PermissionService::class)->check($this, $keyword);
+        return $this->level == config('constants.USER.LEVEL.CS');
+    }
+
+    /**
+     * 是否正常狀態
+     *
+     * @return bool
+     */
+    public function isNormalStatus()
+    {
+        return $this->status == config('constants.USER.STATUS.NORMAL');
+    }
+
+    /**
+     * 是否鎖定狀態
+     *
+     * @return bool
+     */
+    public function isLockStatus()
+    {
+        return $this->status == config('constants.USER.STATUS.LOCK');
+    }
+
+    /**
+     * 該帳號擁有的權限 keywords
+     *
+     * @return HasMany
+     */
+    public function permissions()
+    {
+        return $this->hasMany(UserPermission::class);
+    }
+
+    /**
+     * 檢查是否擁有指定權限
+     * 管理者自動 bypass 所有權限檢查。
+     *
+     * @param string $keyword 權限 keyword
+     * @return bool
+     */
+    public function hasPermission($keyword)
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        return $this->permissions()
+            ->where('permission_keyword', $keyword)
+            ->exists();
     }
 }

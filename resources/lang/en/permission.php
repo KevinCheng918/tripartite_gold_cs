@@ -2,21 +2,23 @@
 
 return [
     'group' => [
-        'account' => 'Account Management',
-        'role' => 'Role & Permissions',
+        'account' => 'Accounts',
+        'shift' => 'Shifts',
     ],
     'account' => [
         'view' => 'View accounts',
-        'create' => 'Create accounts',
-        'update' => 'Update accounts',
-        'delete' => 'Delete accounts',
-        'assign_role' => 'Assign account roles',
+        'create' => 'Create account',
+        'update' => 'Update account',
+        'delete' => 'Delete account',
+        'assign_permission' => 'Assign permissions',
     ],
-    'role' => [
-        'view' => 'View roles',
-        'create' => 'Create roles',
-        'update' => 'Update roles',
-        'delete' => 'Delete roles',
-        'assign_permission' => 'Assign role permissions',
+    'shift' => [
+        'view' => 'View shifts',
+        'update' => 'Update shift times',
+        'assign' => 'Sign up for shift',
+        'swap' => 'Swap shift',
+        'delete' => 'Delete assignment',
+        'cover' => 'Request cover',
+        'cover_review' => 'Review cover',
     ],
 ];

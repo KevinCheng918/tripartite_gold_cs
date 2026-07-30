@@ -4,15 +4,20 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * 建立個人存取權杖表（personal_access_tokens）
+ */
 class CreatePersonalAccessTokensTable extends Migration
 {
     /**
-     * Run the migrations.
-     *
      * @return void
      */
     public function up()
     {
+        if (Schema::hasTable('personal_access_tokens')) {
+            return;
+        }
+
         Schema::create('personal_access_tokens', function (Blueprint $table) {
             $table->id();
             $table->morphs('tokenable');
@@ -25,12 +30,14 @@ class CreatePersonalAccessTokensTable extends Migration
     }
 
     /**
-     * Reverse the migrations.
-     *
      * @return void
      */
     public function down()
     {
+        if (!Schema::hasTable('personal_access_tokens')) {
+            return;
+        }
+
         Schema::dropIfExists('personal_access_tokens');
     }
 }

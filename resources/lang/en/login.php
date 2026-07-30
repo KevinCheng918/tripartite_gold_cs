@@ -2,7 +2,7 @@
 
 return [
     'title' => 'Login',
-    'email' => 'Email',
+    'account' => 'Account',
     'password' => 'Password',
     'remember' => 'Remember me',
     'submit' => 'Login',

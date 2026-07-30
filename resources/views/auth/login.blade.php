@@ -4,7 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ __('login.title') }}</title>
-    <link rel="stylesheet" href="{{ mix('css/app.css') }}">
+    <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('img/favicon-180.png') }}">
+    <link rel="stylesheet" href="{{ asset('css/app.css') }}">
 </head>
 <body>
     <main class="login-page">
@@ -12,7 +14,7 @@
             @csrf
 
             <div class="login-form__brand">
-                <span class="login-form__mark"></span>
+                <img src="{{ asset('img/logo.png') }}" alt="Logo" class="login-form__logo">
                 <span>{{ config('app.name') }}</span>
             </div>
 
@@ -27,8 +29,8 @@
             @endif
 
             <div class="form-group">
-                <label for="email">{{ __('login.email') }}</label>
-                <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus autocomplete="username">
+                <label for="account">{{ __('login.account') }}</label>
+                <input id="account" type="text" name="account" value="{{ old('account') }}" required autofocus autocomplete="username">
             </div>
 
             <div class="form-group">
