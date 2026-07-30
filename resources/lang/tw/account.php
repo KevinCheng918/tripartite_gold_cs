@@ -21,6 +21,7 @@ return [
     'action_delete' => '刪除',
     'action_change_status' => '調整狀態',
     'action_assign_permissions' => '設定權限',
+    'action_save' => '儲存',
     'password_hint' => '不修改請留空',
     'field_level' => '身份',
     'level_admin' => '管理者',

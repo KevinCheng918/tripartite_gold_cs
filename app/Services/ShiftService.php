@@ -79,7 +79,7 @@ class ShiftService
             'is_active'    => array_key_exists('is_active', $params) ? $params['is_active'] : null,
             'sort'         => array_key_exists('sort', $params) ? $params['sort'] : null,
         ], function ($value) {
-            return $value !== null;
+            return filled($value);
         });
 
         return DB::transaction(function () use ($shift, $attributes) {

@@ -2,20 +2,30 @@
 
 namespace App\Services;
 
+/**
+ * 權限地圖 Service
+ *
+ * 讀取 config/permissionMap.php 的權限定義，
+ * 提供分組查詢、關鍵字列表、翻譯標籤等功能。
+ */
 class PermissionMapService
 {
     /**
-     * @return array<string, array{label: string, keywords: array<string, string>}>
+     * 取得分組的權限關鍵字（原始格式）
+     *
+     * @return array
      */
-    public function getGroupedKeywords(): array
+    public function getGroupedKeywords()
     {
         return config('permissionMap', []);
     }
 
     /**
-     * @return array<int, string> every registered permission keyword, flattened
+     * 取得所有已註冊的權限關鍵字（扁平化）
+     *
+     * @return array
      */
-    public function getAllKeywords(): array
+    public function getAllKeywords()
     {
         $keywords = [];
 
@@ -26,17 +36,23 @@ class PermissionMapService
         return $keywords;
     }
 
-    public function isValidKeyword(string $keyword): bool
+    /**
+     * 檢查關鍵字是否有效
+     *
+     * @param string $keyword
+     * @return bool
+     */
+    public function isValidKeyword($keyword)
     {
         return in_array($keyword, $this->getAllKeywords(), true);
     }
 
     /**
-     * Grouped keywords with their translated labels, for the "assign permissions" UI.
+     * 取得分組的權限關鍵字（含翻譯後的 label），供前端權限設定 UI 使用
      *
-     * @return array<int, array{group: string, label: string, keywords: array<int, array{keyword: string, label: string}>}>
+     * @return array
      */
-    public function getGroupedKeywordsWithLabels(): array
+    public function getGroupedKeywordsWithLabels()
     {
         $result = [];
 
@@ -46,13 +62,13 @@ class PermissionMapService
             foreach ($group['keywords'] as $keyword => $langKey) {
                 $keywords[] = [
                     'keyword' => $keyword,
-                    'label' => __($langKey),
+                    'label' => trans($langKey),
                 ];
             }
 
             $result[] = [
                 'group' => $groupKey,
-                'label' => __($group['label']),
+                'label' => trans($group['label']),
                 'keywords' => $keywords,
             ];
         }

@@ -39,4 +39,13 @@ return [
         ],
     ],
 
+    'attendance' => [
+        'label' => 'permission.group.attendance',
+        'keywords' => [
+            'attendance.view' => 'permission.attendance.view',
+            'attendance.clock' => 'permission.attendance.clock',
+            'attendance.report' => 'permission.attendance.report',
+        ],
+    ],
+
 ];

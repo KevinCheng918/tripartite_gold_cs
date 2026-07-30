@@ -4,6 +4,7 @@ return [
     'group' => [
         'account' => '账号管理',
         'shift' => '排班管理',
+        'attendance' => '打卡出勤',
     ],
     'account' => [
         'view' => '查看账号',
@@ -20,5 +21,10 @@ return [
         'delete' => '删除排班',
         'cover' => '申请代班',
         'cover_review' => '审核代班',
+    ],
+    'attendance' => [
+        'view' => '查看出勤',
+        'clock' => '打卡',
+        'report' => '月报表',
     ],
 ];
