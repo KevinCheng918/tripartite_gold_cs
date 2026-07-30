@@ -131,7 +131,7 @@
                     actions =
                         '<button class="btn-sm js-edit">' + i18n.action_edit + '</button> ' +
                         '<button class="btn-sm js-change-status">' + i18n.action_change_status + '</button> ' +
-                        '<button class="btn-sm js-assign-perms">' + i18n.action_assign_permissions + '</button>';
+                        '<a href="/admin/accounts/permissions/' + account.id + '" class="btn-sm">' + i18n.action_assign_permissions + '</a>';
                 }
 
                 return (
@@ -174,12 +174,6 @@
         root.querySelectorAll('.js-change-status').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 openChangeStatusModal(parseInt(btn.closest('tr').dataset.id, 10));
-            });
-        });
-
-        root.querySelectorAll('.js-assign-perms').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                openAssignPermissionsModal(parseInt(btn.closest('tr').dataset.id, 10));
             });
         });
 
@@ -313,9 +307,19 @@
         var container = document.getElementById('permission-checkbox-list');
         var html = '';
 
-        permissionMapData.forEach(function (group) {
+        permissionMapData.forEach(function (group, gIdx) {
+            var groupId = 'perm-grp-' + gIdx;
+            var allChecked = group.keywords.every(function (item) {
+                return currentKeywords.indexOf(item.keyword) !== -1;
+            });
+            var toggleLabel = allChecked ? '取消全選' : '全選';
+
             html += '<div class="perm-group">';
+            html += '<div class="perm-group__header">';
             html += '<h4 class="perm-group__title">' + group.label + '</h4>';
+            html += '<button type="button" class="perm-group__toggle-all" data-group="' + groupId + '">' + toggleLabel + '</button>';
+            html += '</div>';
+            html += '<div class="perm-group__body" id="' + groupId + '">';
 
             group.keywords.forEach(function (item) {
                 var checked = currentKeywords.indexOf(item.keyword) !== -1 ? 'checked' : '';
@@ -325,10 +329,22 @@
                 html += '</label>';
             });
 
-            html += '</div>';
+            html += '</div></div>';
         });
 
         container.innerHTML = html;
+
+        // 綁定「全選/取消全選」按鈕
+        container.querySelectorAll('.perm-group__toggle-all').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var groupBody = document.getElementById(btn.dataset.group);
+                var checkboxes = groupBody.querySelectorAll('input[type="checkbox"]');
+                var allChecked = Array.prototype.every.call(checkboxes, function (cb) { return cb.checked; });
+
+                checkboxes.forEach(function (cb) { cb.checked = !allChecked; });
+                btn.textContent = allChecked ? '全選' : '取消全選';
+            });
+        });
     }
 
     function submitAssignPermissions(e) {
@@ -360,7 +376,6 @@
     document.getElementById('form-create-account').addEventListener('submit', submitCreateAccount);
     document.getElementById('form-edit-account').addEventListener('submit', submitEditAccount);
     document.getElementById('form-change-status').addEventListener('submit', submitChangeStatus);
-    document.getElementById('form-assign-permissions').addEventListener('submit', submitAssignPermissions);
 
     loadAccounts();
 })();
