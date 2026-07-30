@@ -59,6 +59,20 @@ class UserRepository
     }
 
     /**
+     * 依帳號查詢使用者（含密碼，登入驗證用）
+     *
+     * @param string $account
+     * @return User|null
+     */
+    public function findByAccountForLogin($account)
+    {
+        return User::query()
+            ->select(['id', 'account', 'password', 'status'])
+            ->where('account', $account)
+            ->first();
+    }
+
+    /**
      * 新增使用者
      *
      * @param array $attributes

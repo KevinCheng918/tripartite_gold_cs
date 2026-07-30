@@ -50,18 +50,6 @@
         </form>
     @endcomponent
 
-    {{-- 設定權限 Modal --}}
-    @component('components.modal', ['id' => 'modal-assign-permissions', 'title' => trans('account.action_assign_permissions')])
-        <form id="form-assign-permissions">
-            <input type="hidden" id="assign-perm-user-id">
-            <div id="permission-checkbox-list"></div>
-            <div class="modal-actions">
-                <button type="button" data-modal-close>{{ trans('shift.modal_cancel') }}</button>
-                <button type="submit" class="btn-primary">{{ trans('shift.modal_confirm') }}</button>
-            </div>
-        </form>
-    @endcomponent
-
     {{-- 調整狀態 Modal --}}
     @component('components.modal', ['id' => 'modal-change-status', 'title' => trans('account.action_change_status')])
         <form id="form-change-status">

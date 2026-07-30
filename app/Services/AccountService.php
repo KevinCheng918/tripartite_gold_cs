@@ -75,7 +75,7 @@ class AccountService
             'account'  => $params['account'] ?? null,
             'status'   => array_key_exists('status', $params) ? $params['status'] : null,
         ], function ($value) {
-            return $value !== null;
+            return filled($value);
         });
 
         if (filled($params['password'] ?? null)) {
