@@ -5,20 +5,31 @@ namespace App\Criteria\User;
 use App\Criteria\CriteriaInterface;
 use Illuminate\Database\Eloquent\Builder;
 
+/**
+ * 依關鍵字搜尋使用者（帳號或暱稱模糊比對）
+ */
 class UserKeywordSearchCriteria implements CriteriaInterface
 {
-    private string $keyword;
+    /** @var string 搜尋關鍵字 */
+    private $keyword;
 
-    public function __construct(string $keyword)
+    /**
+     * @param string $keyword
+     */
+    public function __construct($keyword)
     {
         $this->keyword = $keyword;
     }
 
-    public function apply(Builder $query): Builder
+    /**
+     * @param Builder $query
+     * @return Builder
+     */
+    public function apply(Builder $query)
     {
         return $query->where(function (Builder $q) {
-            $q->where('name', 'like', "%{$this->keyword}%")
-                ->orWhere('email', 'like', "%{$this->keyword}%");
+            $q->where('account', 'like', "%{$this->keyword}%")
+                ->orWhere('nickname', 'like', "%{$this->keyword}%");
         });
     }
 }

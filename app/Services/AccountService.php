@@ -6,18 +6,29 @@ use App\Models\User;
 use App\Repositories\UserRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 
+/**
+ * 帳號管理 Service
+ *
+ * 處理帳號的 CRUD 及權限指派等核心商業邏輯。
+ * DB Transaction 在此層處理，Controller 不碰 DB。
+ */
 class AccountService
 {
-    private UserRepository $userRepository;
+    private $userRepository;
 
     public function __construct(UserRepository $userRepository)
     {
         $this->userRepository = $userRepository;
     }
 
-    public function list(array $params): LengthAwarePaginator
+    /**
+     * 查詢帳號列表（分頁）
+     *
+     * @param array $params 可含 keyword, per_page
+     * @return LengthAwarePaginator
+     */
+    public function list($params)
     {
         $criteria = [];
 
@@ -25,55 +36,66 @@ class AccountService
             $criteria[] = new \App\Criteria\User\UserKeywordSearchCriteria($params['keyword']);
         }
 
-        if (filled($params['role_id'] ?? null)) {
-            $criteria[] = new \App\Criteria\User\UserRoleFilterCriteria((int) $params['role_id']);
-        }
-
-        return $this->userRepository->paginate($criteria, (int) ($params['per_page'] ?? 20));
+        return $this->userRepository->paginate(
+            $criteria,
+            (int) ($params['per_page'] ?? config('constants.PAGINATION.USER', 20))
+        );
     }
 
-    public function create(array $params): User
+    /**
+     * 新增帳號（客服帳號，level=CS）
+     *
+     * @param array $params 含 account, nickname, password
+     * @return User
+     */
+    public function create($params)
     {
         return DB::transaction(function () use ($params) {
-            $user = $this->userRepository->create([
-                'name' => $params['name'],
-                'email' => $params['email'],
-                'password' => Hash::make($params['password']),
-                'status' => User::STATUS_ACTIVE,
+            return $this->userRepository->create([
+                'account'  => $params['account'],
+                'nickname' => $params['nickname'],
+                'password' => $params['password'],
+                'status'   => config('constants.USER.STATUS.NORMAL'),
+                'level'    => config('constants.USER.LEVEL.CS'),
             ]);
-
-            if (filled($params['role_ids'] ?? null)) {
-                $this->userRepository->syncRoles($user, $params['role_ids']);
-            }
-
-            return $user;
         });
     }
 
-    public function update(User $user, array $params): User
+    /**
+     * 更新帳號
+     *
+     * @param User  $user
+     * @param array $params
+     * @return User
+     */
+    public function update(User $user, $params)
     {
         $attributes = array_filter([
-            'name' => $params['name'] ?? null,
-            'email' => $params['email'] ?? null,
-            'status' => array_key_exists('status', $params) ? $params['status'] : null,
+            'nickname' => $params['nickname'] ?? null,
+            'account'  => $params['account'] ?? null,
+            'status'   => array_key_exists('status', $params) ? $params['status'] : null,
         ], function ($value) {
             return $value !== null;
         });
 
         if (filled($params['password'] ?? null)) {
-            $attributes['password'] = Hash::make($params['password']);
+            $attributes['password'] = $params['password'];
         }
 
-        return $this->userRepository->update($user, $attributes);
+        return DB::transaction(function () use ($user, $attributes) {
+            return $this->userRepository->update($user, $attributes);
+        });
     }
 
-    public function delete(User $user): bool
+    /**
+     * 指派權限（全部取代）
+     *
+     * @param User  $user
+     * @param array $keywords
+     * @return void
+     */
+    public function assignPermissions(User $user, $keywords)
     {
-        return $this->userRepository->softDelete($user);
-    }
-
-    public function assignRoles(User $user, array $roleIds): void
-    {
-        $this->userRepository->syncRoles($user, $roleIds);
+        $this->userRepository->syncPermissions($user, $keywords);
     }
 }
