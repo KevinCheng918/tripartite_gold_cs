@@ -59,6 +59,19 @@ class AccountController extends Controller
     }
 
     /**
+     * 權限設定頁面
+     *
+     * @param \App\Models\User $user
+     * @return \Illuminate\View\View
+     */
+    public function permissionsPage(\App\Models\User $user)
+    {
+        return view('admin.accounts.permissions', [
+            'targetUser' => $user,
+        ]);
+    }
+
+    /**
      * Ajax 取得權限地圖（分組 + 翻譯後的 label）
      *
      * @return \Illuminate\Http\JsonResponse

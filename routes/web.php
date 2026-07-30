@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AccountController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ShiftController;
+use App\Http\Controllers\Admin\AttendanceController;
 use App\Http\Controllers\Admin\ShiftCoverController;
 use App\Http\Controllers\Auth\LoginController;
 use Illuminate\Support\Facades\Auth;
@@ -35,6 +36,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::post('/ajax-store', [AccountController::class, 'ajaxStore'])->middleware('can:account.create')->name('ajax-store');
         Route::put('/ajax-update/{user}', [AccountController::class, 'ajaxUpdate'])->middleware('can:account.update')->name('ajax-update');
         Route::post('/ajax-assign-permissions/{user}', [AccountController::class, 'ajaxAssignPermissions'])->middleware('can:account.assign_permission')->name('ajax-assign-permissions');
+        Route::get('/permissions/{user}', [AccountController::class, 'permissionsPage'])->middleware('can:account.assign_permission')->name('permissions');
     });
 
     // 排班管理
@@ -49,6 +51,18 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::post('/ajax-request-swap', [ShiftController::class, 'ajaxRequestSwap'])->middleware('can:shift.swap')->name('ajax-request-swap');
         Route::put('/ajax-respond-swap/{swap}', [ShiftController::class, 'ajaxRespondSwap'])->middleware('can:shift.swap')->name('ajax-respond-swap');
         Route::get('/ajax-my-swaps', [ShiftController::class, 'ajaxMySwaps'])->middleware('can:shift.swap')->name('ajax-my-swaps');
+    });
+
+    // 打卡出勤
+    Route::prefix('attendance')->name('attendance.')->group(function () {
+        Route::get('/', [AttendanceController::class, 'index'])->middleware('can:attendance.view')->name('index');
+        Route::post('/ajax-clock-in', [AttendanceController::class, 'ajaxClockIn'])->middleware('can:attendance.clock')->name('ajax-clock-in');
+        Route::post('/ajax-clock-out', [AttendanceController::class, 'ajaxClockOut'])->middleware('can:attendance.clock')->name('ajax-clock-out');
+        Route::get('/ajax-today-status', [AttendanceController::class, 'ajaxTodayStatus'])->middleware('can:attendance.view')->name('ajax-today-status');
+        Route::get('/ajax-my-monthly', [AttendanceController::class, 'ajaxMyMonthly'])->middleware('can:attendance.view')->name('ajax-my-monthly');
+        Route::get('/ajax-monthly-report', [AttendanceController::class, 'ajaxMonthlyReport'])->middleware('can:attendance.report')->name('ajax-monthly-report');
+        Route::get('/detail/{userId}', [AttendanceController::class, 'detail'])->middleware('can:attendance.report')->name('detail');
+        Route::get('/ajax-user-monthly', [AttendanceController::class, 'ajaxUserMonthly'])->middleware('can:attendance.report')->name('ajax-user-monthly');
     });
 
     // 代班管理

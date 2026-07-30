@@ -121,16 +121,9 @@ class AttendanceController extends Controller
      * @param int $userId
      * @return \Illuminate\View\View
      */
-    public function detail(Request $request, $userId)
+    public function detail($userId)
     {
-        $yearMonth = $request->input('month', now()->format('Y-m'));
-        $records = $this->attendanceService->getMonthlyRecords((int) $userId, $yearMonth);
-
-        return view('admin.attendance.detail', [
-            'targetUserId' => $userId,
-            'records'      => $records,
-            'yearMonth'    => $yearMonth,
-        ]);
+        return view('admin.attendance.detail', ['targetUserId' => $userId]);
     }
 
     /**
