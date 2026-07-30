@@ -6,7 +6,6 @@ use App\Models\AttendanceRecord;
 use App\Repositories\AttendanceRepository;
 use App\Repositories\ShiftAssignmentRepository;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -59,18 +58,16 @@ class AttendanceService
 
         $status = $lateMinutes > 0 ? AttendanceRecord::STATUS_LATE : AttendanceRecord::STATUS_INCOMPLETE;
 
-        return DB::transaction(function () use ($userId, $today, $assignment, $ip, $device, $lateMinutes, $status) {
-            return $this->attendanceRepository->create([
-                'user_id'         => $userId,
-                'assignment_id'   => $assignment ? $assignment->id : null,
-                'date'            => $today,
-                'clock_in'        => now(),
-                'clock_in_ip'     => $ip,
-                'clock_in_device' => $device,
-                'late_minutes'    => $lateMinutes,
-                'status'          => $status,
-            ]);
-        });
+        return $this->attendanceRepository->create([
+            'user_id'         => $userId,
+            'assignment_id'   => $assignment ? $assignment->id : null,
+            'date'            => $today,
+            'clock_in'        => now(),
+            'clock_in_ip'     => $ip,
+            'clock_in_device' => $device,
+            'late_minutes'    => $lateMinutes,
+            'status'          => $status,
+        ]);
     }
 
     /**
@@ -127,16 +124,14 @@ class AttendanceService
             $status = AttendanceRecord::STATUS_NORMAL;
         }
 
-        return DB::transaction(function () use ($record, $ip, $device, $earlyLeaveMinutes, $overtimeMinutes, $status) {
-            return $this->attendanceRepository->update($record, [
-                'clock_out'           => now(),
-                'clock_out_ip'        => $ip,
-                'clock_out_device'    => $device,
-                'early_leave_minutes' => $earlyLeaveMinutes,
-                'overtime_minutes'    => $overtimeMinutes,
-                'status'              => $status,
-            ]);
-        });
+        return $this->attendanceRepository->update($record, [
+            'clock_out'           => now(),
+            'clock_out_ip'        => $ip,
+            'clock_out_device'    => $device,
+            'early_leave_minutes' => $earlyLeaveMinutes,
+            'overtime_minutes'    => $overtimeMinutes,
+            'status'              => $status,
+        ]);
     }
 
     /**
