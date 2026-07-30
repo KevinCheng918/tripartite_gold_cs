@@ -4,6 +4,7 @@ return [
     'group' => [
         'account' => 'Accounts',
         'shift' => 'Shifts',
+        'attendance' => 'Attendance',
     ],
     'account' => [
         'view' => 'View accounts',
@@ -20,5 +21,10 @@ return [
         'delete' => 'Delete assignment',
         'cover' => 'Request cover',
         'cover_review' => 'Review cover',
+    ],
+    'attendance' => [
+        'view' => 'View attendance',
+        'clock' => 'Clock in/out',
+        'report' => 'Monthly report',
     ],
 ];

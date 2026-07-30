@@ -1,0 +1,60 @@
+<?php
+
+return [
+    'nav_label'          => 'Attendance',
+    'page_title'         => 'Attendance',
+    'subtitle'           => 'Clock in/out & attendance records',
+
+    'not_clocked'        => 'Not clocked in',
+    'clocked_in'         => 'Clocked in',
+    'clocked_out'        => 'Clocked out',
+    'btn_clock_in'       => 'Clock In',
+    'btn_clock_out'      => 'Clock Out',
+
+    'status_incomplete'  => 'Incomplete',
+    'status_normal'      => 'Normal',
+    'status_late'        => 'Late',
+    'status_early_leave' => 'Early Leave',
+    'status_late_early'  => 'Late + Early',
+    'status_absent'      => 'Absent',
+
+    'field_date'         => 'Date',
+    'field_clock_in'     => 'Clock In',
+    'field_clock_out'    => 'Clock Out',
+    'field_late'         => 'Late',
+    'field_early_leave'  => 'Early Leave',
+    'field_overtime'     => 'Overtime',
+    'field_status'       => 'Status',
+    'field_ip'           => 'IP',
+    'field_device'       => 'Device',
+    'unit_minutes'       => 'min',
+
+    'report_title'       => 'Monthly Report',
+    'field_user'         => 'Staff',
+    'field_total_days'   => 'Total Days',
+    'field_normal_days'  => 'Normal Days',
+    'field_late_count'   => 'Late Count',
+    'field_late_total'   => 'Late Total (min)',
+    'field_early_count'  => 'Early Count',
+    'field_early_total'  => 'Early Total (min)',
+    'field_absent_count' => 'Absent Count',
+    'field_overtime_total' => 'Overtime Total (min)',
+    'tab_my_records'     => 'My Records',
+    'tab_report'         => 'Report',
+
+    'detail_title'       => 'Attendance Detail',
+    'detail_subtitle'    => 'Daily attendance records',
+    'back_to_report'     => 'Back to Report',
+    'this_month'         => 'This Month',
+    'last_month'         => 'Last Month',
+
+    'msg' => [
+        'already_clocked_in'  => 'Already clocked in today',
+        'not_clocked_in'      => 'Not clocked in yet',
+        'already_clocked_out' => 'Already clocked out today',
+        'clock_in_success'    => 'Clocked in successfully',
+        'clock_out_success'   => 'Clocked out successfully',
+        'clock_in_failed'     => 'Failed to clock in',
+        'clock_out_failed'    => 'Failed to clock out',
+    ],
+];
