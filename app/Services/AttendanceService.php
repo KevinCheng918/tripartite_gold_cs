@@ -52,8 +52,7 @@ class AttendanceService
         // 計算遲到
         $lateMinutes = 0;
         if ($assignment && $assignment->shift) {
-            $workStart = $assignment->shift->work_start ?: $assignment->shift->start_time;
-            $lateMinutes = $this->calcLateMinutes($workStart);
+            $lateMinutes = $this->calcLateMinutes($assignment->shift->start_time);
         }
 
         $status = $lateMinutes > 0 ? AttendanceRecord::STATUS_LATE : AttendanceRecord::STATUS_INCOMPLETE;
