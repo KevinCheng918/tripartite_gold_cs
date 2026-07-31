@@ -17,12 +17,6 @@ class Kernel extends ConsoleKernel
     {
         // 每日凌晨 1 點標記前一天的曠工
         $schedule->command('attendance:mark-absent')->dailyAt('01:00');
-
-        // 每日凌晨 2 點清理 7 天前的 Telegram 訊息
-        $schedule->command('telegram:purge')->dailyAt('02:00');
-
-        // 每分鐘檢查 Telegram 未回覆訊息告警
-        $schedule->command('telegram:alert')->everyMinute();
     }
 
     /**
