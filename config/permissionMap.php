@@ -22,19 +22,29 @@ return [
             'account.view' => 'permission.account.view',
             'account.create' => 'permission.account.create',
             'account.update' => 'permission.account.update',
-            'account.delete' => 'permission.account.delete',
-            'account.assign_role' => 'permission.account.assign_role',
+            'account.assign_permission' => 'permission.account.assign_permission',
         ],
     ],
 
-    'role' => [
-        'label' => 'permission.group.role',
+    'shift' => [
+        'label' => 'permission.group.shift',
         'keywords' => [
-            'role.view' => 'permission.role.view',
-            'role.create' => 'permission.role.create',
-            'role.update' => 'permission.role.update',
-            'role.delete' => 'permission.role.delete',
-            'role.assign_permission' => 'permission.role.assign_permission',
+            'shift.view' => 'permission.shift.view',
+            'shift.update' => 'permission.shift.update',
+            'shift.assign' => 'permission.shift.assign',
+            'shift.swap' => 'permission.shift.swap',
+            'shift.delete' => 'permission.shift.delete',
+            'shift.cover' => 'permission.shift.cover',
+            'shift.cover_review' => 'permission.shift.cover_review',
+        ],
+    ],
+
+    'attendance' => [
+        'label' => 'permission.group.attendance',
+        'keywords' => [
+            'attendance.view' => 'permission.attendance.view',
+            'attendance.clock' => 'permission.attendance.clock',
+            'attendance.report' => 'permission.attendance.report',
         ],
     ],
 

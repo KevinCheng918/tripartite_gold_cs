@@ -5,6 +5,9 @@ namespace App\Http\Requests\Account;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
+/**
+ * 更新帳號驗證
+ */
 class UpdateAccountRequest extends FormRequest
 {
     public function authorize()
@@ -17,10 +20,20 @@ class UpdateAccountRequest extends FormRequest
         $userId = $this->route('user');
 
         return [
-            'name' => ['sometimes', 'string', 'max:255'],
-            'email' => ['sometimes', 'email', 'max:255', Rule::unique('users', 'email')->ignore($userId)],
-            'password' => ['sometimes', 'nullable', 'string', 'min:8'],
-            'status' => ['sometimes', 'integer', 'in:0,1'],
+            'nickname' => 'sometimes|max:100',
+            'account'  => ['sometimes', 'max:100', Rule::unique('user', 'account')->ignore($userId)],
+            'password' => 'sometimes|nullable|' . config('rules.USER_PASSWORD_REGEX'),
+            'status'   => 'sometimes|integer|in:0,1,2',
+        ];
+    }
+
+    public function messages()
+    {
+        return [
+            'nickname.max'     => trans('account.msg.max_string', ['value' => '100']),
+            'account.unique'   => trans('account.msg.unique'),
+            'password.regex'   => trans('account.msg.regex_password'),
+            'status.in'        => trans('account.msg.invalid_status'),
         ];
     }
 }

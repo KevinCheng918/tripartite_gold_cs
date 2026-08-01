@@ -1,0 +1,60 @@
+<?php
+
+return [
+    'nav_label'          => '打卡出勤',
+    'page_title'         => '打卡出勤',
+    'subtitle'           => '上下班打卡与出勤记录',
+
+    'not_clocked'        => '尚未打卡',
+    'clocked_in'         => '已上班打卡',
+    'clocked_out'        => '已下班打卡',
+    'btn_clock_in'       => '上班打卡',
+    'btn_clock_out'      => '下班打卡',
+
+    'status_incomplete'  => '未完成',
+    'status_normal'      => '正常',
+    'status_late'        => '迟到',
+    'status_early_leave' => '早退',
+    'status_late_early'  => '迟到+早退',
+    'status_absent'      => '旷工',
+
+    'field_date'         => '日期',
+    'field_clock_in'     => '上班打卡',
+    'field_clock_out'    => '下班打卡',
+    'field_late'         => '迟到',
+    'field_early_leave'  => '早退',
+    'field_overtime'     => '加班',
+    'field_status'       => '状态',
+    'field_ip'           => 'IP',
+    'field_device'       => '设备',
+    'unit_minutes'       => '分钟',
+
+    'report_title'       => '月报表',
+    'field_user'         => '员工',
+    'field_total_days'   => '出勤天数',
+    'field_normal_days'  => '正常天数',
+    'field_late_count'   => '迟到次数',
+    'field_late_total'   => '迟到总分钟',
+    'field_early_count'  => '早退次数',
+    'field_early_total'  => '早退总分钟',
+    'field_absent_count' => '旷工次数',
+    'field_overtime_total' => '加班总分钟',
+    'tab_my_records'     => '我的出勤',
+    'tab_report'         => '月报表',
+
+    'detail_title'       => '出勤明细',
+    'detail_subtitle'    => '个人每日出勤状况',
+    'back_to_report'     => '返回月报表',
+    'this_month'         => '本月',
+    'last_month'         => '上个月',
+
+    'msg' => [
+        'already_clocked_in'  => '今日已经上班打卡了',
+        'not_clocked_in'      => '尚未上班打卡，无法下班打卡',
+        'already_clocked_out' => '今日已经下班打卡了',
+        'clock_in_success'    => '上班打卡成功',
+        'clock_out_success'   => '下班打卡成功',
+        'clock_in_failed'     => '上班打卡失败',
+        'clock_out_failed'    => '下班打卡失败',
+    ],
+];

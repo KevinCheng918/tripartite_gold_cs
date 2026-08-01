@@ -1,0 +1,80 @@
+<?php
+
+return [
+    'nav_label' => '排班管理',
+    'page_title' => '排班管理',
+    'tab_shifts' => '班別設定',
+    'tab_assignments' => '排班紀錄',
+    'tab_swaps' => '換班請求',
+
+    // 班別
+    'shift_morning' => '早班',
+    'shift_afternoon' => '午班',
+    'shift_night' => '晚班',
+    'field_display_name' => '班別名稱',
+    'field_start_time' => '開始時間',
+    'field_end_time' => '結束時間',
+    'field_is_active' => '啟用',
+    'field_sort' => '排序',
+    'shift_updated' => '班別已更新',
+
+    // 排班
+    'field_date' => '日期',
+    'field_shift' => '班別',
+    'field_user' => '員工',
+    'action_assign' => '排班',
+    'swap_my_assignment' => '我的排班 ID',
+    'swap_target_assignment' => '對方排班 ID',
+    'swap_my_section' => '我的班（要換出的）',
+    'swap_target_section' => '對方的班（要換入的）',
+    'swap_no_assignment' => '該日期無排班紀錄',
+    'admin_cannot_assign_self' => '管理者不可自行報班',
+    'assigned' => '排班成功',
+    'assignment_deleted' => '排班已刪除',
+    'assignment_detail' => '排班資訊',
+    'action_delete_assignment' => '刪除排班',
+    'already_assigned' => '該日已有排班，無法重複報班',
+    'locked_cannot_assign' => '帳號已鎖定，無法自行報班，請聯繫管理者',
+    'locked_cannot_swap' => '帳號已鎖定，無法自行換班，請聯繫管理者',
+
+    // 換班
+    'action_swap' => '換班',
+    'action_approve' => '同意',
+    'action_reject' => '拒絕',
+    'swap_requested' => '換班請求已送出',
+    'swap_approved' => '換班已同意',
+    'swap_rejected' => '換班已拒絕',
+    'swap_cannot_self' => '不能跟自己換班',
+    'swap_not_own_assignment' => '只能對自己的排班發起換班',
+    'swap_target_not_found' => '對方的排班紀錄不存在',
+    'swap_not_target' => '只有被換班方可以回應',
+    'swap_already_responded' => '此換班請求已回應過',
+    'status_pending' => '待確認',
+    'status_approved' => '已同意',
+    'status_rejected' => '已拒絕',
+
+    // 驗證與操作訊息
+    'msg' => [
+        'required'             => '此欄位為必填',
+        'max_string'           => '長度不可超過 :value 字元',
+        'invalid_time_format'  => '時間格式不正確（HH:mm）',
+        'invalid_date_format'  => '日期格式不正確（Y-m-d）',
+        'shift_not_found'      => '班別不存在',
+        'assignment_not_found' => '排班紀錄不存在',
+        'invalid_swap_status'  => '無效的換班狀態',
+        'user_not_found'       => '員工不存在',
+        'select_user'          => '請選擇客服人員',
+        'delete_failed'        => '刪除排班失敗',
+        'update_failed'        => '班別更新失敗',
+        'assign_failed'        => '報班失敗',
+        'swap_failed'          => '換班請求失敗',
+        'respond_failed'       => '換班回應失敗',
+    ],
+
+    // Modal
+    'modal_assign_title' => '報班',
+    'modal_swap_title' => '發起換班',
+    'modal_edit_shift_title' => '編輯班別',
+    'modal_confirm' => '確認',
+    'modal_cancel' => '取消',
+];
