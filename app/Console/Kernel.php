@@ -15,7 +15,8 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        // $schedule->command('inspire')->hourly();
+        // 每日凌晨 1 點標記前一天的曠工
+        $schedule->command('attendance:mark-absent')->dailyAt('01:00');
     }
 
     /**

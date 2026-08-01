@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'nav_label'          => '首頁',
+    'page_title'         => 'Dashboard',
+    'subtitle'           => '數據總覽',
+    'total_cs'           => '客服總數',
+    'status_normal'      => '正常',
+    'status_lock'        => '鎖定',
+    'status_deactivate'  => '停用',
+    'today_shift'        => '今日排班',
+    'today_no_shift'     => '今日尚無排班',
+    'week_overview'      => '本週概況',
+    'week_total'         => '本週總班次',
+    'week_shift_count'   => '班次',
+    'my_today_shift'     => '今日我的排班',
+    'my_week_shift'      => '本週排班',
+    'my_no_shift'        => '尚無排班',
+    'field_date'         => '日期',
+    'field_shift'        => '班別',
+    'field_time'         => '時段',
+    'field_user'         => '員工',
+    'field_shift_count'  => '班次數',
+    'rank'               => '排名',
+    'now_on_duty'        => '當前時段',
+];
