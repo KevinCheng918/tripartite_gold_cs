@@ -17,3 +17,6 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
+
+// Telegram Webhook（公開端點，無 auth，Telegram 主動推送）
+Route::post('/telegram/webhook', [\App\Http\Controllers\Webhook\TelegramWebhookController::class, 'handle']);
