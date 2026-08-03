@@ -27,4 +27,8 @@ return [
         'clock' => '打卡',
         'report' => '月报表',
     ],
+    'telegram_chat' => [
+        'reply'  => '回复消息',
+        'assign' => '指派值班',
+    ],
 ];
