@@ -1649,6 +1649,250 @@ td button:hover {
    Login page
    ================================================================ */
 
+/* ================================================================
+   Telegram Chat (客服對話)
+   ================================================================ */
+
+.tg-chat {
+    display: flex;
+    height: calc(100vh - 140px);
+    border: 1px solid #ebedf0;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    background: #fff;
+}
+
+/* 左側群組列表 */
+.tg-chat__sidebar {
+    width: 320px;
+    flex-shrink: 0;
+    border-right: 1px solid #ebedf0;
+    display: flex;
+    flex-direction: column;
+}
+
+.tg-chat__sidebar-header {
+    padding: 0.875rem 1rem;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: #111827;
+    border-bottom: 1px solid #ebedf0;
+}
+
+.tg-chat__group-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.tg-group {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    border-bottom: 1px solid #f3f4f6;
+    transition: background 0.12s;
+}
+
+.tg-group:hover { background: #fafafa; }
+.tg-group--active { background: #fef9e7; }
+
+.tg-group__info { flex: 1; min-width: 0; }
+
+.tg-group__title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: #111827;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tg-group__meta {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.125rem;
+    font-size: 0.75rem;
+    color: #9ca3af;
+}
+
+.tg-group__assigned { color: #059669; font-weight: 500; }
+
+.tg-unread {
+    flex-shrink: 0;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: #fff;
+    background: #ef4444;
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 右側主區域 */
+.tg-chat__main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.tg-chat__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #ebedf0;
+    min-height: 52px;
+}
+
+.tg-header__title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.tg-header__right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.tg-header__assigned {
+    font-size: 0.8125rem;
+    color: #6b7280;
+}
+
+/* 訊息區域 */
+.tg-chat__messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.tg-chat__empty {
+    color: #9ca3af;
+    text-align: center;
+    padding: 3rem 1rem;
+    font-size: 0.9375rem;
+}
+
+/* 訊息泡泡 */
+.tg-bubble {
+    max-width: 70%;
+    padding: 0.625rem 0.875rem;
+    border-radius: 0.75rem;
+    font-size: 0.9375rem;
+    line-height: 1.5;
+}
+
+.tg-bubble--inbound {
+    align-self: flex-start;
+    background: #f3f4f6;
+    color: #111827;
+    border-bottom-left-radius: 0.25rem;
+}
+
+.tg-bubble--outbound {
+    align-self: flex-end;
+    background: #a67c00;
+    color: #fff;
+    border-bottom-right-radius: 0.25rem;
+}
+
+.tg-bubble__sender {
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-bottom: 0.125rem;
+}
+
+.tg-bubble--inbound .tg-bubble__sender { color: #6b7280; }
+.tg-bubble--outbound .tg-bubble__sender { color: rgba(255, 255, 255, 0.7); }
+
+.tg-bubble__content { word-break: break-word; }
+
+.tg-bubble__time {
+    font-size: 0.6875rem;
+    margin-top: 0.25rem;
+    text-align: right;
+}
+
+.tg-bubble--inbound .tg-bubble__time { color: #9ca3af; }
+.tg-bubble--outbound .tg-bubble__time { color: rgba(255, 255, 255, 0.6); }
+
+/* 輸入區域 */
+.tg-chat__input {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid #ebedf0;
+}
+
+.tg-chat__input textarea {
+    flex: 1;
+    resize: none;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9375rem;
+    font-family: inherit;
+    border: 1px solid #ebedf0;
+    border-radius: 0.5rem;
+    outline: none;
+    min-height: 38px;
+    max-height: 120px;
+    transition: border-color 0.15s;
+}
+
+.tg-chat__input textarea:focus {
+    border-color: #a67c00;
+}
+
+/* 告警條 */
+.tg-alert-bar {
+    position: fixed;
+    top: 0;
+    left: 240px;
+    right: 0;
+    padding: 0.625rem 1.5rem;
+    background: #fef2f2;
+    border-bottom: 2px solid #ef4444;
+    color: #991b1b;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.tg-alert__icon { font-size: 1.25rem; }
+
+/* 深色模式 */
+[data-theme="dark"] .tg-chat { background: #1a1d27; border-color: #2d3039; }
+[data-theme="dark"] .tg-chat__sidebar { border-color: #2d3039; }
+[data-theme="dark"] .tg-chat__sidebar-header { color: #f3f4f6; border-color: #2d3039; }
+[data-theme="dark"] .tg-group { border-color: #232630; }
+[data-theme="dark"] .tg-group:hover { background: #232630; }
+[data-theme="dark"] .tg-group--active { background: rgba(166, 124, 0, 0.12); }
+[data-theme="dark"] .tg-group__title { color: #f3f4f6; }
+[data-theme="dark"] .tg-chat__header { border-color: #2d3039; }
+[data-theme="dark"] .tg-header__title { color: #f3f4f6; }
+[data-theme="dark"] .tg-header__assigned { color: #9ca3af; }
+[data-theme="dark"] .tg-chat__empty { color: #6b7280; }
+[data-theme="dark"] .tg-bubble--inbound { background: #2d3039; color: #e5e7eb; }
+[data-theme="dark"] .tg-bubble--inbound .tg-bubble__sender { color: #9ca3af; }
+[data-theme="dark"] .tg-chat__input { border-color: #2d3039; }
+[data-theme="dark"] .tg-chat__input textarea { background: #151821; border-color: #2d3039; color: #e5e7eb; }
+[data-theme="dark"] .tg-chat__input textarea:focus { border-color: #a67c00; }
+[data-theme="dark"] .tg-alert-bar { background: rgba(239, 68, 68, 0.15); border-color: #ef4444; color: #f87171; }
+
 .login-page {
     display: flex;
     align-items: center;

@@ -1,7 +1,6 @@
 @extends('layouts.app')
 
 @section('title', trans('telegram_chat.page_title'))
-@section('icon', 'comments')
 @section('subtitle', trans('telegram_chat.subtitle'))
 
 @section('content')
@@ -22,5 +21,5 @@
 
 @section('scripts')
     <script src="{{ asset('vendor/pusher.min.js') }}"></script>
-    <script src="{{ asset('js/telegram-chat.js') }}?v={{ filemtime(public_path('js/telegram-chat.js')) }}"></script>
+    <script src="{{ asset('js/telegram-chat.js') }}"></script>
 @endsection

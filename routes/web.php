@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AccountController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ShiftController;
+use App\Http\Controllers\Admin\TelegramChatController;
 use App\Http\Controllers\Admin\AttendanceController;
 use App\Http\Controllers\Admin\ShiftCoverController;
 use App\Http\Controllers\Auth\LoginController;
@@ -74,5 +75,13 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-pending', [ShiftCoverController::class, 'ajaxPendingCovers'])->middleware('can:shift.cover_review')->name('ajax-pending');
         Route::get('/ajax-approved', [ShiftCoverController::class, 'ajaxApprovedCovers'])->middleware('can:shift.view')->name('ajax-approved');
         Route::get('/ajax-all', [ShiftCoverController::class, 'ajaxAllCovers'])->middleware('can:shift.cover_review')->name('ajax-all');
+    });
+
+    // Telegram 客服聊天（所有登入者可查看，回覆需權限，值班自動從排班指派）
+    Route::prefix('telegram-chat')->name('telegram-chat.')->group(function () {
+        Route::get('/', [TelegramChatController::class, 'index'])->name('index');
+        Route::get('/ajax-groups', [TelegramChatController::class, 'ajaxGroups'])->name('ajax-groups');
+        Route::get('/ajax-messages', [TelegramChatController::class, 'ajaxMessages'])->name('ajax-messages');
+        Route::post('/ajax-reply', [TelegramChatController::class, 'ajaxReply'])->middleware('can:telegram_chat.reply')->name('ajax-reply');
     });
 });

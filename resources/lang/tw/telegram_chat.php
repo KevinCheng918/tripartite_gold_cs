@@ -23,6 +23,5 @@ return [
         'reply_success'    => '回覆已發送',
         'assign_failed'    => '指派失敗',
         'assign_success'   => '指派成功',
-        'reaction_failed'  => '表情回應發送失敗',
     ],
 ];

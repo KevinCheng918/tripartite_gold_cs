@@ -18,7 +18,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null    $sender_user_id     後台發送者 ID（僅 outbound）
  * @property string      $content            訊息內容
  * @property bool        $replied            是否已回覆（僅 inbound 有意義）
- * @property array|null  $reactions          表情回應 [{emoji: "👍", count: 1}]
  */
 class TelegramMessage extends Model
 {
@@ -28,7 +27,6 @@ class TelegramMessage extends Model
     protected $casts = [
         'direction' => 'integer',
         'replied'   => 'boolean',
-        'reactions' => 'array',
     ];
 
     /**

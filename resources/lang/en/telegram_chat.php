@@ -23,6 +23,5 @@ return [
         'reply_success'    => 'Reply sent',
         'assign_failed'    => 'Failed to assign',
         'assign_success'   => 'Assigned successfully',
-        'reaction_failed'  => 'Failed to send reaction',
     ],
 ];

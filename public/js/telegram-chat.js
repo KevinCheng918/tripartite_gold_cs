@@ -54,26 +54,14 @@
             });
             var channel = pusher.subscribe('telegram-chat');
 
-            // 收到新訊息 / reaction 更新
+            // 收到新訊息
             channel.bind('telegram.message', function (data) {
-                var msg = data.message;
-                if (!msg) { return; }
-
-                // reaction 更新
-                if (msg.type === 'reaction_update') {
-                    if (msg.group_id === selectedGroupId) {
-                        // 用 telegram_message_id 找到對應的 bubble
-                        var bubbles = document.querySelectorAll('.tg-bubble[data-msg-id]');
-                        // 需要用 data API 重新載入以取得最新 reactions
-                        loadMessages(selectedGroupId);
-                    }
-                    return;
-                }
-
-                // 一般訊息
+                // 更新群組列表
                 loadGroups();
-                if (msg.group_id === selectedGroupId) {
-                    appendMessage(msg);
+
+                // 如果是當前選中的群組，追加訊息
+                if (data.message && data.message.group_id === selectedGroupId) {
+                    appendMessage(data.message);
                 }
             });
 
@@ -139,7 +127,7 @@
                 '<div class="tg-group__info">' +
                 '<div class="tg-group__title">' + g.title + '</div>' +
                 '<div class="tg-group__meta">' +
-                (g.on_duty_users && g.on_duty_users.length > 0 ? '<span class="tg-group__assigned">' + g.on_duty_users.join('、') + '</span>' : '') +
+                (g.assigned_user ? '<span class="tg-group__assigned">' + g.assigned_user + '</span>' : '') +
                 '<span class="tg-group__time">' + time + '</span>' +
                 '</div>' +
                 '</div>' +
@@ -156,10 +144,6 @@
                 loadMessages(selectedGroupId);
                 renderHeader(selectedGroupId);
                 showInput();
-
-                // RWD：手機版切換到聊天畫面
-                var chat = document.querySelector('.tg-chat');
-                if (chat) { chat.classList.add('tg-chat--chatting'); }
             });
         });
     }
@@ -174,20 +158,10 @@
         if (!group || !header) { return; }
 
         header.innerHTML =
-            '<button class="tg-header__back" id="btn-tg-back">&larr;</button>' +
             '<div class="tg-header__title">' + group.title + '</div>' +
             '<div class="tg-header__right">' +
-            '<span class="tg-header__assigned">' + i18n.assigned_to + '：' + (group.on_duty_users && group.on_duty_users.length > 0 ? group.on_duty_users.join('、') : i18n.unassigned) + '</span>' +
+            '<span class="tg-header__assigned">' + i18n.assigned_to + '：' + (group.assigned_user || i18n.unassigned) + '</span>' +
             '</div>';
-
-        // RWD 返回按鈕
-        var backBtn = document.getElementById('btn-tg-back');
-        if (backBtn) {
-            backBtn.addEventListener('click', function () {
-                var chat = document.querySelector('.tg-chat');
-                if (chat) { chat.classList.remove('tg-chat--chatting'); }
-            });
-        }
     }
 
     // ---------------------------------------------------------------
@@ -205,53 +179,6 @@
             });
     }
 
-    var QUICK_EMOJIS = [
-        '👍', '❤️', '😂', '😮', '😢', '🙏',
-        '❤️‍🔥', '👌', '😁', '🤗', '🔥', '🤔',
-        '👎', '🥰', '👏', '🤯', '🎉', '🤩',
-        '🤮', '💩', '🕊️', '🤡', '🫣', '😌',
-        '😍', '🐳', '🌚', '🌭', '💯', '🤣',
-        '⚡', '🍌', '🏆', '💔', '🤨', '🙂',
-        '🍓', '🍾', '💋', '🖕', '😈', '😴',
-        '😭', '🤓', '👻', '🤷', '👀', '🎃', '🙈',
-        '😇', '😱', '🤝', '✍️', '🫡', '🎅', '🎄',
-        '☃️', '🎆', '🤪', '🗿', '🆒', '💘', '🙉',
-        '🦄', '🥴', '🙊', '👾', '🤷‍♂️'
-    ];
-
-    function buildBubbleContent(m) {
-        var mediaHtml = '';
-        if (m.media_type === 'photo' && m.media_url) {
-            mediaHtml = '<div class="tg-bubble__media"><img src="' + m.media_url + '" alt="photo" loading="lazy"></div>';
-        } else if (m.media_type === 'sticker' && m.media_url) {
-            mediaHtml = '<div class="tg-bubble__media tg-bubble__sticker"><img src="' + m.media_url + '" alt="sticker" loading="lazy"></div>';
-        }
-
-        var textHtml = m.content ? '<div class="tg-bubble__content">' + escapeHtml(m.content) + '</div>' : '';
-
-        var reactionsHtml = buildReactionsHtml(m.reactions, m.id);
-
-        return mediaHtml + textHtml + reactionsHtml;
-    }
-
-    function buildReactionsHtml(reactions, messageId) {
-        var html = '<div class="tg-reactions" data-msg-id="' + messageId + '">';
-
-        if (reactions && reactions.length > 0) {
-            reactions.forEach(function (r) {
-                html += '<span class="tg-reaction">' + r.emoji + (r.count > 1 ? '<span class="tg-reaction__count">' + r.count + '</span>' : '') + '</span>';
-            });
-        }
-
-        // 加號按鈕（新增 reaction）
-        if (canReply) {
-            html += '<button class="tg-reaction tg-reaction--add" data-msg-id="' + messageId + '" title="React">+</button>';
-        }
-
-        html += '</div>';
-        return html;
-    }
-
     function renderMessages(messages) {
         var container = document.getElementById('tg-messages');
 
@@ -266,19 +193,16 @@
             var time = m.created_at ? m.created_at.substring(11, 16) : '';
 
             return (
-                '<div class="tg-bubble ' + bubbleCls + '" data-msg-id="' + m.id + '">' +
+                '<div class="tg-bubble ' + bubbleCls + '">' +
                 '<div class="tg-bubble__sender">' + m.sender_name + '</div>' +
-                buildBubbleContent(m) +
+                '<div class="tg-bubble__content">' + escapeHtml(m.content) + '</div>' +
                 '<div class="tg-bubble__time">' + time + '</div>' +
                 '</div>'
             );
         }).join('');
 
-        // 初次載入直接跳底（不動畫）
-        requestAnimationFrame(function () {
-            container.scrollTop = container.scrollHeight;
-        });
-        bindReactionButtons();
+        // 捲到最下面
+        container.scrollTop = container.scrollHeight;
     }
 
     function appendMessage(msg) {
@@ -294,128 +218,14 @@
         var time = msg.created_at ? msg.created_at.substring(11, 16) : '';
 
         var html =
-            '<div class="tg-bubble ' + bubbleCls + '" data-msg-id="' + msg.id + '">' +
+            '<div class="tg-bubble ' + bubbleCls + '">' +
             '<div class="tg-bubble__sender">' + msg.sender_name + '</div>' +
-            buildBubbleContent(msg) +
+            '<div class="tg-bubble__content">' + escapeHtml(msg.content) + '</div>' +
             '<div class="tg-bubble__time">' + time + '</div>' +
             '</div>';
 
         container.insertAdjacentHTML('beforeend', html);
-        // 新訊息追加用平滑捲動
-        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
-        bindReactionButtons();
-    }
-
-    // ---------------------------------------------------------------
-    //  Reaction 互動
-    // ---------------------------------------------------------------
-
-    function bindReactionButtons() {
-        document.querySelectorAll('.tg-reaction--add').forEach(function (btn) {
-            btn.removeEventListener('click', handleReactionAdd);
-            btn.addEventListener('click', handleReactionAdd);
-        });
-    }
-
-    function handleReactionAdd(e) {
-        e.stopPropagation();
-        var btn = e.currentTarget;
-        var msgId = btn.dataset.msgId;
-
-        // 關閉其他已開啟的 picker
-        closeReactionPicker();
-
-        // 建立 emoji picker
-        var picker = document.createElement('div');
-        picker.className = 'tg-reaction-picker';
-        picker.dataset.msgId = msgId;
-
-        picker.innerHTML = QUICK_EMOJIS.map(function (emoji) {
-            return '<button class="tg-reaction-picker__item" data-emoji="' + emoji + '">' + emoji + '</button>';
-        }).join('');
-
-        // 掛到 body 用 fixed 定位，避免跑版
-        document.body.appendChild(picker);
-
-        // 計算位置：在按鈕上方顯示
-        var rect = btn.getBoundingClientRect();
-        var pickerWidth = 280;
-        var pickerHeight = Math.min(220, picker.scrollHeight);
-        var left = rect.left;
-        var top = rect.top - pickerHeight - 4;
-
-        // 超出右邊界
-        if (left + pickerWidth > window.innerWidth) {
-            left = window.innerWidth - pickerWidth - 8;
-        }
-        // 超出左邊界
-        if (left < 8) { left = 8; }
-        // 超出上邊界，改顯示在下方
-        if (top < 8) { top = rect.bottom + 4; }
-
-        picker.style.left = left + 'px';
-        picker.style.top = top + 'px';
-
-        picker.querySelectorAll('.tg-reaction-picker__item').forEach(function (item) {
-            item.addEventListener('click', function (ev) {
-                ev.stopPropagation();
-                sendReaction(parseInt(msgId, 10), item.dataset.emoji);
-                closeReactionPicker();
-            });
-        });
-
-        // 點其他地方關閉
-        setTimeout(function () {
-            document.addEventListener('click', closeReactionPicker, { once: true });
-        }, 0);
-    }
-
-    function closeReactionPicker() {
-        var existing = document.querySelector('.tg-reaction-picker');
-        if (existing) { existing.remove(); }
-    }
-
-    function sendReaction(messageId, emoji) {
-        apiFetch('/admin/telegram-chat/ajax-react', {
-            method: 'POST',
-            body: JSON.stringify({ message_id: messageId, emoji: emoji }),
-        })
-            .then(function (body) {
-                // 更新本地顯示
-                updateBubbleReactions(messageId, body.reactions);
-            })
-            .catch(function () {
-                // 靜默失敗
-            });
-    }
-
-    function updateBubbleReactions(messageId, reactions) {
-        var bubble = document.querySelector('.tg-bubble[data-msg-id="' + messageId + '"]');
-        if (!bubble) { return; }
-
-        var container = bubble.querySelector('.tg-reactions');
-        if (!container) { return; }
-
-        container.innerHTML = '';
-
-        if (reactions && reactions.length > 0) {
-            reactions.forEach(function (r) {
-                var span = document.createElement('span');
-                span.className = 'tg-reaction';
-                span.innerHTML = r.emoji + (r.count > 1 ? '<span class="tg-reaction__count">' + r.count + '</span>' : '');
-                container.appendChild(span);
-            });
-        }
-
-        if (canReply) {
-            var addBtn = document.createElement('button');
-            addBtn.className = 'tg-reaction tg-reaction--add';
-            addBtn.dataset.msgId = String(messageId);
-            addBtn.title = 'React';
-            addBtn.textContent = '+';
-            container.appendChild(addBtn);
-            addBtn.addEventListener('click', handleReactionAdd);
-        }
+        container.scrollTop = container.scrollHeight;
     }
 
     // ---------------------------------------------------------------
@@ -433,56 +243,29 @@
 
         inputArea.style.display = 'flex';
         inputArea.innerHTML =
-            '<input type="file" id="tg-image-input" accept="image/*" style="display:none">' +
-            '<button class="btn-sm" id="btn-tg-image" title="' + (i18n.btn_image || '傳送圖片') + '">&#128247;</button>' +
             '<textarea id="tg-reply-text" placeholder="' + i18n.input_placeholder + '" rows="1"></textarea>' +
             '<button class="btn-primary" id="btn-tg-send">' + i18n.btn_send + '</button>';
 
         var textarea = document.getElementById('tg-reply-text');
         var sendBtn = document.getElementById('btn-tg-send');
-        var imageBtn = document.getElementById('btn-tg-image');
-        var imageInput = document.getElementById('tg-image-input');
 
         sendBtn.addEventListener('click', function () { sendReply(); });
-        imageBtn.addEventListener('click', function () { imageInput.click(); });
-        imageInput.addEventListener('change', function () {
-            if (imageInput.files.length > 0) {
-                sendImage(imageInput.files[0]);
-                imageInput.value = '';
-            }
-        });
-
-        // 輸入框自動高度
-        function autoResize() {
-            textarea.style.height = 'auto';
-            textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
-        }
-        textarea.addEventListener('input', autoResize);
 
         // Enter 送出（Shift+Enter 換行）
-        var imeActive = false;
-
-        textarea.addEventListener('compositionstart', function () { imeActive = true; });
-        textarea.addEventListener('compositionend', function () {
-            setTimeout(function () { imeActive = false; }, 50);
-        });
-
         textarea.addEventListener('keydown', function (e) {
-            if (e.key !== 'Enter' || e.shiftKey || imeActive) { return; }
-            e.preventDefault();
-            sendReply();
-            textarea.style.height = '';
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendReply();
+            }
         });
     }
 
     function sendReply() {
         var textarea = document.getElementById('tg-reply-text');
-        var sendBtn = document.getElementById('btn-tg-send');
         var content = textarea.value.trim();
         if (!content || !selectedGroupId) { return; }
 
         textarea.disabled = true;
-        if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '...'; }
 
         apiFetch('/admin/telegram-chat/ajax-reply', {
             method: 'POST',
@@ -490,54 +273,13 @@
         })
             .then(function () {
                 textarea.value = '';
-                textarea.style.height = '';
                 textarea.disabled = false;
-                if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = i18n.btn_send; }
                 textarea.focus();
+                // Pusher 會推送新訊息，不需手動追加
             })
             .catch(function (error) {
                 textarea.disabled = false;
-                if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = i18n.btn_send; }
                 var msg = error.message || i18n.msg.reply_failed;
-                alert(msg);
-            });
-    }
-
-    function sendImage(file) {
-        if (!selectedGroupId) { return; }
-
-        var formData = new FormData();
-        formData.append('group_id', selectedGroupId);
-        formData.append('image', file);
-
-        var caption = document.getElementById('tg-reply-text').value.trim();
-        if (caption) {
-            formData.append('caption', caption);
-        }
-
-        fetch('/admin/telegram-chat/ajax-send-image', {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': csrfToken,
-                Accept: 'application/json',
-            },
-            body: formData,
-        })
-            .then(function (response) {
-                return response.json().then(function (body) {
-                    if (!response.ok) { throw body; }
-                    return body;
-                });
-            })
-            .then(function () {
-                var textarea = document.getElementById('tg-reply-text');
-                if (textarea) {
-                    textarea.value = '';
-                    textarea.focus();
-                }
-            })
-            .catch(function (error) {
-                var msg = error.message || (i18n.msg ? i18n.msg.reply_failed : 'Failed');
                 alert(msg);
             });
     }

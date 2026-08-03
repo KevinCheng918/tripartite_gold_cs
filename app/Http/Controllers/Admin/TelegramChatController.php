@@ -9,7 +9,6 @@ use App\Services\TelegramChatService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * Telegram 客服聊天控制器
@@ -86,81 +85,6 @@ class TelegramChatController extends Controller
             Log::error('Telegram 回覆失敗', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
 
             return response()->json(['message' => trans('telegram_chat.msg.reply_failed')], 500);
-        }
-    }
-
-    /**
-     * Ajax 發送圖片訊息
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse|TelegramMessageResource
-     */
-    public function ajaxSendImage(Request $request)
-    {
-        $params = $request->validate([
-            'group_id' => 'required|integer',
-            'image'    => 'required|image|max:5120',
-            'caption'  => 'nullable|string|max:1024',
-        ]);
-
-        try {
-            $file = $params['image'];
-            $filename = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
-
-            Storage::disk('public')->putFileAs('uploads/telegram', $file, $filename);
-            $imageUrl = Storage::disk('public')->url("uploads/telegram/{$filename}");
-
-            $message = $this->chatService->sendReply(
-                (int) $params['group_id'],
-                $params['caption'] ?? '',
-                Auth::id(),
-                Auth::user()->nickname,
-                $imageUrl
-            );
-
-            return new TelegramMessageResource($message);
-        } catch (\Exception $e) {
-            Log::error('Telegram 圖片發送失敗', [
-                'error'   => $e->getMessage(),
-                'trace'   => $e->getTraceAsString(),
-                'user_id' => Auth::id(),
-            ]);
-
-            return response()->json(['message' => $e->getMessage()], 500);
-        }
-    }
-
-    /**
-     * Ajax 對訊息送出表情回應
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function ajaxReact(Request $request)
-    {
-        $params = $request->validate([
-            'message_id' => 'required|integer',
-            'emoji'      => 'required|string|max:10',
-        ]);
-
-        try {
-            $reactions = $this->chatService->sendReaction(
-                (int) $params['message_id'],
-                $params['emoji']
-            );
-
-            if ($reactions === null) {
-                return response()->json(['message' => trans('telegram_chat.msg.reaction_failed')], 500);
-            }
-
-            return response()->json(['reactions' => $reactions]);
-        } catch (\Exception $e) {
-            Log::error('Telegram 表情回應失敗', [
-                'error'   => $e->getMessage(),
-                'user_id' => Auth::id(),
-            ]);
-
-            return response()->json(['message' => trans('telegram_chat.msg.reaction_failed')], 500);
         }
     }
 

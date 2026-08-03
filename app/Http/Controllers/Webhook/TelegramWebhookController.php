@@ -43,12 +43,7 @@ class TelegramWebhookController extends Controller
 
         try {
             $payload = $request->all();
-
-            if (isset($payload['message_reaction'])) {
-                $this->chatService->handleReactionUpdate($payload);
-            } else {
-                $this->chatService->handleIncomingMessage($payload);
-            }
+            $this->chatService->handleIncomingMessage($payload);
         } catch (\Exception $e) {
             Log::error('Telegram Webhook 處理失敗', ['error' => $e->getMessage()]);
         }
