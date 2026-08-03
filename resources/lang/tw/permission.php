@@ -5,6 +5,7 @@ return [
         'account' => '帳號管理',
         'shift' => '排班管理',
         'attendance' => '打卡出勤',
+        'telegram_chat' => 'Telegram 客服',
     ],
     'account' => [
         'view' => '檢視帳號',
@@ -26,5 +27,9 @@ return [
         'view' => '查看出勤',
         'clock' => '打卡',
         'report' => '月報表',
+    ],
+    'telegram_chat' => [
+        'reply'  => '回覆訊息',
+        'assign' => '指派值班',
     ],
 ];

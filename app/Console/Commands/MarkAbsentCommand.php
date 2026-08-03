@@ -3,7 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Models\AttendanceRecord;
-use App\Models\ShiftAssignment;
+use App\Repositories\AttendanceRepository;
+use App\Repositories\ShiftAssignmentRepository;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -15,10 +16,7 @@ use Illuminate\Support\Facades\Log;
  */
 class MarkAbsentCommand extends Command
 {
-    /** @var string 指令名稱 */
     protected $signature = 'attendance:mark-absent {--date= : 指定日期（Y-m-d），預設為昨天}';
-
-    /** @var string 指令說明 */
     protected $description = '標記有排班但未打卡的員工為曠工';
 
     /**
@@ -30,11 +28,11 @@ class MarkAbsentCommand extends Command
 
         $this->info("檢查日期：{$date}");
 
+        $assignmentRepository = app(ShiftAssignmentRepository::class);
+        $attendanceRepository = app(AttendanceRepository::class);
+
         // 取得該日所有排班
-        $assignments = ShiftAssignment::query()
-            ->select(['id', 'user_id', 'shift_id', 'date'])
-            ->where('date', $date)
-            ->get();
+        $assignments = $assignmentRepository->getByDateRange($date, $date);
 
         if ($assignments->isEmpty()) {
             $this->info('該日無排班紀錄。');
@@ -45,18 +43,14 @@ class MarkAbsentCommand extends Command
 
         foreach ($assignments as $assignment) {
             // 檢查是否已有打卡紀錄
-            $existing = AttendanceRecord::query()
-                ->where('user_id', $assignment->user_id)
-                ->where('date', $date)
-                ->first();
+            $existing = $attendanceRepository->findByUserAndDate($assignment->user_id, $date);
 
-            // 已有紀錄（不管狀態）→ 跳過
             if ($existing) {
                 continue;
             }
 
             // 沒有打卡紀錄 → 標記曠工
-            AttendanceRecord::query()->create([
+            $attendanceRepository->create([
                 'user_id'       => $assignment->user_id,
                 'assignment_id' => $assignment->id,
                 'date'          => $date,
@@ -67,7 +61,7 @@ class MarkAbsentCommand extends Command
         }
 
         $this->info("已標記 {$markedCount} 筆曠工。");
-        Log::info("曠工標記完成", ['date' => $date, 'count' => $markedCount]);
+        Log::info('曠工標記完成', ['date' => $date, 'count' => $markedCount]);
 
         return 0;
     }
