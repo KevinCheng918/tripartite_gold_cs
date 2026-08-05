@@ -93,6 +93,23 @@ class ShiftAssignmentRepository
     }
 
     /**
+     * 檢查員工在該日是否已有同一班別
+     *
+     * @param int    $userId
+     * @param string $date
+     * @param int    $shiftId
+     * @return bool
+     */
+    public function existsByUserDateAndShift($userId, $date, $shiftId)
+    {
+        return ShiftAssignment::query()
+            ->where('user_id', $userId)
+            ->where('date', $date)
+            ->where('shift_id', $shiftId)
+            ->exists();
+    }
+
+    /**
      * 新增排班紀錄
      *
      * @param array $attributes
