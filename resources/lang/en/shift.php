@@ -34,6 +34,7 @@ return [
     'assignment_detail' => 'Assignment Detail',
     'action_delete_assignment' => 'Delete assignment',
     'already_assigned' => 'Already assigned on this date',
+    'already_assigned_same_shift' => 'Already assigned to the same shift on this date',
     'locked_cannot_assign' => 'Account is locked, cannot sign up for shifts — contact admin',
     'locked_cannot_swap' => 'Account is locked, cannot swap shifts — contact admin',
 
