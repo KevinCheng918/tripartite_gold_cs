@@ -137,10 +137,10 @@ class ShiftService
             ]);
         }
 
-        // 檢查該員工當天是否已有排班
-        if ($this->assignmentRepository->existsByUserAndDate((int) $params['user_id'], $params['date'])) {
+        // 檢查該員工當天是否已有同一班別（同天可排多個不同班別）
+        if ($this->assignmentRepository->existsByUserDateAndShift((int) $params['user_id'], $params['date'], (int) $params['shift_id'])) {
             throw ValidationException::withMessages([
-                'date' => [trans('shift.already_assigned')],
+                'shift_id' => [trans('shift.already_assigned_same_shift')],
             ]);
         }
 
