@@ -34,6 +34,7 @@ return [
     'assignment_detail' => '排班資訊',
     'action_delete_assignment' => '刪除排班',
     'already_assigned' => '該日已有排班，無法重複報班',
+    'already_assigned_same_shift' => '該日已有相同班別的排班',
     'locked_cannot_assign' => '帳號已鎖定，無法自行報班，請聯繫管理者',
     'locked_cannot_swap' => '帳號已鎖定，無法自行換班，請聯繫管理者',
 
