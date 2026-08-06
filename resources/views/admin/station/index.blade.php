@@ -107,5 +107,5 @@
 @endsection
 
 @section('scripts')
-    <script src="{{ asset('js/station.js') }}"></script>
+    <script src="{{ asset('js/station.js') }}?v={{ time() }}"></script>
 @endsection
