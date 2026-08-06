@@ -24,6 +24,12 @@
             </div>
             @endif
             <div class="form-group">
+                <label class="assign-user-cb">
+                    <input type="checkbox" id="assign-allday">
+                    <span>{{ trans('shift.allday_shift') }}</span>
+                </label>
+            </div>
+            <div class="form-group" id="assign-shift-group">
                 <label for="assign-shift">{{ trans('shift.field_shift') }}</label>
                 <select id="assign-shift" name="shift_id"></select>
             </div>

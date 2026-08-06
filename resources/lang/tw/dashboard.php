@@ -23,4 +23,5 @@ return [
     'field_shift_count'  => '班次數',
     'rank'               => '排名',
     'now_on_duty'        => '當前時段',
+    'allday'             => '全天班',
 ];
