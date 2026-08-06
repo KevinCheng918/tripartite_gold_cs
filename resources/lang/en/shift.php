@@ -22,6 +22,7 @@ return [
     'field_date' => 'Date',
     'field_shift' => 'Shift',
     'field_user' => 'Staff',
+    'allday_shift'  => 'All-day (all shifts)',
     'action_assign' => 'Assign Shift',
     'swap_my_assignment' => 'My assignment ID',
     'swap_target_assignment' => 'Target assignment ID',

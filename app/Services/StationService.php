@@ -3,8 +3,8 @@
 namespace App\Services;
 
 use App\Models\Station;
-use App\Models\TelegramGroup;
 use App\Repositories\StationRepository;
+use App\Repositories\TelegramRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Log;
 
@@ -14,15 +14,18 @@ use Illuminate\Support\Facades\Log;
 class StationService
 {
     private $stationRepository;
+    private $telegramRepository;
     private $mainSystemApi;
     private $telegramBot;
 
     public function __construct(
         StationRepository $stationRepository,
+        TelegramRepository $telegramRepository,
         MainSystemApiService $mainSystemApi,
         TelegramBotService $telegramBot
     ) {
         $this->stationRepository = $stationRepository;
+        $this->telegramRepository = $telegramRepository;
         $this->mainSystemApi = $mainSystemApi;
         $this->telegramBot = $telegramBot;
     }
@@ -176,17 +179,15 @@ class StationService
             return null;
         }
 
-        $group = TelegramGroup::query()
-            ->where('chat_id', (int) $chatId)
-            ->first(['id']);
+        $group = $this->telegramRepository->findGroupByChatId((int) $chatId);
 
         if ($group) {
             return $group->id;
         }
 
-        $newGroup = TelegramGroup::query()->create([
+        $newGroup = $this->telegramRepository->createGroup([
             'chat_id' => (int) $chatId,
-            'title'   => $params['name'] ?? 'Group ' . $chatId,
+            'title'   => $params['name'] ?? "Group {$chatId}",
             'status'  => 1,
         ]);
 
