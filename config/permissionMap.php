@@ -51,7 +51,8 @@ return [
     'telegram_chat' => [
         'label' => 'permission.group.telegram_chat',
         'keywords' => [
-            'telegram_chat.reply' => 'permission.telegram_chat.reply',
+            'telegram_chat.reply'     => 'permission.telegram_chat.reply',
+            'telegram_chat.broadcast' => 'permission.telegram_chat.broadcast',
         ],
     ],
 

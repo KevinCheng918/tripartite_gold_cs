@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AccountController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ShiftController;
+use App\Http\Controllers\Admin\TelegramBroadcastController;
 use App\Http\Controllers\Admin\TelegramChatController;
 use App\Http\Controllers\Admin\AttendanceController;
 use App\Http\Controllers\Admin\ShiftCoverController;
@@ -86,5 +87,13 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-groups', [TelegramChatController::class, 'ajaxGroups'])->name('ajax-groups');
         Route::get('/ajax-messages', [TelegramChatController::class, 'ajaxMessages'])->name('ajax-messages');
         Route::post('/ajax-reply', [TelegramChatController::class, 'ajaxReply'])->middleware('can:telegram_chat.reply')->name('ajax-reply');
+    });
+
+    // Telegram 群發公告
+    Route::prefix('telegram-broadcast')->name('telegram-broadcast.')->group(function () {
+        Route::get('/', [TelegramBroadcastController::class, 'index'])->middleware('can:telegram_chat.broadcast')->name('index');
+        Route::get('/ajax-groups', [TelegramBroadcastController::class, 'ajaxGroups'])->middleware('can:telegram_chat.broadcast')->name('ajax-groups');
+        Route::post('/ajax-send', [TelegramBroadcastController::class, 'ajaxSend'])->middleware('can:telegram_chat.broadcast')->name('ajax-send');
+        Route::get('/ajax-history', [TelegramBroadcastController::class, 'ajaxHistory'])->middleware('can:telegram_chat.broadcast')->name('ajax-history');
     });
 });
