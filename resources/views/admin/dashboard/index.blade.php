@@ -106,19 +106,43 @@
     {{-- ===== 客服 Dashboard ===== --}}
 
     <div class="dash-section">
-        <h2 class="dash-section__title">{{ trans('dashboard.my_today_shift') }} <span class="dash-section__date">{{ now()->format('m/d（D）') }}</span></h2>
+        <h2 class="dash-section__title">{{ trans('dashboard.today_shift') }} <span class="dash-section__date">{{ now()->format('m/d（D）') }}</span></h2>
 
-        @if($todayAssignments->isEmpty())
+        @if($todayByShift->isEmpty())
             <p class="dash-empty">{{ trans('dashboard.today_no_shift') }}</p>
         @else
             <div class="dash-today-shifts">
-                @foreach($todayAssignments as $a)
-                    <div class="dash-shift-group">
-                        <div class="dash-shift-group__name">{{ $a->shift ? $a->shift->display_name : '-' }}</div>
+                @foreach($todayByShift as $shiftName => $info)
+                    @php
+                        $isActive = false;
+                        if ($info['shift']) {
+                            $nowMinutes = now()->hour * 60 + now()->minute;
+                            $startParts = explode(':', $info['shift']->start_time);
+                            $endParts = explode(':', $info['shift']->end_time);
+                            $startMin = (int)$startParts[0] * 60 + (int)$startParts[1];
+                            $endMin = (int)$endParts[0] * 60 + (int)$endParts[1];
+
+                            if ($endMin > $startMin) {
+                                $isActive = ($nowMinutes >= $startMin && $nowMinutes < $endMin);
+                            } elseif ($endMin <= $startMin) {
+                                $isActive = ($nowMinutes >= $startMin || $nowMinutes < $endMin);
+                            }
+                        }
+                    @endphp
+                    <div class="dash-shift-group {{ $isActive ? 'dash-shift-group--active' : '' }}">
+                        @if($isActive)
+                            <span class="dash-shift-group__badge">{{ trans('dashboard.now_on_duty') }}</span>
+                        @endif
+                        <div class="dash-shift-group__name">{{ $shiftName }}</div>
                         <div class="dash-shift-group__time">
-                            @if($a->shift)
-                                {{ $a->shift->start_time }} - {{ $a->shift->end_time }}
+                            @if($info['shift'])
+                                {{ $info['shift']->start_time }} - {{ $info['shift']->end_time }}
                             @endif
+                        </div>
+                        <div class="dash-shift-group__users">
+                            @foreach($info['users'] as $userName)
+                                <span class="dash-user-chip">{{ $userName }}</span>
+                            @endforeach
                         </div>
                     </div>
                 @endforeach
@@ -129,7 +153,7 @@
     <div class="dash-section">
         <h2 class="dash-section__title">{{ trans('dashboard.my_week_shift') }} <span class="dash-section__date">{{ trans('dashboard.week_total') }} {{ $weekTotal }}</span></h2>
 
-        @if($weekAssignments->isEmpty())
+        @if($weekByDate->isEmpty())
             <p class="dash-empty">{{ trans('dashboard.my_no_shift') }}</p>
         @else
             <table>
@@ -141,16 +165,26 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach($weekAssignments->sortBy('date') as $a)
-                        <tr>
-                            <td>{{ $a->date->format('m/d（D）') }}</td>
-                            <td>{{ $a->shift ? $a->shift->display_name : '-' }}</td>
-                            <td>
-                                @if($a->shift)
-                                    {{ $a->shift->start_time }} - {{ $a->shift->end_time }}
-                                @endif
-                            </td>
-                        </tr>
+                    @foreach($weekByDate as $dateKey => $info)
+                        @if($info['is_allday'])
+                            <tr>
+                                <td>{{ $info['date']->format('m/d（D）') }}</td>
+                                <td><span class="badge badge--active">{{ trans('dashboard.allday') }}</span></td>
+                                <td>-</td>
+                            </tr>
+                        @else
+                            @foreach($info['items'] as $a)
+                                <tr>
+                                    <td>{{ $a->date->format('m/d（D）') }}</td>
+                                    <td>{{ $a->shift ? $a->shift->display_name : '-' }}</td>
+                                    <td>
+                                        @if($a->shift)
+                                            {{ $a->shift->start_time }} - {{ $a->shift->end_time }}
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        @endif
                     @endforeach
                 </tbody>
             </table>
