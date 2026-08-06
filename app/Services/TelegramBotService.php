@@ -82,6 +82,45 @@ class TelegramBotService
     }
 
     /**
+     * 取得最近的 updates（需先關閉 webhook）
+     *
+     * @param int $limit
+     * @return array|null
+     */
+    public function getUpdates($limit = 100)
+    {
+        try {
+            $response = $this->client->post("{$this->baseUrl}/getUpdates", [
+                'json' => ['limit' => $limit],
+            ]);
+
+            return json_decode($response->getBody()->getContents(), true);
+        } catch (\Exception $e) {
+            Log::error('Telegram getUpdates 失敗', ['error' => $e->getMessage()]);
+
+            return null;
+        }
+    }
+
+    /**
+     * 取得目前 Webhook 資訊
+     *
+     * @return array|null
+     */
+    public function getWebhookInfo()
+    {
+        try {
+            $response = $this->client->get("{$this->baseUrl}/getWebhookInfo");
+
+            return json_decode($response->getBody()->getContents(), true);
+        } catch (\Exception $e) {
+            Log::error('Telegram getWebhookInfo 失敗', ['error' => $e->getMessage()]);
+
+            return null;
+        }
+    }
+
+    /**
      * 刪除 Webhook
      *
      * @return array|null

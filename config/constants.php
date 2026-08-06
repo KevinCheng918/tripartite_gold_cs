@@ -37,6 +37,14 @@ return [
         'TTL_DAYS' => 7, // 訊息保留天數
     ],
 
+    'STATION' => [
+        'STATUS' => [
+            'ACTIVE'   => 1, // 啟用
+            'FROZEN'   => 2, // 凍結
+            'DISABLED' => 0, // 停用
+        ],
+    ],
+
     'PAGINATION' => [
         'USER' => 20,
     ],
