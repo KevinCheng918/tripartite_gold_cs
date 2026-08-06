@@ -23,4 +23,5 @@ return [
     'field_shift_count'  => 'Shifts',
     'rank'               => 'Rank',
     'now_on_duty'        => 'On Duty',
+    'allday'             => 'All Day',
 ];
