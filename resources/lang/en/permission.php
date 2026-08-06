@@ -5,6 +5,7 @@ return [
         'account' => 'Accounts',
         'shift' => 'Shifts',
         'attendance' => 'Attendance',
+        'station' => 'Stations',
         'telegram_chat' => 'Telegram Chat',
     ],
     'account' => [
@@ -28,8 +29,14 @@ return [
         'clock' => 'Clock in/out',
         'report' => 'Monthly report',
     ],
+    'station' => [
+        'view'   => 'View stations',
+        'create' => 'Create station',
+        'update' => 'Update station',
+    ],
     'telegram_chat' => [
-        'reply'  => 'Reply messages',
-        'assign' => 'Assign duty staff',
+        'reply'     => 'Reply messages',
+        'assign'    => 'Assign duty staff',
+        'broadcast' => 'Broadcast announcement',
     ],
 ];

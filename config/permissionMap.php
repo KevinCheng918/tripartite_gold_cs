@@ -48,10 +48,20 @@ return [
         ],
     ],
 
+    'station' => [
+        'label' => 'permission.group.station',
+        'keywords' => [
+            'station.view'   => 'permission.station.view',
+            'station.create' => 'permission.station.create',
+            'station.update' => 'permission.station.update',
+        ],
+    ],
+
     'telegram_chat' => [
         'label' => 'permission.group.telegram_chat',
         'keywords' => [
-            'telegram_chat.reply' => 'permission.telegram_chat.reply',
+            'telegram_chat.reply'     => 'permission.telegram_chat.reply',
+            'telegram_chat.broadcast' => 'permission.telegram_chat.broadcast',
         ],
     ],
 

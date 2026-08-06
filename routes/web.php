@@ -3,6 +3,8 @@
 use App\Http\Controllers\Admin\AccountController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ShiftController;
+use App\Http\Controllers\Admin\StationController;
+use App\Http\Controllers\Admin\TelegramBroadcastController;
 use App\Http\Controllers\Admin\TelegramChatController;
 use App\Http\Controllers\Admin\AttendanceController;
 use App\Http\Controllers\Admin\ShiftCoverController;
@@ -28,6 +30,9 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
 
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // 個人資訊修改
+    Route::put('/profile', [AccountController::class, 'ajaxUpdateProfile'])->name('profile.update');
 
     // 帳號管理（含權限設定）
     Route::prefix('accounts')->name('accounts.')->group(function () {
@@ -83,5 +88,25 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-groups', [TelegramChatController::class, 'ajaxGroups'])->name('ajax-groups');
         Route::get('/ajax-messages', [TelegramChatController::class, 'ajaxMessages'])->name('ajax-messages');
         Route::post('/ajax-reply', [TelegramChatController::class, 'ajaxReply'])->middleware('can:telegram_chat.reply')->name('ajax-reply');
+    });
+
+    // 站台管理
+    Route::prefix('stations')->name('stations.')->group(function () {
+        Route::get('/', [StationController::class, 'index'])->middleware('can:station.view')->name('index');
+        Route::get('/ajax-list', [StationController::class, 'ajaxList'])->middleware('can:station.view')->name('ajax-list');
+        Route::post('/ajax-store', [StationController::class, 'ajaxStore'])->middleware('can:station.create')->name('ajax-store');
+        Route::put('/ajax-update/{station}', [StationController::class, 'ajaxUpdate'])->middleware('can:station.update')->name('ajax-update');
+        Route::post('/ajax-sync-credits/{station}', [StationController::class, 'ajaxSyncCredits'])->middleware('can:station.update')->name('ajax-sync-credits');
+        Route::get('/ajax-systems', [StationController::class, 'ajaxSystems'])->middleware('can:station.view')->name('ajax-systems');
+        Route::post('/ajax-store-system', [StationController::class, 'ajaxStoreSystem'])->middleware('can:station.create')->name('ajax-store-system');
+        Route::get('/ajax-bot-groups', [StationController::class, 'ajaxBotGroups'])->middleware('can:station.update')->name('ajax-bot-groups');
+    });
+
+    // Telegram 群發公告
+    Route::prefix('telegram-broadcast')->name('telegram-broadcast.')->group(function () {
+        Route::get('/', [TelegramBroadcastController::class, 'index'])->middleware('can:telegram_chat.broadcast')->name('index');
+        Route::get('/ajax-groups', [TelegramBroadcastController::class, 'ajaxGroups'])->middleware('can:telegram_chat.broadcast')->name('ajax-groups');
+        Route::post('/ajax-send', [TelegramBroadcastController::class, 'ajaxSend'])->middleware('can:telegram_chat.broadcast')->name('ajax-send');
+        Route::get('/ajax-history', [TelegramBroadcastController::class, 'ajaxHistory'])->middleware('can:telegram_chat.broadcast')->name('ajax-history');
     });
 });

@@ -61,6 +61,29 @@
             </a>
         </nav>
 
+        @if(Auth::user()->hasPermission('station.view') || Auth::user()->hasPermission('telegram_chat.broadcast'))
+        <div class="sidebar__section-label sidebar__dropdown-toggle" data-dropdown="station-menu">
+            <span>{{ trans('station.section_label') }}</span>
+            <svg class="sidebar__dropdown-arrow" viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+        </div>
+        <nav class="sidebar__nav sidebar__dropdown-content {{ request()->routeIs('admin.stations.*') || request()->routeIs('admin.telegram-broadcast.*') ? '' : 'sidebar__dropdown--collapsed' }}" id="station-menu">
+            @if(Auth::user()->hasPermission('station.view'))
+            <a href="{{ route('admin.stations.index') }}"
+               class="{{ request()->routeIs('admin.stations.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clip-rule="evenodd"/></svg>
+                {{ trans('station.nav_label') }}
+            </a>
+            @endif
+            @if(Auth::user()->hasPermission('telegram_chat.broadcast'))
+            <a href="{{ route('admin.telegram-broadcast.index') }}"
+               class="{{ request()->routeIs('admin.telegram-broadcast.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"/></svg>
+                {{ trans('broadcast.nav_label') }}
+            </a>
+            @endif
+        </nav>
+        @endif
+
         <div class="sidebar__spacer"></div>
 
         <div class="sidebar__footer">
@@ -88,7 +111,7 @@
                     <svg class="theme-toggle__sun" viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/></svg>
                     <svg class="theme-toggle__moon" viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
                 </button>
-                <div class="topbar__user">
+                <div class="topbar__user" id="btn-open-profile" style="cursor:pointer" title="個人設定">
                     <span class="topbar__avatar">{{ mb_substr(Auth::user()->nickname, 0, 1) }}</span>
                     <div class="topbar__user-info">
                         <span class="topbar__user-name">{{ Auth::user()->nickname }}</span>
@@ -103,6 +126,36 @@
             @yield('content')
         </main>
     </div>
+
+    {{-- 個人資訊 Modal --}}
+    @component('components.modal', ['id' => 'modal-profile', 'title' => trans('profile.title')])
+        <form id="form-profile">
+            <div class="form-group">
+                <label>{{ trans('profile.field_account') }}</label>
+                <input type="text" value="{{ Auth::user()->account }}" disabled style="opacity:0.6">
+            </div>
+            <div class="form-group">
+                <label for="profile-nickname">{{ trans('profile.field_nickname') }}</label>
+                <input id="profile-nickname" type="text" name="nickname" value="{{ Auth::user()->nickname }}" required>
+            </div>
+            <div class="form-group">
+                <label for="profile-password">{{ trans('profile.field_password') }}（{{ trans('profile.password_hint') }}）</label>
+                <input id="profile-password" type="password" name="password" minlength="4" autocomplete="new-password">
+            </div>
+            <div class="modal-actions">
+                <button type="button" data-modal-close>{{ trans('shift.modal_cancel') }}</button>
+                <button type="submit" class="btn-primary">{{ trans('shift.modal_confirm') }}</button>
+            </div>
+        </form>
+    @endcomponent
+
+    {{-- 個人資訊訊息 Modal --}}
+    @component('components.modal', ['id' => 'modal-profile-msg', 'title' => ''])
+        <p id="modal-profile-msg-text"></p>
+        <div class="modal-actions">
+            <button type="button" data-modal-close class="btn-primary">OK</button>
+        </div>
+    @endcomponent
 
     <script src="{{ asset('vendor/flatpickr/flatpickr.min.js') }}"></script>
     <script src="{{ asset('vendor/flatpickr/zh-tw.js') }}"></script>
@@ -149,6 +202,99 @@
                 localStorage.setItem('theme', 'dark');
             }
         });
+    })();
+    </script>
+    <script>
+    // sidebar 下拉選單
+    (function () {
+        document.querySelectorAll('.sidebar__dropdown-toggle').forEach(function (toggle) {
+            toggle.addEventListener('click', function () {
+                var targetId = toggle.dataset.dropdown;
+                var content = document.getElementById(targetId);
+                if (!content) { return; }
+
+                toggle.classList.toggle('open');
+                content.classList.toggle('sidebar__dropdown--collapsed');
+            });
+
+            // 如果內容未折疊，標記為 open
+            var targetId = toggle.dataset.dropdown;
+            var content = document.getElementById(targetId);
+            if (content && !content.classList.contains('sidebar__dropdown--collapsed')) {
+                toggle.classList.add('open');
+            }
+        });
+    })();
+    </script>
+    <script>
+    (function () {
+        var csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+
+        // 開啟個人資訊 modal
+        var profileBtn = document.getElementById('btn-open-profile');
+        if (profileBtn) {
+            profileBtn.addEventListener('click', function () {
+                var modal = document.getElementById('modal-profile');
+                if (modal) { modal.style.display = 'flex'; }
+            });
+        }
+
+        // modal 關閉
+        document.querySelectorAll('#modal-profile [data-modal-close], #modal-profile-msg [data-modal-close]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                btn.closest('.modal-overlay').style.display = 'none';
+            });
+        });
+
+        ['modal-profile', 'modal-profile-msg'].forEach(function (id) {
+            var overlay = document.getElementById(id);
+            if (overlay) {
+                overlay.addEventListener('click', function (e) {
+                    if (e.target === overlay) { overlay.style.display = 'none'; }
+                });
+            }
+        });
+
+        // 提交個人資訊
+        var form = document.getElementById('form-profile');
+        if (form) {
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                var data = {};
+                var nickname = document.getElementById('profile-nickname').value.trim();
+                var password = document.getElementById('profile-password').value;
+
+                if (nickname) { data.nickname = nickname; }
+                if (password) { data.password = password; }
+
+                fetch('/admin/profile', {
+                    method: 'PUT',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json',
+                    },
+                    body: JSON.stringify(data),
+                })
+                    .then(function (r) { return r.json(); })
+                    .then(function (body) {
+                        document.getElementById('modal-profile').style.display = 'none';
+                        document.getElementById('modal-profile-msg-text').textContent = body.message || '已更新';
+                        document.getElementById('modal-profile-msg').style.display = 'flex';
+
+                        // 更新頁面上的暱稱
+                        if (nickname) {
+                            document.querySelector('.topbar__user-name').textContent = nickname;
+                            var avatar = document.querySelector('.topbar__avatar');
+                            if (avatar) { avatar.textContent = nickname.substring(0, 1); }
+                        }
+                    })
+                    .catch(function () {
+                        document.getElementById('modal-profile-msg-text').textContent = '更新失敗';
+                        document.getElementById('modal-profile-msg').style.display = 'flex';
+                    });
+            });
+        }
     })();
     </script>
     @yield('scripts')
