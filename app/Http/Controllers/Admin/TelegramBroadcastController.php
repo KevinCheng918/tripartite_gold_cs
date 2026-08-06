@@ -42,9 +42,9 @@ class TelegramBroadcastController extends Controller
      */
     public function ajaxGroups()
     {
-        $groups = $this->chatService->getConversationList();
+        $stations = $this->broadcastService->getTargetStations();
 
-        return response()->json($groups);
+        return response()->json($stations);
     }
 
     /**
