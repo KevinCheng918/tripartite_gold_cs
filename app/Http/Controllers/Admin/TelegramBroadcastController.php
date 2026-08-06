@@ -32,13 +32,7 @@ class TelegramBroadcastController extends Controller
      */
     public function index()
     {
-        $groups = $this->broadcastService->getTargetStations();
-        $history = $this->broadcastService->list(20);
-
-        return view('admin.telegram-broadcast.index', [
-            'groups'  => $groups,
-            'history' => $history,
-        ]);
+        return view('admin.telegram-broadcast.index');
     }
 
     /**
@@ -48,9 +42,9 @@ class TelegramBroadcastController extends Controller
      */
     public function ajaxGroups()
     {
-        $stations = $this->broadcastService->getTargetStations();
+        $groups = $this->chatService->getConversationList();
 
-        return response()->json($stations);
+        return response()->json($groups);
     }
 
     /**

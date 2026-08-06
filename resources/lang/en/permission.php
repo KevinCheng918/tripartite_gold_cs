@@ -29,7 +29,8 @@ return [
         'report' => 'Monthly report',
     ],
     'telegram_chat' => [
-        'reply'  => 'Reply messages',
-        'assign' => 'Assign duty staff',
+        'reply'     => 'Reply messages',
+        'assign'    => 'Assign duty staff',
+        'broadcast' => 'Broadcast announcement',
     ],
 ];
