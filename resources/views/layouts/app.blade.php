@@ -59,6 +59,21 @@
                 <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"/></svg>
                 {{ trans('telegram_chat.nav_label') }}
             </a>
+        </nav>
+
+        @if(Auth::user()->hasPermission('station.view') || Auth::user()->hasPermission('telegram_chat.broadcast'))
+        <div class="sidebar__section-label sidebar__dropdown-toggle" data-dropdown="station-menu">
+            <span>{{ trans('station.section_label') }}</span>
+            <svg class="sidebar__dropdown-arrow" viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+        </div>
+        <nav class="sidebar__nav sidebar__dropdown-content {{ request()->routeIs('admin.stations.*') || request()->routeIs('admin.telegram-broadcast.*') ? '' : 'sidebar__dropdown--collapsed' }}" id="station-menu">
+            @if(Auth::user()->hasPermission('station.view'))
+            <a href="{{ route('admin.stations.index') }}"
+               class="{{ request()->routeIs('admin.stations.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clip-rule="evenodd"/></svg>
+                {{ trans('station.nav_label') }}
+            </a>
+            @endif
             @if(Auth::user()->hasPermission('telegram_chat.broadcast'))
             <a href="{{ route('admin.telegram-broadcast.index') }}"
                class="{{ request()->routeIs('admin.telegram-broadcast.*') ? 'active' : '' }}">
@@ -67,6 +82,7 @@
             </a>
             @endif
         </nav>
+        @endif
 
         <div class="sidebar__spacer"></div>
 
@@ -184,6 +200,28 @@
             } else {
                 document.documentElement.setAttribute('data-theme', 'dark');
                 localStorage.setItem('theme', 'dark');
+            }
+        });
+    })();
+    </script>
+    <script>
+    // sidebar 下拉選單
+    (function () {
+        document.querySelectorAll('.sidebar__dropdown-toggle').forEach(function (toggle) {
+            toggle.addEventListener('click', function () {
+                var targetId = toggle.dataset.dropdown;
+                var content = document.getElementById(targetId);
+                if (!content) { return; }
+
+                toggle.classList.toggle('open');
+                content.classList.toggle('sidebar__dropdown--collapsed');
+            });
+
+            // 如果內容未折疊，標記為 open
+            var targetId = toggle.dataset.dropdown;
+            var content = document.getElementById(targetId);
+            if (content && !content.classList.contains('sidebar__dropdown--collapsed')) {
+                toggle.classList.add('open');
             }
         });
     })();

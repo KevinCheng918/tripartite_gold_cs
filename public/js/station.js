@@ -8,9 +8,9 @@
     var csrfToken = document.querySelector('meta[name="csrf-token"]').content;
 
     var statusMap = {};
-    statusMap[1] = { text: i18n.status_active, css: 'bg-success' };
-    statusMap[2] = { text: i18n.status_frozen, css: 'bg-warning text-dark' };
-    statusMap[0] = { text: i18n.status_disabled, css: 'bg-danger' };
+    statusMap[1] = { text: i18n.status_active, css: 'badge--active' };
+    statusMap[2] = { text: i18n.status_frozen, css: 'badge--pending' };
+    statusMap[0] = { text: i18n.status_disabled, css: 'badge--rejected' };
 
     var stationsData = [];
     var currentPage = 1;
@@ -24,7 +24,6 @@
         support_shop: '',
         score_runner: '',
     };
-    var perPage = 15;
     var systemsCache = [];
 
     function apiFetch(url, options) {
@@ -45,12 +44,12 @@
 
     function openModal(id) {
         var el = document.getElementById(id);
-        if (el) { new bootstrap.Modal(el).show(); }
+        if (el) { el.style.display = 'flex'; }
     }
 
     function closeModal(id) {
         var el = document.getElementById(id);
-        if (el) { var inst = bootstrap.Modal.getInstance(el); if (inst) { inst.hide(); } }
+        if (el) { el.style.display = 'none'; }
     }
 
     function showMessage(message) {
@@ -68,6 +67,10 @@
     }
 
     // modal 關閉
+    document.querySelectorAll('[data-modal-close]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            btn.closest('.modal-overlay').style.display = 'none';
+        });
     });
     document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
         overlay.addEventListener('click', function (e) {
@@ -81,7 +84,7 @@
 
     function loadStations(page) {
         page = page || 1;
-        var url = '/admin/stations/ajax-list?per_page=' + perPage + '&page=' + page;
+        var url = '/admin/stations/ajax-list?per_page=20&page=' + page;
 
         Object.keys(searchFilters).forEach(function (key) {
             if (searchFilters[key] !== '') {
@@ -143,113 +146,59 @@
 
         var toolbarActions = '';
         if (canCreate) {
-            toolbarActions += '<button class="btn btn-primary" id="btn-create-station">' + i18n.action_create + '</button> ';
+            toolbarActions += '<button class="btn-primary" id="btn-create-station">' + i18n.action_create + '</button> ';
         }
         if (canUpdate) {
             toolbarActions += '<button class="btn-sm" id="btn-sync-all">' + (i18n.action_sync_all || '一鍵同步全部') + '</button>';
         }
 
-        function filterField(label, html) {
-            return '<div class="stn-field"><label class="stn-field__label">' + label + '</label>' + html + '</div>';
-        }
-
         var toolbar =
             '<div class="stn-toolbar">' +
-            '<div class="stn-toolbar__top">' +
+            '<div class="stn-toolbar__row">' +
             '<div class="stn-toolbar__actions">' + toolbarActions + '</div>' +
             '</div>' +
-            '<div class="stn-toolbar__grid">' +
-            filterField('關鍵字：', '<input type="text" id="stn-f-keyword" placeholder="名稱或域名" value="' + searchFilters.keyword + '">') +
-            filterField('系統：', '<select id="stn-f-system">' + systemOptions + '</select>') +
-            filterField('狀態：', '<select id="stn-f-status">' +
-                '<option value="">全部</option>' +
-                '<option value="1"' + (searchFilters.status === '1' ? ' selected' : '') + '>' + i18n.status_active + '</option>' +
-                '<option value="2"' + (searchFilters.status === '2' ? ' selected' : '') + '>' + i18n.status_frozen + '</option>' +
-                '<option value="0"' + (searchFilters.status === '0' ? ' selected' : '') + '>' + i18n.status_disabled + '</option>' +
-                '</select>') +
-            filterField('商城：', '<select id="stn-f-shop">' +
-                '<option value="">全部</option>' +
-                '<option value="true"' + (searchFilters.support_shop === 'true' ? ' selected' : '') + '>啟用</option>' +
-                '<option value="false"' + (searchFilters.support_shop === 'false' ? ' selected' : '') + '>未啟用</option>' +
-                '</select>') +
-            filterField('跑分員：', '<select id="stn-f-runner">' +
-                '<option value="">全部</option>' +
-                '<option value="true"' + (searchFilters.score_runner === 'true' ? ' selected' : '') + '>啟用</option>' +
-                '<option value="false"' + (searchFilters.score_runner === 'false' ? ' selected' : '') + '>未啟用</option>' +
-                '</select>') +
-            filterField('點數 ≥：', '<input type="number" id="stn-f-credits-min" placeholder="最小值" value="' + searchFilters.credits_min + '">') +
-            filterField('點數 ≤：', '<input type="number" id="stn-f-credits-max" placeholder="最大值" value="' + searchFilters.credits_max + '">') +
-            filterField('每頁：', '<select id="stn-per-page">' +
-                [15, 30, 50, 75, 100].map(function (n) {
-                    return '<option value="' + n + '"' + (perPage === n ? ' selected' : '') + '>' + n + ' 筆</option>';
-                }).join('') +
-                '</select>') +
-            '</div>' +
-            '<div class="stn-toolbar__bottom">' +
-            '<div></div>' +
-            '<div class="stn-toolbar__right">' +
+            '<div class="stn-toolbar__filters">' +
+            '<input type="text" id="stn-f-keyword" placeholder="名稱或域名..."  value="' + searchFilters.keyword + '">' +
+            '<select id="stn-f-system">' + systemOptions + '</select>' +
+            '<select id="stn-f-status">' +
+            '<option value="">全部狀態</option>' +
+            '<option value="1"' + (searchFilters.status === '1' ? ' selected' : '') + '>' + i18n.status_active + '</option>' +
+            '<option value="2"' + (searchFilters.status === '2' ? ' selected' : '') + '>' + i18n.status_frozen + '</option>' +
+            '<option value="0"' + (searchFilters.status === '0' ? ' selected' : '') + '>' + i18n.status_disabled + '</option>' +
+            '</select>' +
+            '<select id="stn-f-shop">' +
+            '<option value="">商城</option>' +
+            '<option value="true"' + (searchFilters.support_shop === 'true' ? ' selected' : '') + '>啟用</option>' +
+            '<option value="false"' + (searchFilters.support_shop === 'false' ? ' selected' : '') + '>未啟用</option>' +
+            '</select>' +
+            '<select id="stn-f-runner">' +
+            '<option value="">跑分員</option>' +
+            '<option value="true"' + (searchFilters.score_runner === 'true' ? ' selected' : '') + '>啟用</option>' +
+            '<option value="false"' + (searchFilters.score_runner === 'false' ? ' selected' : '') + '>未啟用</option>' +
+            '</select>' +
+            '<input type="number" id="stn-f-credits-min" placeholder="點數 ≥" value="' + searchFilters.credits_min + '">' +
+            '<input type="number" id="stn-f-credits-max" placeholder="點數 ≤" value="' + searchFilters.credits_max + '">' +
+            '<button class="btn-primary btn-sm" id="btn-stn-search">搜尋</button>' +
             '<button class="btn-sm" id="btn-stn-reset">重置</button>' +
-            '<button class="btn btn-primary" id="btn-stn-search">搜尋</button>' +
-            '</div>' +
             '</div>' +
             '</div>';
 
         // 分頁
-        var pagination = '<div class="stn-pagination">';
-        if (currentPage > 1) {
-            pagination += '<button class="btn-sm js-stn-page" data-page="' + (currentPage - 1) + '">&lsaquo;</button>';
-        }
+        var pagination = '';
         if (totalPages > 1) {
-            pagination += '<span class="stn-pagination__info">' + currentPage + ' / ' + totalPages + '</span>';
-        }
-        if (currentPage < totalPages) {
-            pagination += '<button class="btn-sm js-stn-page" data-page="' + (currentPage + 1) + '">&rsaquo;</button>';
-        }
-        pagination += '</div>';
-
-        // 手機版卡片
-        var cards = stations.map(function (s) {
-            var st = statusMap[s.status] || { text: '-', css: '' };
-            var settings = s.settings || {};
-            var depositRate = settings.system_rate ? (settings.system_rate * 100).toFixed(2) + '%' : '-';
-            var withdrawRate = settings.system_rate_withdraw ? (settings.system_rate_withdraw * 100).toFixed(2) + '%' : '-';
-
-            var actions = '<button class="btn-sm js-station-detail" data-id="' + s.id + '">' + (i18n.action_detail || '詳細') + '</button>';
-            if (canUpdate) {
-                actions += '<button class="btn-sm js-edit-station" data-id="' + s.id + '">' + i18n.action_edit + '</button>';
-                actions += '<button class="btn-sm js-sync-credits" data-id="' + s.id + '">' + (i18n.action_sync || '同步') + '</button>';
+            pagination = '<div class="stn-pagination">';
+            if (currentPage > 1) {
+                pagination += '<button class="btn-sm js-stn-page" data-page="' + (currentPage - 1) + '">&lsaquo;</button>';
             }
-
-            var sysName = s.system ? s.system.name : '-';
-            var bannerColors = {
-                'LV': 'linear-gradient(135deg, #7c3aed, #6366f1)',
-                'HM': 'linear-gradient(135deg, #6b7280, #4b5563)'
-            };
-            var bannerBg = bannerColors[sysName] || 'linear-gradient(135deg, #7c3aed, #6366f1)';
-
-            return (
-                '<div class="stn-card">' +
-                '<div class="stn-card__banner" style="background:' + bannerBg + '">&#9881; ' + sysName + '</div>' +
-                '<div class="stn-card__body">' +
-                '<div class="stn-card__profile">' +
-                '<div class="stn-card__info">' +
-                '<div class="stn-card__name">' + s.name + '</div>' +
-                '</div>' +
-                '<span class="badge ' + st.css + '">' + st.text + '</span>' +
-                '</div>' +
-                '<div class="stn-card__divider"></div>' +
-                (s.domain ? '<div class="stn-card__row">&#127760; <span class="stn-card__label">域名</span><span class="stn-card__value">' + s.domain + '</span></div>' : '') +
-                '<div class="stn-card__row">&#128179; <span class="stn-card__label">' + i18n.field_credits + '</span><span class="stn-card__value" style="font-weight:700">' + s.credits + '</span></div>' +
-                '<div class="stn-card__row">&#128196; <span class="stn-card__label">費率（收/付）</span><span class="stn-card__value">' + depositRate + ' / ' + withdrawRate + '</span></div>' +
-                '<div class="stn-card__divider"></div>' +
-                '<div class="stn-card__actions">' + actions + '</div>' +
-                '</div>' +
-                '</div>'
-            );
-        }).join('');
+            pagination += '<span class="stn-pagination__info">' + currentPage + ' / ' + totalPages + '</span>';
+            if (currentPage < totalPages) {
+                pagination += '<button class="btn-sm js-stn-page" data-page="' + (currentPage + 1) + '">&rsaquo;</button>';
+            }
+            pagination += '</div>';
+        }
 
         root.innerHTML = toolbar +
-            '<table class="stn-table-desktop"><thead><tr>' +
+            '<table><thead><tr>' +
             '<th>#</th>' +
             '<th>系統</th>' +
             '<th>' + i18n.field_name + '</th>' +
@@ -258,9 +207,7 @@
             '<th>' + i18n.field_status + '</th>' +
             '<th>同步</th>' +
             '<th></th>' +
-            '</tr></thead><tbody>' + rows + '</tbody></table>' +
-            '<div class="shift-cards stn-cards-mobile">' + cards + '</div>' +
-            pagination;
+            '</tr></thead><tbody>' + rows + '</tbody></table>' + pagination;
 
         // 搜尋事件
         function collectFilters() {
@@ -302,14 +249,6 @@
                 loadStations(parseInt(btn.dataset.page, 10));
             });
         });
-
-        var perPageEl = document.getElementById('stn-per-page');
-        if (perPageEl) {
-            perPageEl.addEventListener('change', function () {
-                perPage = parseInt(perPageEl.value, 10);
-                loadStations(1);
-            });
-        }
 
         var createBtnEl = document.getElementById('btn-create-station');
         if (createBtnEl) {
@@ -403,8 +342,8 @@
 
     function showStationDetail(s) {
         var settings = s.settings || {};
-        var on = '<span class="badge bg-success">啟用</span>';
-        var off = '<span class="badge bg-danger">未啟用</span>';
+        var on = '<span class="badge badge--active">啟用</span>';
+        var off = '<span class="badge badge--disabled">未啟用</span>';
 
         var depositTypes = [];
         if (settings.usdt_deposit) { depositTypes.push('USDT'); }
@@ -416,7 +355,7 @@
         var depositRate = settings.system_rate ? (settings.system_rate * 100).toFixed(2) + '%' : '-';
         var withdrawRate = settings.system_rate_withdraw ? (settings.system_rate_withdraw * 100).toFixed(2) + '%' : '-';
         var depositBadges = depositTypes.length > 0
-            ? depositTypes.map(function (t) { return '<span class="badge bg-success">' + t + '</span>'; }).join(' ')
+            ? depositTypes.map(function (t) { return '<span class="badge badge--active">' + t + '</span>'; }).join(' ')
             : '-';
 
         var html =
