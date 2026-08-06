@@ -88,7 +88,7 @@
                     <svg class="theme-toggle__sun" viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/></svg>
                     <svg class="theme-toggle__moon" viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
                 </button>
-                <div class="topbar__user">
+                <div class="topbar__user" id="btn-open-profile" style="cursor:pointer" title="個人設定">
                     <span class="topbar__avatar">{{ mb_substr(Auth::user()->nickname, 0, 1) }}</span>
                     <div class="topbar__user-info">
                         <span class="topbar__user-name">{{ Auth::user()->nickname }}</span>
@@ -103,6 +103,36 @@
             @yield('content')
         </main>
     </div>
+
+    {{-- 個人資訊 Modal --}}
+    @component('components.modal', ['id' => 'modal-profile', 'title' => trans('profile.title')])
+        <form id="form-profile">
+            <div class="form-group">
+                <label>{{ trans('profile.field_account') }}</label>
+                <input type="text" value="{{ Auth::user()->account }}" disabled style="opacity:0.6">
+            </div>
+            <div class="form-group">
+                <label for="profile-nickname">{{ trans('profile.field_nickname') }}</label>
+                <input id="profile-nickname" type="text" name="nickname" value="{{ Auth::user()->nickname }}" required>
+            </div>
+            <div class="form-group">
+                <label for="profile-password">{{ trans('profile.field_password') }}（{{ trans('profile.password_hint') }}）</label>
+                <input id="profile-password" type="password" name="password" minlength="4" autocomplete="new-password">
+            </div>
+            <div class="modal-actions">
+                <button type="button" data-modal-close>{{ trans('shift.modal_cancel') }}</button>
+                <button type="submit" class="btn-primary">{{ trans('shift.modal_confirm') }}</button>
+            </div>
+        </form>
+    @endcomponent
+
+    {{-- 個人資訊訊息 Modal --}}
+    @component('components.modal', ['id' => 'modal-profile-msg', 'title' => ''])
+        <p id="modal-profile-msg-text"></p>
+        <div class="modal-actions">
+            <button type="button" data-modal-close class="btn-primary">OK</button>
+        </div>
+    @endcomponent
 
     <script src="{{ asset('vendor/flatpickr/flatpickr.min.js') }}"></script>
     <script src="{{ asset('vendor/flatpickr/zh-tw.js') }}"></script>
@@ -149,6 +179,77 @@
                 localStorage.setItem('theme', 'dark');
             }
         });
+    })();
+    </script>
+    <script>
+    (function () {
+        var csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+
+        // 開啟個人資訊 modal
+        var profileBtn = document.getElementById('btn-open-profile');
+        if (profileBtn) {
+            profileBtn.addEventListener('click', function () {
+                var modal = document.getElementById('modal-profile');
+                if (modal) { modal.style.display = 'flex'; }
+            });
+        }
+
+        // modal 關閉
+        document.querySelectorAll('#modal-profile [data-modal-close], #modal-profile-msg [data-modal-close]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                btn.closest('.modal-overlay').style.display = 'none';
+            });
+        });
+
+        ['modal-profile', 'modal-profile-msg'].forEach(function (id) {
+            var overlay = document.getElementById(id);
+            if (overlay) {
+                overlay.addEventListener('click', function (e) {
+                    if (e.target === overlay) { overlay.style.display = 'none'; }
+                });
+            }
+        });
+
+        // 提交個人資訊
+        var form = document.getElementById('form-profile');
+        if (form) {
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                var data = {};
+                var nickname = document.getElementById('profile-nickname').value.trim();
+                var password = document.getElementById('profile-password').value;
+
+                if (nickname) { data.nickname = nickname; }
+                if (password) { data.password = password; }
+
+                fetch('/admin/profile', {
+                    method: 'PUT',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json',
+                    },
+                    body: JSON.stringify(data),
+                })
+                    .then(function (r) { return r.json(); })
+                    .then(function (body) {
+                        document.getElementById('modal-profile').style.display = 'none';
+                        document.getElementById('modal-profile-msg-text').textContent = body.message || '已更新';
+                        document.getElementById('modal-profile-msg').style.display = 'flex';
+
+                        // 更新頁面上的暱稱
+                        if (nickname) {
+                            document.querySelector('.topbar__user-name').textContent = nickname;
+                            var avatar = document.querySelector('.topbar__avatar');
+                            if (avatar) { avatar.textContent = nickname.substring(0, 1); }
+                        }
+                    })
+                    .catch(function () {
+                        document.getElementById('modal-profile-msg-text').textContent = '更新失敗';
+                        document.getElementById('modal-profile-msg').style.display = 'flex';
+                    });
+            });
+        }
     })();
     </script>
     @yield('scripts')

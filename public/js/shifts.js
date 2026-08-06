@@ -663,21 +663,38 @@
         }).join('');
     }
 
-    /** 填充 Admin 排班 Modal 的客服選單 */
+    /** 填充 Admin 排班 Modal 的客服 checkbox 列表 */
     function populateAssignUserSelect() {
-        var select = document.getElementById('assign-user');
-        if (!select) { return; }
+        var container = document.getElementById('assign-user-list');
+        if (!container) { return; }
 
         if (csUsersData.length > 0) {
-            fillUserSelect(select, csUsersData);
+            fillUserCheckboxes(container, csUsersData);
             return;
         }
 
         apiFetch('/admin/shifts/ajax-cs-users')
             .then(function (body) {
                 csUsersData = body;
-                fillUserSelect(select, csUsersData);
+                fillUserCheckboxes(container, csUsersData);
             });
+    }
+
+    /**
+     * 填充客服 checkbox 列表（多選）
+     *
+     * @param {HTMLElement} container
+     * @param {Array} users
+     */
+    function fillUserCheckboxes(container, users) {
+        container.innerHTML = users.map(function (u) {
+            var label = u.nickname + '（' + u.account + '）';
+            var lockTag = u.status === 2 ? ' <span style="color:#dc2626">— 鎖定</span>' : '';
+            return '<label class="assign-user-cb">' +
+                '<input type="checkbox" name="user_ids[]" value="' + u.id + '">' +
+                '<span>' + label + lockTag + '</span>' +
+                '</label>';
+        }).join('');
     }
 
     /**
@@ -760,18 +777,37 @@
     function submitAssign(e) {
         e.preventDefault();
         var form = document.getElementById('form-assign');
-        var data = {
-            shift_id: parseInt(form.querySelector('[name="shift_id"]').value, 10),
-            date: form.querySelector('[name="date"]').value,
-        };
+        var shiftId = parseInt(form.querySelector('[name="shift_id"]').value, 10);
+        var date = form.querySelector('[name="date"]').value;
 
-        // Admin 帶上指定的客服 user_id
-        var userSelect = form.querySelector('[name="user_id"]');
-        if (userSelect) {
-            data.user_id = parseInt(userSelect.value, 10);
+        // Admin 多選：收集勾選的 user_id，逐個送出
+        var checkboxes = form.querySelectorAll('[name="user_ids[]"]:checked');
+        if (checkboxes.length > 0) {
+            var userIds = [];
+            checkboxes.forEach(function (cb) { userIds.push(parseInt(cb.value, 10)); });
+
+            var promises = userIds.map(function (uid) {
+                return apiFetch('/admin/shifts/ajax-assign', {
+                    method: 'POST',
+                    body: JSON.stringify({ shift_id: shiftId, date: date, user_id: uid }),
+                });
+            });
+
+            Promise.all(promises)
+                .then(function () {
+                    closeModal('modal-assign');
+                    showMessage(i18n.assigned + '（' + userIds.length + ' 人）');
+                    if (activeTab === 'timetable') { loadTimetable(); }
+                })
+                .catch(function (error) { showMessage(getErrorMessage(error)); });
+            return;
         }
 
-        apiFetch('/admin/shifts/ajax-assign', { method: 'POST', body: JSON.stringify(data) })
+        // 客服自己報班（沒有 checkbox）
+        apiFetch('/admin/shifts/ajax-assign', {
+            method: 'POST',
+            body: JSON.stringify({ shift_id: shiftId, date: date }),
+        })
             .then(function () {
                 closeModal('modal-assign');
                 showMessage(i18n.assigned);
