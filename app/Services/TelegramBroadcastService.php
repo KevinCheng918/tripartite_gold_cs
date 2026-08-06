@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\TelegramBroadcast;
+use App\Repositories\StationRepository;
 use App\Repositories\TelegramBroadcastRepository;
 use App\Repositories\TelegramRepository;
 use Illuminate\Support\Facades\Log;
@@ -16,15 +17,18 @@ class TelegramBroadcastService
 {
     private $broadcastRepository;
     private $telegramRepository;
+    private $stationRepository;
     private $botService;
 
     public function __construct(
         TelegramBroadcastRepository $broadcastRepository,
         TelegramRepository $telegramRepository,
+        StationRepository $stationRepository,
         TelegramBotService $botService
     ) {
         $this->broadcastRepository = $broadcastRepository;
         $this->telegramRepository = $telegramRepository;
+        $this->stationRepository = $stationRepository;
         $this->botService = $botService;
     }
 
@@ -34,6 +38,22 @@ class TelegramBroadcastService
      * @param int $perPage
      * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
+    /**
+     * 取得可發送公告的站台列表（啟用且有 Telegram 群組）
+     *
+     * @return array
+     */
+    public function getTargetStations()
+    {
+        return $this->stationRepository->getActiveWithTelegram()->map(function ($s) {
+            return [
+                'id'    => $s->id,
+                'name'  => $s->name,
+                'title' => $s->name . ($s->domain ? " ({$s->domain})" : ''),
+            ];
+        })->values()->all();
+    }
+
     public function list($perPage = 20)
     {
         return $this->broadcastRepository->paginate($perPage);
@@ -42,7 +62,10 @@ class TelegramBroadcastService
     /**
      * 發送群發公告
      *
-     * @param array $params   含 content, target_type, group_ids(optional)
+     * 從站台列表取得目標（僅啟用且有 Telegram 群組的站台）。
+     * group_ids 在這裡是 station.id，不是 telegram_group.id。
+     *
+     * @param array $params   含 content, target_type, group_ids(station ids, optional)
      * @param int   $senderId 發送者 user_id
      * @return TelegramBroadcast
      */
@@ -51,21 +74,27 @@ class TelegramBroadcastService
         $targetType = (int) $params['target_type'];
         $content = $params['content'];
 
-        // 取得目標群組
+        // 從站台列表取得目標（僅啟用且有 Telegram 群組的）
+        $allStations = $this->stationRepository->getActiveWithTelegram();
+
         if ($targetType === TelegramBroadcast::TARGET_ALL) {
-            $groups = $this->telegramRepository->getActiveGroups();
-            $groupIds = $groups->pluck('id')->all();
+            $stations = $allStations;
+            $stationIds = $stations->pluck('id')->all();
         } else {
-            $groupIds = $params['group_ids'] ?? [];
-            $groups = $this->telegramRepository->getActiveGroups()
-                ->whereIn('id', $groupIds);
+            $stationIds = $params['group_ids'] ?? [];
+            $stations = $allStations->whereIn('id', $stationIds);
         }
+
+        // 取得對應的 Telegram 群組（透過站台的 telegramGroup 關聯）
+        $groups = $stations->map(function ($station) {
+            return $station->telegramGroup;
+        })->filter();
 
         // 建立紀錄
         $broadcast = $this->broadcastRepository->create([
             'content'          => $content,
             'target_type'      => $targetType,
-            'target_group_ids' => $targetType === TelegramBroadcast::TARGET_SELECTED ? $groupIds : null,
+            'target_group_ids' => $targetType === TelegramBroadcast::TARGET_SELECTED ? $stationIds : null,
             'total_count'      => $groups->count(),
             'success_count'    => 0,
             'fail_count'       => 0,
