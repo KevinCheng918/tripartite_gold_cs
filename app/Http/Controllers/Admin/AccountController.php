@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\AccountService;
 use App\Services\PermissionMapService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -41,6 +42,30 @@ class AccountController extends Controller
     public function index()
     {
         return view('admin.accounts.index');
+    }
+
+    /**
+     * Ajax 修改個人資訊（暱稱、密碼）
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxUpdateProfile(Request $request)
+    {
+        $params = $request->validate([
+            'nickname' => 'sometimes|string|max:100',
+            'password' => 'sometimes|nullable|' . config('rules.USER_PASSWORD_REGEX'),
+        ]);
+
+        try {
+            $this->accountService->update(Auth::user(), $params);
+
+            return response()->json(['message' => trans('profile.msg.update_success')]);
+        } catch (\Exception $e) {
+            Log::error('個人資訊修改失敗', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
+
+            return response()->json(['message' => trans('profile.msg.update_failed')], 500);
+        }
     }
 
     /**

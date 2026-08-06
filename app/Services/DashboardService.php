@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Repositories\ShiftAssignmentRepository;
+use App\Repositories\ShiftRepository;
 use App\Repositories\UserRepository;
 
 /**
@@ -14,13 +15,16 @@ class DashboardService
 {
     private $userRepository;
     private $assignmentRepository;
+    private $shiftRepository;
 
     public function __construct(
         UserRepository $userRepository,
-        ShiftAssignmentRepository $assignmentRepository
+        ShiftAssignmentRepository $assignmentRepository,
+        ShiftRepository $shiftRepository
     ) {
         $this->userRepository = $userRepository;
         $this->assignmentRepository = $assignmentRepository;
+        $this->shiftRepository = $shiftRepository;
     }
 
     /**
@@ -43,19 +47,26 @@ class DashboardService
         $lockCs = $allCsUsers->where('status', config('constants.USER.STATUS.LOCK'))->count();
         $deactivateCs = $allCsUsers->where('status', config('constants.USER.STATUS.DEACTIVATE'))->count();
 
-        // 今日排班 — 依班別分組（早班是誰、午班是誰、晚班是誰）
+        // 今日排班 — 固定三欄：早班、午班、晚班（依 shifts 表的 sort 排序）
         $todayAssignments = $this->assignmentRepository->getByDateRange($today, $today);
+        $allShifts = $this->shiftRepository->allActive();
 
-        $todayByShift = $todayAssignments->groupBy(function ($a) {
-            return $a->shift ? $a->shift->display_name : '-';
-        })->map(function ($group) {
-            return [
-                'shift'    => $group->first()->shift,
-                'users'    => $group->map(function ($a) {
+        $todayByShift = collect();
+        foreach ($allShifts as $shift) {
+            $users = $todayAssignments
+                ->where('shift_id', $shift->id)
+                ->map(function ($a) {
                     return $a->user ? $a->user->nickname : '-';
-                })->values()->all(),
-            ];
-        });
+                })
+                ->unique()
+                ->values()
+                ->all();
+
+            $todayByShift->put($shift->display_name, [
+                'shift' => $shift,
+                'users' => $users,
+            ]);
+        }
 
         // 本週排班 — 依員工班次數排名（最多班的人排最前面）
         $weekAssignments = $this->assignmentRepository->getByDateRange($weekStart, $weekEnd);
