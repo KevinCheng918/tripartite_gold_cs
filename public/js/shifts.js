@@ -319,11 +319,14 @@
 
         /**
          * 為某日某小時建立所有需要顯示的色塊
-         * 每個色塊是 { type: 'shift'|'cover', cls, label, dataId }
+         * 同班別合併成一個色塊，人名用頓號連接
          */
         function buildCellBlocks(date, hour) {
             var blocks = [];
             if (!lookup[date]) { return blocks; }
+
+            // 先收集這個小時所有匹配的排班，按 shift.name 分組
+            var shiftGroups = {};  // key: shift.name → { shift, users: [], assignmentIds: [], covers: [] }
 
             lookup[date].forEach(function (a) {
                 if (!a.shift) { return; }
@@ -331,8 +334,6 @@
                 if (!inRange) { return; }
 
                 var covers = coverLookup[a.id] || [];
-
-                // 檢查這個小時是否在某個代班時段內
                 var coveredBy = null;
                 covers.forEach(function (c) {
                     if (isTimeInRange(c.cover_start, c.cover_end, hour)) {
@@ -341,7 +342,7 @@
                 });
 
                 if (coveredBy) {
-                    // 代班人色塊
+                    // 代班獨立處理
                     var coverName = coveredBy.cover_user ? coveredBy.cover_user.nickname : '';
                     var originalName = a.user ? a.user.nickname : '';
                     var coverKey = date + '_cover_' + coveredBy.id;
@@ -355,21 +356,38 @@
                     }
                     blocks.push({ cls: 'tt-shift-cover', label: coverLabel, dataId: a.id });
                 } else {
-                    // 原班人色塊
-                    var shiftCls = 'tt-shift-' + a.shift.name;
-                    var userName = a.user ? a.user.nickname : '';
-                    var shiftName = a.shift.display_name || '';
-                    var labelKey = date + '_' + a.id;
-                    var label = '';
-                    if (!labelRendered[labelKey]) {
-                        labelRendered[labelKey] = true;
-                        label = '<div class="tt-block-info">' +
-                            '<div class="tt-block-name">' + shiftName + '</div>' +
-                            '<div class="tt-block-user">' + userName + '</div>' +
-                            '</div>';
+                    // 按班別分組
+                    var key = a.shift.name;
+                    if (!shiftGroups[key]) {
+                        shiftGroups[key] = { shift: a.shift, users: [], assignmentIds: [] };
                     }
-                    blocks.push({ cls: shiftCls, label: label, dataId: a.id });
+                    var userName = a.user ? a.user.nickname : '';
+                    if (userName && shiftGroups[key].users.indexOf(userName) === -1) {
+                        shiftGroups[key].users.push(userName);
+                    }
+                    shiftGroups[key].assignmentIds.push(a.id);
                 }
+            });
+
+            // 把分組後的班別轉成色塊（同班別一個色塊）
+            Object.keys(shiftGroups).forEach(function (key) {
+                var group = shiftGroups[key];
+                var shiftCls = 'tt-shift-' + group.shift.name;
+                var shiftName = group.shift.display_name || '';
+                var usersStr = group.users.join('、');
+                var labelKey = date + '_shift_' + key;
+                var label = '';
+
+                if (!labelRendered[labelKey]) {
+                    labelRendered[labelKey] = true;
+                    label = '<div class="tt-block-info">' +
+                        '<div class="tt-block-name">' + shiftName + '</div>' +
+                        '<div class="tt-block-user">' + usersStr + '</div>' +
+                        '</div>';
+                }
+
+                // dataId 用第一個 assignment 的 ID（點擊用）
+                blocks.push({ cls: shiftCls, label: label, dataId: group.assignmentIds[0] });
             });
 
             return blocks;
