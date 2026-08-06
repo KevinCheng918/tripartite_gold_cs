@@ -981,6 +981,7 @@ td button:hover {
     color: #6b7280;
 }
 
+
 .station-info-sub {
     font-size: 0.75rem;
     color: #6b7280;
@@ -992,20 +993,69 @@ td button:hover {
     font-weight: 400;
 }
 
-/* 站台工具列（操作 + 篩選合併） */
+/* 站台工具列（操作 + 篩選） */
 .stn-toolbar {
     background: #fff;
     border: 1px solid #ebedf0;
     border-radius: 0.625rem;
-    padding: 0.625rem 0.875rem;
+    padding: 1rem 1.25rem;
     margin-bottom: 1rem;
 }
 
-.stn-toolbar__row {
+.stn-toolbar__top {
+    display: flex;
+    align-items: center;
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.stn-toolbar__grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.stn-field {
+    display: flex;
+    flex-direction: column;
+}
+
+.stn-field__label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.25rem;
+}
+
+.stn-field input[type="text"],
+.stn-field input[type="number"],
+.stn-field select {
+    width: 100%;
+    padding: 0.4375rem 0.625rem;
+    font-size: 0.875rem;
+    color: #1f2937;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.stn-field input:focus,
+.stn-field select:focus {
+    border-color: #a67c00;
+    box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.12);
+    background: #fff;
+}
+
+.stn-toolbar__bottom {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #f3f4f6;
 }
 
 .stn-toolbar__actions {
@@ -1014,67 +1064,38 @@ td button:hover {
     align-items: center;
 }
 
-.stn-toolbar__search-btns {
+.stn-toolbar__right {
     display: flex;
     gap: 0.375rem;
     align-items: center;
 }
 
-.stn-toolbar__filters {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.375rem;
-    align-items: center;
-}
-
-.stn-toolbar__filters input[type="text"],
-.stn-toolbar__filters input[type="number"],
-.stn-toolbar__filters select {
-    padding: 0.375rem 0.5rem;
-    font-size: 0.8125rem;
-    color: #1f2937;
-    background: #fafafa;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.375rem;
-    outline: none;
-    transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.stn-toolbar__filters input[type="text"] {
-    width: 150px;
-}
-
-.stn-toolbar__filters input[type="number"] {
-    width: 90px;
-}
-
-.stn-toolbar__filters select {
-    min-width: 90px;
-}
-
-.stn-toolbar__filters input:focus,
-.stn-toolbar__filters select:focus {
-    border-color: #a67c00;
-    box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.12);
-    background: #fff;
-}
-
+/* dark mode */
 [data-theme="dark"] .stn-toolbar {
     background: #1a1d27;
     border-color: #2d3039;
 }
 
-[data-theme="dark"] .stn-toolbar__filters input[type="text"],
-[data-theme="dark"] .stn-toolbar__filters input[type="number"],
-[data-theme="dark"] .stn-toolbar__filters select {
+[data-theme="dark"] .stn-field__label {
+    color: #9ca3af;
+}
+
+[data-theme="dark"] .stn-field input[type="text"],
+[data-theme="dark"] .stn-field input[type="number"],
+[data-theme="dark"] .stn-field select {
     background: #151821;
     border-color: #2d3039;
     color: #e5e7eb;
 }
 
-[data-theme="dark"] .stn-toolbar__filters input:focus,
-[data-theme="dark"] .stn-toolbar__filters select:focus {
+[data-theme="dark"] .stn-field input:focus,
+[data-theme="dark"] .stn-field select:focus {
     background: #1e2130;
+}
+
+[data-theme="dark"] .stn-toolbar__top,
+[data-theme="dark"] .stn-toolbar__bottom {
+    border-color: #2d3039;
 }
 
 [data-theme="dark"] .stn-card { background: #1a1d27; border-color: #2d3039; }

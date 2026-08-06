@@ -24,6 +24,7 @@
         support_shop: '',
         score_runner: '',
     };
+    var perPage = 15;
     var systemsCache = [];
 
     function apiFetch(url, options) {
@@ -84,7 +85,7 @@
 
     function loadStations(page) {
         page = page || 1;
-        var url = '/admin/stations/ajax-list?per_page=20&page=' + page;
+        var url = '/admin/stations/ajax-list?per_page=' + perPage + '&page=' + page;
 
         Object.keys(searchFilters).forEach(function (key) {
             if (searchFilters[key] !== '') {
@@ -152,50 +153,63 @@
             toolbarActions += '<button class="btn-sm" id="btn-sync-all">' + (i18n.action_sync_all || '一鍵同步全部') + '</button>';
         }
 
+        function filterField(label, html) {
+            return '<div class="stn-field"><label class="stn-field__label">' + label + '</label>' + html + '</div>';
+        }
+
         var toolbar =
             '<div class="stn-toolbar">' +
-            '<div class="stn-toolbar__row">' +
+            '<div class="stn-toolbar__top">' +
             '<div class="stn-toolbar__actions">' + toolbarActions + '</div>' +
             '</div>' +
-            '<div class="stn-toolbar__filters">' +
-            '<input type="text" id="stn-f-keyword" placeholder="名稱或域名..."  value="' + searchFilters.keyword + '">' +
-            '<select id="stn-f-system">' + systemOptions + '</select>' +
-            '<select id="stn-f-status">' +
-            '<option value="">全部狀態</option>' +
-            '<option value="1"' + (searchFilters.status === '1' ? ' selected' : '') + '>' + i18n.status_active + '</option>' +
-            '<option value="2"' + (searchFilters.status === '2' ? ' selected' : '') + '>' + i18n.status_frozen + '</option>' +
-            '<option value="0"' + (searchFilters.status === '0' ? ' selected' : '') + '>' + i18n.status_disabled + '</option>' +
-            '</select>' +
-            '<select id="stn-f-shop">' +
-            '<option value="">商城</option>' +
-            '<option value="true"' + (searchFilters.support_shop === 'true' ? ' selected' : '') + '>啟用</option>' +
-            '<option value="false"' + (searchFilters.support_shop === 'false' ? ' selected' : '') + '>未啟用</option>' +
-            '</select>' +
-            '<select id="stn-f-runner">' +
-            '<option value="">跑分員</option>' +
-            '<option value="true"' + (searchFilters.score_runner === 'true' ? ' selected' : '') + '>啟用</option>' +
-            '<option value="false"' + (searchFilters.score_runner === 'false' ? ' selected' : '') + '>未啟用</option>' +
-            '</select>' +
-            '<input type="number" id="stn-f-credits-min" placeholder="點數 ≥" value="' + searchFilters.credits_min + '">' +
-            '<input type="number" id="stn-f-credits-max" placeholder="點數 ≤" value="' + searchFilters.credits_max + '">' +
-            '<button class="btn-primary btn-sm" id="btn-stn-search">搜尋</button>' +
+            '<div class="stn-toolbar__grid">' +
+            filterField('關鍵字：', '<input type="text" id="stn-f-keyword" placeholder="名稱或域名" value="' + searchFilters.keyword + '">') +
+            filterField('系統：', '<select id="stn-f-system">' + systemOptions + '</select>') +
+            filterField('狀態：', '<select id="stn-f-status">' +
+                '<option value="">全部</option>' +
+                '<option value="1"' + (searchFilters.status === '1' ? ' selected' : '') + '>' + i18n.status_active + '</option>' +
+                '<option value="2"' + (searchFilters.status === '2' ? ' selected' : '') + '>' + i18n.status_frozen + '</option>' +
+                '<option value="0"' + (searchFilters.status === '0' ? ' selected' : '') + '>' + i18n.status_disabled + '</option>' +
+                '</select>') +
+            filterField('商城：', '<select id="stn-f-shop">' +
+                '<option value="">全部</option>' +
+                '<option value="true"' + (searchFilters.support_shop === 'true' ? ' selected' : '') + '>啟用</option>' +
+                '<option value="false"' + (searchFilters.support_shop === 'false' ? ' selected' : '') + '>未啟用</option>' +
+                '</select>') +
+            filterField('跑分員：', '<select id="stn-f-runner">' +
+                '<option value="">全部</option>' +
+                '<option value="true"' + (searchFilters.score_runner === 'true' ? ' selected' : '') + '>啟用</option>' +
+                '<option value="false"' + (searchFilters.score_runner === 'false' ? ' selected' : '') + '>未啟用</option>' +
+                '</select>') +
+            filterField('點數 ≥：', '<input type="number" id="stn-f-credits-min" placeholder="最小值" value="' + searchFilters.credits_min + '">') +
+            filterField('點數 ≤：', '<input type="number" id="stn-f-credits-max" placeholder="最大值" value="' + searchFilters.credits_max + '">') +
+            filterField('每頁：', '<select id="stn-per-page">' +
+                [15, 30, 50, 75, 100].map(function (n) {
+                    return '<option value="' + n + '"' + (perPage === n ? ' selected' : '') + '>' + n + ' 筆</option>';
+                }).join('') +
+                '</select>') +
+            '</div>' +
+            '<div class="stn-toolbar__bottom">' +
+            '<div></div>' +
+            '<div class="stn-toolbar__right">' +
             '<button class="btn-sm" id="btn-stn-reset">重置</button>' +
+            '<button class="btn-primary" id="btn-stn-search">搜尋</button>' +
+            '</div>' +
             '</div>' +
             '</div>';
 
         // 分頁
-        var pagination = '';
-        if (totalPages > 1) {
-            pagination = '<div class="stn-pagination">';
-            if (currentPage > 1) {
-                pagination += '<button class="btn-sm js-stn-page" data-page="' + (currentPage - 1) + '">&lsaquo;</button>';
-            }
-            pagination += '<span class="stn-pagination__info">' + currentPage + ' / ' + totalPages + '</span>';
-            if (currentPage < totalPages) {
-                pagination += '<button class="btn-sm js-stn-page" data-page="' + (currentPage + 1) + '">&rsaquo;</button>';
-            }
-            pagination += '</div>';
+        var pagination = '<div class="stn-pagination">';
+        if (currentPage > 1) {
+            pagination += '<button class="btn-sm js-stn-page" data-page="' + (currentPage - 1) + '">&lsaquo;</button>';
         }
+        if (totalPages > 1) {
+            pagination += '<span class="stn-pagination__info">' + currentPage + ' / ' + totalPages + '</span>';
+        }
+        if (currentPage < totalPages) {
+            pagination += '<button class="btn-sm js-stn-page" data-page="' + (currentPage + 1) + '">&rsaquo;</button>';
+        }
+        pagination += '</div>';
 
         root.innerHTML = toolbar +
             '<table><thead><tr>' +
@@ -249,6 +263,14 @@
                 loadStations(parseInt(btn.dataset.page, 10));
             });
         });
+
+        var perPageEl = document.getElementById('stn-per-page');
+        if (perPageEl) {
+            perPageEl.addEventListener('change', function () {
+                perPage = parseInt(perPageEl.value, 10);
+                loadStations(1);
+            });
+        }
 
         var createBtnEl = document.getElementById('btn-create-station');
         if (createBtnEl) {
