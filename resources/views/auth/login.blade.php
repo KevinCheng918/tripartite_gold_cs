@@ -38,10 +38,6 @@
                 <input id="password" type="password" name="password" required autocomplete="current-password">
             </div>
 
-            <label class="login-form__remember">
-                <input type="checkbox" name="remember"> {{ __('login.remember') }}
-            </label>
-
             <button type="submit">{{ __('login.submit') }}</button>
         </form>
     </main>

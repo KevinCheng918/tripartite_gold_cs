@@ -466,6 +466,12 @@
         var assignBtn = document.getElementById('js-open-assign');
         if (assignBtn) {
             assignBtn.addEventListener('click', function () {
+                // 重置全天班 checkbox
+                var alldayCb = document.getElementById('assign-allday');
+                if (alldayCb) { alldayCb.checked = false; }
+                var shiftGroup = document.getElementById('assign-shift-group');
+                if (shiftGroup) { shiftGroup.style.display = ''; }
+
                 populateAssignShiftSelect();
                 if (isAdmin) { populateAssignUserSelect(); }
                 openModal('modal-assign');
@@ -777,37 +783,55 @@
     function submitAssign(e) {
         e.preventDefault();
         var form = document.getElementById('form-assign');
-        var shiftId = parseInt(form.querySelector('[name="shift_id"]').value, 10);
         var date = form.querySelector('[name="date"]').value;
+        var isAllday = document.getElementById('assign-allday') && document.getElementById('assign-allday').checked;
 
-        // Admin 多選：收集勾選的 user_id，逐個送出
+        // 全天班：取得所有啟用班別的 ID
+        var shiftIds = [];
+        if (isAllday) {
+            shiftIds = shiftsData.filter(function (s) { return s.is_active; }).map(function (s) { return s.id; });
+        } else {
+            shiftIds = [parseInt(form.querySelector('[name="shift_id"]').value, 10)];
+        }
+
+        // Admin 多選：收集勾選的 user_id
         var checkboxes = form.querySelectorAll('[name="user_ids[]"]:checked');
-        if (checkboxes.length > 0) {
-            var userIds = [];
-            checkboxes.forEach(function (cb) { userIds.push(parseInt(cb.value, 10)); });
+        var userIds = [];
+        checkboxes.forEach(function (cb) { userIds.push(parseInt(cb.value, 10)); });
 
-            var promises = userIds.map(function (uid) {
-                return apiFetch('/admin/shifts/ajax-assign', {
-                    method: 'POST',
-                    body: JSON.stringify({ shift_id: shiftId, date: date, user_id: uid }),
+        var promises = [];
+
+        if (userIds.length > 0) {
+            // Admin：每個人 × 每個班別
+            userIds.forEach(function (uid) {
+                shiftIds.forEach(function (sid) {
+                    promises.push(apiFetch('/admin/shifts/ajax-assign', {
+                        method: 'POST',
+                        body: JSON.stringify({ shift_id: sid, date: date, user_id: uid }),
+                    }));
                 });
             });
 
             Promise.all(promises)
                 .then(function () {
                     closeModal('modal-assign');
-                    showMessage(i18n.assigned + '（' + userIds.length + ' 人）');
+                    var msg = i18n.assigned + '（' + userIds.length + ' 人' + (isAllday ? '，全天班' : '') + '）';
+                    showMessage(msg);
                     if (activeTab === 'timetable') { loadTimetable(); }
                 })
                 .catch(function (error) { showMessage(getErrorMessage(error)); });
             return;
         }
 
-        // 客服自己報班（沒有 checkbox）
-        apiFetch('/admin/shifts/ajax-assign', {
-            method: 'POST',
-            body: JSON.stringify({ shift_id: shiftId, date: date }),
-        })
+        // 客服自己報班
+        var selfPromises = shiftIds.map(function (sid) {
+            return apiFetch('/admin/shifts/ajax-assign', {
+                method: 'POST',
+                body: JSON.stringify({ shift_id: sid, date: date }),
+            });
+        });
+
+        Promise.all(selfPromises)
             .then(function () {
                 closeModal('modal-assign');
                 showMessage(i18n.assigned);
@@ -1098,6 +1122,17 @@
     bindModalCloseButtons();
 
     document.getElementById('form-assign').addEventListener('submit', submitAssign);
+
+    // 全天班 checkbox — 勾選時隱藏班別選單
+    var alldayCheckbox = document.getElementById('assign-allday');
+    if (alldayCheckbox) {
+        alldayCheckbox.addEventListener('change', function () {
+            var shiftGroup = document.getElementById('assign-shift-group');
+            if (shiftGroup) {
+                shiftGroup.style.display = alldayCheckbox.checked ? 'none' : '';
+            }
+        });
+    }
     document.getElementById('form-swap').addEventListener('submit', submitSwap);
     document.getElementById('form-edit-shift').addEventListener('submit', submitEditShift);
 

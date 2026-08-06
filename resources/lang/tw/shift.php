@@ -22,6 +22,7 @@ return [
     'field_date' => '日期',
     'field_shift' => '班別',
     'field_user' => '員工',
+    'allday_shift'  => '全天班（所有班別）',
     'action_assign' => '排班',
     'swap_my_assignment' => '我的排班 ID',
     'swap_target_assignment' => '對方排班 ID',

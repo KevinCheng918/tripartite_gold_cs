@@ -96,10 +96,48 @@ class DashboardService
         $weekStart = now()->startOfWeek()->format('Y-m-d');
         $weekEnd = now()->endOfWeek()->format('Y-m-d');
 
-        $todayAssignments = $this->assignmentRepository->getByUserAndDateRange($userId, $today, $today);
+        // 今日排班（全員，跟 admin 一樣）
+        $todayAllAssignments = $this->assignmentRepository->getByDateRange($today, $today);
+        $allShifts = $this->shiftRepository->allActive();
+
+        $todayByShift = collect();
+        foreach ($allShifts as $shift) {
+            $users = $todayAllAssignments
+                ->where('shift_id', $shift->id)
+                ->map(function ($a) {
+                    return $a->user ? $a->user->nickname : '-';
+                })
+                ->unique()
+                ->values()
+                ->all();
+
+            $todayByShift->put($shift->display_name, [
+                'shift' => $shift,
+                'users' => $users,
+            ]);
+        }
+
+        // 本週自己的排班
         $weekAssignments = $this->assignmentRepository->getByUserAndDateRange($userId, $weekStart, $weekEnd);
         $weekTotal = $weekAssignments->count();
 
-        return compact('todayAssignments', 'weekAssignments', 'weekTotal');
+        // 取得所有啟用班別數量，用來判斷是否全天班
+        $activeShiftCount = $allShifts->count();
+
+        // 依日期分組，若同一天班別數 = 啟用班別數 → 全天班
+        $weekByDate = $weekAssignments->sortBy('date')->groupBy(function ($a) {
+            return $a->date->format('Y-m-d');
+        })->map(function ($group) use ($activeShiftCount) {
+            $shiftIds = $group->pluck('shift_id')->unique()->count();
+            $isAllday = $shiftIds >= $activeShiftCount;
+
+            return [
+                'date'      => $group->first()->date,
+                'is_allday' => $isAllday,
+                'items'     => $isAllday ? collect() : $group,
+            ];
+        });
+
+        return compact('todayByShift', 'weekTotal', 'weekByDate');
     }
 }
