@@ -151,5 +151,5 @@
 @endsection
 
 @section('scripts')
-    <script src="{{ asset('js/shifts.js') }}"></script>
+    <script src="{{ asset('js/shifts.js') }}?v={{ time() }}"></script>
 @endsection
