@@ -28,7 +28,8 @@ return [
         'report' => '月报表',
     ],
     'telegram_chat' => [
-        'reply'  => '回复消息',
-        'assign' => '指派值班',
+        'reply'     => '回复消息',
+        'assign'    => '指派值班',
+        'broadcast' => '群发公告',
     ],
 ];

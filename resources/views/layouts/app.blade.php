@@ -59,6 +59,13 @@
                 <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"/></svg>
                 {{ trans('telegram_chat.nav_label') }}
             </a>
+            @if(Auth::user()->hasPermission('telegram_chat.broadcast'))
+            <a href="{{ route('admin.telegram-broadcast.index') }}"
+               class="{{ request()->routeIs('admin.telegram-broadcast.*') ? 'active' : '' }}">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"/></svg>
+                {{ trans('broadcast.nav_label') }}
+            </a>
+            @endif
         </nav>
 
         <div class="sidebar__spacer"></div>
