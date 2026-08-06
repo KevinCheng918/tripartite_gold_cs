@@ -19,8 +19,8 @@
         <form id="form-assign">
             @if(Auth::user()->isAdmin())
             <div class="form-group">
-                <label for="assign-user">{{ trans('shift.field_user') }}</label>
-                <select id="assign-user" name="user_id"></select>
+                <label>{{ trans('shift.field_user') }}</label>
+                <div id="assign-user-list" class="assign-user-checkboxes"></div>
             </div>
             @endif
             <div class="form-group">

@@ -29,6 +29,9 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
+    // 個人資訊修改
+    Route::put('/profile', [AccountController::class, 'ajaxUpdateProfile'])->name('profile.update');
+
     // 帳號管理（含權限設定）
     Route::prefix('accounts')->name('accounts.')->group(function () {
         Route::get('/', [AccountController::class, 'index'])->middleware('can:account.view')->name('index');
