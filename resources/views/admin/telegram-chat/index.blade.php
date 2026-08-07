@@ -21,5 +21,5 @@
 
 @section('scripts')
     <script src="{{ asset('vendor/pusher.min.js') }}"></script>
-    <script src="{{ asset('js/telegram-chat.js') }}"></script>
+    <script src="{{ asset('js/telegram-chat.js') }}?v={{ time() }}"></script>
 @endsection

@@ -179,6 +179,19 @@
             });
     }
 
+    function buildBubbleContent(m) {
+        var mediaHtml = '';
+        if (m.media_type === 'photo' && m.media_url) {
+            mediaHtml = '<div class="tg-bubble__media"><img src="' + m.media_url + '" alt="photo" loading="lazy"></div>';
+        } else if (m.media_type === 'sticker' && m.media_url) {
+            mediaHtml = '<div class="tg-bubble__media tg-bubble__sticker"><img src="' + m.media_url + '" alt="sticker" loading="lazy"></div>';
+        }
+
+        var textHtml = m.content ? '<div class="tg-bubble__content">' + escapeHtml(m.content) + '</div>' : '';
+
+        return mediaHtml + textHtml;
+    }
+
     function renderMessages(messages) {
         var container = document.getElementById('tg-messages');
 
@@ -195,7 +208,7 @@
             return (
                 '<div class="tg-bubble ' + bubbleCls + '">' +
                 '<div class="tg-bubble__sender">' + m.sender_name + '</div>' +
-                '<div class="tg-bubble__content">' + escapeHtml(m.content) + '</div>' +
+                buildBubbleContent(m) +
                 '<div class="tg-bubble__time">' + time + '</div>' +
                 '</div>'
             );
@@ -220,7 +233,7 @@
         var html =
             '<div class="tg-bubble ' + bubbleCls + '">' +
             '<div class="tg-bubble__sender">' + msg.sender_name + '</div>' +
-            '<div class="tg-bubble__content">' + escapeHtml(msg.content) + '</div>' +
+            buildBubbleContent(msg) +
             '<div class="tg-bubble__time">' + time + '</div>' +
             '</div>';
 
@@ -243,13 +256,24 @@
 
         inputArea.style.display = 'flex';
         inputArea.innerHTML =
+            '<input type="file" id="tg-image-input" accept="image/*" style="display:none">' +
+            '<button class="btn-sm" id="btn-tg-image" title="' + (i18n.btn_image || '傳送圖片') + '">&#128247;</button>' +
             '<textarea id="tg-reply-text" placeholder="' + i18n.input_placeholder + '" rows="1"></textarea>' +
             '<button class="btn-primary" id="btn-tg-send">' + i18n.btn_send + '</button>';
 
         var textarea = document.getElementById('tg-reply-text');
         var sendBtn = document.getElementById('btn-tg-send');
+        var imageBtn = document.getElementById('btn-tg-image');
+        var imageInput = document.getElementById('tg-image-input');
 
         sendBtn.addEventListener('click', function () { sendReply(); });
+        imageBtn.addEventListener('click', function () { imageInput.click(); });
+        imageInput.addEventListener('change', function () {
+            if (imageInput.files.length > 0) {
+                sendImage(imageInput.files[0]);
+                imageInput.value = '';
+            }
+        });
 
         // Enter 送出（Shift+Enter 換行）
         textarea.addEventListener('keydown', function (e) {
@@ -280,6 +304,45 @@
             .catch(function (error) {
                 textarea.disabled = false;
                 var msg = error.message || i18n.msg.reply_failed;
+                alert(msg);
+            });
+    }
+
+    function sendImage(file) {
+        if (!selectedGroupId) { return; }
+
+        var formData = new FormData();
+        formData.append('group_id', selectedGroupId);
+        formData.append('image', file);
+
+        var caption = document.getElementById('tg-reply-text').value.trim();
+        if (caption) {
+            formData.append('caption', caption);
+        }
+
+        fetch('/admin/telegram-chat/ajax-send-image', {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': csrfToken,
+                Accept: 'application/json',
+            },
+            body: formData,
+        })
+            .then(function (response) {
+                return response.json().then(function (body) {
+                    if (!response.ok) { throw body; }
+                    return body;
+                });
+            })
+            .then(function () {
+                var textarea = document.getElementById('tg-reply-text');
+                if (textarea) {
+                    textarea.value = '';
+                    textarea.focus();
+                }
+            })
+            .catch(function (error) {
+                var msg = error.message || (i18n.msg ? i18n.msg.reply_failed : 'Failed');
                 alert(msg);
             });
     }
