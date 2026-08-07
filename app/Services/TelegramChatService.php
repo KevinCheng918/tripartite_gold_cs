@@ -96,20 +96,19 @@ class TelegramChatService
 
         if (isset($message['photo'])) {
             $mediaType = 'photo';
-            // Telegram 回傳多個尺寸，取最大的
             $photos = $message['photo'];
             $largest = end($photos);
             $fileId = $largest['file_id'] ?? null;
 
             if (filled($fileId)) {
-                $mediaUrl = $this->botService->getFileUrl($fileId);
+                $mediaUrl = $this->downloadTelegramFile($fileId, 'photo');
             }
         } elseif (isset($message['sticker'])) {
             $mediaType = 'sticker';
             $fileId = $message['sticker']['file_id'] ?? null;
 
             if (filled($fileId)) {
-                $mediaUrl = $this->botService->getFileUrl($fileId);
+                $mediaUrl = $this->downloadTelegramFile($fileId, 'sticker');
             }
         }
 
@@ -281,6 +280,48 @@ class TelegramChatService
         // 如果找到值班客服且與目前指派不同，更新
         if (filled($onDutyUserId) && (int) $group->assigned_user_id !== (int) $onDutyUserId) {
             $this->telegramRepository->assignGroup($group, $onDutyUserId);
+        }
+    }
+
+    /**
+     * 從 Telegram 下載檔案到本地
+     *
+     * @param string $fileId Telegram file_id
+     * @param string $prefix 檔名前綴（photo / sticker）
+     * @return string|null 本地公開 URL
+     */
+    private function downloadTelegramFile($fileId, $prefix)
+    {
+        $remoteUrl = $this->botService->getFileUrl($fileId);
+
+        if (!filled($remoteUrl)) {
+            return null;
+        }
+
+        try {
+            $uploadDir = public_path('uploads/telegram');
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+
+            // 取得副檔名
+            $pathInfo = pathinfo(parse_url($remoteUrl, PHP_URL_PATH));
+            $ext = $pathInfo['extension'] ?? 'jpg';
+            $filename = "{$prefix}_" . time() . '_' . mt_rand(1000, 9999) . ".{$ext}";
+
+            $content = file_get_contents($remoteUrl);
+
+            if ($content === false) {
+                Log::warning('Telegram 檔案下載失敗', ['url' => $remoteUrl]);
+                return null;
+            }
+
+            file_put_contents("{$uploadDir}/{$filename}", $content);
+
+            return url("uploads/telegram/{$filename}");
+        } catch (\Exception $e) {
+            Log::error('Telegram 檔案下載異常', ['error' => $e->getMessage(), 'file_id' => $fileId]);
+            return null;
         }
     }
 
