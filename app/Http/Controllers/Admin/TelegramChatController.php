@@ -103,10 +103,21 @@ class TelegramChatController extends Controller
         ]);
 
         try {
-            // 確保目錄存在
             $uploadDir = public_path('uploads/telegram');
+
+            Log::info('圖片上傳 debug', [
+                'public_path'  => public_path(),
+                'upload_dir'   => $uploadDir,
+                'dir_exists'   => is_dir($uploadDir),
+                'dir_writable' => is_dir($uploadDir) ? is_writable($uploadDir) : 'N/A',
+                'parent_exists'    => is_dir(public_path('uploads')),
+                'parent_writable'  => is_dir(public_path('uploads')) ? is_writable(public_path('uploads')) : 'N/A',
+                'public_writable'  => is_writable(public_path()),
+            ]);
+
+            // 確保目錄存在
             if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
+                mkdir($uploadDir, 0777, true);
             }
 
             // 儲存圖片
