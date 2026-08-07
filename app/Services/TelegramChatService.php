@@ -86,12 +86,35 @@ class TelegramChatService
 
         $chatId = $message['chat']['id'];
         $chatTitle = $message['chat']['title'] ?? "Chat {$chatId}";
-        $text = $message['text'] ?? '';
+        $text = $message['text'] ?? ($message['caption'] ?? '');
         $senderName = $this->buildSenderName($message['from'] ?? []);
         $telegramMessageId = $message['message_id'] ?? null;
 
-        // 空訊息跳過（如貼圖、圖片等目前不處理）
-        if (!filled($text)) {
+        // 解析媒體（圖片）
+        $mediaType = null;
+        $mediaUrl = null;
+
+        if (isset($message['photo'])) {
+            $mediaType = 'photo';
+            // Telegram 回傳多個尺寸，取最大的
+            $photos = $message['photo'];
+            $largest = end($photos);
+            $fileId = $largest['file_id'] ?? null;
+
+            if (filled($fileId)) {
+                $mediaUrl = $this->botService->getFileUrl($fileId);
+            }
+        } elseif (isset($message['sticker'])) {
+            $mediaType = 'sticker';
+            $fileId = $message['sticker']['file_id'] ?? null;
+
+            if (filled($fileId)) {
+                $mediaUrl = $this->botService->getFileUrl($fileId);
+            }
+        }
+
+        // 無文字也無媒體則跳過
+        if (!filled($text) && !filled($mediaType)) {
             return;
         }
 
@@ -121,6 +144,8 @@ class TelegramChatService
             'telegram_message_id' => $telegramMessageId,
             'sender_name'        => $senderName,
             'content'            => $text,
+            'media_type'         => $mediaType,
+            'media_url'          => $mediaUrl,
             'replied'            => false,
         ]);
 
@@ -131,6 +156,8 @@ class TelegramChatService
                 'direction'   => $msg->direction,
                 'sender_name' => $msg->sender_name,
                 'content'     => $msg->content,
+                'media_type'  => $msg->media_type,
+                'media_url'   => $msg->media_url,
                 'created_at'  => $msg->created_at->toDateTimeString(),
                 'group_id'    => $group->id,
                 'group_title' => $group->title,
@@ -147,18 +174,23 @@ class TelegramChatService
     /**
      * 從後台回覆訊息到 Telegram 群組
      *
-     * @param int    $groupId 群組 ID
-     * @param string $content 回覆內容
-     * @param int    $userId  後台使用者 ID
-     * @param string $nickname 後台使用者暱稱
+     * @param int         $groupId   群組 ID
+     * @param string|null $content   回覆內容
+     * @param int         $userId    後台使用者 ID
+     * @param string      $nickname  後台使用者暱稱
+     * @param string|null $imageUrl  圖片 URL（本地上傳後的公開 URL）
      * @return \App\Models\TelegramMessage
      */
-    public function sendReply($groupId, $content, $userId, $nickname)
+    public function sendReply($groupId, $content, $userId, $nickname, $imageUrl = null)
     {
         $group = $this->telegramRepository->findGroup($groupId);
 
         // 透過 Bot API 發送到 Telegram
-        $this->botService->sendMessage($group->chat_id, $content);
+        if (filled($imageUrl)) {
+            $this->botService->sendPhoto($group->chat_id, $imageUrl, $content);
+        } else {
+            $this->botService->sendMessage($group->chat_id, $content);
+        }
 
         // 存入 outbound 訊息
         $msg = $this->telegramRepository->createMessage([
@@ -166,7 +198,9 @@ class TelegramChatService
             'direction'         => config('constants.TELEGRAM.DIRECTION.OUTBOUND'),
             'sender_name'       => $nickname,
             'sender_user_id'    => $userId,
-            'content'           => $content,
+            'content'           => $content ?: '',
+            'media_type'        => filled($imageUrl) ? 'photo' : null,
+            'media_url'         => $imageUrl,
             'replied'           => true,
         ]);
 
@@ -180,6 +214,8 @@ class TelegramChatService
                 'direction'   => $msg->direction,
                 'sender_name' => $msg->sender_name,
                 'content'     => $msg->content,
+                'media_type'  => $msg->media_type,
+                'media_url'   => $msg->media_url,
                 'created_at'  => $msg->created_at->toDateTimeString(),
                 'group_id'    => $group->id,
                 'group_title' => $group->title,

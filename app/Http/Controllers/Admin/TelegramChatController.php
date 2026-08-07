@@ -88,5 +88,42 @@ class TelegramChatController extends Controller
         }
     }
 
+    /**
+     * Ajax 發送圖片訊息
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse|TelegramMessageResource
+     */
+    public function ajaxSendImage(Request $request)
+    {
+        $params = $request->validate([
+            'group_id' => 'required|integer',
+            'image'    => 'required|image|max:5120',
+            'caption'  => 'nullable|string|max:1024',
+        ]);
+
+        try {
+            // 儲存圖片到 public/uploads/telegram
+            $file = $request->file('image');
+            $filename = time() . '_' . $file->getClientOriginalName();
+            $file->move(public_path('uploads/telegram'), $filename);
+            $imageUrl = url("uploads/telegram/{$filename}");
+
+            $message = $this->chatService->sendReply(
+                (int) $params['group_id'],
+                $params['caption'] ?? '',
+                Auth::id(),
+                Auth::user()->nickname,
+                $imageUrl
+            );
+
+            return new TelegramMessageResource($message);
+        } catch (\Exception $e) {
+            Log::error('Telegram 圖片發送失敗', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
+
+            return response()->json(['message' => trans('telegram_chat.msg.reply_failed')], 500);
+        }
+    }
+
     // 值班客服自動從排班系統指派，不需要手動操作
 }

@@ -82,6 +82,77 @@ class TelegramBotService
     }
 
     /**
+     * 發送圖片到 Telegram 群組
+     *
+     * @param int         $chatId
+     * @param string      $photoUrl 圖片 URL 或本地路徑
+     * @param string|null $caption  圖片說明文字
+     * @return array|null
+     */
+    public function sendPhoto($chatId, $photoUrl, $caption = null)
+    {
+        try {
+            $data = [
+                'chat_id' => $chatId,
+                'photo'   => $photoUrl,
+            ];
+
+            if (filled($caption)) {
+                $data['caption'] = $caption;
+                $data['parse_mode'] = 'HTML';
+            }
+
+            $response = $this->client->post("{$this->baseUrl}/sendPhoto", [
+                'json' => $data,
+            ]);
+
+            return json_decode($response->getBody()->getContents(), true);
+        } catch (\Exception $e) {
+            Log::error('Telegram sendPhoto 失敗', [
+                'chat_id' => $chatId,
+                'error'   => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * 取得 Telegram 檔案的下載 URL
+     *
+     * @param string $fileId Telegram file_id
+     * @return string|null
+     */
+    public function getFileUrl($fileId)
+    {
+        try {
+            $response = $this->client->post("{$this->baseUrl}/getFile", [
+                'json' => ['file_id' => $fileId],
+            ]);
+
+            $body = json_decode($response->getBody()->getContents(), true);
+
+            if (!($body['ok'] ?? false)) {
+                return null;
+            }
+
+            $filePath = $body['result']['file_path'] ?? null;
+
+            if (!filled($filePath)) {
+                return null;
+            }
+
+            $token = config('telegram.bot_token');
+
+            return "https://api.telegram.org/file/bot{$token}/{$filePath}";
+        } catch (\Exception $e) {
+            Log::error('Telegram getFile 失敗', ['file_id' => $fileId, 'error' => $e->getMessage()]);
+
+            return null;
+        }
+    }
+
+    /**
      * 取得最近的 updates（需先關閉 webhook）
      *
      * @param int $limit
