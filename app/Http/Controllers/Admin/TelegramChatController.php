@@ -103,10 +103,16 @@ class TelegramChatController extends Controller
         ]);
 
         try {
-            // 儲存圖片到 public/uploads/telegram
+            // 確保目錄存在
+            $uploadDir = public_path('uploads/telegram');
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+
+            // 儲存圖片
             $file = $request->file('image');
-            $filename = time() . '_' . $file->getClientOriginalName();
-            $file->move(public_path('uploads/telegram'), $filename);
+            $filename = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
+            $file->move($uploadDir, $filename);
             $imageUrl = url("uploads/telegram/{$filename}");
 
             $message = $this->chatService->sendReply(
@@ -119,9 +125,13 @@ class TelegramChatController extends Controller
 
             return new TelegramMessageResource($message);
         } catch (\Exception $e) {
-            Log::error('Telegram 圖片發送失敗', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
+            Log::error('Telegram 圖片發送失敗', [
+                'error'   => $e->getMessage(),
+                'trace'   => $e->getTraceAsString(),
+                'user_id' => Auth::id(),
+            ]);
 
-            return response()->json(['message' => trans('telegram_chat.msg.reply_failed')], 500);
+            return response()->json(['message' => $e->getMessage()], 500);
         }
     }
 
