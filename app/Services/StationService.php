@@ -105,64 +105,20 @@ class StationService
     }
 
     /**
-     * 從 Telegram API 讀取機器人所在的群組
+     * 取得已知的 Telegram 群組列表（從 DB 中讀取，由 webhook 自動建立）
      *
-     * 流程：暫時關閉 webhook → getUpdates → 提取群組 → 恢復 webhook
-     *
-     * @return array 群組列表 [{chat_id, title, type}]
+     * @return array 群組列表 [{chat_id, title}]
      */
     public function fetchBotGroups()
     {
-        // 記住目前 webhook URL
-        $webhookInfo = $this->telegramBot->getWebhookInfo();
-        $currentUrl = $webhookInfo['result']['url'] ?? null;
+        $groups = $this->telegramRepository->getAllGroups();
 
-        // 暫時關閉 webhook
-        $this->telegramBot->deleteWebhook();
-
-        // 讀取 updates
-        $response = $this->telegramBot->getUpdates(100);
-
-        // 恢復 webhook
-        if (filled($currentUrl)) {
-            $this->telegramBot->setWebhook($currentUrl);
-        }
-
-        if (!$response || !($response['ok'] ?? false)) {
-            Log::warning('fetchBotGroups: getUpdates 失敗', ['response' => $response]);
-            return [];
-        }
-
-        // 提取不重複的群組
-        $groups = [];
-        $seen = [];
-
-        foreach ($response['result'] ?? [] as $update) {
-            $chat = $update['message']['chat'] ?? ($update['my_chat_member']['chat'] ?? null);
-
-            if (!$chat) {
-                continue;
-            }
-
-            $type = $chat['type'] ?? '';
-            if ($type !== 'group' && $type !== 'supergroup') {
-                continue;
-            }
-
-            $chatId = $chat['id'];
-            if (isset($seen[$chatId])) {
-                continue;
-            }
-
-            $seen[$chatId] = true;
-            $groups[] = [
-                'chat_id' => $chatId,
-                'title'   => $chat['title'] ?? "Group {$chatId}",
-                'type'    => $type,
+        return $groups->map(function ($g) {
+            return [
+                'chat_id' => $g->chat_id,
+                'title'   => $g->title,
             ];
-        }
-
-        return $groups;
+        })->values()->all();
     }
 
     /**
