@@ -34,6 +34,19 @@ class TelegramRepository
     }
 
     /**
+     * 取得所有群組（供站台選擇用）
+     *
+     * @return Collection
+     */
+    public function getAllGroups()
+    {
+        return TelegramGroup::query()
+            ->select(['id', 'chat_id', 'title', 'status'])
+            ->orderBy('title')
+            ->get();
+    }
+
+    /**
      * 依 Telegram chat_id 查詢群組
      *
      * @param int $chatId
