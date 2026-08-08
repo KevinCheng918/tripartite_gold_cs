@@ -21,5 +21,5 @@
 @endsection
 
 @section('scripts')
-    <script src="{{ asset('js/broadcast.js') }}"></script>
+    <script src="{{ asset('js/broadcast.js') }}?v={{ filemtime(public_path('js/broadcast.js')) }}"></script>
 @endsection
