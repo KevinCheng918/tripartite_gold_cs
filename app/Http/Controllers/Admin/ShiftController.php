@@ -230,12 +230,7 @@ class ShiftController extends Controller
         $params = $request->only(['per_page']);
         $perPage = (int) ($params['per_page'] ?? 20);
 
-        // Admin 查看所有換班紀錄，客服只看自己的
-        if (Auth::user()->isAdmin()) {
-            $swaps = $this->shiftService->listAllSwaps($perPage);
-        } else {
-            $swaps = $this->shiftService->listSwapsByUser(Auth::id(), $perPage);
-        }
+        $swaps = $this->shiftService->listSwaps(Auth::id(), Auth::user()->isAdmin(), $perPage);
 
         return ShiftSwapResource::collection($swaps);
     }
