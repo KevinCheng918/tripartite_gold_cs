@@ -470,9 +470,14 @@
         }
         textarea.addEventListener('input', autoResize);
 
-        // 連按兩次 Enter 送出（單次 Enter 換行）
+        // 連按兩次 Enter 送出（單次 Enter 換行，IME 選字的 Enter 不算）
         var lastEnterTime = 0;
         textarea.addEventListener('keydown', function (e) {
+            // 排除 IME 選字中的 Enter（中文、日文輸入法）
+            if (e.isComposing || e.keyCode === 229) {
+                return;
+            }
+
             if (e.key === 'Enter' && !e.shiftKey) {
                 var now = Date.now();
                 if (now - lastEnterTime < 500) {
@@ -484,7 +489,6 @@
                     }
                     sendReply();
                     lastEnterTime = 0;
-                    // 重置高度
                     textarea.style.height = '';
                 } else {
                     lastEnterTime = now;
