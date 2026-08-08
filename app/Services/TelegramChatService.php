@@ -7,6 +7,7 @@ use App\Repositories\ShiftAssignmentRepository;
 use App\Repositories\TelegramRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Telegram 客服聊天 Service
@@ -299,11 +300,6 @@ class TelegramChatService
         }
 
         try {
-            $uploadDir = public_path('uploads/telegram');
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
-            }
-
             // 取得副檔名
             $pathInfo = pathinfo(parse_url($remoteUrl, PHP_URL_PATH));
             $ext = $pathInfo['extension'] ?? 'jpg';
@@ -316,9 +312,9 @@ class TelegramChatService
                 return null;
             }
 
-            file_put_contents("{$uploadDir}/{$filename}", $content);
+            Storage::disk('public')->put("uploads/telegram/{$filename}", $content);
 
-            return url("uploads/telegram/{$filename}");
+            return Storage::disk('public')->url("uploads/telegram/{$filename}");
         } catch (\Exception $e) {
             Log::error('Telegram 檔案下載異常', ['error' => $e->getMessage(), 'file_id' => $fileId]);
             return null;
