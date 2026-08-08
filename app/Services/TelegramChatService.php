@@ -106,7 +106,16 @@ class TelegramChatService
             }
         } elseif (isset($message['sticker'])) {
             $mediaType = 'sticker';
-            $fileId = $message['sticker']['file_id'] ?? null;
+            $sticker = $message['sticker'];
+            $isAnimated = $sticker['is_animated'] ?? false;
+            $isVideo = $sticker['is_video'] ?? false;
+
+            // 動態 / 影片貼圖原始檔為 .tgs / .webm，<img> 無法顯示，改用縮圖
+            if (($isAnimated || $isVideo) && isset($sticker['thumbnail']['file_id'])) {
+                $fileId = $sticker['thumbnail']['file_id'];
+            } else {
+                $fileId = $sticker['file_id'] ?? null;
+            }
 
             if (filled($fileId)) {
                 $mediaUrl = $this->downloadTelegramFile($fileId, 'sticker');
