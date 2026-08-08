@@ -116,6 +116,7 @@
     }
 
     function loadTabContent() {
+        stopLiveClock();
         if (activeTab === 'clock') {
             loadClockStatus();
         } else if (activeTab === 'my_records') {
@@ -163,8 +164,10 @@
 
         var html =
             '<div class="att-clock-panel">' +
+            '<div class="att-clock-date" id="att-live-clock"></div>' +
             '<div class="att-clock-status ' + statusCss + '">' +
             '<div class="att-clock-status__icon"></div>' +
+            '<div class="att-clock-status__label">' + (i18n.current_status || '目前狀態') + '</div>' +
             '<div class="att-clock-status__text">' + statusText + '</div>' +
             '</div>';
 
@@ -199,13 +202,99 @@
 
         var btnIn = document.getElementById('btn-clock-in');
         if (btnIn) {
-            btnIn.addEventListener('click', function () { clockIn(); });
+            btnIn.addEventListener('click', function () { showClockConfirm('in'); });
         }
 
         var btnOut = document.getElementById('btn-clock-out');
         if (btnOut) {
-            btnOut.addEventListener('click', function () { clockOut(); });
+            btnOut.addEventListener('click', function () { showClockConfirm('out'); });
         }
+
+        // 即時時鐘
+        startLiveClock();
+    }
+
+    var liveClockTimer = null;
+
+    function startLiveClock() {
+        stopLiveClock();
+        updateLiveClock();
+        liveClockTimer = setInterval(updateLiveClock, 1000);
+    }
+
+    function stopLiveClock() {
+        if (liveClockTimer) {
+            clearInterval(liveClockTimer);
+            liveClockTimer = null;
+        }
+    }
+
+    function updateLiveClock() {
+        var el = document.getElementById('att-live-clock');
+        if (!el) {
+            stopLiveClock();
+            return;
+        }
+        var now = new Date();
+        var dateStr = now.getFullYear() + '-' +
+            String(now.getMonth() + 1).padStart(2, '0') + '-' +
+            String(now.getDate()).padStart(2, '0');
+        var timeStr = String(now.getHours()).padStart(2, '0') + ':' +
+            String(now.getMinutes()).padStart(2, '0') + ':' +
+            String(now.getSeconds()).padStart(2, '0');
+        el.textContent = dateStr + ' ' + timeStr;
+    }
+
+    // ---------------------------------------------------------------
+    //  二次確認彈窗
+    // ---------------------------------------------------------------
+
+    var pendingClockAction = null;
+
+    function showClockConfirm(action) {
+        var now = new Date();
+        var dateStr = now.getFullYear() + '-' +
+            String(now.getMonth() + 1).padStart(2, '0') + '-' +
+            String(now.getDate()).padStart(2, '0');
+        var timeStr = String(now.getHours()).padStart(2, '0') + ':' +
+            String(now.getMinutes()).padStart(2, '0') + ':' +
+            String(now.getSeconds()).padStart(2, '0');
+
+        var isIn = action === 'in';
+        var actionLabel = isIn ? i18n.btn_clock_in : i18n.btn_clock_out;
+        var statusLabel = isIn ? (i18n.not_clocked || '尚未打卡') : (i18n.clocked_in || '已上班打卡');
+        var statusCss = isIn ? 'att-confirm-status--none' : 'att-confirm-status--in';
+
+        var body = document.getElementById('modal-attendance-confirm-body');
+        body.innerHTML =
+            '<div class="att-confirm-content">' +
+            '<div class="att-confirm-action ' + (isIn ? 'att-confirm-action--in' : 'att-confirm-action--out') + '">' + actionLabel + '</div>' +
+            '<div class="att-confirm-info">' +
+            '<div class="att-confirm-row"><span class="att-confirm-label">' + (i18n.current_status || '目前狀態') + '</span><span class="att-confirm-value ' + statusCss + '">' + statusLabel + '</span></div>' +
+            '<div class="att-confirm-row"><span class="att-confirm-label">' + (i18n.field_date || '日期') + '</span><span class="att-confirm-value">' + dateStr + '</span></div>' +
+            '<div class="att-confirm-row"><span class="att-confirm-label">' + (i18n.msg.clock_time || '打卡時間') + '</span><span class="att-confirm-value">' + timeStr + '</span></div>' +
+            '</div>' +
+            '<p class="att-confirm-hint">' + (i18n.msg.confirm_hint || '確認後將無法修改，請確認資訊正確') + '</p>' +
+            '</div>';
+
+        pendingClockAction = action;
+        openModal('modal-attendance-confirm');
+    }
+
+    // 綁定確認按鈕
+    var confirmBtn = document.getElementById('btn-confirm-clock');
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', function () {
+            var overlay = document.getElementById('modal-attendance-confirm');
+            if (overlay) { overlay.style.display = 'none'; }
+
+            if (pendingClockAction === 'in') {
+                clockIn();
+            } else if (pendingClockAction === 'out') {
+                clockOut();
+            }
+            pendingClockAction = null;
+        });
     }
 
     function clockIn() {
