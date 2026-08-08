@@ -42,13 +42,14 @@ class TelegramChatService
     public function getConversationList()
     {
         $groups = $this->telegramRepository->getActiveGroups();
+        $onDutyUsers = $this->getOnDutyUsers();
 
-        return $groups->map(function ($group) {
+        return $groups->map(function ($group) use ($onDutyUsers) {
             return [
                 'id'              => $group->id,
                 'chat_id'         => $group->chat_id,
                 'title'           => $group->title,
-                'assigned_user'   => $group->assignedUser ? $group->assignedUser->nickname : null,
+                'on_duty_users'   => $onDutyUsers,
                 'last_message_at' => $group->last_message_at ? $group->last_message_at->toDateTimeString() : null,
                 'unread_count'    => $this->telegramRepository->getUnrepliedCount($group->id),
             ];
@@ -324,6 +325,39 @@ class TelegramChatService
     // ---------------------------------------------------------------
 
     /**
+     * 取得當前時段所有值班中的客服暱稱
+     *
+     * @return array 暱稱陣列（如 ['客服一號', 'localCS04']），無人值班時回傳空陣列
+     */
+    private function getOnDutyUsers()
+    {
+        $today = now()->format('Y-m-d');
+        $nowMinutes = now()->hour * 60 + now()->minute;
+
+        $assignments = $this->assignmentRepository->getByDateRange($today, $today);
+
+        if ($assignments->isEmpty()) {
+            return [];
+        }
+
+        $users = [];
+        foreach ($assignments as $assignment) {
+            if (!$assignment->shift || !$assignment->user) {
+                continue;
+            }
+
+            if ($this->isTimeInShiftRange($assignment->shift, $nowMinutes)) {
+                $nickname = $assignment->user->nickname;
+                if (!in_array($nickname, $users, true)) {
+                    $users[] = $nickname;
+                }
+            }
+        }
+
+        return $users;
+    }
+
+    /**
      * 自動指派當前值班客服到群組
      *
      * 從今日排班中找出當前時段正在上班的客服，
@@ -337,43 +371,48 @@ class TelegramChatService
         $today = now()->format('Y-m-d');
         $nowMinutes = now()->hour * 60 + now()->minute;
 
-        // 取得今日所有排班
         $assignments = $this->assignmentRepository->getByDateRange($today, $today);
 
         if ($assignments->isEmpty()) {
             return;
         }
 
-        // 找出當前時段正在值班的客服
-        $onDutyUserId = null;
+        // 找出第一個當前值班的客服
         foreach ($assignments as $assignment) {
             if (!$assignment->shift) {
                 continue;
             }
 
-            $parts = explode(':', $assignment->shift->start_time);
-            $startMin = (int) $parts[0] * 60 + (int) $parts[1];
-
-            $parts = explode(':', $assignment->shift->end_time);
-            $endMin = (int) $parts[0] * 60 + (int) $parts[1];
-
-            $inRange = false;
-            if ($endMin > $startMin) {
-                $inRange = ($nowMinutes >= $startMin && $nowMinutes < $endMin);
-            } elseif ($endMin <= $startMin) {
-                $inRange = ($nowMinutes >= $startMin || $nowMinutes < $endMin);
-            }
-
-            if ($inRange) {
-                $onDutyUserId = $assignment->user_id;
-                break;
+            if ($this->isTimeInShiftRange($assignment->shift, $nowMinutes)) {
+                if ((int) $group->assigned_user_id !== (int) $assignment->user_id) {
+                    $this->telegramRepository->assignGroup($group, $assignment->user_id);
+                }
+                return;
             }
         }
+    }
 
-        // 如果找到值班客服且與目前指派不同，更新
-        if (filled($onDutyUserId) && (int) $group->assigned_user_id !== (int) $onDutyUserId) {
-            $this->telegramRepository->assignGroup($group, $onDutyUserId);
+    /**
+     * 判斷當前分鐘數是否在班別時段範圍內
+     *
+     * @param \App\Models\Shift $shift
+     * @param int               $nowMinutes 當前時間（分鐘數）
+     * @return bool
+     */
+    private function isTimeInShiftRange($shift, $nowMinutes)
+    {
+        $parts = explode(':', $shift->start_time);
+        $startMin = (int) $parts[0] * 60 + (int) $parts[1];
+
+        $parts = explode(':', $shift->end_time);
+        $endMin = (int) $parts[0] * 60 + (int) $parts[1];
+
+        if ($endMin > $startMin) {
+            return $nowMinutes >= $startMin && $nowMinutes < $endMin;
         }
+
+        // 跨日班
+        return $nowMinutes >= $startMin || $nowMinutes < $endMin;
     }
 
     /**
