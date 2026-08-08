@@ -23,5 +23,5 @@
 @endsection
 
 @section('scripts')
-    <script src="{{ asset('js/permissions.js') }}"></script>
+    <script src="{{ asset('js/permissions.js') }}?v={{ filemtime(public_path('js/permissions.js')) }}"></script>
 @endsection

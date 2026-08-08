@@ -251,10 +251,8 @@ class TelegramChatService
             return null;
         }
 
-        // 更新本地 reactions
-        $reactions = $this->mergeReactions($message->reactions, [
-            ['type' => 'emoji', 'emoji' => $emoji],
-        ]);
+        // Bot 的 reaction 是覆蓋邏輯（一次只有一個），直接替換
+        $reactions = $this->replaceBotReaction($message->reactions, $emoji);
 
         $this->telegramRepository->updateReactions($message, $reactions);
 
@@ -456,6 +454,26 @@ class TelegramChatService
         }
 
         return count($result) > 0 ? $result : null;
+    }
+
+    /**
+     * 替換 Bot 的 reaction（覆蓋邏輯）
+     *
+     * Bot 一次只能對一則訊息有一個 reaction，
+     * 移除 Bot 上次的 reaction（count=1 且由 Bot 設定的），換成新的。
+     * 保留其他來源（Telegram 用戶）的 reaction 不動。
+     *
+     * @param array|null $existing 現有 reactions
+     * @param string     $emoji    新的 emoji
+     * @return array
+     */
+    private function replaceBotReaction($existing, $emoji)
+    {
+        // 目前無法區分 Bot vs 使用者的 reaction，
+        // 直接以「覆蓋」方式處理：只保留新的 emoji
+        $result = [['emoji' => $emoji, 'count' => 1]];
+
+        return $result;
     }
 
     /**

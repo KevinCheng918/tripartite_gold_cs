@@ -298,19 +298,22 @@ class ShiftService
      * @param int $perPage
      * @return LengthAwarePaginator
      */
-    public function listSwapsByUser($userId, $perPage = 20)
-    {
-        return $this->assignmentRepository->paginateSwapsByUser($userId, $perPage);
-    }
-
     /**
-     * 查詢所有換班請求（管理者用）
+     * 查詢換班請求
      *
-     * @param int $perPage
+     * Admin 查看全部，客服只查自己相關的。
+     *
+     * @param int  $userId
+     * @param bool $isAdmin
+     * @param int  $perPage
      * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
-    public function listAllSwaps($perPage = 20)
+    public function listSwaps($userId, $isAdmin, $perPage = 20)
     {
-        return $this->assignmentRepository->paginateAllSwaps($perPage);
+        if ($isAdmin) {
+            return $this->assignmentRepository->paginateAllSwaps($perPage);
+        }
+
+        return $this->assignmentRepository->paginateSwapsByUser($userId, $perPage);
     }
 }
