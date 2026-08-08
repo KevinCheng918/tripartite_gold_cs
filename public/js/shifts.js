@@ -557,6 +557,21 @@
             );
         }).join('');
 
+        var cards = shifts.map(function (shift) {
+            var color = shiftColors[shift.name] || defaultColor;
+            return (
+                '<div class="shift-card" data-id="' + shift.id + '">' +
+                '<div class="shift-card__header">' +
+                '<span class="tt-legend" style="background:' + color.bg + ';border-color:' + color.border + ';color:' + color.text + '">' + shift.display_name + '</span>' +
+                (shift.is_active ? '<span class="badge badge--active">' + i18n.field_is_active + '</span>' : '<span class="badge badge--disabled">-</span>') +
+                '</div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_start_time + '</span><span>' + shift.start_time + '</span></div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_end_time + '</span><span>' + shift.end_time + '</span></div>' +
+                '<div class="shift-card__actions"><button class="btn-sm js-edit-shift">' + i18n.modal_edit_shift_title + '</button></div>' +
+                '</div>'
+            );
+        }).join('');
+
         var html =
             '<table><thead><tr>' +
             '<th>' + i18n.field_display_name + '</th>' +
@@ -564,14 +579,15 @@
             '<th>' + i18n.field_end_time + '</th>' +
             '<th>' + i18n.field_is_active + '</th>' +
             '<th></th>' +
-            '</tr></thead><tbody>' + rows + '</tbody></table>';
+            '</tr></thead><tbody>' + rows + '</tbody></table>' +
+            '<div class="shift-cards">' + cards + '</div>';
 
         document.getElementById('tab-content').innerHTML = html;
 
         root.querySelectorAll('.js-edit-shift').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                var tr = btn.closest('tr');
-                var id = parseInt(tr.dataset.id, 10);
+                var row = btn.closest('tr') || btn.closest('.shift-card');
+                var id = parseInt(row.dataset.id, 10);
                 var shift = shiftsData.filter(function (s) { return s.id === id; })[0];
                 if (shift) { openEditShiftModal(shift); }
             });
@@ -604,8 +620,10 @@
         var rows = swaps.map(function (swap) {
             var requester = swap.requester ? swap.requester.nickname : '-';
             var target = swap.target ? swap.target.nickname : '-';
+            var reqDate = swap.requester_assignment ? swap.requester_assignment.date : '-';
             var reqShift = swap.requester_assignment && swap.requester_assignment.shift
                 ? swap.requester_assignment.shift.display_name : '-';
+            var tgtDate = swap.target_assignment ? swap.target_assignment.date : '-';
             var tgtShift = swap.target_assignment && swap.target_assignment.shift
                 ? swap.target_assignment.shift.display_name : '-';
             var statusInfo = swapStatusMap[swap.status] || { text: '-', css: '' };
@@ -620,8 +638,10 @@
             return (
                 '<tr>' +
                 '<td>' + requester + '</td>' +
+                '<td>' + reqDate + '</td>' +
                 '<td>' + reqShift + '</td>' +
                 '<td>' + target + '</td>' +
+                '<td>' + tgtDate + '</td>' +
                 '<td>' + tgtShift + '</td>' +
                 '<td><span class="badge ' + statusInfo.css + '">' + statusInfo.text + '</span></td>' +
                 '<td>' + actions + '</td>' +
@@ -629,12 +649,48 @@
             );
         }).join('');
 
+        var swapCards = swaps.map(function (swap) {
+            var requester = swap.requester ? swap.requester.nickname : '-';
+            var target = swap.target ? swap.target.nickname : '-';
+            var reqDate = swap.requester_assignment ? swap.requester_assignment.date : '-';
+            var reqShift = swap.requester_assignment && swap.requester_assignment.shift
+                ? swap.requester_assignment.shift.display_name : '-';
+            var tgtDate = swap.target_assignment ? swap.target_assignment.date : '-';
+            var tgtShift = swap.target_assignment && swap.target_assignment.shift
+                ? swap.target_assignment.shift.display_name : '-';
+            var statusInfo = swapStatusMap[swap.status] || { text: '-', css: '' };
+
+            var actions = '';
+            if (swap.status === 0 && swap.target_id === currentUserId) {
+                actions =
+                    '<div class="shift-card__actions">' +
+                    '<button class="btn-primary btn-sm js-respond-swap" data-id="' + swap.id + '" data-status="1">' + i18n.action_approve + '</button>' +
+                    '<button class="btn-sm js-respond-swap" data-id="' + swap.id + '" data-status="2">' + i18n.action_reject + '</button>' +
+                    '</div>';
+            }
+
+            return (
+                '<div class="shift-card">' +
+                '<div class="shift-card__header">' +
+                '<span class="shift-card__title">' + requester + ' ↔ ' + target + '</span>' +
+                '<span class="badge ' + statusInfo.css + '">' + statusInfo.text + '</span>' +
+                '</div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_user + '（發起）</span><span>' + requester + '</span></div>' +
+                '<div class="shift-card__row"><span class="shift-card__label"></span><span>' + reqDate + ' ' + reqShift + '</span></div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_user + '（對方）</span><span>' + target + '</span></div>' +
+                '<div class="shift-card__row"><span class="shift-card__label"></span><span>' + tgtDate + ' ' + tgtShift + '</span></div>' +
+                actions +
+                '</div>'
+            );
+        }).join('');
+
         var html =
             '<table><thead><tr>' +
-            '<th>' + i18n.field_user + '（發起方）</th><th>' + i18n.field_shift + '</th>' +
-            '<th>' + i18n.field_user + '（對方）</th><th>' + i18n.field_shift + '</th>' +
+            '<th>' + i18n.field_user + '（發起方）</th><th>' + (i18n.field_date || '日期') + '</th><th>' + i18n.field_shift + '</th>' +
+            '<th>' + i18n.field_user + '（對方）</th><th>' + (i18n.field_date || '日期') + '</th><th>' + i18n.field_shift + '</th>' +
             '<th>狀態</th><th></th>' +
-            '</tr></thead><tbody>' + rows + '</tbody></table>';
+            '</tr></thead><tbody>' + rows + '</tbody></table>' +
+            '<div class="shift-cards">' + swapCards + '</div>';
 
         document.getElementById('tab-content').innerHTML = html;
 
@@ -1053,6 +1109,49 @@
             );
         }).join('');
 
+        var coverCards = covers.map(function (c) {
+            var requester = c.requester ? c.requester.nickname : '-';
+            var coverUser = c.cover_user ? c.cover_user.nickname : '-';
+            var shiftName = c.assignment && c.assignment.shift ? c.assignment.shift.display_name : '-';
+            var shiftDate = c.assignment ? c.assignment.date : '-';
+            var coverTime = c.cover_start + ' - ' + c.cover_end;
+            var coverStatus = coverStatusMap[c.cover_user_status] || { text: '-', css: '' };
+            var aStatus = adminStatusMap[c.admin_status] || { text: '-', css: '' };
+
+            var actions = '';
+            if (c.cover_user_status === 0 && c.cover_user_id === currentUserId) {
+                actions =
+                    '<div class="shift-card__actions">' +
+                    '<button class="btn-primary btn-sm js-cover-respond" data-id="' + c.id + '" data-status="1">' + (coverI18n.action_approve || '同意') + '</button>' +
+                    '<button class="btn-sm js-cover-respond" data-id="' + c.id + '" data-status="2">' + (coverI18n.action_reject || '拒絕') + '</button>' +
+                    '</div>';
+            }
+            if (isAdmin && c.cover_user_status === 1 && c.admin_status === 0) {
+                actions =
+                    '<div class="shift-card__actions">' +
+                    '<button class="btn-primary btn-sm js-cover-admin" data-id="' + c.id + '" data-status="1">' + (coverI18n.action_admin_approve || '核准') + '</button>' +
+                    '<button class="btn-sm js-cover-admin" data-id="' + c.id + '" data-status="2">' + (coverI18n.action_admin_reject || '駁回') + '</button>' +
+                    '</div>';
+            }
+
+            return (
+                '<div class="shift-card">' +
+                '<div class="shift-card__header">' +
+                '<span class="shift-card__title">' + shiftDate + ' ' + shiftName + '</span>' +
+                '</div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + (coverI18n.field_requester || '原班人') + '</span><span>' + requester + '</span></div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + (coverI18n.field_cover_user || '代班人') + '</span><span>' + coverUser + '</span></div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + (coverI18n.field_cover_time || '代班時段') + '</span><span>' + coverTime + '</span></div>' +
+                (c.reason ? '<div class="shift-card__row"><span class="shift-card__label">' + (coverI18n.field_reason || '原因') + '</span><span>' + c.reason + '</span></div>' : '') +
+                '<div class="shift-card__badges">' +
+                '<span class="badge ' + coverStatus.css + '">' + (coverI18n.field_cover_status || '代班人') + '：' + coverStatus.text + '</span>' +
+                '<span class="badge ' + aStatus.css + '">' + (coverI18n.field_admin_status || '管理者') + '：' + aStatus.text + '</span>' +
+                '</div>' +
+                actions +
+                '</div>'
+            );
+        }).join('');
+
         var html =
             '<table><thead><tr>' +
             '<th>' + (coverI18n.field_date || '日期') + '</th>' +
@@ -1064,23 +1163,61 @@
             '<th>' + (coverI18n.field_cover_status || '代班人') + '</th>' +
             '<th>' + (coverI18n.field_admin_status || '管理者') + '</th>' +
             '<th></th>' +
-            '</tr></thead><tbody>' + rows + '</tbody></table>';
+            '</tr></thead><tbody>' + rows + '</tbody></table>' +
+            '<div class="shift-cards">' + coverCards + '</div>';
 
         document.getElementById('tab-content').innerHTML = html;
 
-        // 綁定代班人回應按鈕
+        // 綁定代班人回應按鈕（含二次確認）
         root.querySelectorAll('.js-cover-respond').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                respondCoverUser(parseInt(btn.dataset.id, 10), parseInt(btn.dataset.status, 10));
+                var coverId = parseInt(btn.dataset.id, 10);
+                var status = parseInt(btn.dataset.status, 10);
+                var actionLabel = status === 1 ? (coverI18n.action_approve || '同意') : (coverI18n.action_reject || '拒絕');
+                showCoverConfirm(actionLabel, status === 2, function () {
+                    respondCoverUser(coverId, status);
+                });
             });
         });
 
-        // 綁定管理者審核按鈕
+        // 綁定管理者審核按鈕（含二次確認）
         root.querySelectorAll('.js-cover-admin').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                respondCoverAdmin(parseInt(btn.dataset.id, 10), parseInt(btn.dataset.status, 10));
+                var coverId = parseInt(btn.dataset.id, 10);
+                var status = parseInt(btn.dataset.status, 10);
+                var actionLabel = status === 1 ? (coverI18n.action_admin_approve || '核准') : (coverI18n.action_admin_reject || '駁回');
+                showCoverConfirm(actionLabel, status === 2, function () {
+                    respondCoverAdmin(coverId, status);
+                });
             });
         });
+    }
+
+    // ---------------------------------------------------------------
+    //  代班二次確認
+    // ---------------------------------------------------------------
+
+    var pendingCoverAction = null;
+
+    /**
+     * 顯示代班操作二次確認彈窗
+     *
+     * @param {string}   actionLabel 操作名稱（如「同意」「駁回」）
+     * @param {boolean}  isDanger    是否為拒絕/駁回類操作
+     * @param {function} onConfirm   確認後執行的 callback
+     */
+    function showCoverConfirm(actionLabel, isDanger, onConfirm) {
+        var body = document.getElementById('modal-cover-confirm-body');
+        var actionCls = isDanger ? 'att-confirm-action--out' : 'att-confirm-action--in';
+
+        body.innerHTML =
+            '<div class="att-confirm-content">' +
+            '<div class="att-confirm-action ' + actionCls + '">' + actionLabel + '</div>' +
+            '<p class="att-confirm-hint">' + (coverI18n.confirm_hint || '此操作無法撤回，請確認') + '</p>' +
+            '</div>';
+
+        pendingCoverAction = onConfirm;
+        openModal('modal-cover-confirm');
     }
 
     /**
@@ -1120,6 +1257,18 @@
     // ---------------------------------------------------------------
 
     bindModalCloseButtons();
+
+    // 綁定代班確認 Modal 的確認按鈕
+    var coverConfirmBtn = document.getElementById('btn-cover-confirm-ok');
+    if (coverConfirmBtn) {
+        coverConfirmBtn.addEventListener('click', function () {
+            closeModal('modal-cover-confirm');
+            if (pendingCoverAction) {
+                pendingCoverAction();
+                pendingCoverAction = null;
+            }
+        });
+    }
 
     document.getElementById('form-assign').addEventListener('submit', submitAssign);
 

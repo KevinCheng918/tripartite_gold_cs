@@ -31,6 +31,7 @@ return [
     'modal_request_title'   => '申请代班',
     'modal_cancel'          => '取消',
     'modal_confirm'         => '确认',
+    'confirm_hint'          => '此操作无法撤回，请确认',
 
     'requested'             => '代班申请已送出',
     'cover_user_approved'   => '已同意代班',

@@ -97,10 +97,14 @@
         </div>
     </aside>
 
+    {{-- 手機版遮罩 --}}
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
     {{-- 右側主區域 --}}
     <div class="app-main">
         {{-- 頂部列 --}}
         <header class="topbar">
+            <button class="topbar__hamburger" id="btn-hamburger" aria-label="選單">&#9776;</button>
             <div class="topbar__left">
                 <h1 class="topbar__title">@yield('title', config('app.name'))</h1>
                 <p class="topbar__subtitle">@yield('subtitle', '')</p>
@@ -295,6 +299,33 @@
                     });
             });
         }
+    })();
+    </script>
+    <script>
+    // RWD 漢堡選單
+    (function () {
+        var hamburger = document.getElementById('btn-hamburger');
+        var sidebar = document.querySelector('.sidebar');
+        var overlay = document.getElementById('sidebar-overlay');
+        if (!hamburger || !sidebar || !overlay) { return; }
+
+        function openSidebar() {
+            sidebar.classList.add('sidebar--open');
+            overlay.classList.add('sidebar-overlay--visible');
+        }
+
+        function closeSidebar() {
+            sidebar.classList.remove('sidebar--open');
+            overlay.classList.remove('sidebar-overlay--visible');
+        }
+
+        hamburger.addEventListener('click', openSidebar);
+        overlay.addEventListener('click', closeSidebar);
+
+        // 點選 sidebar 導航項目後自動關閉
+        sidebar.querySelectorAll('.sidebar__nav a').forEach(function (link) {
+            link.addEventListener('click', closeSidebar);
+        });
     })();
     </script>
     @yield('scripts')
