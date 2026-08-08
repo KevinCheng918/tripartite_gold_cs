@@ -141,6 +141,15 @@
     @endcomponent
     @endif
 
+    {{-- 二次確認 Modal --}}
+    @component('components.modal', ['id' => 'modal-cover-confirm', 'title' => ''])
+        <div id="modal-cover-confirm-body"></div>
+        <div class="modal-actions">
+            <button type="button" data-modal-close class="btn-cancel">{{ trans('cover.modal_cancel') }}</button>
+            <button type="button" id="btn-cover-confirm-ok" class="btn-primary">{{ trans('cover.modal_confirm') }}</button>
+        </div>
+    @endcomponent
+
     {{-- 訊息提示 Modal --}}
     @component('components.modal', ['id' => 'modal-message', 'title' => ''])
         <p id="modal-message-text"></p>

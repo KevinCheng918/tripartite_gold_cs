@@ -206,6 +206,20 @@ class ShiftAssignmentRepository
     }
 
     /**
+     * 查詢所有換班請求（管理者用）
+     *
+     * @param int $perPage
+     * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
+     */
+    public function paginateAllSwaps($perPage = 20)
+    {
+        return ShiftSwap::query()
+            ->with(['requester', 'target', 'requesterAssignment.shift', 'targetAssignment.shift'])
+            ->orderByDesc('id')
+            ->paginate($perPage);
+    }
+
+    /**
      * 查詢與指定員工相關的換班請求（發起或被請求）
      *
      * @param int $userId

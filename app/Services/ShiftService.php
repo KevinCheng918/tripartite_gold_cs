@@ -265,7 +265,7 @@ class ShiftService
     }
 
     /**
-     * 執行換班：在 Transaction 中互換雙方 shift_id 並更新狀態
+     * 執行換班：在 Transaction 中互換雙方 user_id 並更新狀態
      *
      * @param ShiftSwap $swap
      * @return ShiftSwap
@@ -276,15 +276,15 @@ class ShiftService
             $requesterAssignment = $this->assignmentRepository->find((int) $swap->requester_assignment_id);
             $targetAssignment = $this->assignmentRepository->find((int) $swap->target_assignment_id);
 
-            // 互換 shift_id
-            $tempShiftId = $requesterAssignment->shift_id;
+            // 互換 user_id（你上我的班，我上你的班）
+            $tempUserId = $requesterAssignment->user_id;
 
             $this->assignmentRepository->update($requesterAssignment, [
-                'shift_id' => $targetAssignment->shift_id,
+                'user_id' => $targetAssignment->user_id,
             ]);
 
             $this->assignmentRepository->update($targetAssignment, [
-                'shift_id' => $tempShiftId,
+                'user_id' => $tempUserId,
             ]);
 
             return $this->assignmentRepository->updateSwapStatus($swap, ShiftSwap::STATUS_APPROVED);
@@ -301,5 +301,16 @@ class ShiftService
     public function listSwapsByUser($userId, $perPage = 20)
     {
         return $this->assignmentRepository->paginateSwapsByUser($userId, $perPage);
+    }
+
+    /**
+     * 查詢所有換班請求（管理者用）
+     *
+     * @param int $perPage
+     * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
+     */
+    public function listAllSwaps($perPage = 20)
+    {
+        return $this->assignmentRepository->paginateAllSwaps($perPage);
     }
 }

@@ -228,8 +228,14 @@ class ShiftController extends Controller
     public function ajaxMySwaps(Request $request)
     {
         $params = $request->only(['per_page']);
+        $perPage = (int) ($params['per_page'] ?? 20);
 
-        $swaps = $this->shiftService->listSwapsByUser(Auth::id(), (int) ($params['per_page'] ?? 20));
+        // Admin 查看所有換班紀錄，客服只看自己的
+        if (Auth::user()->isAdmin()) {
+            $swaps = $this->shiftService->listAllSwaps($perPage);
+        } else {
+            $swaps = $this->shiftService->listSwapsByUser(Auth::id(), $perPage);
+        }
 
         return ShiftSwapResource::collection($swaps);
     }
