@@ -9,6 +9,7 @@ use App\Services\TelegramChatService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Telegram 客服聊天控制器
@@ -103,28 +104,11 @@ class TelegramChatController extends Controller
         ]);
 
         try {
-            $uploadDir = public_path('uploads/telegram');
-
-            Log::info('圖片上傳 debug', [
-                'public_path'  => public_path(),
-                'upload_dir'   => $uploadDir,
-                'dir_exists'   => is_dir($uploadDir),
-                'dir_writable' => is_dir($uploadDir) ? is_writable($uploadDir) : 'N/A',
-                'parent_exists'    => is_dir(public_path('uploads')),
-                'parent_writable'  => is_dir(public_path('uploads')) ? is_writable(public_path('uploads')) : 'N/A',
-                'public_writable'  => is_writable(public_path()),
-            ]);
-
-            // 確保目錄存在
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0777, true);
-            }
-
-            // 儲存圖片
-            $file = $request->file('image');
+            $file = $params['image'];
             $filename = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
-            $file->move($uploadDir, $filename);
-            $imageUrl = url("uploads/telegram/{$filename}");
+
+            Storage::disk('public')->putFileAs('uploads/telegram', $file, $filename);
+            $imageUrl = Storage::disk('public')->url("uploads/telegram/{$filename}");
 
             $message = $this->chatService->sendReply(
                 (int) $params['group_id'],
