@@ -139,7 +139,7 @@
                 '<div class="tg-group__info">' +
                 '<div class="tg-group__title">' + g.title + '</div>' +
                 '<div class="tg-group__meta">' +
-                (g.assigned_user ? '<span class="tg-group__assigned">' + g.assigned_user + '</span>' : '') +
+                (g.on_duty_users && g.on_duty_users.length > 0 ? '<span class="tg-group__assigned">' + g.on_duty_users.join('、') + '</span>' : '') +
                 '<span class="tg-group__time">' + time + '</span>' +
                 '</div>' +
                 '</div>' +
@@ -177,7 +177,7 @@
             '<button class="tg-header__back" id="btn-tg-back">&larr;</button>' +
             '<div class="tg-header__title">' + group.title + '</div>' +
             '<div class="tg-header__right">' +
-            '<span class="tg-header__assigned">' + i18n.assigned_to + '：' + (group.assigned_user || i18n.unassigned) + '</span>' +
+            '<span class="tg-header__assigned">' + i18n.assigned_to + '：' + (group.on_duty_users && group.on_duty_users.length > 0 ? group.on_duty_users.join('、') : i18n.unassigned) + '</span>' +
             '</div>';
 
         // RWD 返回按鈕
