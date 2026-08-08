@@ -54,14 +54,26 @@
             });
             var channel = pusher.subscribe('telegram-chat');
 
-            // 收到新訊息
+            // 收到新訊息 / reaction 更新
             channel.bind('telegram.message', function (data) {
-                // 更新群組列表
-                loadGroups();
+                var msg = data.message;
+                if (!msg) { return; }
 
-                // 如果是當前選中的群組，追加訊息
-                if (data.message && data.message.group_id === selectedGroupId) {
-                    appendMessage(data.message);
+                // reaction 更新
+                if (msg.type === 'reaction_update') {
+                    if (msg.group_id === selectedGroupId) {
+                        // 用 telegram_message_id 找到對應的 bubble
+                        var bubbles = document.querySelectorAll('.tg-bubble[data-msg-id]');
+                        // 需要用 data API 重新載入以取得最新 reactions
+                        loadMessages(selectedGroupId);
+                    }
+                    return;
+                }
+
+                // 一般訊息
+                loadGroups();
+                if (msg.group_id === selectedGroupId) {
+                    appendMessage(msg);
                 }
             });
 
@@ -179,6 +191,20 @@
             });
     }
 
+    var QUICK_EMOJIS = [
+        '👍', '❤️', '😂', '😮', '😢', '🙏',
+        '❤️‍🔥', '👌', '😁', '🤗', '🔥', '🤔',
+        '👎', '🥰', '👏', '🤯', '🎉', '🤩',
+        '🤮', '💩', '🕊️', '🤡', '🫣', '😌',
+        '😍', '🐳', '🌚', '🌭', '💯', '🤣',
+        '⚡', '🍌', '🏆', '💔', '🤨', '🙂',
+        '🍓', '🍾', '💋', '🖕', '😈', '😴',
+        '😭', '🤓', '👻', '🤷', '👀', '🎃', '🙈',
+        '😇', '😱', '🤝', '✍️', '🫡', '🎅', '🎄',
+        '☃️', '🎆', '🤪', '🗿', '🆒', '💘', '🙉',
+        '🦄', '🥴', '🙊', '👾', '🤷‍♂️'
+    ];
+
     function buildBubbleContent(m) {
         var mediaHtml = '';
         if (m.media_type === 'photo' && m.media_url) {
@@ -189,7 +215,27 @@
 
         var textHtml = m.content ? '<div class="tg-bubble__content">' + escapeHtml(m.content) + '</div>' : '';
 
-        return mediaHtml + textHtml;
+        var reactionsHtml = buildReactionsHtml(m.reactions, m.id);
+
+        return mediaHtml + textHtml + reactionsHtml;
+    }
+
+    function buildReactionsHtml(reactions, messageId) {
+        var html = '<div class="tg-reactions" data-msg-id="' + messageId + '">';
+
+        if (reactions && reactions.length > 0) {
+            reactions.forEach(function (r) {
+                html += '<span class="tg-reaction">' + r.emoji + (r.count > 1 ? '<span class="tg-reaction__count">' + r.count + '</span>' : '') + '</span>';
+            });
+        }
+
+        // 加號按鈕（新增 reaction）
+        if (canReply) {
+            html += '<button class="tg-reaction tg-reaction--add" data-msg-id="' + messageId + '" title="React">+</button>';
+        }
+
+        html += '</div>';
+        return html;
     }
 
     function renderMessages(messages) {
@@ -206,7 +252,7 @@
             var time = m.created_at ? m.created_at.substring(11, 16) : '';
 
             return (
-                '<div class="tg-bubble ' + bubbleCls + '">' +
+                '<div class="tg-bubble ' + bubbleCls + '" data-msg-id="' + m.id + '">' +
                 '<div class="tg-bubble__sender">' + m.sender_name + '</div>' +
                 buildBubbleContent(m) +
                 '<div class="tg-bubble__time">' + time + '</div>' +
@@ -216,6 +262,7 @@
 
         // 捲到最下面
         container.scrollTop = container.scrollHeight;
+        bindReactionButtons();
     }
 
     function appendMessage(msg) {
@@ -231,7 +278,7 @@
         var time = msg.created_at ? msg.created_at.substring(11, 16) : '';
 
         var html =
-            '<div class="tg-bubble ' + bubbleCls + '">' +
+            '<div class="tg-bubble ' + bubbleCls + '" data-msg-id="' + msg.id + '">' +
             '<div class="tg-bubble__sender">' + msg.sender_name + '</div>' +
             buildBubbleContent(msg) +
             '<div class="tg-bubble__time">' + time + '</div>' +
@@ -239,6 +286,99 @@
 
         container.insertAdjacentHTML('beforeend', html);
         container.scrollTop = container.scrollHeight;
+        bindReactionButtons();
+    }
+
+    // ---------------------------------------------------------------
+    //  Reaction 互動
+    // ---------------------------------------------------------------
+
+    function bindReactionButtons() {
+        document.querySelectorAll('.tg-reaction--add').forEach(function (btn) {
+            btn.removeEventListener('click', handleReactionAdd);
+            btn.addEventListener('click', handleReactionAdd);
+        });
+    }
+
+    function handleReactionAdd(e) {
+        e.stopPropagation();
+        var btn = e.currentTarget;
+        var msgId = btn.dataset.msgId;
+
+        // 關閉其他已開啟的 picker
+        closeReactionPicker();
+
+        // 建立 emoji picker
+        var picker = document.createElement('div');
+        picker.className = 'tg-reaction-picker';
+        picker.dataset.msgId = msgId;
+
+        picker.innerHTML = QUICK_EMOJIS.map(function (emoji) {
+            return '<button class="tg-reaction-picker__item" data-emoji="' + emoji + '">' + emoji + '</button>';
+        }).join('');
+
+        btn.parentNode.appendChild(picker);
+
+        picker.querySelectorAll('.tg-reaction-picker__item').forEach(function (item) {
+            item.addEventListener('click', function (ev) {
+                ev.stopPropagation();
+                sendReaction(parseInt(msgId, 10), item.dataset.emoji);
+                closeReactionPicker();
+            });
+        });
+
+        // 點其他地方關閉
+        setTimeout(function () {
+            document.addEventListener('click', closeReactionPicker, { once: true });
+        }, 0);
+    }
+
+    function closeReactionPicker() {
+        var existing = document.querySelector('.tg-reaction-picker');
+        if (existing) { existing.remove(); }
+    }
+
+    function sendReaction(messageId, emoji) {
+        apiFetch('/admin/telegram-chat/ajax-react', {
+            method: 'POST',
+            body: JSON.stringify({ message_id: messageId, emoji: emoji }),
+        })
+            .then(function (body) {
+                // 更新本地顯示
+                updateBubbleReactions(messageId, body.reactions);
+            })
+            .catch(function () {
+                // 靜默失敗
+            });
+    }
+
+    function updateBubbleReactions(messageId, reactions) {
+        var bubble = document.querySelector('.tg-bubble[data-msg-id="' + messageId + '"]');
+        if (!bubble) { return; }
+
+        var container = bubble.querySelector('.tg-reactions');
+        if (!container) { return; }
+
+        container.innerHTML = '';
+
+        if (reactions && reactions.length > 0) {
+            reactions.forEach(function (r) {
+                var span = document.createElement('span');
+                span.className = 'tg-reaction';
+                span.innerHTML = r.emoji + (r.count > 1 ? '<span class="tg-reaction__count">' + r.count + '</span>' : '');
+                container.appendChild(span);
+            });
+        }
+
+        if (canReply) {
+            var addBtn = document.createElement('button');
+            addBtn.className = 'tg-reaction tg-reaction--add';
+            addBtn.dataset.msgId = String(messageId);
+            addBtn.title = 'React';
+            addBtn.textContent = '+';
+            container.appendChild(addBtn);
+            addBtn.addEventListener('click', handleReactionAdd);
+        }
     }
 
     // ---------------------------------------------------------------

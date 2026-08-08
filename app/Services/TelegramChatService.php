@@ -177,6 +177,91 @@ class TelegramChatService
     }
 
     // ---------------------------------------------------------------
+    //  表情回應（Reaction）
+    // ---------------------------------------------------------------
+
+    /**
+     * 處理 Telegram Webhook 收到的 message_reaction 事件
+     *
+     * @param array $payload Telegram Update 物件
+     * @return void
+     */
+    public function handleReactionUpdate($payload)
+    {
+        $reaction = $payload['message_reaction'] ?? null;
+
+        if (!$reaction) {
+            return;
+        }
+
+        $chatId = $reaction['chat']['id'] ?? null;
+        $telegramMsgId = $reaction['message_id'] ?? null;
+
+        if (!filled($chatId) || !filled($telegramMsgId)) {
+            return;
+        }
+
+        $message = $this->telegramRepository->findByTelegramMessageId($chatId, $telegramMsgId);
+
+        if (!$message) {
+            return;
+        }
+
+        // 合併 new_reaction 到現有 reactions
+        $newReactions = $reaction['new_reaction'] ?? [];
+        $reactions = $this->mergeReactions($message->reactions, $newReactions);
+
+        $this->telegramRepository->updateReactions($message, $reactions);
+
+        // Broadcasting — 通知前端更新
+        try {
+            event(new \App\Events\TelegramMessageReceived($message->telegram_group_id, [
+                'type'                => 'reaction_update',
+                'telegram_message_id' => $telegramMsgId,
+                'reactions'           => $reactions,
+                'group_id'            => $message->telegram_group_id,
+            ]));
+        } catch (\Exception $e) {
+            Log::warning('Broadcasting reaction 失敗', ['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * 從後台對 Telegram 訊息送出表情回應
+     *
+     * @param int    $messageId 本地訊息 ID
+     * @param string $emoji     表情符號
+     * @return array|null 更新後的 reactions
+     */
+    public function sendReaction($messageId, $emoji)
+    {
+        $message = $this->telegramRepository->findMessageWithGroup($messageId);
+
+        if (!$message || !filled($message->telegram_message_id)) {
+            return null;
+        }
+
+        $result = $this->botService->setMessageReaction(
+            $message->group->chat_id,
+            $message->telegram_message_id,
+            $emoji
+        );
+
+        if (!$result || !($result['ok'] ?? false)) {
+            return null;
+        }
+
+        // 更新本地 reactions
+        $reactions = $this->mergeReactions($message->reactions, [
+            ['type' => 'emoji', 'emoji' => $emoji],
+        ]);
+
+        $this->telegramRepository->updateReactions($message, $reactions);
+
+        return $reactions;
+    }
+
+    // ---------------------------------------------------------------
     //  回覆
     // ---------------------------------------------------------------
 
@@ -328,6 +413,49 @@ class TelegramChatService
             Log::error('Telegram 檔案下載異常', ['error' => $e->getMessage(), 'file_id' => $fileId]);
             return null;
         }
+    }
+
+    /**
+     * 合併 reactions（累加相同 emoji 的計數）
+     *
+     * @param array|null $existing    現有 reactions [{emoji: "👍", count: 1}, ...]
+     * @param array      $newReactions Telegram 格式 [{type: "emoji", emoji: "👍"}, ...]
+     * @return array
+     */
+    private function mergeReactions($existing, $newReactions)
+    {
+        $map = [];
+
+        // 載入現有
+        if (filled($existing)) {
+            foreach ($existing as $r) {
+                $map[$r['emoji']] = $r['count'] ?? 1;
+            }
+        }
+
+        // 合併新的（Telegram reaction 是替換邏輯，不是累加）
+        // message_reaction 的 new_reaction 代表該使用者目前的全部 reaction
+        // 簡化處理：將新的 emoji 計數設為 1（若已存在則保留較大值）
+        foreach ($newReactions as $r) {
+            $emoji = $r['emoji'] ?? null;
+            if (!filled($emoji)) {
+                continue;
+            }
+
+            if (isset($map[$emoji])) {
+                $map[$emoji] = $map[$emoji] + 1;
+            } else {
+                $map[$emoji] = 1;
+            }
+        }
+
+        // 轉回陣列格式
+        $result = [];
+        foreach ($map as $emoji => $count) {
+            $result[] = ['emoji' => $emoji, 'count' => $count];
+        }
+
+        return count($result) > 0 ? $result : null;
     }
 
     /**

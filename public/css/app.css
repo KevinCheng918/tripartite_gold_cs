@@ -2389,6 +2389,132 @@ td button:hover {
 .tg-bubble--inbound .tg-bubble__time { color: #9ca3af; }
 .tg-bubble--outbound .tg-bubble__time { color: rgba(255, 255, 255, 0.6); }
 
+/* Reactions */
+.tg-reactions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.375rem;
+    position: relative;
+}
+
+.tg-reaction {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.125rem;
+    font-size: 0.8125rem;
+    padding: 0.125rem 0.375rem;
+    border-radius: 1rem;
+    background: rgba(0, 0, 0, 0.06);
+    cursor: default;
+    line-height: 1.4;
+}
+
+.tg-bubble--outbound .tg-reaction {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.tg-reaction__count {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: #6b7280;
+}
+
+.tg-bubble--outbound .tg-reaction__count {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.tg-reaction--add {
+    cursor: pointer;
+    font-weight: 700;
+    color: #9ca3af;
+    background: rgba(0, 0, 0, 0.04);
+    border: 1px dashed #d1d5db;
+    font-size: 0.75rem;
+    padding: 0.125rem 0.5rem;
+    transition: background 0.12s;
+}
+
+.tg-reaction--add:hover {
+    background: rgba(0, 0, 0, 0.1);
+    color: #374151;
+}
+
+.tg-bubble--outbound .tg-reaction--add {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.tg-bubble--outbound .tg-reaction--add:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+
+.tg-reaction-picker {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 0.125rem;
+    background: #fff;
+    border: 1px solid #ebedf0;
+    border-radius: 0.75rem;
+    padding: 0.375rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    z-index: 10;
+    margin-bottom: 0.25rem;
+    max-height: 240px;
+    overflow-y: auto;
+    width: 280px;
+}
+
+.tg-reaction-picker__item {
+    border: none;
+    background: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 0.375rem;
+    transition: background 0.1s;
+    line-height: 1;
+    text-align: center;
+}
+
+.tg-reaction-picker__item:hover {
+    background: #f3f4f6;
+}
+
+[data-theme="dark"] .tg-reaction {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .tg-reaction__count {
+    color: #9ca3af;
+}
+
+[data-theme="dark"] .tg-reaction--add {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: #4b5563;
+    color: #6b7280;
+}
+
+[data-theme="dark"] .tg-reaction--add:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #d1d5db;
+}
+
+[data-theme="dark"] .tg-reaction-picker {
+    background: #2d3039;
+    border-color: #3d4049;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .tg-reaction-picker__item:hover {
+    background: #3d4049;
+}
+
 /* 輸入區域 */
 .tg-chat__input {
     display: flex;
