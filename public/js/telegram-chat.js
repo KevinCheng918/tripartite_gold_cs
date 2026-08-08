@@ -274,8 +274,10 @@
             );
         }).join('');
 
-        // 平滑捲到最下面
-        scrollToBottom(container);
+        // 初次載入直接跳底（不動畫）
+        requestAnimationFrame(function () {
+            container.scrollTop = container.scrollHeight;
+        });
         bindReactionButtons();
     }
 
@@ -299,22 +301,9 @@
             '</div>';
 
         container.insertAdjacentHTML('beforeend', html);
-        scrollToBottom(container);
+        // 新訊息追加用平滑捲動
+        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
         bindReactionButtons();
-    }
-
-    /**
-     * 平滑捲動到容器底部
-     *
-     * @param {HTMLElement} container
-     */
-    function scrollToBottom(container) {
-        // 初次載入直接跳底，後續追加用平滑捲動
-        if (container.scrollTop === 0 && container.scrollHeight > container.clientHeight) {
-            container.scrollTop = container.scrollHeight;
-        } else {
-            container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
-        }
     }
 
     // ---------------------------------------------------------------
@@ -472,27 +461,33 @@
 
         // 連按兩次 Enter 送出（單次 Enter 換行，IME 選字的 Enter 不算）
         var lastEnterTime = 0;
+        var isComposing = false;
+
+        textarea.addEventListener('compositionstart', function () { isComposing = true; });
+        textarea.addEventListener('compositionend', function () {
+            isComposing = false;
+            // compositionend 後緊接的 keydown 要跳過，給一個短暫冷卻
+            lastEnterTime = 0;
+        });
+
         textarea.addEventListener('keydown', function (e) {
-            // 排除 IME 選字中的 Enter（中文、日文輸入法）
-            if (e.isComposing || e.keyCode === 229) {
+            if (e.key !== 'Enter' || e.shiftKey || isComposing) {
                 return;
             }
 
-            if (e.key === 'Enter' && !e.shiftKey) {
-                var now = Date.now();
-                if (now - lastEnterTime < 500) {
-                    e.preventDefault();
-                    // 移除第一次 Enter 產生的換行
-                    var val = textarea.value;
-                    if (val.charAt(val.length - 1) === '\n') {
-                        textarea.value = val.substring(0, val.length - 1);
-                    }
-                    sendReply();
-                    lastEnterTime = 0;
-                    textarea.style.height = '';
-                } else {
-                    lastEnterTime = now;
+            var now = Date.now();
+            if (now - lastEnterTime < 500) {
+                e.preventDefault();
+                // 移除第一次 Enter 產生的換行
+                var val = textarea.value;
+                if (val.charAt(val.length - 1) === '\n') {
+                    textarea.value = val.substring(0, val.length - 1);
                 }
+                sendReply();
+                lastEnterTime = 0;
+                textarea.style.height = '';
+            } else {
+                lastEnterTime = now;
             }
         });
     }
