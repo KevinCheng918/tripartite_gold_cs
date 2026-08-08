@@ -2831,7 +2831,8 @@ td button:hover {
 
     /* ---- Telegram 聊天 ---- */
     .tg-chat {
-        height: calc(100vh - 100px);
+        height: calc(100vh - 120px);
+        height: calc(100dvh - 120px);
         flex-direction: column;
     }
 
@@ -2853,6 +2854,13 @@ td button:hover {
 
     .tg-chat--chatting .tg-chat__main {
         display: flex;
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .tg-chat__messages {
+        min-height: 0;
         flex: 1;
     }
 
