@@ -8,6 +8,7 @@ return [
     'not_clocked'        => 'Not clocked in',
     'clocked_in'         => 'Clocked in',
     'clocked_out'        => 'Clocked out',
+    'current_status'     => 'Current Status',
     'btn_clock_in'       => 'Clock In',
     'btn_clock_out'      => 'Clock Out',
 
@@ -56,5 +57,10 @@ return [
         'clock_out_success'   => 'Clocked out successfully',
         'clock_in_failed'     => 'Failed to clock in',
         'clock_out_failed'    => 'Failed to clock out',
+        'previous_not_clocked_out' => 'Previous shift not clocked out yet. Please clock out first.',
+        'confirm'             => 'Confirm',
+        'cancel'              => 'Cancel',
+        'clock_time'          => 'Clock Time',
+        'confirm_hint'        => 'This action cannot be undone. Please verify the information.',
     ],
 ];

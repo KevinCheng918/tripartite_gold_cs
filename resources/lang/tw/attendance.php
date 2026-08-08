@@ -9,6 +9,7 @@ return [
     'not_clocked'        => '尚未打卡',
     'clocked_in'         => '已上班打卡',
     'clocked_out'        => '已下班打卡',
+    'current_status'     => '目前狀態',
     'btn_clock_in'       => '上班打卡',
     'btn_clock_out'      => '下班打卡',
 
@@ -62,5 +63,10 @@ return [
         'clock_out_success'   => '下班打卡成功',
         'clock_in_failed'     => '上班打卡失敗',
         'clock_out_failed'    => '下班打卡失敗',
+        'previous_not_clocked_out' => '前一班尚未下班打卡，請先完成下班打卡',
+        'confirm'             => '確認打卡',
+        'cancel'              => '取消',
+        'clock_time'          => '打卡時間',
+        'confirm_hint'        => '確認後將無法修改，請確認資訊正確',
     ],
 ];
