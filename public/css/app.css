@@ -2192,6 +2192,7 @@ td button:hover {
     border-radius: 0.75rem;
     overflow: hidden;
     background: #fff;
+    transition: height 0.2s ease;
 }
 
 /* 左側群組列表 */
@@ -2452,9 +2453,7 @@ td button:hover {
 }
 
 .tg-reaction-picker {
-    position: absolute;
-    bottom: 100%;
-    left: 0;
+    position: fixed;
     display: grid;
     grid-template-columns: repeat(8, 1fr);
     gap: 0.125rem;
@@ -2462,10 +2461,9 @@ td button:hover {
     border: 1px solid #ebedf0;
     border-radius: 0.75rem;
     padding: 0.375rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-    z-index: 10;
-    margin-bottom: 0.25rem;
-    max-height: 240px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+    max-height: 220px;
     overflow-y: auto;
     width: 280px;
 }
@@ -2562,6 +2560,450 @@ td button:hover {
 
 .tg-alert__icon { font-size: 1.25rem; }
 
+/* 桌面版隱藏手機元素 */
+.topbar__hamburger { display: none; }
+.sidebar-overlay { display: none; }
+.account-cards { display: none; }
+.shift-cards { display: none; }
+
+/* RWD — 手機版 */
+/* ================================================================
+   RWD（≤ 768px）
+   ================================================================ */
+@media (max-width: 768px) {
+
+    /* ---- 全站：側邊欄收合 ---- */
+    .sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+    }
+
+    .sidebar--open {
+        transform: translateX(0);
+    }
+
+    /* 遮罩 */
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 99;
+    }
+
+    .sidebar-overlay--visible {
+        display: block;
+    }
+
+    .app-body {
+        overflow-x: hidden;
+    }
+
+    .app-main {
+        margin-left: 0;
+        width: 100%;
+        max-width: 100vw;
+        overflow-x: hidden;
+    }
+
+    /* 漢堡按鈕 */
+    .topbar__hamburger {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border: none;
+        background: none;
+        font-size: 1.375rem;
+        cursor: pointer;
+        color: #374151;
+        margin-right: 0.5rem;
+        flex-shrink: 0;
+    }
+
+    .topbar {
+        padding: 0.75rem 1rem;
+    }
+
+    .topbar__title {
+        font-size: 1.125rem;
+    }
+
+    .topbar__left {
+        display: none;
+    }
+
+    .topbar__right {
+        gap: 0.5rem;
+    }
+
+    .topbar {
+        justify-content: center;
+        position: relative;
+    }
+
+    .topbar__hamburger {
+        position: absolute;
+        left: 0.75rem;
+    }
+
+    .topbar__right {
+        position: absolute;
+        right: 0.75rem;
+    }
+
+    .topbar__clock {
+        font-size: 0.9375rem;
+        white-space: nowrap;
+    }
+
+    .topbar__user-info {
+        display: none;
+    }
+
+    /* ---- 全站：內容區域 ---- */
+    .app-content {
+        padding: 1rem;
+    }
+
+    /* ---- 表格橫向捲動（排班課表由 timetable-wrap 處理，排除） ---- */
+    table:not(.timetable) {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    table:not(.timetable) thead,
+    table:not(.timetable) tbody,
+    table:not(.timetable) tr,
+    table:not(.timetable) th,
+    table:not(.timetable) td {
+        white-space: nowrap;
+    }
+
+    /* ---- 排班管理 ---- */
+    .tt-toolbar {
+        flex-direction: column;
+        gap: 0.75rem;
+        align-items: stretch;
+    }
+
+    .tt-toolbar__left {
+        order: 2;
+    }
+
+    .tt-toolbar__center {
+        order: 1;
+        justify-content: center;
+    }
+
+    .tt-week-nav {
+        gap: 0.375rem;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .tt-week-label {
+        font-size: 0.875rem;
+        min-width: auto;
+    }
+
+    .tt-actions {
+        justify-content: center;
+    }
+
+    .timetable {
+        min-width: 600px;
+    }
+
+    .tt-multi-wrap {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* ---- Tabs ---- */
+    .tabs {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .tabs button {
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    /* ---- Dashboard 卡片 ---- */
+    .dash-cards {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+    }
+
+    .dash-card__value {
+        font-size: 1.5rem;
+    }
+
+    /* ---- Modal ---- */
+    .modal-box {
+        width: 92vw;
+        max-width: 92vw;
+        margin: 1rem;
+    }
+
+    /* ---- 打卡 ---- */
+    .att-clock-panel {
+        padding: 1rem 0;
+    }
+
+    .att-clock-date {
+        font-size: 1.25rem;
+    }
+
+    .att-clock-status__icon {
+        width: 60px;
+        height: 60px;
+    }
+
+    .att-clock-btn {
+        font-size: 1rem !important;
+        padding: 0.75rem 2rem !important;
+    }
+
+    .att-confirm-info {
+        max-width: 100%;
+    }
+
+    /* ---- 月份切換 ---- */
+    .att-month-nav {
+        flex-wrap: wrap;
+    }
+
+    /* ---- Telegram 聊天 ---- */
+    .tg-chat {
+        height: calc(100vh - 100px);
+        flex-direction: column;
+    }
+
+    .tg-chat__sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid #ebedf0;
+        max-height: none;
+        flex-shrink: 1;
+    }
+
+    .tg-chat--chatting .tg-chat__sidebar {
+        display: none;
+    }
+
+    .tg-chat__main {
+        display: none;
+    }
+
+    .tg-chat--chatting .tg-chat__main {
+        display: flex;
+        flex: 1;
+    }
+
+    .tg-header__back {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: none;
+        font-size: 1.25rem;
+        cursor: pointer;
+        color: #6b7280;
+        margin-right: 0.5rem;
+        flex-shrink: 0;
+    }
+
+    .tg-header__back:hover {
+        color: #111827;
+    }
+
+    .tg-bubble {
+        max-width: 85%;
+    }
+
+    .tg-bubble__media img {
+        max-width: 180px;
+        max-height: 180px;
+    }
+
+    .tg-reaction-picker {
+        width: 260px;
+        grid-template-columns: repeat(7, 1fr);
+    }
+
+    .tg-chat__input {
+        padding: 0.5rem 0.75rem;
+    }
+
+    /* ---- 告警條 ---- */
+    .tg-alert-bar {
+        left: 0;
+    }
+
+    /* ---- 按鈕 ---- */
+    .btn-primary, .btn-danger-full {
+        font-size: 0.875rem;
+        padding: 0.5rem 1rem;
+    }
+
+    /* ---- 帳號管理：卡片式 ---- */
+    #account-app table { display: none; }
+
+    .account-cards {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        margin-top: 0.75rem;
+    }
+
+    .account-card {
+        background: #fff;
+        border: 1px solid #ebedf0;
+        border-radius: 0.625rem;
+        padding: 0.875rem 1rem;
+    }
+
+    .account-card__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+    }
+
+    .account-card__name {
+        font-weight: 700;
+        font-size: 0.9375rem;
+        color: #111827;
+    }
+
+    .account-card__account {
+        font-size: 0.8125rem;
+        color: #6b7280;
+    }
+
+    .account-card__row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.25rem 0;
+        font-size: 0.875rem;
+        color: #374151;
+    }
+
+    .account-card__label {
+        color: #6b7280;
+        font-size: 0.8125rem;
+    }
+
+    .account-card__actions {
+        display: flex;
+        gap: 0.375rem;
+        margin-top: 0.625rem;
+        flex-wrap: wrap;
+    }
+
+    .account-card__actions .btn-sm {
+        flex: 1;
+        text-align: center;
+        font-size: 0.8125rem;
+    }
+
+    [data-theme="dark"] .account-card {
+        background: #1a1d27;
+        border-color: #2d3039;
+    }
+
+    [data-theme="dark"] .account-card__name { color: #f3f4f6; }
+    [data-theme="dark"] .account-card__row { color: #d1d5db; }
+
+    /* ---- 排班子頁卡片式 ---- */
+    #tab-content > table { display: none; }
+
+    .shift-cards {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        margin-top: 0.5rem;
+    }
+
+    .shift-card {
+        background: #fff;
+        border: 1px solid #ebedf0;
+        border-radius: 0.625rem;
+        padding: 0.875rem 1rem;
+    }
+
+    .shift-card__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+    }
+
+    .shift-card__title {
+        font-weight: 700;
+        font-size: 0.9375rem;
+        color: #111827;
+    }
+
+    .shift-card__row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.25rem 0;
+        font-size: 0.875rem;
+        color: #374151;
+    }
+
+    .shift-card__label {
+        color: #6b7280;
+        font-size: 0.8125rem;
+    }
+
+    .shift-card__actions {
+        display: flex;
+        gap: 0.375rem;
+        margin-top: 0.625rem;
+    }
+
+    .shift-card__actions .btn-sm,
+    .shift-card__actions .btn-primary {
+        flex: 1;
+        text-align: center;
+        font-size: 0.8125rem;
+    }
+
+    .shift-card__badges {
+        display: flex;
+        gap: 0.375rem;
+        flex-wrap: wrap;
+        margin-top: 0.375rem;
+    }
+
+    [data-theme="dark"] .shift-card {
+        background: #1a1d27;
+        border-color: #2d3039;
+    }
+
+    [data-theme="dark"] .shift-card__title { color: #f3f4f6; }
+    [data-theme="dark"] .shift-card__row { color: #d1d5db; }
+
+    /* ---- 權限頁面 ---- */
+    .perm-checkbox {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.875rem;
+    }
+}
+
+/* 桌面版隱藏手機元素 */
+.tg-header__back { display: none; }
+
 /* 深色模式 */
 [data-theme="dark"] .tg-chat { background: #1a1d27; border-color: #2d3039; }
 [data-theme="dark"] .tg-chat__sidebar { border-color: #2d3039; }
@@ -2580,6 +3022,10 @@ td button:hover {
 [data-theme="dark"] .tg-chat__input textarea { background: #151821; border-color: #2d3039; color: #e5e7eb; }
 [data-theme="dark"] .tg-chat__input textarea:focus { border-color: #a67c00; }
 [data-theme="dark"] .tg-alert-bar { background: rgba(239, 68, 68, 0.15); border-color: #ef4444; color: #f87171; }
+[data-theme="dark"] .tg-header__back { color: #9ca3af; }
+[data-theme="dark"] .tg-header__back:hover { color: #f3f4f6; }
+[data-theme="dark"] .topbar__hamburger { color: #d1d5db; }
+[data-theme="dark"] .sidebar-overlay--visible { background: rgba(0, 0, 0, 0.6); }
 
 .login-page {
     display: flex;

@@ -31,6 +31,7 @@ return [
     'modal_request_title'   => 'Request Cover',
     'modal_cancel'          => 'Cancel',
     'modal_confirm'         => 'Confirm',
+    'confirm_hint'          => 'This action cannot be undone.',
 
     'requested'             => 'Cover request submitted',
     'cover_user_approved'   => 'Cover approved',
