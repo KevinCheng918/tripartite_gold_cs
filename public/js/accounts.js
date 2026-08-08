@@ -121,11 +121,6 @@
 
                 var statusInfo = statusMap[account.status] || { text: '-', css: '' };
 
-                var perms = (account.permission_keywords || []).map(function (kw) {
-                    return '<span class="badge badge--active">' + translateKeyword(kw) + '</span>';
-                }).join(' ');
-
-                // 管理者不顯示操作按鈕
                 var actions = '';
                 if (account.level !== 0) {
                     actions =
@@ -140,7 +135,6 @@
                     '<td>' + account.nickname + '</td>' +
                     '<td><span class="badge ' + statusInfo.css + '">' + statusInfo.text + '</span></td>' +
                     '<td>' + levelLabel + '</td>' +
-                    '<td class="td-permissions">' + (account.level === 0 ? '-' : (perms || '-')) + '</td>' +
                     '<td class="td-actions">' + actions + '</td>' +
                     '</tr>'
                 );
@@ -177,7 +171,6 @@
             '<th>' + i18n.field_nickname + '</th>' +
             '<th>' + i18n.field_status + '</th>' +
             '<th>' + i18n.field_level + '</th>' +
-            '<th>' + i18n.action_assign_permissions + '</th>' +
             '<th></th>' +
             '</tr></thead><tbody>' + rows + '</tbody></table>' +
             '<div class="account-cards">' + cards + '</div>';
