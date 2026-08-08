@@ -160,5 +160,5 @@
 @endsection
 
 @section('scripts')
-    <script src="{{ asset('js/shifts.js') }}?v={{ time() }}"></script>
+    <script src="{{ asset('js/shifts.js') }}?v={{ filemtime(public_path('js/shifts.js')) }}"></script>
 @endsection
