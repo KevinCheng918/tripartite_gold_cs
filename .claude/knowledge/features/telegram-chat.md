@@ -15,6 +15,18 @@
   - 週一至週五：客人問題超過 5 分鐘未回覆 → 告警
   - 週六、週日：客人問題超過 30 分鐘未回覆 → 告警
 
+## 已實作功能
+
+| 功能 | 說明 |
+|------|------|
+| 文字收發 | Webhook 收訊 + 後台回覆 |
+| 圖片收發 | 收：下載 Telegram 圖片/貼圖到 storage；發：上傳圖片後透過 Bot API 傳送 |
+| 貼圖相容 | 動態/影片貼圖自動取用 thumbnail 靜態縮圖 |
+| 表情回應 | 收：處理 message_reaction webhook，合併計數存入 reactions JSON；發：透過 setMessageReaction Bot API，前端提供 6 個快速 emoji 選擇器 |
+| 值班自動指派 | 依排班自動指派當前值班客服 |
+| 即時推送 | Pusher/WebSocket broadcasting |
+| 未回覆告警 | 超時未回覆告警（工作日 5 分鐘、假日 30 分鐘） |
+
 ## 待釐清
 
 - （已全部釐清）

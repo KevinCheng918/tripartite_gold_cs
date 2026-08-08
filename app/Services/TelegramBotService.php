@@ -118,6 +118,40 @@ class TelegramBotService
     }
 
     /**
+     * 對指定訊息設定表情回應
+     *
+     * @param int    $chatId    Telegram chat_id
+     * @param int    $messageId Telegram message_id
+     * @param string $emoji     表情符號（如 👍）
+     * @return array|null
+     */
+    public function setMessageReaction($chatId, $messageId, $emoji)
+    {
+        try {
+            $response = $this->client->post("{$this->baseUrl}/setMessageReaction", [
+                'json' => [
+                    'chat_id'    => $chatId,
+                    'message_id' => $messageId,
+                    'reaction'   => [
+                        ['type' => 'emoji', 'emoji' => $emoji],
+                    ],
+                ],
+            ]);
+
+            return json_decode($response->getBody()->getContents(), true);
+        } catch (\Exception $e) {
+            Log::error('Telegram setMessageReaction 失敗', [
+                'chat_id'    => $chatId,
+                'message_id' => $messageId,
+                'emoji'      => $emoji,
+                'error'      => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
      * 取得 Telegram 檔案的下載 URL
      *
      * @param string $fileId Telegram file_id
