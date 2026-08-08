@@ -459,30 +459,20 @@
         }
         textarea.addEventListener('input', autoResize);
 
-        // 連按兩次 Enter 送出（單次 Enter 換行，IME 選字的 Enter 不算）
+        // 連按兩次 Enter 送出（Shift+Enter 換行）
+        // Enter 一律攔截不換行，500ms 內連按兩次送出
         var lastEnterTime = 0;
-        var isComposing = false;
-
-        textarea.addEventListener('compositionstart', function () { isComposing = true; });
-        textarea.addEventListener('compositionend', function () {
-            isComposing = false;
-            // compositionend 後緊接的 keydown 要跳過，給一個短暫冷卻
-            lastEnterTime = 0;
-        });
-
         textarea.addEventListener('keydown', function (e) {
-            if (e.key !== 'Enter' || e.shiftKey || isComposing) {
-                return;
-            }
+            if (e.key !== 'Enter') { return; }
+            // IME 組字中不處理
+            if (e.isComposing || e.keyCode === 229) { return; }
+            // Shift+Enter 換行，不攔截
+            if (e.shiftKey) { return; }
+
+            e.preventDefault();
 
             var now = Date.now();
             if (now - lastEnterTime < 500) {
-                e.preventDefault();
-                // 移除第一次 Enter 產生的換行
-                var val = textarea.value;
-                if (val.charAt(val.length - 1) === '\n') {
-                    textarea.value = val.substring(0, val.length - 1);
-                }
                 sendReply();
                 lastEnterTime = 0;
                 textarea.style.height = '';
