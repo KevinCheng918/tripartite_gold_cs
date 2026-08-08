@@ -274,8 +274,8 @@
             );
         }).join('');
 
-        // 捲到最下面
-        container.scrollTop = container.scrollHeight;
+        // 平滑捲到最下面
+        scrollToBottom(container);
         bindReactionButtons();
     }
 
@@ -299,8 +299,22 @@
             '</div>';
 
         container.insertAdjacentHTML('beforeend', html);
-        container.scrollTop = container.scrollHeight;
+        scrollToBottom(container);
         bindReactionButtons();
+    }
+
+    /**
+     * 平滑捲動到容器底部
+     *
+     * @param {HTMLElement} container
+     */
+    function scrollToBottom(container) {
+        // 初次載入直接跳底，後續追加用平滑捲動
+        if (container.scrollTop === 0 && container.scrollHeight > container.clientHeight) {
+            container.scrollTop = container.scrollHeight;
+        } else {
+            container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+        }
     }
 
     // ---------------------------------------------------------------
@@ -449,6 +463,13 @@
             }
         });
 
+        // 輸入框自動高度
+        function autoResize() {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+        }
+        textarea.addEventListener('input', autoResize);
+
         // 連按兩次 Enter 送出（單次 Enter 換行）
         var lastEnterTime = 0;
         textarea.addEventListener('keydown', function (e) {
@@ -463,6 +484,8 @@
                     }
                     sendReply();
                     lastEnterTime = 0;
+                    // 重置高度
+                    textarea.style.height = '';
                 } else {
                     lastEnterTime = now;
                 }
@@ -472,10 +495,12 @@
 
     function sendReply() {
         var textarea = document.getElementById('tg-reply-text');
+        var sendBtn = document.getElementById('btn-tg-send');
         var content = textarea.value.trim();
         if (!content || !selectedGroupId) { return; }
 
         textarea.disabled = true;
+        if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '...'; }
 
         apiFetch('/admin/telegram-chat/ajax-reply', {
             method: 'POST',
@@ -483,12 +508,14 @@
         })
             .then(function () {
                 textarea.value = '';
+                textarea.style.height = '';
                 textarea.disabled = false;
+                if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = i18n.btn_send; }
                 textarea.focus();
-                // Pusher 會推送新訊息，不需手動追加
             })
             .catch(function (error) {
                 textarea.disabled = false;
+                if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = i18n.btn_send; }
                 var msg = error.message || i18n.msg.reply_failed;
                 alert(msg);
             });

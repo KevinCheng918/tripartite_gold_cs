@@ -2224,11 +2224,12 @@ td button:hover {
     padding: 0.75rem 1rem;
     cursor: pointer;
     border-bottom: 1px solid #f3f4f6;
-    transition: background 0.12s;
+    transition: background 0.18s ease, box-shadow 0.18s ease;
 }
 
 .tg-group:hover { background: #fafafa; }
-.tg-group--active { background: #fef9e7; }
+.tg-group:active { background: #f3f4f6; }
+.tg-group--active { background: #fef9e7; box-shadow: inset 3px 0 0 #a67c00; }
 
 .tg-group__info { flex: 1; min-width: 0; }
 
@@ -2308,6 +2309,8 @@ td button:hover {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
 }
 
 .tg-chat__empty {
@@ -2318,12 +2321,19 @@ td button:hover {
 }
 
 /* 訊息泡泡 */
+@keyframes bubbleIn {
+    from { opacity: 0; transform: translateY(8px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 .tg-bubble {
     max-width: 70%;
     padding: 0.625rem 0.875rem;
     border-radius: 0.75rem;
     font-size: 0.9375rem;
     line-height: 1.5;
+    animation: bubbleIn 0.25s ease-out;
+    will-change: transform, opacity;
 }
 
 .tg-bubble--inbound {
@@ -2331,6 +2341,7 @@ td button:hover {
     background: #f3f4f6;
     color: #111827;
     border-bottom-left-radius: 0.25rem;
+    transform-origin: left bottom;
 }
 
 .tg-bubble--outbound {
@@ -2338,6 +2349,7 @@ td button:hover {
     background: #a67c00;
     color: #fff;
     border-bottom-right-radius: 0.25rem;
+    transform-origin: right bottom;
 }
 
 .tg-bubble__sender {
@@ -2361,10 +2373,12 @@ td button:hover {
     border-radius: 0.375rem;
     cursor: pointer;
     display: block;
+    transition: transform 0.15s ease, opacity 0.15s ease;
 }
 
 .tg-bubble__media img:hover {
-    opacity: 0.9;
+    opacity: 0.92;
+    transform: scale(1.02);
 }
 
 .tg-bubble__sticker img {
@@ -2399,6 +2413,12 @@ td button:hover {
     position: relative;
 }
 
+@keyframes reactionPop {
+    0%   { transform: scale(0.5); opacity: 0; }
+    60%  { transform: scale(1.15); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
 .tg-reaction {
     display: inline-flex;
     align-items: center;
@@ -2409,6 +2429,12 @@ td button:hover {
     background: rgba(0, 0, 0, 0.06);
     cursor: default;
     line-height: 1.4;
+    animation: reactionPop 0.3s ease-out;
+    transition: transform 0.12s ease;
+}
+
+.tg-reaction:hover {
+    transform: scale(1.15);
 }
 
 .tg-bubble--outbound .tg-reaction {
@@ -2475,13 +2501,18 @@ td button:hover {
     cursor: pointer;
     padding: 0.25rem;
     border-radius: 0.375rem;
-    transition: background 0.1s;
+    transition: background 0.1s, transform 0.12s ease;
     line-height: 1;
     text-align: center;
 }
 
 .tg-reaction-picker__item:hover {
     background: #f3f4f6;
+    transform: scale(1.25);
+}
+
+.tg-reaction-picker__item:active {
+    transform: scale(0.9);
 }
 
 [data-theme="dark"] .tg-reaction {
@@ -2533,11 +2564,31 @@ td button:hover {
     outline: none;
     min-height: 38px;
     max-height: 120px;
-    transition: border-color 0.15s;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, height 0.1s ease;
+    overflow-y: hidden;
 }
 
 .tg-chat__input textarea:focus {
     border-color: #a67c00;
+    box-shadow: 0 0 0 3px rgba(166, 124, 0, 0.1);
+}
+
+.tg-chat__input textarea:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.tg-chat__input .btn-primary {
+    transition: background 0.15s ease, opacity 0.15s ease, transform 0.1s ease;
+}
+
+.tg-chat__input .btn-primary:active {
+    transform: scale(0.95);
+}
+
+.tg-chat__input .btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 /* 告警條 */

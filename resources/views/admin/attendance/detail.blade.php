@@ -15,5 +15,5 @@
 @endsection
 
 @section('scripts')
-    <script src="{{ asset('js/attendance-detail.js') }}"></script>
+    <script src="{{ asset('js/attendance-detail.js') }}?v={{ filemtime(public_path('js/attendance-detail.js')) }}"></script>
 @endsection
