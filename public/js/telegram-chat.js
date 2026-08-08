@@ -459,26 +459,19 @@
         }
         textarea.addEventListener('input', autoResize);
 
-        // 連按兩次 Enter 送出（Shift+Enter 換行）
-        // Enter 一律攔截不換行，500ms 內連按兩次送出
-        var lastEnterTime = 0;
+        // Enter 送出（Shift+Enter 換行）
+        var imeActive = false;
+
+        textarea.addEventListener('compositionstart', function () { imeActive = true; });
+        textarea.addEventListener('compositionend', function () {
+            setTimeout(function () { imeActive = false; }, 50);
+        });
+
         textarea.addEventListener('keydown', function (e) {
-            if (e.key !== 'Enter') { return; }
-            // IME 組字中不處理
-            if (e.isComposing || e.keyCode === 229) { return; }
-            // Shift+Enter 換行，不攔截
-            if (e.shiftKey) { return; }
-
+            if (e.key !== 'Enter' || e.shiftKey || imeActive) { return; }
             e.preventDefault();
-
-            var now = Date.now();
-            if (now - lastEnterTime < 500) {
-                sendReply();
-                lastEnterTime = 0;
-                textarea.style.height = '';
-            } else {
-                lastEnterTime = now;
-            }
+            sendReply();
+            textarea.style.height = '';
         });
     }
 
