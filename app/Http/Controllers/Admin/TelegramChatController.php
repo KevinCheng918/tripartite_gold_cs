@@ -130,5 +130,39 @@ class TelegramChatController extends Controller
         }
     }
 
+    /**
+     * Ajax 對訊息送出表情回應
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxReact(Request $request)
+    {
+        $params = $request->validate([
+            'message_id' => 'required|integer',
+            'emoji'      => 'required|string|max:10',
+        ]);
+
+        try {
+            $reactions = $this->chatService->sendReaction(
+                (int) $params['message_id'],
+                $params['emoji']
+            );
+
+            if ($reactions === null) {
+                return response()->json(['message' => trans('telegram_chat.msg.reaction_failed')], 500);
+            }
+
+            return response()->json(['reactions' => $reactions]);
+        } catch (\Exception $e) {
+            Log::error('Telegram 表情回應失敗', [
+                'error'   => $e->getMessage(),
+                'user_id' => Auth::id(),
+            ]);
+
+            return response()->json(['message' => trans('telegram_chat.msg.reaction_failed')], 500);
+        }
+    }
+
     // 值班客服自動從排班系統指派，不需要手動操作
 }
