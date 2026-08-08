@@ -2309,7 +2309,6 @@ td button:hover {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
 }
 
@@ -2616,6 +2615,7 @@ td button:hover {
 .sidebar-overlay { display: none; }
 .account-cards { display: none; }
 .shift-cards { display: none; }
+.tg-header__back { display: none; }
 
 /* RWD — 手機版 */
 /* ================================================================
@@ -3060,8 +3060,6 @@ td button:hover {
     }
 }
 
-/* 桌面版隱藏手機元素 */
-.tg-header__back { display: none; }
 
 /* 深色模式 */
 [data-theme="dark"] .tg-chat { background: #1a1d27; border-color: #2d3039; }
