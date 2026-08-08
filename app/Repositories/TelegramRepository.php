@@ -122,7 +122,7 @@ class TelegramRepository
     public function getMessagesByGroup($groupId, $perPage = 50)
     {
         return TelegramMessage::query()
-            ->select(['id', 'telegram_group_id', 'direction', 'sender_name', 'sender_user_id', 'content', 'media_type', 'media_url', 'replied', 'created_at'])
+            ->select(['id', 'telegram_group_id', 'direction', 'telegram_message_id', 'sender_name', 'sender_user_id', 'content', 'media_type', 'media_url', 'reactions', 'replied', 'created_at'])
             ->where('telegram_group_id', $groupId)
             ->orderByDesc('created_at')
             ->paginate($perPage);
@@ -159,6 +159,52 @@ class TelegramRepository
             ->where('direction', config('constants.TELEGRAM.DIRECTION.INBOUND'))
             ->where('replied', false)
             ->update(['replied' => true]);
+    }
+
+    /**
+     * 依 ID 查詢訊息（含群組關聯）
+     *
+     * @param int $id
+     * @return TelegramMessage|null
+     */
+    public function findMessageWithGroup($id)
+    {
+        return TelegramMessage::query()
+            ->select(['id', 'telegram_group_id', 'telegram_message_id', 'reactions'])
+            ->with(['group:id,chat_id'])
+            ->find($id);
+    }
+
+    /**
+     * 依群組 chat_id 和 Telegram message_id 查詢訊息
+     *
+     * @param int $chatId           Telegram chat_id
+     * @param int $telegramMsgId    Telegram message_id
+     * @return TelegramMessage|null
+     */
+    public function findByTelegramMessageId($chatId, $telegramMsgId)
+    {
+        return TelegramMessage::query()
+            ->select(['id', 'telegram_group_id', 'telegram_message_id', 'reactions'])
+            ->whereHas('group', function ($q) use ($chatId) {
+                $q->where('chat_id', $chatId);
+            })
+            ->where('telegram_message_id', $telegramMsgId)
+            ->first();
+    }
+
+    /**
+     * 更新訊息的 reactions
+     *
+     * @param TelegramMessage $message
+     * @param array|null      $reactions
+     * @return TelegramMessage
+     */
+    public function updateReactions(TelegramMessage $message, $reactions)
+    {
+        $message->update(['reactions' => $reactions]);
+
+        return $message;
     }
 
     /**
