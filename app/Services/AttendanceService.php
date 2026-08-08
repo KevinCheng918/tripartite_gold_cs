@@ -46,6 +46,16 @@ class AttendanceService
             ]);
         }
 
+        // 檢查昨日是否有未完成的跨日班打卡（未下班就不允許打新的上班卡）
+        $yesterday = now()->subDay()->format('Y-m-d');
+        $yesterdayRecord = $this->attendanceRepository->findByUserAndDate($userId, $yesterday);
+
+        if ($yesterdayRecord && filled($yesterdayRecord->clock_in) && !filled($yesterdayRecord->clock_out)) {
+            throw ValidationException::withMessages([
+                'clock_in' => [trans('attendance.msg.previous_not_clocked_out')],
+            ]);
+        }
+
         // 找今日排班
         $assignment = $this->findTodayAssignment($userId, $today);
 
@@ -82,6 +92,18 @@ class AttendanceService
     {
         $today = now()->format('Y-m-d');
         $record = $this->attendanceRepository->findByUserAndDate($userId, $today);
+        $isOvernight = false;
+
+        // 今日找不到紀錄，檢查昨日是否有未完成的跨日班打卡
+        if (!$record || !filled($record->clock_in)) {
+            $yesterday = now()->subDay()->format('Y-m-d');
+            $yesterdayRecord = $this->attendanceRepository->findByUserAndDate($userId, $yesterday);
+
+            if ($yesterdayRecord && filled($yesterdayRecord->clock_in) && !filled($yesterdayRecord->clock_out)) {
+                $record = $yesterdayRecord;
+                $isOvernight = true;
+            }
+        }
 
         if (!$record || !filled($record->clock_in)) {
             throw ValidationException::withMessages([
@@ -104,7 +126,7 @@ class AttendanceService
 
         if ($assignment && $assignment->shift) {
             $endTime = $assignment->shift->end_time;
-            $result = $this->calcEarlyLeaveAndOvertime($endTime);
+            $result = $this->calcEarlyLeaveAndOvertime($endTime, $isOvernight);
             $earlyLeaveMinutes = $result['early_leave'];
             $overtimeMinutes = $result['overtime'];
         }
@@ -141,7 +163,21 @@ class AttendanceService
      */
     public function getTodayRecord($userId)
     {
-        return $this->attendanceRepository->findByUserAndDate($userId, now()->format('Y-m-d'));
+        $record = $this->attendanceRepository->findByUserAndDate($userId, now()->format('Y-m-d'));
+
+        if ($record) {
+            return $record;
+        }
+
+        // 檢查昨日是否有未完成的跨日班打卡（上班打卡但未下班）
+        $yesterday = now()->subDay()->format('Y-m-d');
+        $yesterdayRecord = $this->attendanceRepository->findByUserAndDate($userId, $yesterday);
+
+        if ($yesterdayRecord && filled($yesterdayRecord->clock_in) && !filled($yesterdayRecord->clock_out)) {
+            return $yesterdayRecord;
+        }
+
+        return null;
     }
 
     /**
@@ -227,19 +263,24 @@ class AttendanceService
     /**
      * 計算早退和加班分鐘數
      *
-     * @param string $endTime 班別結束時間 HH:mm:ss
+     * @param string $endTime     班別結束時間 HH:mm:ss
+     * @param bool   $isOvernight 是否為跨日打卡（下班打卡日期 ≠ 上班打卡日期）
      * @return array{early_leave: int, overtime: int}
      */
-    private function calcEarlyLeaveAndOvertime($endTime)
+    private function calcEarlyLeaveAndOvertime($endTime, $isOvernight = false)
     {
         $parts = explode(':', $endTime);
         $endMinutes = (int) $parts[0] * 60 + (int) $parts[1];
         $nowMinutes = now()->hour * 60 + now()->minute;
 
-        // 處理跨日班（endTime < startTime 的情況）
-        // 如果 endMinutes 是 0（00:00），代表到午夜
+        // 跨日打卡：目前時間已過午夜，加上一天的分鐘數才能正確比較
+        if ($isOvernight) {
+            $nowMinutes += 1440; // 24 * 60
+        }
+
+        // 處理跨日班（endTime 00:00 代表到午夜）
         if ($endMinutes === 0) {
-            $endMinutes = 1440; // 24 * 60
+            $endMinutes = 1440;
         }
 
         $diff = $nowMinutes - $endMinutes;
