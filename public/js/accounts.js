@@ -147,6 +147,29 @@
             })
             .join('');
 
+        // 手機版卡片（不顯示權限，透過權限頁管理即可）
+        var cards = accounts.map(function (account) {
+            var statusInfo = statusMap[account.status] || { text: '-', css: '' };
+
+            var actions = '';
+            if (account.level !== 0) {
+                actions =
+                    '<button class="btn-sm js-edit">' + i18n.action_edit + '</button>' +
+                    '<button class="btn-sm js-change-status">' + i18n.action_change_status + '</button>' +
+                    '<a href="/admin/accounts/permissions/' + account.id + '" class="btn-sm">' + i18n.action_assign_permissions + '</a>';
+            }
+
+            return (
+                '<div class="account-card" data-id="' + account.id + '">' +
+                '<div class="account-card__header">' +
+                '<div><span class="account-card__name">' + account.nickname + '</span> <span class="account-card__account">' + account.account + '</span></div>' +
+                '<span class="badge ' + statusInfo.css + '">' + statusInfo.text + '</span>' +
+                '</div>' +
+                (actions ? '<div class="account-card__actions">' + actions + '</div>' : '') +
+                '</div>'
+            );
+        }).join('');
+
         root.innerHTML =
             '<button class="btn-primary" id="js-create-account">' + i18n.action_create + '</button>' +
             '<table><thead><tr>' +
@@ -156,7 +179,8 @@
             '<th>' + i18n.field_level + '</th>' +
             '<th>' + i18n.action_assign_permissions + '</th>' +
             '<th></th>' +
-            '</tr></thead><tbody>' + rows + '</tbody></table>';
+            '</tr></thead><tbody>' + rows + '</tbody></table>' +
+            '<div class="account-cards">' + cards + '</div>';
 
         document.getElementById('js-create-account').addEventListener('click', function () {
             document.getElementById('create-account').value = '';
@@ -167,13 +191,15 @@
 
         root.querySelectorAll('.js-edit').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                openEditModal(parseInt(btn.closest('tr').dataset.id, 10));
+                var row = btn.closest('tr') || btn.closest('.account-card');
+                openEditModal(parseInt(row.dataset.id, 10));
             });
         });
 
         root.querySelectorAll('.js-change-status').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                openChangeStatusModal(parseInt(btn.closest('tr').dataset.id, 10));
+                var row = btn.closest('tr') || btn.closest('.account-card');
+                openChangeStatusModal(parseInt(row.dataset.id, 10));
             });
         });
 

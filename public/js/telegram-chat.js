@@ -156,6 +156,10 @@
                 loadMessages(selectedGroupId);
                 renderHeader(selectedGroupId);
                 showInput();
+
+                // RWD：手機版切換到聊天畫面
+                var chat = document.querySelector('.tg-chat');
+                if (chat) { chat.classList.add('tg-chat--chatting'); }
             });
         });
     }
@@ -170,10 +174,20 @@
         if (!group || !header) { return; }
 
         header.innerHTML =
+            '<button class="tg-header__back" id="btn-tg-back">&larr;</button>' +
             '<div class="tg-header__title">' + group.title + '</div>' +
             '<div class="tg-header__right">' +
             '<span class="tg-header__assigned">' + i18n.assigned_to + '：' + (group.assigned_user || i18n.unassigned) + '</span>' +
             '</div>';
+
+        // RWD 返回按鈕
+        var backBtn = document.getElementById('btn-tg-back');
+        if (backBtn) {
+            backBtn.addEventListener('click', function () {
+                var chat = document.querySelector('.tg-chat');
+                if (chat) { chat.classList.remove('tg-chat--chatting'); }
+            });
+        }
     }
 
     // ---------------------------------------------------------------
@@ -317,7 +331,27 @@
             return '<button class="tg-reaction-picker__item" data-emoji="' + emoji + '">' + emoji + '</button>';
         }).join('');
 
-        btn.parentNode.appendChild(picker);
+        // 掛到 body 用 fixed 定位，避免跑版
+        document.body.appendChild(picker);
+
+        // 計算位置：在按鈕上方顯示
+        var rect = btn.getBoundingClientRect();
+        var pickerWidth = 280;
+        var pickerHeight = Math.min(220, picker.scrollHeight);
+        var left = rect.left;
+        var top = rect.top - pickerHeight - 4;
+
+        // 超出右邊界
+        if (left + pickerWidth > window.innerWidth) {
+            left = window.innerWidth - pickerWidth - 8;
+        }
+        // 超出左邊界
+        if (left < 8) { left = 8; }
+        // 超出上邊界，改顯示在下方
+        if (top < 8) { top = rect.bottom + 4; }
+
+        picker.style.left = left + 'px';
+        picker.style.top = top + 'px';
 
         picker.querySelectorAll('.tg-reaction-picker__item').forEach(function (item) {
             item.addEventListener('click', function (ev) {
@@ -415,11 +449,23 @@
             }
         });
 
-        // Enter 送出（Shift+Enter 換行）
+        // 連按兩次 Enter 送出（單次 Enter 換行）
+        var lastEnterTime = 0;
         textarea.addEventListener('keydown', function (e) {
             if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendReply();
+                var now = Date.now();
+                if (now - lastEnterTime < 500) {
+                    e.preventDefault();
+                    // 移除第一次 Enter 產生的換行
+                    var val = textarea.value;
+                    if (val.charAt(val.length - 1) === '\n') {
+                        textarea.value = val.substring(0, val.length - 1);
+                    }
+                    sendReply();
+                    lastEnterTime = 0;
+                } else {
+                    lastEnterTime = now;
+                }
             }
         });
     }
