@@ -41,9 +41,9 @@
 
         if (isOutbound) {
             return (
-                '<div class="chat-box-wrapper chat-box-wrapper-right" data-msg-id="' + m.id + '">' +
+                '<div class="chat-box-wrapper" data-msg-id="' + m.id + '" style="display:flex;justify-content:flex-end">' +
                 '<div style="text-align:right">' +
-                '<div class="chat-box" style="background:#e0f3ff">' + mediaHtml + textHtml + reactBtn + '</div>' +
+                '<div class="chat-box" style="background:#e0f3ff;display:inline-block">' + mediaHtml + textHtml + reactBtn + '</div>' +
                 reactHtml +
                 '<small class="text-muted">' + timeLabel + ' | ' + m.sender_name + '</small>' +
                 '</div>' +
