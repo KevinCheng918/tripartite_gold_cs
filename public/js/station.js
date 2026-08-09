@@ -67,13 +67,6 @@
         return error.message || 'Failed';
     }
 
-    // modal 關閉
-    });
-    document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
-        overlay.addEventListener('click', function (e) {
-            if (e.target === overlay) { overlay.style.display = 'none'; }
-        });
-    });
 
     // ---------------------------------------------------------------
     //  列表

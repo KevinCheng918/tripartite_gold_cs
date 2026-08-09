@@ -298,6 +298,7 @@
     <script src="{{ asset('vendors/architect-ui/vendors/perfect-scrollbar/dist/perfect-scrollbar.min.js') }}"></script>
     <script src="{{ asset('vendors/architect-ui/js/app.js') }}"></script>
     <script src="{{ asset('vendors/architect-ui/js/scrollbar.js') }}"></script>
+    <script src="{{ asset('vendors/architect-ui/js/bs5-modal-to-body.js') }}"></script>
 
     {{-- Flatpickr --}}
     <script src="{{ asset('vendor/flatpickr/flatpickr.min.js') }}"></script>

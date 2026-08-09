@@ -272,8 +272,7 @@
     var confirmBtn = document.getElementById('btn-confirm-clock');
     if (confirmBtn) {
         confirmBtn.addEventListener('click', function () {
-            var overlay = document.getElementById('modal-attendance-confirm');
-            if (overlay) { overlay.style.display = 'none'; }
+            hideBsModal('modal-attendance-confirm');
 
             if (pendingClockAction === 'in') {
                 clockIn();
