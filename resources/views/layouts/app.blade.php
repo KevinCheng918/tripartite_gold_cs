@@ -7,13 +7,12 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', config('app.name'))</title>
     <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
-    <link rel="apple-touch-icon" href="{{ asset('img/favicon-180.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('img/pwa-apple-icon.png') }}">
     <link rel="manifest" href="{{ asset('manifest.json') }}">
     <meta name="theme-color" content="#a67c00">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="{{ config('app.name') }}">
-    <link rel="apple-touch-icon" href="{{ asset('img/pwa-apple-icon.png') }}">
     <link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ filemtime(public_path('css/app.css')) }}">
     <link rel="stylesheet" href="{{ asset('vendor/flatpickr/flatpickr.min.css') }}">
     <link rel="stylesheet" href="{{ asset('vendor/flatpickr/airbnb.css') }}">
