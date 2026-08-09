@@ -4,21 +4,18 @@
 
 /* ---- Telegram 聊天覆寫 ---- */
 
-/* 修正 chat-box 撐滿問題，讓泡泡自適寬度 */
+/* 修正 chat-box 泡泡寬度 */
 .chat-box-wrapper .chat-box {
     min-width: auto !important;
-    max-width: 80% !important;
+    max-width: none !important;
+    flex: none !important;
     display: inline-block !important;
 }
 
 /* 發送方靠右 */
 .chat-box-wrapper.chat-box-wrapper-right {
     justify-content: flex-end !important;
-    flex-direction: row !important;
-}
-.chat-box-wrapper.chat-box-wrapper-right > div:first-child {
-    text-align: right;
-    margin-left: auto;
+    text-align: right !important;
 }
 
 /* 時間戳記 */
