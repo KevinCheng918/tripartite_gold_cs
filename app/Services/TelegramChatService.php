@@ -19,15 +19,18 @@ class TelegramChatService
     private $telegramRepository;
     private $botService;
     private $assignmentRepository;
+    private $webPushService;
 
     public function __construct(
         TelegramRepository $telegramRepository,
         TelegramBotService $botService,
-        ShiftAssignmentRepository $assignmentRepository
+        ShiftAssignmentRepository $assignmentRepository,
+        WebPushService $webPushService
     ) {
         $this->telegramRepository = $telegramRepository;
         $this->botService = $botService;
         $this->assignmentRepository = $assignmentRepository;
+        $this->webPushService = $webPushService;
     }
 
     // ---------------------------------------------------------------
@@ -175,6 +178,14 @@ class TelegramChatService
         } catch (\Exception $e) {
             Log::warning('Broadcasting 失敗', ['error' => $e->getMessage()]);
         }
+
+        // Web Push 推播通知（通知所有已訂閱的客服）
+        $pushBody = filled($text) ? $text : ($mediaType === 'photo' ? '[圖片]' : '[貼圖]');
+        $this->webPushService->sendToAll(
+            "{$group->title} — {$senderName}",
+            mb_substr($pushBody, 0, 100),
+            '/admin/telegram-chat'
+        );
     }
 
     // ---------------------------------------------------------------
