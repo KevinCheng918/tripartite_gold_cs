@@ -69,12 +69,12 @@
 
     function openModal(id) {
         var el = document.getElementById(id);
-        if (el) { el.style.display = 'flex'; }
+        if (el) { new bootstrap.Modal(el).show(); }
     }
 
     function closeModal(id) {
         var el = document.getElementById(id);
-        if (el) { el.style.display = 'none'; }
+        if (el) { var inst = bootstrap.Modal.getInstance(el); if (inst) { inst.hide(); } }
     }
 
     function showMessage(message) {
@@ -93,19 +93,6 @@
         return error.message || 'Failed';
     }
 
-    function bindModalCloseButtons() {
-        document.querySelectorAll('[data-modal-close]').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var overlay = btn.closest('.modal-overlay');
-                if (overlay) { overlay.style.display = 'none'; }
-            });
-        });
-        document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
-            overlay.addEventListener('click', function (e) {
-                if (e.target === overlay) { overlay.style.display = 'none'; }
-            });
-        });
-    }
 
     // ---------------------------------------------------------------
     //  狀態
@@ -119,9 +106,9 @@
     var currentMonday = getMonday();
 
     var swapStatusMap = {};
-    swapStatusMap[0] = { text: i18n.status_pending, css: 'badge--pending' };
-    swapStatusMap[1] = { text: i18n.status_approved, css: 'badge--approved' };
-    swapStatusMap[2] = { text: i18n.status_rejected, css: 'badge--rejected' };
+    swapStatusMap[0] = { text: i18n.status_pending, css: 'bg-warning text-dark' };
+    swapStatusMap[1] = { text: i18n.status_approved, css: 'bg-success' };
+    swapStatusMap[2] = { text: i18n.status_rejected, css: 'bg-danger' };
 
     // ---------------------------------------------------------------
     //  日期工具
@@ -210,16 +197,16 @@
         // 只顯示有權限的 Tab
         var tabs = allTabs.filter(function (t) { return hasPerm(t.perm); });
 
-        var html = '<div class="tabs">';
+        var html = '<ul class="nav nav-tabs mb-3">';
         tabs.forEach(function (tab) {
             var cls = tab.key === activeTab ? 'active' : '';
-            html += '<button class="' + cls + '" data-tab="' + tab.key + '">' + tab.label + '</button>';
+            html += '<li class="nav-item"><button class="nav-link ' + cls + '" data-tab="' + tab.key + '">' + tab.label + '</button></li>';
         });
-        html += '</div><div id="tab-content"></div>';
+        html += '</ul><div id="tab-content"></div>';
 
         root.innerHTML = html;
 
-        root.querySelectorAll('.tabs button').forEach(function (btn) {
+        root.querySelectorAll('.nav-tabs .nav-link').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 activeTab = btn.dataset.tab;
                 renderTabs();
@@ -551,7 +538,7 @@
                 '<td><span class="tt-legend" style="background:' + color.bg + ';border-color:' + color.border + ';color:' + color.text + '">' + shift.display_name + '</span></td>' +
                 '<td>' + shift.start_time + '</td>' +
                 '<td>' + shift.end_time + '</td>' +
-                '<td>' + (shift.is_active ? '<span class="badge badge--active">' + i18n.field_is_active + '</span>' : '<span class="badge badge--disabled">-</span>') + '</td>' +
+                '<td>' + (shift.is_active ? '<span class="badge bg-success">' + i18n.field_is_active + '</span>' : '<span class="badge bg-secondary">-</span>') + '</td>' +
                 '<td><button class="btn-sm js-edit-shift">' + i18n.modal_edit_shift_title + '</button></td>' +
                 '</tr>'
             );
@@ -563,7 +550,7 @@
                 '<div class="shift-card" data-id="' + shift.id + '">' +
                 '<div class="shift-card__header">' +
                 '<span class="tt-legend" style="background:' + color.bg + ';border-color:' + color.border + ';color:' + color.text + '">' + shift.display_name + '</span>' +
-                (shift.is_active ? '<span class="badge badge--active">' + i18n.field_is_active + '</span>' : '<span class="badge badge--disabled">-</span>') +
+                (shift.is_active ? '<span class="badge bg-success">' + i18n.field_is_active + '</span>' : '<span class="badge bg-secondary">-</span>') +
                 '</div>' +
                 '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_start_time + '</span><span>' + shift.start_time + '</span></div>' +
                 '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_end_time + '</span><span>' + shift.end_time + '</span></div>' +
@@ -989,14 +976,14 @@
 
     /** 代班狀態 badge 對應 */
     var coverStatusMap = {};
-    coverStatusMap[0] = { text: coverI18n.status_pending || '待確認', css: 'badge--pending' };
-    coverStatusMap[1] = { text: coverI18n.status_approved || '已同意', css: 'badge--approved' };
-    coverStatusMap[2] = { text: coverI18n.status_rejected || '已拒絕', css: 'badge--rejected' };
+    coverStatusMap[0] = { text: coverI18n.status_pending || '待確認', css: 'bg-warning text-dark' };
+    coverStatusMap[1] = { text: coverI18n.status_approved || '已同意', css: 'bg-success' };
+    coverStatusMap[2] = { text: coverI18n.status_rejected || '已拒絕', css: 'bg-danger' };
 
     var adminStatusMap = {};
-    adminStatusMap[0] = { text: coverI18n.admin_pending || '待審核', css: 'badge--pending' };
-    adminStatusMap[1] = { text: coverI18n.admin_approved || '已核准', css: 'badge--approved' };
-    adminStatusMap[2] = { text: coverI18n.admin_rejected || '已駁回', css: 'badge--rejected' };
+    adminStatusMap[0] = { text: coverI18n.admin_pending || '待審核', css: 'bg-warning text-dark' };
+    adminStatusMap[1] = { text: coverI18n.admin_approved || '已核准', css: 'bg-success' };
+    adminStatusMap[2] = { text: coverI18n.admin_rejected || '已駁回', css: 'bg-danger' };
 
     /**
      * 開啟代班申請 Modal
@@ -1256,7 +1243,6 @@
     //  初始化
     // ---------------------------------------------------------------
 
-    bindModalCloseButtons();
 
     // 綁定代班確認 Modal 的確認按鈕
     var coverConfirmBtn = document.getElementById('btn-cover-confirm-ok');

@@ -8,9 +8,9 @@
     var csrfToken = document.querySelector('meta[name="csrf-token"]').content;
 
     var statusMap = {};
-    statusMap[1] = { text: i18n.status_active, css: 'badge--active' };
-    statusMap[2] = { text: i18n.status_frozen, css: 'badge--pending' };
-    statusMap[0] = { text: i18n.status_disabled, css: 'badge--rejected' };
+    statusMap[1] = { text: i18n.status_active, css: 'bg-success' };
+    statusMap[2] = { text: i18n.status_frozen, css: 'bg-warning text-dark' };
+    statusMap[0] = { text: i18n.status_disabled, css: 'bg-danger' };
 
     var stationsData = [];
     var currentPage = 1;
@@ -45,12 +45,12 @@
 
     function openModal(id) {
         var el = document.getElementById(id);
-        if (el) { el.style.display = 'flex'; }
+        if (el) { new bootstrap.Modal(el).show(); }
     }
 
     function closeModal(id) {
         var el = document.getElementById(id);
-        if (el) { el.style.display = 'none'; }
+        if (el) { var inst = bootstrap.Modal.getInstance(el); if (inst) { inst.hide(); } }
     }
 
     function showMessage(message) {
@@ -68,10 +68,6 @@
     }
 
     // modal 關閉
-    document.querySelectorAll('[data-modal-close]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            btn.closest('.modal-overlay').style.display = 'none';
-        });
     });
     document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
         overlay.addEventListener('click', function (e) {
@@ -147,7 +143,7 @@
 
         var toolbarActions = '';
         if (canCreate) {
-            toolbarActions += '<button class="btn-primary" id="btn-create-station">' + i18n.action_create + '</button> ';
+            toolbarActions += '<button class="btn btn-primary" id="btn-create-station">' + i18n.action_create + '</button> ';
         }
         if (canUpdate) {
             toolbarActions += '<button class="btn-sm" id="btn-sync-all">' + (i18n.action_sync_all || '一鍵同步全部') + '</button>';
@@ -193,7 +189,7 @@
             '<div></div>' +
             '<div class="stn-toolbar__right">' +
             '<button class="btn-sm" id="btn-stn-reset">重置</button>' +
-            '<button class="btn-primary" id="btn-stn-search">搜尋</button>' +
+            '<button class="btn btn-primary" id="btn-stn-search">搜尋</button>' +
             '</div>' +
             '</div>' +
             '</div>';
@@ -211,8 +207,49 @@
         }
         pagination += '</div>';
 
+        // 手機版卡片
+        var cards = stations.map(function (s) {
+            var st = statusMap[s.status] || { text: '-', css: '' };
+            var settings = s.settings || {};
+            var depositRate = settings.system_rate ? (settings.system_rate * 100).toFixed(2) + '%' : '-';
+            var withdrawRate = settings.system_rate_withdraw ? (settings.system_rate_withdraw * 100).toFixed(2) + '%' : '-';
+
+            var actions = '<button class="btn-sm js-station-detail" data-id="' + s.id + '">' + (i18n.action_detail || '詳細') + '</button>';
+            if (canUpdate) {
+                actions += '<button class="btn-sm js-edit-station" data-id="' + s.id + '">' + i18n.action_edit + '</button>';
+                actions += '<button class="btn-sm js-sync-credits" data-id="' + s.id + '">' + (i18n.action_sync || '同步') + '</button>';
+            }
+
+            var sysName = s.system ? s.system.name : '-';
+            var bannerColors = {
+                'LV': 'linear-gradient(135deg, #7c3aed, #6366f1)',
+                'HM': 'linear-gradient(135deg, #6b7280, #4b5563)'
+            };
+            var bannerBg = bannerColors[sysName] || 'linear-gradient(135deg, #7c3aed, #6366f1)';
+
+            return (
+                '<div class="stn-card">' +
+                '<div class="stn-card__banner" style="background:' + bannerBg + '">&#9881; ' + sysName + '</div>' +
+                '<div class="stn-card__body">' +
+                '<div class="stn-card__profile">' +
+                '<div class="stn-card__info">' +
+                '<div class="stn-card__name">' + s.name + '</div>' +
+                '</div>' +
+                '<span class="badge ' + st.css + '">' + st.text + '</span>' +
+                '</div>' +
+                '<div class="stn-card__divider"></div>' +
+                (s.domain ? '<div class="stn-card__row">&#127760; <span class="stn-card__label">域名</span><span class="stn-card__value">' + s.domain + '</span></div>' : '') +
+                '<div class="stn-card__row">&#128179; <span class="stn-card__label">' + i18n.field_credits + '</span><span class="stn-card__value" style="font-weight:700">' + s.credits + '</span></div>' +
+                '<div class="stn-card__row">&#128196; <span class="stn-card__label">費率（收/付）</span><span class="stn-card__value">' + depositRate + ' / ' + withdrawRate + '</span></div>' +
+                '<div class="stn-card__divider"></div>' +
+                '<div class="stn-card__actions">' + actions + '</div>' +
+                '</div>' +
+                '</div>'
+            );
+        }).join('');
+
         root.innerHTML = toolbar +
-            '<table><thead><tr>' +
+            '<table class="stn-table-desktop"><thead><tr>' +
             '<th>#</th>' +
             '<th>系統</th>' +
             '<th>' + i18n.field_name + '</th>' +
@@ -221,7 +258,9 @@
             '<th>' + i18n.field_status + '</th>' +
             '<th>同步</th>' +
             '<th></th>' +
-            '</tr></thead><tbody>' + rows + '</tbody></table>' + pagination;
+            '</tr></thead><tbody>' + rows + '</tbody></table>' +
+            '<div class="shift-cards stn-cards-mobile">' + cards + '</div>' +
+            pagination;
 
         // 搜尋事件
         function collectFilters() {
@@ -364,8 +403,8 @@
 
     function showStationDetail(s) {
         var settings = s.settings || {};
-        var on = '<span class="badge badge--active">啟用</span>';
-        var off = '<span class="badge badge--disabled">未啟用</span>';
+        var on = '<span class="badge bg-success">啟用</span>';
+        var off = '<span class="badge bg-danger">未啟用</span>';
 
         var depositTypes = [];
         if (settings.usdt_deposit) { depositTypes.push('USDT'); }
@@ -377,7 +416,7 @@
         var depositRate = settings.system_rate ? (settings.system_rate * 100).toFixed(2) + '%' : '-';
         var withdrawRate = settings.system_rate_withdraw ? (settings.system_rate_withdraw * 100).toFixed(2) + '%' : '-';
         var depositBadges = depositTypes.length > 0
-            ? depositTypes.map(function (t) { return '<span class="badge badge--active">' + t + '</span>'; }).join(' ')
+            ? depositTypes.map(function (t) { return '<span class="badge bg-success">' + t + '</span>'; }).join(' ')
             : '-';
 
         var html =

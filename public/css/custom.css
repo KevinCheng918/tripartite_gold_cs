@@ -1,0 +1,224 @@
+/* ================================================================
+   客服系統自訂覆寫（建立在 Architect base.css 之上）
+   ================================================================ */
+
+/* 全域字體 — 加大加深 */
+html { font-size: 16px; }
+body {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: #212529;
+    font-weight: 400;
+}
+
+/* 標題 */
+h1, .h1 { font-size: 2rem; font-weight: 600; color: #212529; }
+h2, .h2 { font-size: 1.75rem; font-weight: 600; color: #212529; }
+h3, .h3 { font-size: 1.5rem; font-weight: 600; color: #212529; }
+h4, .h4 { font-size: 1.25rem; font-weight: 600; color: #212529; }
+h5, .h5 { font-size: 1.125rem; font-weight: 600; color: #212529; }
+h6, .h6 { font-size: 1rem; font-weight: 600; color: #212529; }
+
+/* 表格文字加深 */
+.table { color: #212529; font-size: 0.9375rem; }
+.table th { font-size: 0.9375rem; font-weight: 600; color: #495057; }
+.table td { color: #212529; }
+
+/* 表單文字加深 */
+.form-control, .form-select { font-size: 1rem; color: #212529; }
+.form-label, label { font-size: 0.9375rem; font-weight: 500; color: #212529; }
+
+/* Sidebar 文字加大加深 */
+.vertical-nav-menu li a { font-size: 0.9375rem; font-weight: 500; }
+.app-sidebar__heading { font-size: 0.8125rem; font-weight: 700; }
+
+/* Header 文字加深 */
+.widget-heading { font-size: 0.9375rem; font-weight: 600; color: #212529; }
+.widget-subheading { font-size: 0.8125rem; color: #495057; }
+
+/* Badge 加大 */
+.badge { font-size: 0.8125rem; font-weight: 600; }
+
+/* 按鈕文字 */
+.btn { font-size: 0.9375rem; font-weight: 500; }
+.btn-sm { font-size: 0.8125rem; }
+
+/* Page title */
+.page-title-heading > div { font-size: 1.25rem; font-weight: 600; color: #212529; }
+.page-title-subheading { font-size: 0.875rem; color: #495057; }
+
+/* Card */
+.card-header { font-size: 1rem; font-weight: 600; color: #212529; }
+.card-body { font-size: 0.9375rem; color: #212529; }
+
+/* text-muted 加深 */
+.text-muted { color: #495057 !important; }
+
+/* 按鈕主色 */
+.btn-primary {
+    background: linear-gradient(135deg, #d4af37, #a67c00) !important;
+    border-color: #a67c00 !important;
+    color: #1f1a05 !important;
+}
+.btn-primary:hover {
+    background: linear-gradient(135deg, #e0b830, #b8860b) !important;
+    border-color: #b8860b !important;
+}
+
+/* Sidebar active 金色 */
+.vertical-nav-menu li a.mm-active {
+    color: #a67c00 !important;
+    font-weight: 600;
+}
+.vertical-nav-menu li a.mm-active > i.metismenu-icon {
+    color: #a67c00 !important;
+}
+
+/* Page title icon 金色 */
+.page-title-icon {
+    background: linear-gradient(135deg, #d4af37, #a67c00) !important;
+    color: #fff !important;
+}
+
+/* 深色模式 */
+[data-theme="dark"] body,
+[data-theme="dark"] .app-container {
+    background: #0f1117 !important;
+    color: #e5e7eb;
+}
+
+[data-theme="dark"] .app-sidebar {
+    background: #1a1d27 !important;
+}
+
+[data-theme="dark"] .app-header {
+    background: #1a1d27 !important;
+}
+
+[data-theme="dark"] .app-main__outer {
+    background: #0f1117 !important;
+}
+
+[data-theme="dark"] .card,
+[data-theme="dark"] .main-card {
+    background: #1a1d27 !important;
+    border-color: #2d3039 !important;
+}
+
+[data-theme="dark"] .app-page-title {
+    background: rgba(0, 0, 0, 0.15) !important;
+}
+
+[data-theme="dark"] .page-title-heading > div {
+    color: #f3f4f6;
+}
+
+[data-theme="dark"] .page-title-subheading {
+    color: #9ca3af !important;
+}
+
+[data-theme="dark"] .table {
+    color: #d1d5db;
+}
+
+[data-theme="dark"] .table td,
+[data-theme="dark"] .table th {
+    border-color: #2d3039 !important;
+}
+
+[data-theme="dark"] .table thead th {
+    background: #151821;
+    color: #9ca3af;
+}
+
+[data-theme="dark"] .table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+[data-theme="dark"] .modal-content {
+    background: #1a1d27 !important;
+    color: #e5e7eb;
+}
+
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-select {
+    background: #151821 !important;
+    border-color: #2d3039 !important;
+    color: #e5e7eb !important;
+}
+
+[data-theme="dark"] .dropdown-menu {
+    background: #1a1d27;
+    border-color: #2d3039;
+}
+
+[data-theme="dark"] .dropdown-item {
+    color: #d1d5db;
+}
+
+[data-theme="dark"] .dropdown-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+}
+
+[data-theme="dark"] .vertical-nav-menu li a {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+[data-theme="dark"] .vertical-nav-menu li a:hover {
+    color: #fff;
+}
+
+[data-theme="dark"] .vertical-nav-menu li a.mm-active {
+    color: #fbbf24 !important;
+}
+
+[data-theme="dark"] .app-sidebar__heading {
+    color: rgba(255, 255, 255, 0.4) !important;
+}
+
+[data-theme="dark"] .hamburger-inner,
+[data-theme="dark"] .hamburger-inner::before,
+[data-theme="dark"] .hamburger-inner::after {
+    background-color: rgba(255, 255, 255, 0.7) !important;
+}
+
+[data-theme="dark"] .app-header__content {
+    color: #e5e7eb;
+}
+
+[data-theme="dark"] .widget-heading {
+    color: #f3f4f6 !important;
+}
+
+[data-theme="dark"] .widget-subheading {
+    color: #9ca3af !important;
+}
+
+[data-theme="dark"] .btn-link {
+    color: rgba(255, 255, 255, 0.7) !important;
+}
+
+[data-theme="dark"] .alert {
+    background: #1a1d27;
+    border-color: #2d3039;
+    color: #d1d5db;
+}
+
+[data-theme="dark"] .badge {
+    opacity: 0.9;
+}
+
+[data-theme="dark"] .text-muted {
+    color: #9ca3af !important;
+}
+
+[data-theme="dark"] h1, [data-theme="dark"] h2, [data-theme="dark"] h3,
+[data-theme="dark"] h4, [data-theme="dark"] h5, [data-theme="dark"] h6,
+[data-theme="dark"] .h1, [data-theme="dark"] .h2, [data-theme="dark"] .h3,
+[data-theme="dark"] .h4, [data-theme="dark"] .h5, [data-theme="dark"] .h6 {
+    color: #f3f4f6;
+}
+
+/* 深色模式切換按鈕圖示 */
+.theme-icon-dark, .theme-icon-light { pointer-events: none; }

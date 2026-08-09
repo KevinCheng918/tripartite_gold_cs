@@ -26,9 +26,17 @@ class StationController extends Controller
      *
      * @return \Illuminate\View\View
      */
-    public function index()
+    public function index(Request $request)
     {
-        return view('admin.station.index');
+        $params = $request->only(['keyword', 'system_id', 'status', 'per_page']);
+        $stations = $this->stationService->list($params);
+        $systems = $this->stationService->getActiveSystems();
+
+        return view('admin.station.index', [
+            'stations' => $stations,
+            'systems'  => $systems,
+            'filters'  => $params,
+        ]);
     }
 
     /**

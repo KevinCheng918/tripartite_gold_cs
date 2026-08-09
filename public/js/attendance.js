@@ -35,7 +35,7 @@
 
     function openModal(id) {
         var el = document.getElementById(id);
-        if (el) { el.style.display = 'flex'; }
+        if (el) { new bootstrap.Modal(el).show(); }
     }
 
     function showMessage(message) {
@@ -52,28 +52,15 @@
         return error.message || 'Failed';
     }
 
-    function bindModalCloseButtons() {
-        document.querySelectorAll('[data-modal-close]').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var overlay = btn.closest('.modal-overlay');
-                if (overlay) { overlay.style.display = 'none'; }
-            });
-        });
-        document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
-            overlay.addEventListener('click', function (e) {
-                if (e.target === overlay) { overlay.style.display = 'none'; }
-            });
-        });
-    }
 
     /** 出勤狀態對應 */
     var statusMap = {};
-    statusMap[0] = { text: i18n.status_incomplete, css: 'badge--pending' };
-    statusMap[1] = { text: i18n.status_normal, css: 'badge--active' };
-    statusMap[2] = { text: i18n.status_late, css: 'badge--rejected' };
-    statusMap[3] = { text: i18n.status_early_leave, css: 'badge--pending' };
-    statusMap[4] = { text: i18n.status_late_early, css: 'badge--rejected' };
-    statusMap[5] = { text: i18n.status_absent, css: 'badge--rejected' };
+    statusMap[0] = { text: i18n.status_incomplete, css: 'bg-warning text-dark' };
+    statusMap[1] = { text: i18n.status_normal, css: 'bg-success' };
+    statusMap[2] = { text: i18n.status_late, css: 'bg-danger' };
+    statusMap[3] = { text: i18n.status_early_leave, css: 'bg-warning text-dark' };
+    statusMap[4] = { text: i18n.status_late_early, css: 'bg-danger' };
+    statusMap[5] = { text: i18n.status_absent, css: 'bg-danger' };
 
     // ---------------------------------------------------------------
     //  打卡狀態 + 按鈕
@@ -96,16 +83,16 @@
 
         var tabs = allTabs.filter(function (t) { return t; });
 
-        var html = '<div class="tabs">';
+        var html = '<ul class="nav nav-tabs mb-3">';
         tabs.forEach(function (tab) {
             var cls = tab.key === activeTab ? 'active' : '';
-            html += '<button class="' + cls + '" data-tab="' + tab.key + '">' + tab.label + '</button>';
+            html += '<li class="nav-item"><button class="nav-link ' + cls + '" data-tab="' + tab.key + '">' + tab.label + '</button></li>';
         });
-        html += '</div><div id="att-content"></div>';
+        html += '</ul><div id="att-content"></div>';
 
         root.innerHTML = html;
 
-        root.querySelectorAll('.tabs button').forEach(function (btn) {
+        root.querySelectorAll('.nav-tabs .nav-link').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 activeTab = btn.dataset.tab;
                 renderPage();
@@ -344,8 +331,8 @@
         // 月份切換
         var nav =
             '<div class="att-month-nav">' +
-            '<button class="btn-sm' + (month === lastMonth ? ' active' : '') + '" data-month="' + lastMonth + '">' + i18n.last_month + '（' + lastMonth + '）</button>' +
-            '<button class="btn-sm' + (month === thisMonth ? ' active' : '') + '" data-month="' + thisMonth + '">' + i18n.this_month + '（' + thisMonth + '）</button>' +
+            '<button class="btn btn-sm btn-outline-secondary' + (month === lastMonth ? ' active' : '') + '" data-month="' + lastMonth + '">' + i18n.last_month + '（' + lastMonth + '）</button>' +
+            '<button class="btn btn-sm btn-outline-secondary' + (month === thisMonth ? ' active' : '') + '" data-month="' + thisMonth + '">' + i18n.this_month + '（' + thisMonth + '）</button>' +
             '</div>';
 
         // 統計
@@ -367,7 +354,7 @@
             '<div class="dash-card dash-card--green"><div class="dash-card__label">' + i18n.field_overtime_total + '</div><div class="dash-card__value">' + otMin + '</div><div class="dash-card__sub">' + i18n.unit_minutes + '</div></div>' +
             '</div>';
 
-        // 每日明細
+        // 每日明細（表格）
         var rows = records.map(function (r) {
             var st = statusMap[r.status] || { text: '-', css: '' };
             return (
@@ -383,8 +370,8 @@
             );
         }).join('');
 
-        var table =
-            '<table><thead><tr>' +
+        var tableHtml =
+            '<table class="att-table-desktop"><thead><tr>' +
             '<th>' + i18n.field_date + '</th>' +
             '<th>' + i18n.field_clock_in + '</th>' +
             '<th>' + i18n.field_clock_out + '</th>' +
@@ -394,7 +381,26 @@
             '<th>' + i18n.field_status + '</th>' +
             '</tr></thead><tbody>' + rows + '</tbody></table>';
 
-        document.getElementById('att-content').innerHTML = nav + summary + table;
+        // 手機版卡片
+        var cards = records.map(function (r) {
+            var st = statusMap[r.status] || { text: '-', css: '' };
+            return (
+                '<div class="shift-card">' +
+                '<div class="shift-card__header">' +
+                '<span class="shift-card__title">' + r.date + '</span>' +
+                '<span class="badge ' + st.css + '">' + st.text + '</span>' +
+                '</div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_clock_in + '</span><span>' + (r.clock_in || '-') + '</span></div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_clock_out + '</span><span>' + (r.clock_out || '-') + '</span></div>' +
+                (r.late_minutes > 0 ? '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_late + '</span><span style="color:#dc2626;font-weight:600">' + r.late_minutes + ' ' + i18n.unit_minutes + '</span></div>' : '') +
+                (r.early_leave_minutes > 0 ? '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_early_leave + '</span><span style="color:#dc2626;font-weight:600">' + r.early_leave_minutes + ' ' + i18n.unit_minutes + '</span></div>' : '') +
+                (r.overtime_minutes > 0 ? '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_overtime + '</span><span style="color:#059669;font-weight:600">' + r.overtime_minutes + ' ' + i18n.unit_minutes + '</span></div>' : '') +
+                '</div>'
+            );
+        }).join('');
+
+        document.getElementById('att-content').innerHTML = nav + summary + table +
+            '<div class="shift-cards">' + cards + '</div>';
 
         // 綁定月份切換
         document.querySelectorAll('.att-month-nav button').forEach(function (btn) {
@@ -442,9 +448,9 @@
             );
         }).join('');
 
-        var table =
+        var tableHtml =
             '<h3>' + i18n.report_title + '（' + month + '）</h3>' +
-            '<table><thead><tr>' +
+            '<table class="att-table-desktop"><thead><tr>' +
             '<th>' + i18n.field_user + '</th>' +
             '<th>' + i18n.field_total_days + '</th>' +
             '<th>' + i18n.field_normal_days + '</th>' +
@@ -454,7 +460,27 @@
             '<th>' + i18n.field_overtime_total + '</th>' +
             '</tr></thead><tbody>' + rows + '</tbody></table>';
 
-        document.getElementById('att-content').innerHTML = nav + table;
+        // 手機版卡片
+        var reportCards = report.map(function (r) {
+            var userName = r.user ? r.user.nickname : '-';
+            var userId = r.user ? r.user.id : '';
+            return (
+                '<div class="shift-card js-detail-link" data-user-id="' + userId + '" style="cursor:pointer">' +
+                '<div class="shift-card__header">' +
+                '<span class="shift-card__title">' + userName + '</span>' +
+                '<span class="badge bg-success">' + i18n.field_total_days + ' ' + r.total_days + '</span>' +
+                '</div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_normal_days + '</span><span>' + r.normal_days + '</span></div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_late_count + '</span><span>' + r.late_count + '（' + r.late_total_minutes + ' ' + i18n.unit_minutes + '）</span></div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_early_count + '</span><span>' + r.early_count + '（' + r.early_total_minutes + ' ' + i18n.unit_minutes + '）</span></div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_absent_count + '</span><span>' + r.absent_count + '</span></div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_overtime_total + '</span><span>' + r.overtime_total_minutes + ' ' + i18n.unit_minutes + '</span></div>' +
+                '</div>'
+            );
+        }).join('');
+
+        document.getElementById('att-content').innerHTML = nav + table +
+            '<div class="shift-cards">' + reportCards + '</div>';
 
         // 綁定 flatpickr 月份選擇器
         flatpickr('#report-month-picker', {
@@ -483,6 +509,5 @@
     //  初始化
     // ---------------------------------------------------------------
 
-    bindModalCloseButtons();
     renderPage();
 })();

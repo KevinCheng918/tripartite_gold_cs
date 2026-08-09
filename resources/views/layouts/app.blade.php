@@ -1,184 +1,342 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
-    <script>if(localStorage.getItem('theme')==='dark')document.documentElement.setAttribute('data-theme','dark');</script>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', config('app.name'))</title>
     <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
     <link rel="apple-touch-icon" href="{{ asset('img/pwa-apple-icon.png') }}">
     <link rel="manifest" href="{{ asset('manifest.json') }}">
-    <meta name="theme-color" content="#a67c00">
+    <meta name="theme-color" content="#1e3a5f">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="{{ config('app.name') }}">
-    <link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ filemtime(public_path('css/app.css')) }}">
+
+    {{-- Architect UI CSS --}}
+    <link rel="stylesheet" href="{{ asset('vendors/architect-ui/styles/css/base.css') }}">
+    <link rel="stylesheet" href="{{ asset('vendors/architect-ui/vendors/@fortawesome/fontawesome-free/css/all.min.css') }}">
+
+    {{-- Flatpickr --}}
     <link rel="stylesheet" href="{{ asset('vendor/flatpickr/flatpickr.min.css') }}">
     <link rel="stylesheet" href="{{ asset('vendor/flatpickr/airbnb.css') }}">
     <link rel="stylesheet" href="{{ asset('vendor/flatpickr/monthSelect.css') }}">
+
+    {{-- 客服系統自訂樣式（覆寫 Architect） --}}
+    <link rel="stylesheet" href="{{ asset('css/custom.css') }}?v={{ filemtime(public_path('css/custom.css')) }}">
+    <link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ filemtime(public_path('css/app.css')) }}">
+
+    <style>
+        body .app-container { opacity: 1 !important; visibility: visible !important; }
+        .app-sidebar__inner, .app-main__inner { opacity: 0; transition: opacity 0.3s ease-in-out !important; }
+        .page-loaded .app-sidebar__inner, .page-loaded .app-main__inner { opacity: 1; }
+        .app-sidebar { transition: all .3s cubic-bezier(0.4, 0, 0.2, 1) !important; will-change: width, flex; }
+        .closed-sidebar:not(.sidebar-mobile-open) .app-sidebar__heading,
+        .closed-sidebar:not(.sidebar-mobile-open) .metismenu-link span,
+        .closed-sidebar:not(.sidebar-mobile-open) .sidebar-brand-sub { opacity: 0; visibility: hidden; white-space: nowrap; }
+        .app-main__outer, .app-main__inner { overflow-x: hidden; }
+        @yield('css')
+    </style>
 </head>
-<body class="app-body">
 
-    {{-- 側邊欄 --}}
-    <aside class="sidebar">
-        <div class="sidebar__brand">
-            <img src="{{ asset('img/logo.png') }}" alt="Logo" class="sidebar__logo-img">
-            <span class="sidebar__brand-name">{{ config('app.name') }}</span>
-            <span class="sidebar__brand-sub">技術客服管理系統</span>
-        </div>
+<body>
+    {{-- Sidebar 狀態同步 --}}
+    <script>
+        (function() {
+            var state = localStorage.getItem('sidebar-state');
+            if (state === 'closed') {
+                document.documentElement.classList.add('is-sidebar-closed');
+            }
+        })();
+    </script>
 
-        <nav class="sidebar__nav">
-            <a href="{{ route('admin.dashboard') }}"
-               class="{{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">
-                <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
-                {{ trans('dashboard.nav_label') }}
-            </a>
-        </nav>
+    <div class="app-container app-theme-white body-tabs-shadow fixed-header fixed-sidebar fixed-footer">
 
-        <div class="sidebar__section-label">主要功能</div>
-        <nav class="sidebar__nav">
-            @if(Auth::user()->hasPermission('account.view'))
-            <a href="{{ route('admin.accounts.index') }}"
-               class="{{ request()->routeIs('admin.accounts.*') ? 'active' : '' }}">
-                <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/></svg>
-                {{ trans('account.nav_label') }}
-            </a>
-            @endif
-            @if(Auth::user()->hasPermission('shift.view'))
-            <a href="{{ route('admin.shifts.index') }}"
-               class="{{ request()->routeIs('admin.shifts.*') ? 'active' : '' }}">
-                <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
-                {{ trans('shift.nav_label') }}
-            </a>
-            @endif
-            @if(Auth::user()->hasPermission('attendance.view'))
-            <a href="{{ route('admin.attendance.index') }}"
-               class="{{ request()->routeIs('admin.attendance.*') ? 'active' : '' }}">
-                <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
-                {{ trans('attendance.nav_label') }}
-            </a>
-            @endif
-            <a href="{{ route('admin.telegram-chat.index') }}"
-               class="{{ request()->routeIs('admin.telegram-chat.*') ? 'active' : '' }}">
-                <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"/></svg>
-                {{ trans('telegram_chat.nav_label') }}
-            </a>
-        </nav>
-
-        @if(Auth::user()->hasPermission('station.view') || Auth::user()->hasPermission('telegram_chat.broadcast'))
-        <div class="sidebar__section-label sidebar__dropdown-toggle" data-dropdown="station-menu">
-            <span>{{ trans('station.section_label') }}</span>
-            <svg class="sidebar__dropdown-arrow" viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
-        </div>
-        <nav class="sidebar__nav sidebar__dropdown-content {{ request()->routeIs('admin.stations.*') || request()->routeIs('admin.telegram-broadcast.*') ? '' : 'sidebar__dropdown--collapsed' }}" id="station-menu">
-            @if(Auth::user()->hasPermission('station.view'))
-            <a href="{{ route('admin.stations.index') }}"
-               class="{{ request()->routeIs('admin.stations.*') ? 'active' : '' }}">
-                <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clip-rule="evenodd"/></svg>
-                {{ trans('station.nav_label') }}
-            </a>
-            @endif
-            @if(Auth::user()->hasPermission('telegram_chat.broadcast'))
-            <a href="{{ route('admin.telegram-broadcast.index') }}"
-               class="{{ request()->routeIs('admin.telegram-broadcast.*') ? 'active' : '' }}">
-                <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"/></svg>
-                {{ trans('broadcast.nav_label') }}
-            </a>
-            @endif
-        </nav>
-        @endif
-
-        <div class="sidebar__spacer"></div>
-
-        <div class="sidebar__footer">
-            <form action="{{ route('logout') }}" method="POST">
-                @csrf
-                <button type="submit" class="sidebar__logout-btn">
-                    <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 001 1h5a1 1 0 100-2H4V5h4a1 1 0 100-2H3zm11.707 3.293a1 1 0 010 1.414L13.414 9H17a1 1 0 110 2h-3.586l1.293 1.293a1 1 0 01-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                    {{ trans('auth.logout') }}
-                </button>
-            </form>
-        </div>
-    </aside>
-
-    {{-- 手機版遮罩 --}}
-    <div class="sidebar-overlay" id="sidebar-overlay"></div>
-
-    {{-- 右側主區域 --}}
-    <div class="app-main">
-        {{-- 頂部列 --}}
-        <header class="topbar">
-            <button class="topbar__hamburger" id="btn-hamburger" aria-label="選單">&#9776;</button>
-            <div class="topbar__left">
-                <h1 class="topbar__title">@yield('title', config('app.name'))</h1>
-                <p class="topbar__subtitle">@yield('subtitle', '')</p>
+        {{-- ==================== Header ==================== --}}
+        <div class="app-header header-shadow">
+            <div class="app-header__logo">
+                <a href="{{ route('admin.dashboard') }}" class="ms-2 fw-semibold fs-5 lh-1 d-flex align-items-center text-decoration-none" style="color:#a67c00">
+                    <span class="brand-logo-text">{{ config('app.name') }}</span>
+                </a>
+                <div class="header__pane ms-auto">
+                    <button type="button" class="hamburger close-sidebar-btn hamburger--elastic" data-class="closed-sidebar">
+                        <span class="hamburger-box"><span class="hamburger-inner"></span></span>
+                    </button>
+                </div>
             </div>
-            <div class="topbar__right">
-                <span class="topbar__clock" id="topbar-clock"></span>
-                <button class="theme-toggle" id="btn-push-toggle" title="推播通知" onclick="window.requestPushPermission && window.requestPushPermission()">
-                    <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>
+            <div class="app-header__mobile-menu">
+                <button type="button" class="hamburger hamburger--elastic mobile-toggle-nav">
+                    <span class="hamburger-box"><span class="hamburger-inner"></span></span>
                 </button>
-                <button class="theme-toggle" id="theme-toggle" title="切換深色/淺色模式">
-                    <svg class="theme-toggle__sun" viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/></svg>
-                    <svg class="theme-toggle__moon" viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
-                </button>
-                <div class="topbar__user" id="btn-open-profile" style="cursor:pointer" title="個人設定">
-                    <span class="topbar__avatar">{{ mb_substr(Auth::user()->nickname, 0, 1) }}</span>
-                    <div class="topbar__user-info">
-                        <span class="topbar__user-name">{{ Auth::user()->nickname }}</span>
-                        <span class="topbar__user-account">{{ Auth::user()->account }}</span>
+            </div>
+            <div class="app-header__menu">
+                <span>
+                    <button type="button" class="btn-icon btn-icon-only btn btn-primary btn-sm mobile-toggle-header-nav">
+                        <span class="btn-icon-wrapper"><i class="fa fa-ellipsis-v fa-w-6"></i></span>
+                    </button>
+                </span>
+            </div>
+            <div class="app-header__content">
+                <div class="app-header-left">
+                    <span class="fw-bold me-3" id="topbar-clock" style="font-size:0.9375rem; white-space:nowrap;"></span>
+                </div>
+                <div class="app-header-right">
+                    <div class="header-btn-lg pe-0">
+                        <div class="widget-content p-0">
+                            <div class="widget-content-wrapper">
+                                {{-- 推播 --}}
+                                <button class="btn btn-link p-1 me-1" title="推播通知" onclick="window.requestPushPermission && window.requestPushPermission()">
+                                    <i class="fas fa-bell"></i>
+                                </button>
+                                {{-- 深色模式 --}}
+                                <button class="btn btn-link p-1 me-2" id="theme-toggle" title="切換深色/淺色模式">
+                                    <i class="fas fa-moon theme-icon-dark"></i>
+                                    <i class="fas fa-sun theme-icon-light" style="display:none"></i>
+                                </button>
+                                {{-- 使用者 --}}
+                                <div class="widget-content-left me-3 header-user-info" id="btn-open-profile" style="cursor:pointer" title="個人設定">
+                                    <div class="widget-heading">{{ Auth::user()->nickname }}</div>
+                                    <div class="widget-subheading">{{ Auth::user()->account }}</div>
+                                </div>
+                                <div class="widget-content-left">
+                                    <div class="btn-group">
+                                        <a class="p-0 btn" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <div class="icon-wrapper icon-wrapper-alt rounded-circle" style="width:36px;height:36px;background:linear-gradient(135deg,#d4af37,#a67c00);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;">
+                                                {{ mb_substr(Auth::user()->nickname, 0, 1) }}
+                                            </div>
+                                        </a>
+                                        <div class="dropdown-menu dropdown-menu-end">
+                                            <button class="dropdown-item" id="btn-open-profile-dropdown">
+                                                <i class="fas fa-user-cog me-2"></i>{{ trans('profile.title') }}
+                                            </button>
+                                            <div class="dropdown-divider"></div>
+                                            <form action="{{ route('logout') }}" method="POST" class="m-0">
+                                                @csrf
+                                                <button type="submit" class="dropdown-item text-danger">
+                                                    <i class="fas fa-sign-out-alt me-2"></i>{{ trans('auth.logout') }}
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-        </header>
+        </div>
 
-        {{-- 內容區 --}}
-        <main class="app-content">
-            @yield('content')
-        </main>
+        {{-- ==================== Main ==================== --}}
+        <div class="app-main">
+            {{-- Sidebar --}}
+            <div class="app-sidebar sidebar-shadow">
+                <div class="app-header__logo">
+                    <a href="{{ route('admin.dashboard') }}" class="ms-2 fw-semibold fs-5 lh-1 d-flex align-items-center text-decoration-none" style="color:#a67c00">
+                        <span class="brand-logo-text">{{ config('app.name') }}</span>
+                    </a>
+                    <div class="header__pane ms-auto">
+                        <button type="button" class="hamburger close-sidebar-btn hamburger--elastic" data-class="closed-sidebar">
+                            <span class="hamburger-box"><span class="hamburger-inner"></span></span>
+                        </button>
+                    </div>
+                </div>
+                <div class="app-header__mobile-menu">
+                    <button type="button" class="hamburger hamburger--elastic mobile-toggle-nav">
+                        <span class="hamburger-box"><span class="hamburger-inner"></span></span>
+                    </button>
+                </div>
+                <div class="app-header__menu">
+                    <span>
+                        <button type="button" class="btn-icon btn-icon-only btn btn-primary btn-sm mobile-toggle-header-nav">
+                            <span class="btn-icon-wrapper"><i class="fa fa-ellipsis-v fa-w-6"></i></span>
+                        </button>
+                    </span>
+                </div>
+                <div class="scrollbar-sidebar">
+                    <div class="app-sidebar__inner">
+                        <ul class="vertical-nav-menu">
+                            <li class="app-sidebar__heading">{{ config('app.name') }}</li>
+                            <li>
+                                <a href="{{ route('admin.dashboard') }}" class="{{ request()->routeIs('admin.dashboard') ? 'mm-active' : '' }}">
+                                    <i class="metismenu-icon fas fa-home"></i>
+                                    {{ trans('dashboard.nav_label') }}
+                                </a>
+                            </li>
+                            <li class="app-sidebar__heading">主要功能</li>
+                            @if(Auth::user()->hasPermission('account.view'))
+                            <li>
+                                <a href="{{ route('admin.accounts.index') }}" class="{{ request()->routeIs('admin.accounts.*') ? 'mm-active' : '' }}">
+                                    <i class="metismenu-icon fas fa-users"></i>
+                                    {{ trans('account.nav_label') }}
+                                </a>
+                            </li>
+                            @endif
+                            @if(Auth::user()->hasPermission('shift.view'))
+                            <li>
+                                <a href="{{ route('admin.shifts.index') }}" class="{{ request()->routeIs('admin.shifts.*') ? 'mm-active' : '' }}">
+                                    <i class="metismenu-icon fas fa-calendar-alt"></i>
+                                    {{ trans('shift.nav_label') }}
+                                </a>
+                            </li>
+                            @endif
+                            @if(Auth::user()->hasPermission('attendance.view'))
+                            <li>
+                                <a href="{{ route('admin.attendance.index') }}" class="{{ request()->routeIs('admin.attendance.*') ? 'mm-active' : '' }}">
+                                    <i class="metismenu-icon fas fa-clock"></i>
+                                    {{ trans('attendance.nav_label') }}
+                                </a>
+                            </li>
+                            @endif
+                            <li>
+                                <a href="{{ route('admin.telegram-chat.index') }}" class="{{ request()->routeIs('admin.telegram-chat.*') ? 'mm-active' : '' }}">
+                                    <i class="metismenu-icon fas fa-comments"></i>
+                                    {{ trans('telegram_chat.nav_label') }}
+                                </a>
+                            </li>
+                            @if(Auth::user()->hasPermission('station.view') || Auth::user()->hasPermission('telegram_chat.broadcast'))
+                            <li class="app-sidebar__heading">{{ trans('station.section_label') }}</li>
+                            @if(Auth::user()->hasPermission('station.view'))
+                            <li>
+                                <a href="{{ route('admin.stations.index') }}" class="{{ request()->routeIs('admin.stations.*') ? 'mm-active' : '' }}">
+                                    <i class="metismenu-icon fas fa-server"></i>
+                                    {{ trans('station.nav_label') }}
+                                </a>
+                            </li>
+                            @endif
+                            @if(Auth::user()->hasPermission('telegram_chat.broadcast'))
+                            <li>
+                                <a href="{{ route('admin.telegram-broadcast.index') }}" class="{{ request()->routeIs('admin.telegram-broadcast.*') ? 'mm-active' : '' }}">
+                                    <i class="metismenu-icon fas fa-bullhorn"></i>
+                                    {{ trans('broadcast.nav_label') }}
+                                </a>
+                            </li>
+                            @endif
+                            @endif
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            {{-- 手機 sidebar 遮罩 --}}
+            <div class="sidebar-mobile-overlay" id="sidebarMobileOverlay"></div>
+
+            {{-- Content --}}
+            <div class="app-main__outer">
+                <div class="app-main__inner">
+                    {{-- Page Title --}}
+                    <div class="app-page-title">
+                        <div class="page-title-wrapper">
+                            <div class="page-title-heading">
+                                <div class="page-title-icon" style="background:linear-gradient(135deg,#d4af37,#a67c00);color:#fff;">
+                                    <i class="fas fa-@yield('icon', 'tachometer-alt')"></i>
+                                </div>
+                                <div>
+                                    @yield('title', config('app.name'))
+                                    <div class="page-title-subheading">@yield('subtitle', '')</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Main Content --}}
+                    @yield('content')
+                </div>
+            </div>
+        </div>
     </div>
 
+    {{-- ==================== Modals ==================== --}}
     {{-- 個人資訊 Modal --}}
-    @component('components.modal', ['id' => 'modal-profile', 'title' => trans('profile.title')])
-        <form id="form-profile">
-            <div class="form-group">
-                <label>{{ trans('profile.field_account') }}</label>
-                <input type="text" value="{{ Auth::user()->account }}" disabled style="opacity:0.6">
+    <div class="modal fade" id="modal-profile" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">{{ trans('profile.title') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="form-profile">
+                        <div class="mb-3">
+                            <label class="form-label">{{ trans('profile.field_account') }}</label>
+                            <input type="text" class="form-control" value="{{ Auth::user()->account }}" disabled>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="profile-nickname">{{ trans('profile.field_nickname') }}</label>
+                            <input id="profile-nickname" type="text" class="form-control" name="nickname" value="{{ Auth::user()->nickname }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="profile-password">{{ trans('profile.field_password') }}（{{ trans('profile.password_hint') }}）</label>
+                            <input id="profile-password" type="password" class="form-control" name="password" minlength="4" autocomplete="new-password">
+                        </div>
+                        <div class="text-end">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('shift.modal_cancel') }}</button>
+                            <button type="submit" class="btn btn-primary">{{ trans('shift.modal_confirm') }}</button>
+                        </div>
+                    </form>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="profile-nickname">{{ trans('profile.field_nickname') }}</label>
-                <input id="profile-nickname" type="text" name="nickname" value="{{ Auth::user()->nickname }}" required>
-            </div>
-            <div class="form-group">
-                <label for="profile-password">{{ trans('profile.field_password') }}（{{ trans('profile.password_hint') }}）</label>
-                <input id="profile-password" type="password" name="password" minlength="4" autocomplete="new-password">
-            </div>
-            <div class="modal-actions">
-                <button type="button" data-modal-close>{{ trans('shift.modal_cancel') }}</button>
-                <button type="submit" class="btn-primary">{{ trans('shift.modal_confirm') }}</button>
-            </div>
-        </form>
-    @endcomponent
-
-    {{-- 個人資訊訊息 Modal --}}
-    @component('components.modal', ['id' => 'modal-profile-msg', 'title' => ''])
-        <p id="modal-profile-msg-text"></p>
-        <div class="modal-actions">
-            <button type="button" data-modal-close class="btn-primary">OK</button>
         </div>
-    @endcomponent
+    </div>
 
+    {{-- 訊息 Modal --}}
+    <div class="modal fade" id="modal-profile-msg" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-body text-center py-4">
+                    <p id="modal-profile-msg-text" class="mb-3"></p>
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- ==================== Scripts ==================== --}}
+    {{-- Architect UI 核心 --}}
+    <script src="{{ asset('vendors/architect-ui/vendors/jquery/dist/jquery.min.js') }}"></script>
+    <script src="{{ asset('vendors/architect-ui/vendors/bootstrap/dist/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ asset('vendors/architect-ui/vendors/metismenu/dist/metisMenu.min.js') }}"></script>
+    <script src="{{ asset('vendors/architect-ui/vendors/perfect-scrollbar/dist/perfect-scrollbar.min.js') }}"></script>
+    <script src="{{ asset('vendors/architect-ui/js/app.js') }}"></script>
+    <script src="{{ asset('vendors/architect-ui/js/scrollbar.js') }}"></script>
+
+    {{-- Flatpickr --}}
     <script src="{{ asset('vendor/flatpickr/flatpickr.min.js') }}"></script>
     <script src="{{ asset('vendor/flatpickr/zh-tw.js') }}"></script>
     <script src="{{ asset('vendor/flatpickr/monthSelect.js') }}"></script>
     <script>flatpickr.localize(flatpickr.l10ns.zh_tw);</script>
+
     <script>
-    (function () {
-        var el = document.getElementById('topbar-clock');
-        if (!el) { return; }
+    $(function () {
+        var $appContainer = $('.app-container');
+
+        // Sidebar 狀態同步
+        var sidebarState = localStorage.getItem('sidebar-state');
+        if (sidebarState === 'closed') {
+            $appContainer.addClass('closed-sidebar');
+        }
+
+        requestAnimationFrame(function () {
+            $('body').addClass('page-loaded');
+            $appContainer.addClass('page-loaded');
+        });
+
+        // Sidebar 切換記憶
+        $('.hamburger.close-sidebar-btn').on('click', function () {
+            setTimeout(function () {
+                var isClosed = $appContainer.hasClass('closed-sidebar');
+                localStorage.setItem('sidebar-state', isClosed ? 'closed' : 'open');
+            }, 150);
+        });
+
+        // 手機 sidebar 遮罩
+        $('#sidebarMobileOverlay').on('click', function () {
+            $appContainer.removeClass('sidebar-mobile-open');
+            $('.mobile-toggle-nav').removeClass('is-active');
+        });
+
+        // 時鐘
         var weekdays = ['日', '一', '二', '三', '四', '五', '六'];
-        function update() {
+        function updateClock() {
             var now = new Date();
             var y = now.getFullYear();
             var m = String(now.getMonth() + 1).padStart(2, '0');
@@ -187,136 +345,78 @@
             var h = String(now.getHours()).padStart(2, '0');
             var min = String(now.getMinutes()).padStart(2, '0');
             var s = String(now.getSeconds()).padStart(2, '0');
-            el.textContent = y + '/' + m + '/' + d + '（' + w + '）' + h + ':' + min + ':' + s;
+            $('#topbar-clock').text(y + '/' + m + '/' + d + '（' + w + '）' + h + ':' + min + ':' + s);
         }
-        update();
-        setInterval(update, 1000);
-    })();
-    </script>
-    <script>
-    (function () {
-        var btn = document.getElementById('theme-toggle');
-        if (!btn) { return; }
+        updateClock();
+        setInterval(updateClock, 1000);
 
-        // 從 localStorage 讀取偏好
+        // 深色模式
         var saved = localStorage.getItem('theme');
         if (saved === 'dark') {
             document.documentElement.setAttribute('data-theme', 'dark');
+            $('.theme-icon-dark').hide();
+            $('.theme-icon-light').show();
         }
 
-        btn.addEventListener('click', function () {
+        $('#theme-toggle').on('click', function () {
             var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
             if (isDark) {
                 document.documentElement.removeAttribute('data-theme');
                 localStorage.setItem('theme', 'light');
+                $('.theme-icon-dark').show();
+                $('.theme-icon-light').hide();
             } else {
                 document.documentElement.setAttribute('data-theme', 'dark');
                 localStorage.setItem('theme', 'dark');
-            }
-        });
-    })();
-    </script>
-    <script>
-    // sidebar 下拉選單
-    (function () {
-        document.querySelectorAll('.sidebar__dropdown-toggle').forEach(function (toggle) {
-            toggle.addEventListener('click', function () {
-                var targetId = toggle.dataset.dropdown;
-                var content = document.getElementById(targetId);
-                if (!content) { return; }
-
-                toggle.classList.toggle('open');
-                content.classList.toggle('sidebar__dropdown--collapsed');
-            });
-
-            // 如果內容未折疊，標記為 open
-            var targetId = toggle.dataset.dropdown;
-            var content = document.getElementById(targetId);
-            if (content && !content.classList.contains('sidebar__dropdown--collapsed')) {
-                toggle.classList.add('open');
-            }
-        });
-    })();
-    </script>
-    <script>
-    (function () {
-        var csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-
-        // 開啟個人資訊 modal
-        var profileBtn = document.getElementById('btn-open-profile');
-        if (profileBtn) {
-            profileBtn.addEventListener('click', function () {
-                var modal = document.getElementById('modal-profile');
-                if (modal) { modal.style.display = 'flex'; }
-            });
-        }
-
-        // modal 關閉
-        document.querySelectorAll('#modal-profile [data-modal-close], #modal-profile-msg [data-modal-close]').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                btn.closest('.modal-overlay').style.display = 'none';
-            });
-        });
-
-        ['modal-profile', 'modal-profile-msg'].forEach(function (id) {
-            var overlay = document.getElementById(id);
-            if (overlay) {
-                overlay.addEventListener('click', function (e) {
-                    if (e.target === overlay) { overlay.style.display = 'none'; }
-                });
+                $('.theme-icon-dark').hide();
+                $('.theme-icon-light').show();
             }
         });
 
-        // 提交個人資訊
-        var form = document.getElementById('form-profile');
-        if (form) {
-            form.addEventListener('submit', function (e) {
-                e.preventDefault();
-                var data = {};
-                var nickname = document.getElementById('profile-nickname').value.trim();
-                var password = document.getElementById('profile-password').value;
+        // 個人資訊 Modal
+        $('#btn-open-profile, #btn-open-profile-dropdown').on('click', function () {
+            new bootstrap.Modal($('#modal-profile')[0]).show();
+        });
 
-                if (nickname) { data.nickname = nickname; }
-                if (password) { data.password = password; }
+        // 個人資訊提交
+        $('#form-profile').on('submit', function (e) {
+            e.preventDefault();
+            var data = {};
+            var nickname = $('#profile-nickname').val().trim();
+            var password = $('#profile-password').val();
+            if (nickname) { data.nickname = nickname; }
+            if (password) { data.password = password; }
 
-                fetch('/admin/profile', {
-                    method: 'PUT',
-                    headers: {
-                        'X-CSRF-TOKEN': csrfToken,
-                        'Content-Type': 'application/json',
-                        Accept: 'application/json',
-                    },
-                    body: JSON.stringify(data),
-                })
-                    .then(function (r) { return r.json(); })
-                    .then(function (body) {
-                        document.getElementById('modal-profile').style.display = 'none';
-                        document.getElementById('modal-profile-msg-text').textContent = body.message || '已更新';
-                        document.getElementById('modal-profile-msg').style.display = 'flex';
-
-                        // 更新頁面上的暱稱
-                        if (nickname) {
-                            document.querySelector('.topbar__user-name').textContent = nickname;
-                            var avatar = document.querySelector('.topbar__avatar');
-                            if (avatar) { avatar.textContent = nickname.substring(0, 1); }
-                        }
-                    })
-                    .catch(function () {
-                        document.getElementById('modal-profile-msg-text').textContent = '更新失敗';
-                        document.getElementById('modal-profile-msg').style.display = 'flex';
-                    });
+            $.ajax({
+                url: '/admin/profile',
+                method: 'PUT',
+                headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+                contentType: 'application/json',
+                data: JSON.stringify(data),
+                success: function (body) {
+                    bootstrap.Modal.getInstance($('#modal-profile')[0]).hide();
+                    $('#modal-profile-msg-text').text(body.message || '已更新');
+                    new bootstrap.Modal($('#modal-profile-msg')[0]).show();
+                    if (nickname) {
+                        $('.header-user-info .widget-heading').text(nickname);
+                    }
+                },
+                error: function () {
+                    $('#modal-profile-msg-text').text('更新失敗');
+                    new bootstrap.Modal($('#modal-profile-msg')[0]).show();
+                }
             });
-        }
-    })();
+        });
+    });
     </script>
+
+    {{-- Service Worker + Web Push --}}
     <script>
-    // Service Worker + Web Push
     (function () {
         if (!('serviceWorker' in navigator) || !('PushManager' in window)) { return; }
 
         navigator.serviceWorker.register('/sw.js').then(function (reg) {
             window._swReg = reg;
-
             if ('Notification' in window && Notification.permission === 'granted') {
                 subscribePush(reg);
             }
@@ -358,7 +458,6 @@
             });
         }
 
-        // 公開給通知設定 UI 使用
         window.requestPushPermission = function () {
             if (!('Notification' in window)) { return; }
             Notification.requestPermission().then(function (result) {
@@ -369,33 +468,39 @@
         };
     })();
     </script>
+
+    {{-- 相容層：讓舊的 openModal / data-modal-close 繼續運作 --}}
     <script>
-    // RWD 漢堡選單
     (function () {
-        var hamburger = document.getElementById('btn-hamburger');
-        var sidebar = document.querySelector('.sidebar');
-        var overlay = document.getElementById('sidebar-overlay');
-        if (!hamburger || !sidebar || !overlay) { return; }
+        // 舊 JS 的 openModal('id') → Bootstrap 5 modal.show()
+        window.openModalCompat = function (id) {
+            var el = document.getElementById(id);
+            if (!el) { return; }
+            // 如果是 Bootstrap modal
+            if (el.classList.contains('modal')) {
+                new bootstrap.Modal(el).show();
+            } else {
+                // 舊的 modal-overlay 方式
+                el.style.display = 'flex';
+            }
+        };
 
-        function openSidebar() {
-            sidebar.classList.add('sidebar--open');
-            overlay.classList.add('sidebar-overlay--visible');
-        }
-
-        function closeSidebar() {
-            sidebar.classList.remove('sidebar--open');
-            overlay.classList.remove('sidebar-overlay--visible');
-        }
-
-        hamburger.addEventListener('click', openSidebar);
-        overlay.addEventListener('click', closeSidebar);
-
-        // 點選 sidebar 導航項目後自動關閉
-        sidebar.querySelectorAll('.sidebar__nav a').forEach(function (link) {
-            link.addEventListener('click', closeSidebar);
+        // 攔截舊的 data-modal-close 按鈕
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-modal-close]');
+            if (!btn) { return; }
+            var modal = btn.closest('.modal');
+            if (modal) {
+                var instance = bootstrap.Modal.getInstance(modal);
+                if (instance) { instance.hide(); }
+            } else {
+                var overlay = btn.closest('.modal-overlay');
+                if (overlay) { overlay.style.display = 'none'; }
+            }
         });
     })();
     </script>
+
     @yield('scripts')
 </body>
 </html>

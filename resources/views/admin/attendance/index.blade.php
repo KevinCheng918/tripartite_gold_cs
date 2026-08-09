@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('title', trans('attendance.page_title'))
+@section('icon', 'clock')
 @section('subtitle', trans('attendance.subtitle'))
 
 @section('content')
@@ -16,8 +17,8 @@
     {{-- 打卡二次確認 Modal --}}
     @component('components.modal', ['id' => 'modal-attendance-confirm', 'title' => ''])
         <div id="modal-attendance-confirm-body"></div>
-        <div class="modal-actions">
-            <button type="button" data-modal-close class="btn-cancel">{{ trans('attendance.msg.cancel') }}</button>
+        <div class="text-end mt-3">
+            <button type="button" data-bs-dismiss="modal" class="btn-cancel">{{ trans('attendance.msg.cancel') }}</button>
             <button type="button" id="btn-confirm-clock" class="btn-primary">{{ trans('attendance.msg.confirm') }}</button>
         </div>
     @endcomponent
@@ -25,8 +26,8 @@
     {{-- 訊息提示 Modal --}}
     @component('components.modal', ['id' => 'modal-attendance-message', 'title' => ''])
         <p id="modal-attendance-message-text"></p>
-        <div class="modal-actions">
-            <button type="button" data-modal-close class="btn-primary">OK</button>
+        <div class="text-end mt-3">
+            <button type="button" data-bs-dismiss="modal" class="btn-primary">OK</button>
         </div>
     @endcomponent
 

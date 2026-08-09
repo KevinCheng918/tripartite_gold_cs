@@ -1,111 +1,335 @@
 @extends('layouts.app')
 
 @section('title', trans('station.page_title'))
+@section('icon', 'server')
 @section('subtitle', trans('station.subtitle'))
 
 @section('content')
 
-    <div id="station-app"
-         data-i18n='@json(trans("station"))'
-         data-can-create="{{ Auth::user()->hasPermission('station.create') ? '1' : '0' }}"
-         data-can-update="{{ Auth::user()->hasPermission('station.update') ? '1' : '0' }}">
-        <p>Loading…</p>
+    {{-- 搜尋列 --}}
+    <div class="main-card mb-3 card">
+        <div class="card-body">
+            <form method="GET" class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small">關鍵字</label>
+                    <input type="text" class="form-control form-control-sm" name="keyword" value="{{ $filters['keyword'] ?? '' }}" placeholder="名稱或域名">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">系統</label>
+                    <select name="system_id" class="form-select form-select-sm">
+                        <option value="">全部</option>
+                        @foreach($systems as $sys)
+                            <option value="{{ $sys->id }}" {{ ($filters['system_id'] ?? '') == $sys->id ? 'selected' : '' }}>{{ $sys->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">狀態</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="">全部</option>
+                        <option value="1" {{ ($filters['status'] ?? '') === '1' ? 'selected' : '' }}>{{ trans('station.status_active') }}</option>
+                        <option value="2" {{ ($filters['status'] ?? '') === '2' ? 'selected' : '' }}>{{ trans('station.status_frozen') }}</option>
+                        <option value="0" {{ ($filters['status'] ?? '') === '0' ? 'selected' : '' }}>{{ trans('station.status_disabled') }}</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary btn-sm w-100">
+                        <i class="fas fa-search me-1"></i>搜尋
+                    </button>
+                </div>
+                <div class="col-md-1">
+                    <a href="{{ route('admin.stations.index') }}" class="btn btn-outline-secondary btn-sm w-100">重置</a>
+                </div>
+                @if(Auth::user()->hasPermission('station.create'))
+                <div class="col-md-2 text-end">
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-station">
+                        <i class="fas fa-plus me-1"></i>{{ trans('station.action_create') }}
+                    </button>
+                </div>
+                @endif
+            </form>
+        </div>
+    </div>
+
+    {{-- 站台列表 --}}
+    <div class="main-card mb-3 card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>系統</th>
+                            <th>{{ trans('station.field_name') }}</th>
+                            <th>{{ trans('station.field_credits') }}</th>
+                            <th>費率（收/付）</th>
+                            <th>{{ trans('station.field_status') }}</th>
+                            <th>同步</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($stations as $station)
+                            @php
+                                $settings = $station->settings ?? [];
+                                $depositRate = isset($settings['system_rate']) ? number_format($settings['system_rate'] * 100, 2) . '%' : '-';
+                                $withdrawRate = isset($settings['system_rate_withdraw']) ? number_format($settings['system_rate_withdraw'] * 100, 2) . '%' : '-';
+                            @endphp
+                            <tr>
+                                <td>{{ $loop->iteration }}</td>
+                                <td>{{ $station->system ? $station->system->name : '-' }}</td>
+                                <td>
+                                    <strong>{{ $station->name }}</strong>
+                                    @if(filled($station->domain))
+                                        <br><small class="text-muted">{{ $station->domain }}</small>
+                                    @endif
+                                </td>
+                                <td><strong>{{ number_format($station->credits, 2) }}</strong></td>
+                                <td>{{ $depositRate }} / {{ $withdrawRate }}</td>
+                                <td>
+                                    @if($station->status == 1)
+                                        <span class="badge bg-success">{{ trans('station.status_active') }}</span>
+                                    @elseif($station->status == 2)
+                                        <span class="badge bg-warning text-dark">{{ trans('station.status_frozen') }}</span>
+                                    @else
+                                        <span class="badge bg-danger">{{ trans('station.status_disabled') }}</span>
+                                    @endif
+                                </td>
+                                <td><small class="text-muted">{{ $station->synced_at ? $station->synced_at->format('m/d H:i') : '-' }}</small></td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-info js-station-detail" data-id="{{ $station->id }}">
+                                        <i class="fas fa-info-circle"></i>
+                                    </button>
+                                    @if(Auth::user()->hasPermission('station.update'))
+                                        <button class="btn btn-sm btn-outline-secondary js-edit-station"
+                                                data-id="{{ $station->id }}"
+                                                data-name="{{ $station->name }}"
+                                                data-domain="{{ $station->domain }}"
+                                                data-system-id="{{ $station->system_id }}"
+                                                data-api-url="{{ $station->api_url }}"
+                                                data-api-key="{{ $station->api_key }}"
+                                                data-telegram-chat-id="{{ $station->telegram_chat_id }}"
+                                                data-note="{{ $station->note }}">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary js-sync-credits" data-id="{{ $station->id }}">
+                                            <i class="fas fa-sync-alt"></i>
+                                        </button>
+                                    @endif
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-4">暫無資料</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        @if($stations->hasPages())
+            <div class="card-footer">{{ $stations->withQueryString()->links() }}</div>
+        @endif
     </div>
 
     {{-- 新增/編輯站台 Modal --}}
-    @component('components.modal', ['id' => 'modal-station', 'title' => trans('station.action_create')])
-        <form id="form-station">
-            <input type="hidden" id="station-id">
-            <div class="form-group">
-                <label>{{ trans('station.field_system') }}</label>
-                <div style="display:flex;gap:0.5rem;align-items:center">
-                    <select id="station-system" name="system_id" style="flex:1"></select>
-                    <button type="button" class="btn-sm" id="btn-add-system" title="新增系統">+</button>
+    <div class="modal fade" id="modal-station" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">{{ trans('station.action_create') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="form-station">
+                        <input type="hidden" id="station-id">
+                        <div class="mb-3">
+                            <label class="form-label">{{ trans('station.field_system') }}</label>
+                            <select id="station-system" name="system_id" class="form-select">
+                                @foreach($systems as $sys)
+                                    <option value="{{ $sys->id }}">{{ $sys->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{{ trans('station.field_name') }}</label>
+                            <input id="station-name" type="text" class="form-control" name="name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{{ trans('station.field_domain') }}</label>
+                            <input id="station-domain" type="text" class="form-control" name="domain">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{{ trans('station.field_api_url') }}</label>
+                            <input id="station-api-url" type="text" class="form-control" name="api_url" placeholder="https://...">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{{ trans('station.field_api_key') }}</label>
+                            <input id="station-api-key" type="text" class="form-control" name="api_key">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{{ trans('station.field_telegram_chat_id') }}</label>
+                            <input id="station-telegram-chat-id" type="text" class="form-control" name="telegram_chat_id" placeholder="-100xxxxxxxxxx">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{{ trans('station.field_note') }}</label>
+                            <input id="station-note" type="text" class="form-control" name="note">
+                        </div>
+                        <div class="text-end">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                            <button type="submit" class="btn btn-primary">確認</button>
+                        </div>
+                    </form>
                 </div>
             </div>
-            <div class="form-group">
-                <label for="station-name">{{ trans('station.field_name') }}</label>
-                <input id="station-name" type="text" name="name" required>
+        </div>
+    </div>
+
+    {{-- 詳細資訊 Modal --}}
+    <div class="modal fade" id="modal-station-detail" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">站台詳細資訊</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="station-detail-body"></div>
             </div>
-            <div class="form-group">
-                <label for="station-domain">{{ trans('station.field_domain') }}</label>
-                <input id="station-domain" type="text" name="domain">
-            </div>
-            <div class="form-group">
-                <label for="station-api-url">{{ trans('station.field_api_url') }}</label>
-                <input id="station-api-url" type="text" name="api_url" placeholder="https://..." autocomplete="off">
-            </div>
-            <div class="form-group">
-                <label for="station-api-key">{{ trans('station.field_api_key') }}</label>
-                <input id="station-api-key" type="text" name="api_key" autocomplete="off">
-            </div>
-            <div class="form-group">
-                <label for="station-telegram-chat-id">{{ trans('station.field_telegram_chat_id') }}</label>
-                <div style="display:flex;gap:0.5rem;align-items:center">
-                    <input id="station-telegram-chat-id" type="text" name="telegram_chat_id" placeholder="-100xxxxxxxxxx" style="flex:1">
-                    <button type="button" class="btn-sm" id="btn-fetch-bot-groups" title="讀取機器人群組">讀取群組</button>
+        </div>
+    </div>
+
+    {{-- 訊息 Modal --}}
+    <div class="modal fade" id="modal-station-msg" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-body text-center py-4">
+                    <p id="modal-station-msg-text" class="mb-3"></p>
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
                 </div>
             </div>
-            <div class="form-group">
-                <label for="station-note">{{ trans('station.field_note') }}</label>
-                <input id="station-note" type="text" name="note">
-            </div>
-            <div class="modal-actions">
-                <button type="button" data-modal-close>{{ trans('shift.modal_cancel') }}</button>
-                <button type="submit" class="btn-primary">{{ trans('shift.modal_confirm') }}</button>
-            </div>
-        </form>
-    @endcomponent
-
-    {{-- 調整狀態 Modal --}}
-    @component('components.modal', ['id' => 'modal-station-status', 'title' => trans('station.field_status')])
-        <input type="hidden" id="modal-status-station-id">
-        <div class="form-group">
-            <label class="status-radio">
-                <input type="radio" name="station_status" value="1">
-                <span class="status-radio__label">{{ trans('station.status_active') }}</span>
-            </label>
-            <label class="status-radio">
-                <input type="radio" name="station_status" value="2">
-                <span class="status-radio__label">{{ trans('station.status_frozen') }}</span>
-            </label>
-            <label class="status-radio">
-                <input type="radio" name="station_status" value="0">
-                <span class="status-radio__label">{{ trans('station.status_disabled') }}</span>
-            </label>
         </div>
-        <div class="modal-actions">
-            <button type="button" data-modal-close>{{ trans('shift.modal_cancel') }}</button>
-            <button type="button" class="btn-primary" id="btn-submit-station-status">{{ trans('shift.modal_confirm') }}</button>
-        </div>
-    @endcomponent
-
-    {{-- 站台詳細資訊 Modal --}}
-    @component('components.modal', ['id' => 'modal-station-detail', 'title' => ''])
-        <div id="station-detail-body"></div>
-        <div class="modal-actions">
-            <button type="button" data-modal-close class="btn-primary">OK</button>
-        </div>
-    @endcomponent
-
-    {{-- Bot 群組列表 Modal --}}
-    @component('components.modal', ['id' => 'modal-bot-groups', 'title' => trans('station.bot_groups_title')])
-        <div id="bot-groups-body"></div>
-        <div class="modal-actions">
-            <button type="button" data-modal-close class="btn-primary">OK</button>
-        </div>
-    @endcomponent
-
-    {{-- 訊息提示 Modal --}}
-    @component('components.modal', ['id' => 'modal-station-msg', 'title' => ''])
-        <p id="modal-station-msg-text"></p>
-        <div class="modal-actions">
-            <button type="button" data-modal-close class="btn-primary">OK</button>
-        </div>
-    @endcomponent
+    </div>
 
 @endsection
 
 @section('scripts')
-    <script src="{{ asset('js/station.js') }}?v={{ filemtime(public_path('js/station.js')) }}"></script>
+<script>
+$(function () {
+    var csrfToken = $('meta[name="csrf-token"]').attr('content');
+
+    function showMessage(msg) {
+        $('#modal-station-msg-text').text(msg);
+        new bootstrap.Modal($('#modal-station-msg')[0]).show();
+    }
+
+    // 編輯站台
+    $('.js-edit-station').on('click', function () {
+        var $btn = $(this);
+        $('#station-id').val($btn.data('id'));
+        $('#station-name').val($btn.data('name'));
+        $('#station-domain').val($btn.data('domain'));
+        $('#station-system').val($btn.data('system-id'));
+        $('#station-api-url').val($btn.data('api-url'));
+        $('#station-api-key').val($btn.data('api-key'));
+        $('#station-telegram-chat-id').val($btn.data('telegram-chat-id'));
+        $('#station-note').val($btn.data('note'));
+        $('#modal-station .modal-title').text('{{ trans("station.action_edit") }}');
+        new bootstrap.Modal($('#modal-station')[0]).show();
+    });
+
+    // 新增/編輯提交
+    $('#form-station').on('submit', function (e) {
+        e.preventDefault();
+        var id = $('#station-id').val();
+        var url = id ? '/admin/stations/ajax-update/' + id : '/admin/stations/ajax-store';
+        var method = id ? 'PUT' : 'POST';
+
+        $.ajax({
+            url: url, method: method,
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            contentType: 'application/json',
+            data: JSON.stringify({
+                system_id: $('#station-system').val(),
+                name: $('#station-name').val(),
+                domain: $('#station-domain').val(),
+                api_url: $('#station-api-url').val(),
+                api_key: $('#station-api-key').val(),
+                telegram_chat_id: $('#station-telegram-chat-id').val(),
+                note: $('#station-note').val(),
+            }),
+            success: function () { location.reload(); },
+            error: function (xhr) {
+                var msg = (xhr.responseJSON && xhr.responseJSON.message) || '操作失敗';
+                showMessage(msg);
+            }
+        });
+    });
+
+    // 新增 Modal 打開時清空
+    $('[data-bs-target="#modal-station"]').on('click', function () {
+        $('#station-id').val('');
+        $('#form-station')[0].reset();
+        $('#modal-station .modal-title').text('{{ trans("station.action_create") }}');
+    });
+
+    // 同步點數
+    $('.js-sync-credits').on('click', function () {
+        var id = $(this).data('id');
+        var $btn = $(this);
+        $btn.prop('disabled', true);
+
+        $.ajax({
+            url: '/admin/stations/ajax-sync-credits/' + id,
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            contentType: 'application/json',
+            success: function () { location.reload(); },
+            error: function (xhr) {
+                $btn.prop('disabled', false);
+                showMessage((xhr.responseJSON && xhr.responseJSON.message) || '同步失敗');
+            }
+        });
+    });
+
+    // 詳細資訊
+    $('.js-station-detail').on('click', function () {
+        var id = $(this).data('id');
+        $('#station-detail-body').html('<p class="text-center py-3">Loading...</p>');
+        new bootstrap.Modal($('#modal-station-detail')[0]).show();
+
+        $.ajax({
+            url: '/admin/stations/ajax-list?per_page=100',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            success: function (body) {
+                var list = body.data || [];
+                var station = list.filter(function (s) { return s.id === id; })[0];
+                if (!station) { $('#station-detail-body').html('<p>找不到</p>'); return; }
+
+                var s = station.settings || {};
+                var on = '<span class="badge bg-success">啟用</span>';
+                var off = '<span class="badge bg-danger">未啟用</span>';
+
+                var html = '<table class="table table-sm">';
+                html += '<tr><th>名稱</th><td>' + station.name + '</td></tr>';
+                html += '<tr><th>域名</th><td>' + (station.domain || '-') + '</td></tr>';
+                html += '<tr><th>系統</th><td>' + (station.system ? station.system.name : '-') + '</td></tr>';
+                html += '<tr><th>點數</th><td><strong>' + station.credits + '</strong></td></tr>';
+                html += '<tr><th>代收費率</th><td>' + (s.system_rate ? (s.system_rate * 100).toFixed(2) + '%' : '-') + '</td></tr>';
+                html += '<tr><th>代付費率</th><td>' + (s.system_rate_withdraw ? (s.system_rate_withdraw * 100).toFixed(2) + '%' : '-') + '</td></tr>';
+                html += '<tr><th>USDT 代收</th><td>' + (s.usdt_deposit ? on : off) + '</td></tr>';
+                html += '<tr><th>ATM 代收</th><td>' + (s.atm_deposit ? on : off) + '</td></tr>';
+                html += '<tr><th>超商代收</th><td>' + (s.cvs_deposit ? on : off) + '</td></tr>';
+                html += '<tr><th>信用卡</th><td>' + (s.cc_deposit ? on : off) + '</td></tr>';
+                html += '<tr><th>QR 代收</th><td>' + (s.qr_deposit ? on : off) + '</td></tr>';
+                html += '<tr><th>代付</th><td>' + (s.withdraw ? on : off) + '</td></tr>';
+                html += '<tr><th>商城</th><td>' + (s.support_shop ? on : off) + '</td></tr>';
+                html += '<tr><th>跑分員</th><td>' + (s.score_runner ? on : off) + '</td></tr>';
+                html += '</table>';
+
+                $('#station-detail-body').html(html);
+            }
+        });
+    });
+});
+</script>
 @endsection
