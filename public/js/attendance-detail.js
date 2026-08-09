@@ -98,7 +98,7 @@
         }).join('');
 
         var table =
-            '<table><thead><tr>' +
+            '<table class="att-table-desktop"><thead><tr>' +
             '<th>' + i18n.field_date + '</th>' +
             '<th>' + i18n.field_clock_in + '</th>' +
             '<th>' + i18n.field_clock_out + '</th>' +
@@ -110,7 +110,28 @@
             '<th>' + i18n.field_device + '</th>' +
             '</tr></thead><tbody>' + rows + '</tbody></table>';
 
-        root.innerHTML = header + summary + table;
+        var detailCards = records.map(function (r) {
+            var st = statusMap[r.status] || { text: '-', css: '' };
+            var clockIn = r.clock_in ? r.clock_in.substring(11, 19) : '-';
+            var clockOut = r.clock_out ? r.clock_out.substring(11, 19) : '-';
+
+            return (
+                '<div class="shift-card">' +
+                '<div class="shift-card__header">' +
+                '<span class="shift-card__title">' + r.date + '</span>' +
+                '<span class="badge ' + st.css + '">' + st.text + '</span>' +
+                '</div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_clock_in + '</span><span>' + clockIn + '</span></div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_clock_out + '</span><span>' + clockOut + '</span></div>' +
+                (r.late_minutes > 0 ? '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_late + '</span><span style="color:#dc2626;font-weight:600">' + r.late_minutes + ' ' + i18n.unit_minutes + '</span></div>' : '') +
+                (r.early_leave_minutes > 0 ? '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_early_leave + '</span><span style="color:#dc2626;font-weight:600">' + r.early_leave_minutes + ' ' + i18n.unit_minutes + '</span></div>' : '') +
+                (r.overtime_minutes > 0 ? '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_overtime + '</span><span style="color:#059669;font-weight:600">' + r.overtime_minutes + ' ' + i18n.unit_minutes + '</span></div>' : '') +
+                '</div>'
+            );
+        }).join('');
+
+        root.innerHTML = header + summary + table +
+            '<div class="shift-cards">' + detailCards + '</div>';
 
         // flatpickr 月份選擇器
         flatpickr('#detail-month-picker', {
