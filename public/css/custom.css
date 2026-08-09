@@ -12,8 +12,11 @@
 .chat-layout .app-inner-layout__content {
     display: flex !important;
     flex-direction: column !important;
-    height: 100% !important;
-    max-height: 100% !important;
+}
+@media (min-width: 768px) {
+    .chat-layout .app-inner-layout__content {
+        height: 100% !important;
+    }
 }
 .chat-layout .chat-wrapper {
     flex: 1 1 0 !important;
@@ -106,11 +109,17 @@
         z-index: 20;
         border-radius: 0 !important;
         margin: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+    }
+    .chat-layout.tg-chatting .app-inner-layout__top-pane {
+        flex-shrink: 0 !important;
     }
     .chat-layout.tg-chatting .chat-wrapper {
-        flex: 1 !important;
+        flex: 1 1 0 !important;
         min-height: 0 !important;
         overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
     }
     .chat-layout.tg-chatting .app-inner-layout__bottom-pane {
         flex-shrink: 0 !important;
