@@ -29,10 +29,42 @@ h4, .h4 { font-size: 1.25rem; font-weight: 600; color: #212529; }
 h5, .h5 { font-size: 1.125rem; font-weight: 600; color: #212529; }
 h6, .h6 { font-size: 1rem; font-weight: 600; color: #212529; }
 
-/* 表格文字加深 */
-.table { color: #212529; font-size: 0.9375rem; }
-.table th { font-size: 0.9375rem; font-weight: 600; color: #495057; }
-.table td { color: #212529; }
+/* 表格 — Architect Data Tables 風格 */
+.table {
+    color: #212529;
+    font-size: 0.9375rem;
+    border-collapse: collapse;
+}
+.table > :not(caption) > * > * {
+    border-bottom: 1px solid #dee2e6;
+    padding: 0.75rem 1rem;
+}
+.table > thead > tr > th {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: #212529;
+    background: transparent;
+    border-bottom: 2px solid #dee2e6;
+    border-top: none;
+}
+.table > tbody > tr > td {
+    color: #212529;
+    vertical-align: middle;
+}
+.table > tbody > tr:last-child > td {
+    border-bottom: 2px solid #dee2e6;
+}
+.table-hover > tbody > tr:hover {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+/* 移除外邊框和圓角，乾淨扁平 */
+.table {
+    border: none !important;
+    border-radius: 0 !important;
+}
+.card-body.p-0 .table > :not(caption) > *:first-child > * {
+    border-top: none;
+}
 
 /* 表單文字加深 */
 .form-control, .form-select { font-size: 1rem; color: #212529; }

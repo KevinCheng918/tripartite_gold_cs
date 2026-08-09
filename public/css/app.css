@@ -2,28 +2,33 @@
    相容層：JS 動態 HTML 使用的 class（對接 Bootstrap）
    ================================================================ */
 
-/* 表格 — JS 生成的 <table> 自動套 Bootstrap 樣式 */
+/* 表格 — JS 生成的 <table>（Architect Data Tables 風格） */
 table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 0.5rem;
+    border: none;
 }
-table thead { background: #f8f9fa; }
+table thead { background: transparent; }
 table th {
     padding: 0.75rem 1rem;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #495057;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: #212529;
     border-bottom: 2px solid #dee2e6;
+    border-top: none;
     text-align: left;
 }
 table td {
     padding: 0.75rem 1rem;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid #dee2e6;
     color: #212529;
     vertical-align: middle;
 }
-table tbody tr:hover { background: #f8f9fa; }
+table tbody tr:last-child td {
+    border-bottom: 2px solid #dee2e6;
+}
+table tbody tr:hover { background: rgba(0, 0, 0, 0.02); }
 
 /* Tabs — JS 動態 tabs */
 .tabs {
