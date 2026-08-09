@@ -2648,6 +2648,7 @@ td button:hover {
 .sidebar-overlay { display: none; }
 .account-cards { display: none; }
 .shift-cards { display: none; }
+.att-table-desktop + .shift-cards { display: none; }
 .tg-header__back { display: none; }
 
 /* RWD — 手機版 */
@@ -2752,18 +2753,9 @@ td button:hover {
     }
 
     /* ---- 表格橫向捲動（排班課表由 timetable-wrap 處理，排除） ---- */
+    /* ---- 表格：用 wrapper 方式處理溢出，不破壞 table 本身 ---- */
     table:not(.timetable) {
-        display: block;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    table:not(.timetable) thead,
-    table:not(.timetable) tbody,
-    table:not(.timetable) tr,
-    table:not(.timetable) th,
-    table:not(.timetable) td {
-        white-space: nowrap;
+        width: 100%;
     }
 
     /* ---- 排班管理 ---- */
@@ -3017,6 +3009,8 @@ td button:hover {
 
     /* ---- 排班子頁卡片式 ---- */
     #tab-content > table { display: none; }
+    .att-table-desktop { display: none; }
+    .att-table-desktop + .shift-cards { display: flex; }
 
     .shift-cards {
         display: flex;
