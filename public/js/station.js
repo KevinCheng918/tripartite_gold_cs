@@ -8,9 +8,9 @@
     var csrfToken = document.querySelector('meta[name="csrf-token"]').content;
 
     var statusMap = {};
-    statusMap[1] = { text: i18n.status_active, css: 'badge--active' };
-    statusMap[2] = { text: i18n.status_frozen, css: 'badge--pending' };
-    statusMap[0] = { text: i18n.status_disabled, css: 'badge--rejected' };
+    statusMap[1] = { text: i18n.status_active, css: 'bg-success' };
+    statusMap[2] = { text: i18n.status_frozen, css: 'bg-warning text-dark' };
+    statusMap[0] = { text: i18n.status_disabled, css: 'bg-danger' };
 
     var stationsData = [];
     var currentPage = 1;
@@ -68,10 +68,6 @@
     }
 
     // modal 關閉
-    document.querySelectorAll('[data-modal-close]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            btn.closest('.modal-overlay').style.display = 'none';
-        });
     });
     document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
         overlay.addEventListener('click', function (e) {
@@ -147,7 +143,7 @@
 
         var toolbarActions = '';
         if (canCreate) {
-            toolbarActions += '<button class="btn-primary" id="btn-create-station">' + i18n.action_create + '</button> ';
+            toolbarActions += '<button class="btn btn-primary" id="btn-create-station">' + i18n.action_create + '</button> ';
         }
         if (canUpdate) {
             toolbarActions += '<button class="btn-sm" id="btn-sync-all">' + (i18n.action_sync_all || '一鍵同步全部') + '</button>';
@@ -193,7 +189,7 @@
             '<div></div>' +
             '<div class="stn-toolbar__right">' +
             '<button class="btn-sm" id="btn-stn-reset">重置</button>' +
-            '<button class="btn-primary" id="btn-stn-search">搜尋</button>' +
+            '<button class="btn btn-primary" id="btn-stn-search">搜尋</button>' +
             '</div>' +
             '</div>' +
             '</div>';
@@ -407,8 +403,8 @@
 
     function showStationDetail(s) {
         var settings = s.settings || {};
-        var on = '<span class="badge badge--active">啟用</span>';
-        var off = '<span class="badge badge--disabled">未啟用</span>';
+        var on = '<span class="badge bg-success">啟用</span>';
+        var off = '<span class="badge bg-danger">未啟用</span>';
 
         var depositTypes = [];
         if (settings.usdt_deposit) { depositTypes.push('USDT'); }
@@ -420,7 +416,7 @@
         var depositRate = settings.system_rate ? (settings.system_rate * 100).toFixed(2) + '%' : '-';
         var withdrawRate = settings.system_rate_withdraw ? (settings.system_rate_withdraw * 100).toFixed(2) + '%' : '-';
         var depositBadges = depositTypes.length > 0
-            ? depositTypes.map(function (t) { return '<span class="badge badge--active">' + t + '</span>'; }).join(' ')
+            ? depositTypes.map(function (t) { return '<span class="badge bg-success">' + t + '</span>'; }).join(' ')
             : '-';
 
         var html =
