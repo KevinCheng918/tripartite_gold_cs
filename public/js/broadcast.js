@@ -26,19 +26,11 @@
     function showMessage(message) {
         var el = document.getElementById('modal-broadcast-msg-text');
         if (el) { el.textContent = message; }
-        document.getElementById('modal-broadcast-msg').style.display = 'flex';
+        new bootstrap.Modal(document.getElementById('modal-broadcast-msg')).show();
     }
 
     // modal 關閉
-    document.querySelectorAll('[data-modal-close]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            btn.closest('.modal-overlay').style.display = 'none';
-        });
     });
-    document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
-        overlay.addEventListener('click', function (e) {
-            if (e.target === overlay) { overlay.style.display = 'none'; }
-        });
     });
 
     // ---------------------------------------------------------------
@@ -216,8 +208,8 @@
                 '<td>' + target + '</td>' +
                 '<td>' + preview + '</td>' +
                 '<td>' + r.total_count + '</td>' +
-                '<td><span class="badge badge--active">' + r.success_count + '</span></td>' +
-                '<td>' + (r.fail_count > 0 ? '<span class="badge badge--rejected">' + r.fail_count + '</span>' : '0') + '</td>' +
+                '<td><span class="badge bg-success">' + r.success_count + '</span></td>' +
+                '<td>' + (r.fail_count > 0 ? '<span class="badge bg-danger">' + r.fail_count + '</span>' : '0') + '</td>' +
                 '</tr>'
             );
         }).join('');
