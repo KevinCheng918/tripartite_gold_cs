@@ -66,6 +66,21 @@ h6, .h6 { font-size: 1rem; font-weight: 600; color: #212529; }
     border-top: none;
 }
 
+/* 按鈕 hover — 明顯的互動回饋 */
+.btn-outline-secondary:hover,
+.btn-outline-secondary:hover:active {
+    background-color: #212529 !important;
+    color: #fff !important;
+    border-color: #212529 !important;
+    box-shadow: none !important;
+}
+.btn-outline-secondary:focus {
+    background-color: #343a40 !important;
+    color: #fff !important;
+    border-color: #343a40 !important;
+    box-shadow: none !important;
+}
+
 /* 表單文字加深 */
 .form-control, .form-select { font-size: 1rem; color: #212529; }
 .form-label, label { font-size: 0.9375rem; font-weight: 500; color: #212529; }
