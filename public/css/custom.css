@@ -14,9 +14,11 @@
 /* 發送方靠右 */
 .chat-box-wrapper.chat-box-wrapper-right {
     justify-content: flex-end !important;
+    flex-direction: row !important;
 }
 .chat-box-wrapper.chat-box-wrapper-right > div:first-child {
     text-align: right;
+    margin-left: auto;
 }
 
 /* 時間戳記 */
@@ -74,6 +76,19 @@
     }
     .chat-layout.tg-chatting .app-inner-layout__bottom-pane {
         flex-shrink: 0 !important;
+    }
+
+    /* 手機版聊天標頭加大 */
+    .chat-layout.tg-chatting .app-inner-layout__top-pane {
+        padding: 0.5rem 0 !important;
+    }
+    .chat-layout.tg-chatting .app-inner-layout__top-pane .fw-bold {
+        font-size: 1.25rem !important;
+    }
+    .chat-layout.tg-chatting .app-inner-layout__top-pane .rounded-circle {
+        width: 42px !important;
+        height: 42px !important;
+        font-size: 1rem !important;
     }
 
     /* 隱藏 page title 讓聊天撐滿 */

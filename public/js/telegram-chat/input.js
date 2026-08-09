@@ -76,6 +76,8 @@
                 textarea.disabled = false;
                 if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = '<i class="fas fa-paper-plane" style="font-size:0.875rem"></i>'; }
                 textarea.focus();
+                // 重新載入訊息（不依賴 Pusher）
+                T.loadMessages(T.selectedGroupId);
             })
             .catch(function (error) {
                 textarea.disabled = false;
@@ -108,6 +110,7 @@
             .then(function () {
                 var textarea = document.getElementById('tg-reply-text');
                 if (textarea) { textarea.value = ''; textarea.focus(); }
+                T.loadMessages(T.selectedGroupId);
             })
             .catch(function (error) {
                 alert(error.message || 'Failed');
