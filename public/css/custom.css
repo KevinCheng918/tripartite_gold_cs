@@ -145,6 +145,19 @@
     }
 }
 
+/* Header icon 樣式 */
+.app-header-right .icon-wrapper {
+    width: 36px !important;
+    height: 36px !important;
+}
+.app-header-right .icon-wrapper i {
+    font-size: 1rem !important;
+    color: #3f6ad8 !important;
+}
+.app-header-right .icon-wrapper .icon-wrapper-bg {
+    opacity: 0.08 !important;
+}
+
 /* 修正 modal backdrop 殘留導致畫面變黑 */
 .modal-backdrop + .modal-backdrop { display: none; }
 
