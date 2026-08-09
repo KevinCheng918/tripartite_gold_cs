@@ -90,6 +90,10 @@
                 T.loadMessages(T.selectedGroupId);
                 T.renderHeader(T.selectedGroupId);
                 T.showInput();
+
+                // 手機版切到聊天
+                var chatLayout = document.querySelector('.chat-layout');
+                if (chatLayout) { chatLayout.classList.add('tg-chatting'); }
             });
         });
     }
@@ -109,9 +113,19 @@
 
         header.innerHTML =
             '<div class="px-3 py-2 d-flex align-items-center">' +
+            '<button class="btn btn-link text-muted p-0 me-2 d-md-none" id="btn-tg-back"><i class="fas fa-arrow-left"></i></button>' +
             '<div class="rounded-circle text-white d-flex align-items-center justify-content-center me-2" style="width:36px;height:36px;background:#6c757d;font-size:0.9rem;font-weight:700">' + initial + '</div>' +
             '<span class="fw-bold" style="font-size:1.0625rem">' + group.title + '</span>' +
             '<span class="text-muted ms-2" style="font-size:0.875rem">' + dutyText + '</span>' +
             '</div>';
+
+        // 手機版返回按鈕
+        var backBtn = document.getElementById('btn-tg-back');
+        if (backBtn) {
+            backBtn.addEventListener('click', function () {
+                var chatLayout = document.querySelector('.chat-layout');
+                if (chatLayout) { chatLayout.classList.remove('tg-chatting'); }
+            });
+        }
     };
 })();

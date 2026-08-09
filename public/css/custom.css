@@ -33,6 +33,31 @@
     padding: 0 !important;
 }
 
+/* ---- 聊天 RWD（手機版） ---- */
+@media (max-width: 767.98px) {
+    .chat-layout .app-inner-layout__wrapper {
+        flex-direction: column !important;
+    }
+    .chat-layout .app-inner-layout__sidebar {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: none !important;
+    }
+    .chat-layout .app-inner-layout__content {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: none !important;
+        display: none !important;
+    }
+    /* 選了群組後：隱藏列表、顯示聊天 */
+    .chat-layout.tg-chatting .app-inner-layout__sidebar {
+        display: none !important;
+    }
+    .chat-layout.tg-chatting .app-inner-layout__content {
+        display: flex !important;
+    }
+}
+
 /* 修正 modal backdrop 殘留導致畫面變黑 */
 .modal-backdrop + .modal-backdrop { display: none; }
 
