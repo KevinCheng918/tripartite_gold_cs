@@ -22,5 +22,11 @@
 
 @section('scripts')
     <script src="{{ asset('vendor/pusher.min.js') }}"></script>
-    <script src="{{ asset('js/telegram-chat.js') }}?v={{ filemtime(public_path('js/telegram-chat.js')) }}"></script>
+    <script src="{{ asset('js/telegram-chat/state.js') }}"></script>
+    <script src="{{ asset('js/telegram-chat/layout.js') }}"></script>
+    <script src="{{ asset('js/telegram-chat/messages.js') }}"></script>
+    <script src="{{ asset('js/telegram-chat/reactions.js') }}"></script>
+    <script src="{{ asset('js/telegram-chat/input.js') }}"></script>
+    <script src="{{ asset('js/telegram-chat/alert.js') }}"></script>
+    <script src="{{ asset('js/telegram-chat/main.js') }}"></script>
 @endsection

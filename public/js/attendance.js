@@ -398,7 +398,7 @@
             );
         }).join('');
 
-        document.getElementById('att-content').innerHTML = nav + summary + table +
+        document.getElementById('att-content').innerHTML = nav + summary + tableHtml +
             '<div class="shift-cards">' + cards + '</div>';
 
         // 綁定月份切換
@@ -478,7 +478,7 @@
             );
         }).join('');
 
-        document.getElementById('att-content').innerHTML = nav + table +
+        document.getElementById('att-content').innerHTML = nav + tableHtml +
             '<div class="shift-cards">' + reportCards + '</div>';
 
         // 綁定 flatpickr 月份選擇器

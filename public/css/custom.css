@@ -2,6 +2,149 @@
    客服系統自訂覆寫（建立在 Architect base.css 之上）
    ================================================================ */
 
+/* ---- Telegram 聊天覆寫 ---- */
+
+/* 電腦版：聊天自適應螢幕高度 */
+.chat-layout .app-inner-layout__wrapper {
+    height: calc(100vh - 220px) !important;
+    min-height: auto !important;
+}
+.chat-layout .app-inner-layout__content {
+    display: flex !important;
+    flex-direction: column !important;
+}
+@media (min-width: 768px) {
+    .chat-layout .app-inner-layout__content {
+        height: 100% !important;
+    }
+}
+.chat-layout .chat-wrapper {
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+}
+.chat-layout .app-inner-layout__top-pane {
+    flex-shrink: 0 !important;
+}
+.chat-layout .app-inner-layout__bottom-pane {
+    flex-shrink: 0 !important;
+}
+.chat-layout .app-inner-layout__sidebar {
+    height: 100% !important;
+    overflow-y: auto !important;
+}
+
+/* 修正 chat-box 泡泡寬度 */
+.chat-box-wrapper .chat-box {
+    min-width: auto !important;
+    max-width: none !important;
+    flex: none !important;
+    display: inline-block !important;
+}
+
+/* 發送方靠右 */
+.chat-box-wrapper.chat-box-wrapper-right {
+    justify-content: flex-end !important;
+    text-align: right !important;
+}
+
+/* 時間戳記 */
+.chat-box-wrapper small {
+    display: block;
+    padding-top: 0.25rem;
+}
+
+/* Header 精簡 — 不要太高 */
+.app-inner-layout__top-pane {
+    flex-shrink: 0;
+}
+.chat-layout .app-inner-layout__top-pane {
+    padding: 0 !important;
+}
+
+/* ---- 聊天 RWD（手機版） ---- */
+@media (max-width: 767.98px) {
+    .chat-layout .app-inner-layout__wrapper {
+        flex-direction: column !important;
+    }
+    /* 覆蓋 Architect 預設的 display:none，固定全屏 */
+    .chat-layout .app-inner-layout__sidebar.app-inner-layout__sidebar {
+        display: flex !important;
+        flex-direction: column !important;
+        position: fixed !important;
+        top: 60px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: none !important;
+        z-index: 20;
+        border-radius: 0 !important;
+        margin: 0 !important;
+    }
+    .chat-layout .app-inner-layout__sidebar #tg-group-list {
+        flex: 1 !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+    .chat-layout .app-inner-layout__content {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: none !important;
+        display: none !important;
+    }
+    /* 選了群組後：隱藏列表、顯示聊天 */
+    .chat-layout.tg-chatting .app-inner-layout__sidebar.app-inner-layout__sidebar {
+        display: none !important;
+    }
+    .chat-layout.tg-chatting .app-inner-layout__content {
+        display: flex !important;
+        flex-direction: column !important;
+        position: fixed !important;
+        top: 60px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 20;
+        border-radius: 0 !important;
+        margin: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+    }
+    .chat-layout.tg-chatting .app-inner-layout__top-pane {
+        flex-shrink: 0 !important;
+    }
+    .chat-layout.tg-chatting .chat-wrapper {
+        flex: 1 1 0 !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+    .chat-layout.tg-chatting .app-inner-layout__bottom-pane {
+        flex-shrink: 0 !important;
+    }
+
+    /* 手機版聊天標頭加大 */
+    .chat-layout.tg-chatting .app-inner-layout__top-pane {
+        padding: 0.5rem 0 !important;
+    }
+    .chat-layout.tg-chatting .app-inner-layout__top-pane .fw-bold {
+        font-size: 1.25rem !important;
+    }
+    .chat-layout.tg-chatting .app-inner-layout__top-pane .rounded-circle {
+        width: 42px !important;
+        height: 42px !important;
+        font-size: 1rem !important;
+    }
+
+    /* 隱藏 page title 讓聊天撐滿 */
+    .chat-layout.tg-chatting ~ .app-page-title,
+    .chat-layout .app-page-title {
+        display: none;
+    }
+}
+
 /* 修正 modal backdrop 殘留導致畫面變黑 */
 .modal-backdrop + .modal-backdrop { display: none; }
 
@@ -29,10 +172,57 @@ h4, .h4 { font-size: 1.25rem; font-weight: 600; color: #212529; }
 h5, .h5 { font-size: 1.125rem; font-weight: 600; color: #212529; }
 h6, .h6 { font-size: 1rem; font-weight: 600; color: #212529; }
 
-/* 表格文字加深 */
-.table { color: #212529; font-size: 0.9375rem; }
-.table th { font-size: 0.9375rem; font-weight: 600; color: #495057; }
-.table td { color: #212529; }
+/* 表格 — Architect Data Tables 風格 */
+.table {
+    color: #212529;
+    font-size: 0.9375rem;
+    border-collapse: collapse;
+}
+.table > :not(caption) > * > * {
+    border-bottom: 1px solid #dee2e6;
+    padding: 0.75rem 1rem;
+}
+.table > thead > tr > th {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: #212529;
+    background: transparent;
+    border-bottom: 2px solid #dee2e6;
+    border-top: none;
+}
+.table > tbody > tr > td {
+    color: #212529;
+    vertical-align: middle;
+}
+.table > tbody > tr:last-child > td {
+    border-bottom: 2px solid #dee2e6;
+}
+.table-hover > tbody > tr:hover {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+/* 移除外邊框和圓角，乾淨扁平 */
+.table {
+    border: none !important;
+    border-radius: 0 !important;
+}
+.card-body.p-0 .table > :not(caption) > *:first-child > * {
+    border-top: none;
+}
+
+/* 按鈕 hover — 明顯的互動回饋 */
+.btn-outline-secondary:hover,
+.btn-outline-secondary:hover:active {
+    background-color: #212529 !important;
+    color: #fff !important;
+    border-color: #212529 !important;
+    box-shadow: none !important;
+}
+.btn-outline-secondary:focus {
+    background-color: #343a40 !important;
+    color: #fff !important;
+    border-color: #343a40 !important;
+    box-shadow: none !important;
+}
 
 /* 表單文字加深 */
 .form-control, .form-select { font-size: 1rem; color: #212529; }

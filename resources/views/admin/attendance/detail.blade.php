@@ -26,37 +26,40 @@
         $earlyMin = $records->sum('early_leave_minutes');
         $otMin = $records->sum('overtime_minutes');
     @endphp
-    <div class="row g-3 mb-3">
-        <div class="col-md-2 col-4">
+    <div class="row row-cols-3 row-cols-md-6 g-3 mb-3">
+        <div class="col">
             <div class="card shadow-sm text-center py-3">
                 <div class="small text-muted">{{ trans('attendance.field_total_days') }}</div>
                 <div class="h4 mb-0 fw-light">{{ $totalDays }}</div>
+                <div class="small text-muted">&nbsp;</div>
             </div>
         </div>
-        <div class="col-md-2 col-4">
+        <div class="col">
             <div class="card shadow-sm text-center py-3" style="border-left:3px solid #198754">
                 <div class="small text-muted">{{ trans('attendance.field_normal_days') }}</div>
                 <div class="h4 mb-0 fw-light text-success">{{ $normalDays }}</div>
+                <div class="small text-muted">&nbsp;</div>
             </div>
         </div>
-        <div class="col-md-2 col-4">
+        <div class="col">
             <div class="card shadow-sm text-center py-3" style="border-left:3px solid #dc3545">
                 <div class="small text-muted">{{ trans('attendance.field_late_count') }}</div>
                 <div class="h4 mb-0 fw-light text-danger">{{ $lateCnt }}</div>
                 <div class="small text-muted">{{ $lateMin }} {{ trans('attendance.unit_minutes') }}</div>
             </div>
         </div>
-        <div class="col-md-2 col-4">
+        <div class="col">
             <div class="card shadow-sm text-center py-3" style="border-left:3px solid #ffc107">
                 <div class="small text-muted">{{ trans('attendance.field_early_count') }}</div>
                 <div class="h4 mb-0 fw-light text-warning">{{ $earlyCnt }}</div>
                 <div class="small text-muted">{{ $earlyMin }} {{ trans('attendance.unit_minutes') }}</div>
             </div>
         </div>
-        <div class="col-md-2 col-4">
+        <div class="col">
             <div class="card shadow-sm text-center py-3" style="border-left:3px solid #dc3545">
                 <div class="small text-muted">{{ trans('attendance.field_absent_count') }}</div>
                 <div class="h4 mb-0 fw-light text-danger">{{ $absentCnt }}</div>
+                <div class="small text-muted">&nbsp;</div>
             </div>
         </div>
         <div class="col-md-2 col-4">
