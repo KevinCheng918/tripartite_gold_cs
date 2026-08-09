@@ -108,12 +108,10 @@
             : T.i18n.unassigned;
 
         header.innerHTML =
-            '<div class="px-3 py-1 d-flex align-items-center" style="min-height:48px">' +
+            '<div class="px-3 py-2 d-flex align-items-center">' +
             '<div class="rounded-circle text-white d-flex align-items-center justify-content-center me-2" style="width:36px;height:36px;background:#6c757d;font-size:0.9rem;font-weight:700">' + initial + '</div>' +
-            '<div style="line-height:1.3">' +
-            '<div class="fw-bold">' + group.title + '</div>' +
-            '<small class="text-muted" style="font-size:0.8125rem">' + dutyText + '</small>' +
-            '</div>' +
+            '<span class="fw-bold" style="font-size:1.0625rem">' + group.title + '</span>' +
+            '<span class="text-muted ms-2" style="font-size:0.875rem">' + dutyText + '</span>' +
             '</div>';
     };
 })();
