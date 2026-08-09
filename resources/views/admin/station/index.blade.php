@@ -52,7 +52,8 @@
     </div>
 
     {{-- 站台列表 --}}
-    <div class="main-card mb-3 card">
+    {{-- 桌面版：表格 --}}
+    <div class="main-card mb-3 card d-none d-md-block">
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover table-striped align-middle mb-0">
@@ -129,6 +130,74 @@
         </div>
         @if($stations->hasPages())
             <div class="card-footer">{{ $stations->withQueryString()->links() }}</div>
+        @endif
+    </div>
+
+    {{-- 手機版：卡片 --}}
+    <div class="d-md-none">
+        @forelse($stations as $station)
+            @php
+                $settings = $station->settings ?? [];
+                $depositRate = isset($settings['system_rate']) ? number_format($settings['system_rate'] * 100, 2) . '%' : '-';
+                $withdrawRate = isset($settings['system_rate_withdraw']) ? number_format($settings['system_rate_withdraw'] * 100, 2) . '%' : '-';
+            @endphp
+            <div class="card mb-2 shadow-sm">
+                <div class="card-body py-3">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <strong style="font-size:1.0625rem">{{ $station->name }}</strong>
+                            <div class="text-muted" style="font-size:0.8125rem">{{ $station->system ? $station->system->name : '-' }}</div>
+                        </div>
+                        @if($station->status == 1)
+                            <span class="badge bg-success">{{ trans('station.status_active') }}</span>
+                        @elseif($station->status == 2)
+                            <span class="badge bg-warning text-dark">{{ trans('station.status_frozen') }}</span>
+                        @else
+                            <span class="badge bg-danger">{{ trans('station.status_disabled') }}</span>
+                        @endif
+                    </div>
+                    @if(filled($station->domain))
+                        <div class="d-flex justify-content-between mb-1" style="font-size:0.875rem">
+                            <span class="text-muted">域名</span>
+                            <span>{{ $station->domain }}</span>
+                        </div>
+                    @endif
+                    <div class="d-flex justify-content-between mb-1" style="font-size:0.875rem">
+                        <span class="text-muted">{{ trans('station.field_credits') }}</span>
+                        <strong>{{ number_format($station->credits, 2) }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2" style="font-size:0.875rem">
+                        <span class="text-muted">費率（收/付）</span>
+                        <span>{{ $depositRate }} / {{ $withdrawRate }}</span>
+                    </div>
+                    <div class="d-flex gap-1 flex-wrap">
+                        <button class="btn btn-sm btn-outline-secondary js-station-detail" data-id="{{ $station->id }}">
+                            <i class="fas fa-info-circle me-1"></i>詳細
+                        </button>
+                        @if(Auth::user()->hasPermission('station.update'))
+                            <button class="btn btn-sm btn-outline-secondary js-edit-station"
+                                    data-id="{{ $station->id }}"
+                                    data-name="{{ $station->name }}"
+                                    data-domain="{{ $station->domain }}"
+                                    data-system-id="{{ $station->system_id }}"
+                                    data-api-url="{{ $station->api_url }}"
+                                    data-api-key="{{ $station->api_key }}"
+                                    data-telegram-chat-id="{{ $station->telegram_chat_id }}"
+                                    data-note="{{ $station->note }}">
+                                <i class="fas fa-edit me-1"></i>編輯
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary js-sync-credits" data-id="{{ $station->id }}">
+                                <i class="fas fa-sync-alt me-1"></i>同步
+                            </button>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        @empty
+            <div class="text-center text-muted py-4">暫無資料</div>
+        @endforelse
+        @if($stations->hasPages())
+            <div class="mt-2">{{ $stations->withQueryString()->links() }}</div>
         @endif
     </div>
 
