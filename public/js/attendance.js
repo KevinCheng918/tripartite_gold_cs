@@ -367,7 +367,7 @@
             '<div class="dash-card dash-card--green"><div class="dash-card__label">' + i18n.field_overtime_total + '</div><div class="dash-card__value">' + otMin + '</div><div class="dash-card__sub">' + i18n.unit_minutes + '</div></div>' +
             '</div>';
 
-        // 每日明細
+        // 每日明細（表格）
         var rows = records.map(function (r) {
             var st = statusMap[r.status] || { text: '-', css: '' };
             return (
@@ -384,7 +384,7 @@
         }).join('');
 
         var table =
-            '<table><thead><tr>' +
+            '<table class="att-table-desktop"><thead><tr>' +
             '<th>' + i18n.field_date + '</th>' +
             '<th>' + i18n.field_clock_in + '</th>' +
             '<th>' + i18n.field_clock_out + '</th>' +
@@ -394,7 +394,26 @@
             '<th>' + i18n.field_status + '</th>' +
             '</tr></thead><tbody>' + rows + '</tbody></table>';
 
-        document.getElementById('att-content').innerHTML = nav + summary + table;
+        // 手機版卡片
+        var cards = records.map(function (r) {
+            var st = statusMap[r.status] || { text: '-', css: '' };
+            return (
+                '<div class="shift-card">' +
+                '<div class="shift-card__header">' +
+                '<span class="shift-card__title">' + r.date + '</span>' +
+                '<span class="badge ' + st.css + '">' + st.text + '</span>' +
+                '</div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_clock_in + '</span><span>' + (r.clock_in || '-') + '</span></div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_clock_out + '</span><span>' + (r.clock_out || '-') + '</span></div>' +
+                (r.late_minutes > 0 ? '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_late + '</span><span style="color:#dc2626;font-weight:600">' + r.late_minutes + ' ' + i18n.unit_minutes + '</span></div>' : '') +
+                (r.early_leave_minutes > 0 ? '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_early_leave + '</span><span style="color:#dc2626;font-weight:600">' + r.early_leave_minutes + ' ' + i18n.unit_minutes + '</span></div>' : '') +
+                (r.overtime_minutes > 0 ? '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_overtime + '</span><span style="color:#059669;font-weight:600">' + r.overtime_minutes + ' ' + i18n.unit_minutes + '</span></div>' : '') +
+                '</div>'
+            );
+        }).join('');
+
+        document.getElementById('att-content').innerHTML = nav + summary + table +
+            '<div class="shift-cards">' + cards + '</div>';
 
         // 綁定月份切換
         document.querySelectorAll('.att-month-nav button').forEach(function (btn) {
@@ -444,7 +463,7 @@
 
         var table =
             '<h3>' + i18n.report_title + '（' + month + '）</h3>' +
-            '<table><thead><tr>' +
+            '<table class="att-table-desktop"><thead><tr>' +
             '<th>' + i18n.field_user + '</th>' +
             '<th>' + i18n.field_total_days + '</th>' +
             '<th>' + i18n.field_normal_days + '</th>' +
@@ -454,7 +473,27 @@
             '<th>' + i18n.field_overtime_total + '</th>' +
             '</tr></thead><tbody>' + rows + '</tbody></table>';
 
-        document.getElementById('att-content').innerHTML = nav + table;
+        // 手機版卡片
+        var reportCards = report.map(function (r) {
+            var userName = r.user ? r.user.nickname : '-';
+            var userId = r.user ? r.user.id : '';
+            return (
+                '<div class="shift-card js-detail-link" data-user-id="' + userId + '" style="cursor:pointer">' +
+                '<div class="shift-card__header">' +
+                '<span class="shift-card__title">' + userName + '</span>' +
+                '<span class="badge badge--active">' + i18n.field_total_days + ' ' + r.total_days + '</span>' +
+                '</div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_normal_days + '</span><span>' + r.normal_days + '</span></div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_late_count + '</span><span>' + r.late_count + '（' + r.late_total_minutes + ' ' + i18n.unit_minutes + '）</span></div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_early_count + '</span><span>' + r.early_count + '（' + r.early_total_minutes + ' ' + i18n.unit_minutes + '）</span></div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_absent_count + '</span><span>' + r.absent_count + '</span></div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_overtime_total + '</span><span>' + r.overtime_total_minutes + ' ' + i18n.unit_minutes + '</span></div>' +
+                '</div>'
+            );
+        }).join('');
+
+        document.getElementById('att-content').innerHTML = nav + table +
+            '<div class="shift-cards">' + reportCards + '</div>';
 
         // 綁定 flatpickr 月份選擇器
         flatpickr('#report-month-picker', {
