@@ -57,6 +57,29 @@
     }
     .chat-layout.tg-chatting .app-inner-layout__content {
         display: flex !important;
+        flex-direction: column !important;
+        position: fixed !important;
+        top: 60px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 20;
+        border-radius: 0 !important;
+        margin: 0 !important;
+    }
+    .chat-layout.tg-chatting .chat-wrapper {
+        flex: 1 !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+    }
+    .chat-layout.tg-chatting .app-inner-layout__bottom-pane {
+        flex-shrink: 0 !important;
+    }
+
+    /* 隱藏 page title 讓聊天撐滿 */
+    .chat-layout.tg-chatting ~ .app-page-title,
+    .chat-layout .app-page-title {
+        display: none;
     }
 }
 
