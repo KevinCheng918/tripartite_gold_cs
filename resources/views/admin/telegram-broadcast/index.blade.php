@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('title', trans('broadcast.page_title'))
+@section('icon', 'bullhorn')
 @section('subtitle', trans('broadcast.subtitle'))
 
 @section('content')
@@ -13,8 +14,8 @@
     {{-- 訊息提示 Modal --}}
     @component('components.modal', ['id' => 'modal-broadcast-msg', 'title' => ''])
         <p id="modal-broadcast-msg-text"></p>
-        <div class="modal-actions">
-            <button type="button" data-modal-close class="btn-primary">OK</button>
+        <div class="text-end mt-3">
+            <button type="button" data-bs-dismiss="modal" class="btn-primary">OK</button>
         </div>
     @endcomponent
 

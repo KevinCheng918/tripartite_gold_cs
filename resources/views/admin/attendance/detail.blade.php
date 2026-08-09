@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('title', trans('attendance.detail_title'))
+@section('icon', 'clock')
 @section('subtitle', trans('attendance.detail_subtitle'))
 
 @section('content')
