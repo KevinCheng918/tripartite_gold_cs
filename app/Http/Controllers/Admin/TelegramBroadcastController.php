@@ -32,7 +32,13 @@ class TelegramBroadcastController extends Controller
      */
     public function index()
     {
-        return view('admin.telegram-broadcast.index');
+        $groups = $this->broadcastService->getTargetStations();
+        $history = $this->broadcastService->list(20);
+
+        return view('admin.telegram-broadcast.index', [
+            'groups'  => $groups,
+            'history' => $history,
+        ]);
     }
 
     /**
