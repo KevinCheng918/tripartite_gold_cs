@@ -8,6 +8,10 @@
     <title>@yield('title', config('app.name'))</title>
     <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
     <link rel="apple-touch-icon" href="{{ asset('img/favicon-180.png') }}">
+    <link rel="manifest" href="{{ asset('manifest.json') }}">
+    <meta name="theme-color" content="#a67c00">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ filemtime(public_path('css/app.css')) }}">
     <link rel="stylesheet" href="{{ asset('vendor/flatpickr/flatpickr.min.css') }}">
     <link rel="stylesheet" href="{{ asset('vendor/flatpickr/airbnb.css') }}">
@@ -111,6 +115,9 @@
             </div>
             <div class="topbar__right">
                 <span class="topbar__clock" id="topbar-clock"></span>
+                <button class="theme-toggle" id="btn-push-toggle" title="推播通知" onclick="window.requestPushPermission && window.requestPushPermission()">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>
+                </button>
                 <button class="theme-toggle" id="theme-toggle" title="切換深色/淺色模式">
                     <svg class="theme-toggle__sun" viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/></svg>
                     <svg class="theme-toggle__moon" viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
@@ -299,6 +306,66 @@
                     });
             });
         }
+    })();
+    </script>
+    <script>
+    // Service Worker + Web Push
+    (function () {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) { return; }
+
+        navigator.serviceWorker.register('/sw.js').then(function (reg) {
+            window._swReg = reg;
+
+            if ('Notification' in window && Notification.permission === 'granted') {
+                subscribePush(reg);
+            }
+        }).catch(function () {});
+
+        function urlBase64ToUint8Array(base64String) {
+            var padding = '='.repeat((4 - base64String.length % 4) % 4);
+            var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+            var rawData = window.atob(base64);
+            var outputArray = new Uint8Array(rawData.length);
+            for (var i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+
+        function subscribePush(reg) {
+            var vapidKey = '{{ config("services.vapid.public_key") }}';
+            if (!vapidKey) { return; }
+
+            reg.pushManager.getSubscription().then(function (sub) {
+                if (sub) { return sub; }
+                return reg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(vapidKey)
+                });
+            }).then(function (sub) {
+                if (!sub) { return; }
+                fetch('/admin/push/ajax-subscribe', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify(sub.toJSON())
+                });
+            }).catch(function (e) {
+                console.warn('Push subscribe failed:', e);
+            });
+        }
+
+        // 公開給通知設定 UI 使用
+        window.requestPushPermission = function () {
+            if (!('Notification' in window)) { return; }
+            Notification.requestPermission().then(function (result) {
+                if (result === 'granted' && window._swReg) {
+                    subscribePush(window._swReg);
+                }
+            });
+        };
     })();
     </script>
     <script>

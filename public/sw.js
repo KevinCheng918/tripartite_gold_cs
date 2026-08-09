@@ -4,8 +4,8 @@ self.addEventListener('push', function (event) {
     event.waitUntil(
         self.registration.showNotification(data.title || '新通知', {
             body: data.body || '',
-            icon: '/img/pwa-icon-192.png',
-            badge: '/img/pwa-icon-192.png',
+            icon: '/img/logo.png',
+            badge: '/img/logo.png',
             data: { url: data.url || '/' },
             requireInteraction: true,
         })

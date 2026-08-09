@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\TelegramBroadcastController;
 use App\Http\Controllers\Admin\TelegramChatController;
 use App\Http\Controllers\Admin\AttendanceController;
 use App\Http\Controllers\Admin\ShiftCoverController;
+use App\Http\Controllers\Admin\PushController;
 use App\Http\Controllers\Auth\LoginController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -110,5 +111,11 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-groups', [TelegramBroadcastController::class, 'ajaxGroups'])->middleware('can:telegram_chat.broadcast')->name('ajax-groups');
         Route::post('/ajax-send', [TelegramBroadcastController::class, 'ajaxSend'])->middleware('can:telegram_chat.broadcast')->name('ajax-send');
         Route::get('/ajax-history', [TelegramBroadcastController::class, 'ajaxHistory'])->middleware('can:telegram_chat.broadcast')->name('ajax-history');
+    });
+
+    // Web Push 訂閱
+    Route::prefix('push')->name('push.')->group(function () {
+        Route::post('/ajax-subscribe', [PushController::class, 'ajaxSubscribe'])->name('ajax-subscribe');
+        Route::post('/ajax-unsubscribe', [PushController::class, 'ajaxUnsubscribe'])->name('ajax-unsubscribe');
     });
 });
