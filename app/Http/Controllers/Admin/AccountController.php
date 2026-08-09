@@ -95,8 +95,13 @@ class AccountController extends Controller
      */
     public function permissionsPage(\App\Models\User $user)
     {
+        $permissionMap = $this->permissionMapService->getGroupedKeywordsWithLabels();
+        $currentKeywords = $user->permissions()->pluck('permission_keyword')->all();
+
         return view('admin.accounts.permissions', [
-            'targetUser' => $user,
+            'targetUser'      => $user,
+            'permissionMap'   => $permissionMap,
+            'currentKeywords' => $currentKeywords,
         ]);
     }
 
