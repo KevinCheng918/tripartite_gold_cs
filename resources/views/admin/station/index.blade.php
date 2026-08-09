@@ -219,7 +219,7 @@ $(function () {
 
     function showMessage(msg) {
         $('#modal-station-msg-text').text(msg);
-        new bootstrap.Modal($('#modal-station-msg')[0]).show();
+        showBsModal('modal-station-msg');
     }
 
     // 編輯站台
@@ -234,7 +234,7 @@ $(function () {
         $('#station-telegram-chat-id').val($btn.data('telegram-chat-id'));
         $('#station-note').val($btn.data('note'));
         $('#modal-station .modal-title').text('{{ trans("station.action_edit") }}');
-        new bootstrap.Modal($('#modal-station')[0]).show();
+        showBsModal('modal-station');
     });
 
     // 新增/編輯提交
@@ -295,7 +295,7 @@ $(function () {
     $('.js-station-detail').on('click', function () {
         var id = $(this).data('id');
         $('#station-detail-body').html('<p class="text-center py-3">Loading...</p>');
-        new bootstrap.Modal($('#modal-station-detail')[0]).show();
+        showBsModal('modal-station-detail');
 
         $.ajax({
             url: '/admin/stations/ajax-list?per_page=100',

@@ -121,7 +121,7 @@ $(function () {
 
     function showMessage(msg) {
         $('#modal-broadcast-msg-text').text(msg);
-        new bootstrap.Modal($('#modal-broadcast-msg')[0]).show();
+        showBsModal('modal-broadcast-msg');
     }
 
     // 切換全部/指定

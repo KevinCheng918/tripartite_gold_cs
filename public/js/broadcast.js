@@ -26,7 +26,7 @@
     function showMessage(message) {
         var el = document.getElementById('modal-broadcast-msg-text');
         if (el) { el.textContent = message; }
-        new bootstrap.Modal(document.getElementById('modal-broadcast-msg')).show();
+        showBsModal('modal-broadcast-msg');
     }
 
     // modal 關閉
