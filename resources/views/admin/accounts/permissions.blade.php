@@ -64,7 +64,7 @@ $(function () {
 
     function showMessage(msg) {
         $('#modal-perm-message-text').text(msg);
-        new bootstrap.Modal($('#modal-perm-message')[0]).show();
+        showBsModal('modal-perm-message');
     }
 
     // 全選/取消全選

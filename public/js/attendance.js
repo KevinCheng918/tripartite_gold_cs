@@ -35,7 +35,7 @@
 
     function openModal(id) {
         var el = document.getElementById(id);
-        if (el) { new bootstrap.Modal(el).show(); }
+        if (el) { showBsModal(el); }
     }
 
     function showMessage(message) {
