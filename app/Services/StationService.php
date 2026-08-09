@@ -40,6 +40,7 @@ class StationService
     {
         $criteria = [
             'keyword'      => $params['keyword'] ?? null,
+            'domain'       => $params['domain'] ?? null,
             'system_id'    => $params['system_id'] ?? null,
             'status'       => $params['status'] ?? null,
             'credits_min'  => $params['credits_min'] ?? null,

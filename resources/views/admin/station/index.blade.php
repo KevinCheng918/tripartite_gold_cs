@@ -6,47 +6,89 @@
 
 @section('content')
 
-    {{-- 搜尋列 --}}
     <div class="main-card mb-3 card">
-        <div class="card-body">
-            <form method="GET" class="row g-2 align-items-end">
-                <div class="col-md-3">
-                    <label class="form-label small">關鍵字</label>
-                    <input type="text" class="form-control form-control-sm" name="keyword" value="{{ $filters['keyword'] ?? '' }}" placeholder="名稱或域名">
+        {{-- 頂部：新增按鈕 --}}
+        <div class="card-header d-flex align-items-center">
+            @if(Auth::user()->hasPermission('station.create'))
+                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modal-station">
+                    <i class="fas fa-plus me-1"></i>{{ trans('station.action_create') }}
+                </button>
+            @endif
+        </div>
+
+        {{-- 搜尋區 --}}
+        <div class="card-body pt-3">
+            <form method="GET">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3 col-6">
+                        <label class="form-label fw-bold">{{ trans('station.field_name') }}：</label>
+                        <input type="text" class="form-control" name="keyword" value="{{ $filters['keyword'] ?? '' }}" placeholder="{{ trans('station.field_name') }}">
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label fw-bold">域名：</label>
+                        <input type="text" class="form-control" name="domain" value="{{ $filters['domain'] ?? '' }}" placeholder="域名">
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label fw-bold">系統：</label>
+                        <select name="system_id" class="form-select">
+                            <option value="">全部</option>
+                            @foreach($systems as $sys)
+                                <option value="{{ $sys->id }}" {{ ($filters['system_id'] ?? '') == $sys->id ? 'selected' : '' }}>{{ $sys->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label fw-bold">{{ trans('station.field_status') }}：</label>
+                        <select name="status" class="form-select">
+                            <option value="">全部</option>
+                            <option value="1" {{ ($filters['status'] ?? '') === '1' ? 'selected' : '' }}>{{ trans('station.status_active') }}</option>
+                            <option value="2" {{ ($filters['status'] ?? '') === '2' ? 'selected' : '' }}>{{ trans('station.status_frozen') }}</option>
+                            <option value="0" {{ ($filters['status'] ?? '') === '0' ? 'selected' : '' }}>{{ trans('station.status_disabled') }}</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="col-md-2">
-                    <label class="form-label small">系統</label>
-                    <select name="system_id" class="form-select form-select-sm">
-                        <option value="">全部</option>
-                        @foreach($systems as $sys)
-                            <option value="{{ $sys->id }}" {{ ($filters['system_id'] ?? '') == $sys->id ? 'selected' : '' }}>{{ $sys->name }}</option>
-                        @endforeach
-                    </select>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3 col-6">
+                        <label class="form-label fw-bold">點數 ≥：</label>
+                        <input type="number" class="form-control" name="credits_min" value="{{ $filters['credits_min'] ?? '' }}" placeholder="最小值" step="0.01">
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label fw-bold">點數 ≤：</label>
+                        <input type="number" class="form-control" name="credits_max" value="{{ $filters['credits_max'] ?? '' }}" placeholder="最大值" step="0.01">
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label fw-bold">商城：</label>
+                        <select name="support_shop" class="form-select">
+                            <option value="">全部</option>
+                            <option value="true" {{ ($filters['support_shop'] ?? '') === 'true' ? 'selected' : '' }}>啟用</option>
+                            <option value="false" {{ ($filters['support_shop'] ?? '') === 'false' ? 'selected' : '' }}>未啟用</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label fw-bold">跑分員：</label>
+                        <select name="score_runner" class="form-select">
+                            <option value="">全部</option>
+                            <option value="true" {{ ($filters['score_runner'] ?? '') === 'true' ? 'selected' : '' }}>啟用</option>
+                            <option value="false" {{ ($filters['score_runner'] ?? '') === 'false' ? 'selected' : '' }}>未啟用</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="col-md-2">
-                    <label class="form-label small">狀態</label>
-                    <select name="status" class="form-select form-select-sm">
-                        <option value="">全部</option>
-                        <option value="1" {{ ($filters['status'] ?? '') === '1' ? 'selected' : '' }}>{{ trans('station.status_active') }}</option>
-                        <option value="2" {{ ($filters['status'] ?? '') === '2' ? 'selected' : '' }}>{{ trans('station.status_frozen') }}</option>
-                        <option value="0" {{ ($filters['status'] ?? '') === '0' ? 'selected' : '' }}>{{ trans('station.status_disabled') }}</option>
-                    </select>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3 col-6">
+                        <label class="form-label fw-bold">每頁：</label>
+                        <select name="per_page" class="form-select">
+                            @foreach([15, 30, 50, 100] as $n)
+                                <option value="{{ $n }}" {{ ($filters['per_page'] ?? 15) == $n ? 'selected' : '' }}>{{ $n }} 筆</option>
+                            @endforeach
+                        </select>
+                    </div>
                 </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary btn-sm w-100">
+                <div class="d-flex justify-content-end gap-2">
+                    <a href="{{ route('admin.stations.index') }}" class="btn btn-outline-secondary">重置</a>
+                    <button type="submit" class="btn btn-primary">
                         <i class="fas fa-search me-1"></i>搜尋
                     </button>
                 </div>
-                <div class="col-md-1">
-                    <a href="{{ route('admin.stations.index') }}" class="btn btn-outline-secondary btn-sm w-100">重置</a>
-                </div>
-                @if(Auth::user()->hasPermission('station.create'))
-                <div class="col-md-2 text-end">
-                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-station">
-                        <i class="fas fa-plus me-1"></i>{{ trans('station.action_create') }}
-                    </button>
-                </div>
-                @endif
             </form>
         </div>
     </div>
