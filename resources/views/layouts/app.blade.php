@@ -375,7 +375,7 @@
 
         // 個人資訊 Modal
         $('#btn-open-profile, #btn-open-profile-dropdown').on('click', function () {
-            new bootstrap.Modal($('#modal-profile')[0]).show();
+            showBsModal('modal-profile');
         });
 
         // 個人資訊提交
@@ -394,16 +394,16 @@
                 contentType: 'application/json',
                 data: JSON.stringify(data),
                 success: function (body) {
-                    bootstrap.Modal.getInstance($('#modal-profile')[0]).hide();
+                    hideBsModal('modal-profile');
                     $('#modal-profile-msg-text').text(body.message || '已更新');
-                    new bootstrap.Modal($('#modal-profile-msg')[0]).show();
+                    showBsModal('modal-profile-msg');
                     if (nickname) {
                         $('.header-user-info .widget-heading').text(nickname);
                     }
                 },
                 error: function () {
                     $('#modal-profile-msg-text').text('更新失敗');
-                    new bootstrap.Modal($('#modal-profile-msg')[0]).show();
+                    showBsModal('modal-profile-msg');
                 }
             });
         });
@@ -469,20 +469,26 @@
     })();
     </script>
 
-    {{-- 相容層：讓舊的 openModal / data-modal-close 繼續運作 --}}
+    {{-- 全域 Modal helper：避免重複建立 instance --}}
+    <script>
+    window.showBsModal = function (el) {
+        if (typeof el === 'string') { el = document.getElementById(el); }
+        if (!el) { return; }
+        bootstrap.Modal.getOrCreateInstance(el).show();
+    };
+    window.hideBsModal = function (el) {
+        if (typeof el === 'string') { el = document.getElementById(el); }
+        if (!el) { return; }
+        var inst = bootstrap.Modal.getInstance(el);
+        if (inst) { inst.hide(); }
+    };
+    </script>
+
+    {{-- 相容層 --}}
     <script>
     (function () {
-        // 舊 JS 的 openModal('id') → Bootstrap 5 modal.show()
         window.openModalCompat = function (id) {
-            var el = document.getElementById(id);
-            if (!el) { return; }
-            // 如果是 Bootstrap modal
-            if (el.classList.contains('modal')) {
-                new bootstrap.Modal(el).show();
-            } else {
-                // 舊的 modal-overlay 方式
-                el.style.display = 'flex';
-            }
+            window.showBsModal(id);
         };
 
         // 攔截舊的 data-modal-close 按鈕

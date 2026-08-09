@@ -207,7 +207,7 @@ $(function () {
 
     function showMessage(msg) {
         $('#modal-account-message-text').text(msg);
-        new bootstrap.Modal($('#modal-account-message')[0]).show();
+        showBsModal('modal-account-message');
     }
 
     function getErrorMsg(xhr) {
@@ -225,7 +225,7 @@ $(function () {
         $('#edit-account-id').val($btn.data('id'));
         $('#edit-nickname').val($btn.data('nickname'));
         $('#edit-password').val('');
-        new bootstrap.Modal($('#modal-edit-account')[0]).show();
+        showBsModal('modal-edit-account');
     });
 
     // 調整狀態按鈕
@@ -233,7 +233,7 @@ $(function () {
         var $btn = $(this);
         $('#status-user-id').val($btn.data('id'));
         $('input[name="status"][value="' + $btn.data('status') + '"]').prop('checked', true);
-        new bootstrap.Modal($('#modal-change-status')[0]).show();
+        showBsModal('modal-change-status');
     });
 
     // 新增帳號
