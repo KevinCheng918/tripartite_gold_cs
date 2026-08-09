@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('title', trans('telegram_chat.page_title'))
+@section('icon', 'comments')
 @section('subtitle', trans('telegram_chat.subtitle'))
 
 @section('content')
