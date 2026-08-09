@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('title', trans('account.action_assign_permissions'))
+@section('icon', 'key')
 @section('subtitle', $targetUser->nickname . '（' . $targetUser->account . '）')
 
 @section('content')
@@ -16,7 +17,7 @@
     @component('components.modal', ['id' => 'modal-perm-message', 'title' => ''])
         <p id="modal-perm-message-text"></p>
         <div class="modal-actions">
-            <button type="button" data-modal-close class="btn-primary">OK</button>
+            <button type="button" data-bs-dismiss="modal" class="btn-primary">OK</button>
         </div>
     @endcomponent
 

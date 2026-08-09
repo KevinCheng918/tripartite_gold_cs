@@ -69,12 +69,12 @@
 
     function openModal(id) {
         var el = document.getElementById(id);
-        if (el) { el.style.display = 'flex'; }
+        if (el) { new bootstrap.Modal(el).show(); }
     }
 
     function closeModal(id) {
         var el = document.getElementById(id);
-        if (el) { el.style.display = 'none'; }
+        if (el) { var inst = bootstrap.Modal.getInstance(el); if (inst) { inst.hide(); } }
     }
 
     function showMessage(message) {
