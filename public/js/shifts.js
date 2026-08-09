@@ -69,12 +69,12 @@
 
     function openModal(id) {
         var el = document.getElementById(id);
-        if (el) { new bootstrap.Modal(el).show(); }
+        if (el) { showBsModal(el); }
     }
 
     function closeModal(id) {
         var el = document.getElementById(id);
-        if (el) { var inst = bootstrap.Modal.getInstance(el); if (inst) { inst.hide(); } }
+        if (el) { hideBsModal(el); }
     }
 
     function showMessage(message) {
