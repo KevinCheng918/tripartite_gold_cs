@@ -2,6 +2,13 @@
    客服系統自訂覆寫（建立在 Architect base.css 之上）
    ================================================================ */
 
+/* 內容區用瀏覽器原生捲動，不用 perfect-scrollbar */
+.app-main__outer {
+    position: static !important;
+    height: auto !important;
+    overflow: visible !important;
+}
+
 /* 全域字體 — 加大加深 */
 html { font-size: 16px; }
 body {
