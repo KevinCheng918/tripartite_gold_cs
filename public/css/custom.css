@@ -38,7 +38,9 @@
     .chat-layout .app-inner-layout__wrapper {
         flex-direction: column !important;
     }
-    .chat-layout .app-inner-layout__sidebar {
+    /* 覆蓋 Architect 預設的 display:none */
+    .chat-layout .app-inner-layout__sidebar.app-inner-layout__sidebar {
+        display: block !important;
         width: 100% !important;
         max-width: 100% !important;
         flex: none !important;
@@ -50,7 +52,7 @@
         display: none !important;
     }
     /* 選了群組後：隱藏列表、顯示聊天 */
-    .chat-layout.tg-chatting .app-inner-layout__sidebar {
+    .chat-layout.tg-chatting .app-inner-layout__sidebar.app-inner-layout__sidebar {
         display: none !important;
     }
     .chat-layout.tg-chatting .app-inner-layout__content {
