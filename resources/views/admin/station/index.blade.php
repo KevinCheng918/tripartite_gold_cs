@@ -97,7 +97,7 @@
                                 </td>
                                 <td><small class="text-muted">{{ $station->synced_at ? $station->synced_at->format('m/d H:i') : '-' }}</small></td>
                                 <td>
-                                    <button class="btn btn-sm btn-outline-info js-station-detail" data-id="{{ $station->id }}">
+                                    <button class="btn btn-sm btn-outline-secondary js-station-detail" data-id="{{ $station->id }}">
                                         <i class="fas fa-info-circle me-1"></i>詳細
                                     </button>
                                     @if(Auth::user()->hasPermission('station.update'))
