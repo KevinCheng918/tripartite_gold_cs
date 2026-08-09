@@ -25,20 +25,12 @@
     padding-top: 0.25rem;
 }
 
-/* Header 精簡 */
+/* Header 精簡 — 不要太高 */
 .app-inner-layout__top-pane {
     flex-shrink: 0;
 }
-
-/* 輸入區底部精簡 */
-.app-inner-layout__bottom-pane .input-group {
-    border-radius: 0.375rem;
-}
-.app-inner-layout__bottom-pane .input-group .form-control {
-    border-radius: 0 !important;
-}
-.app-inner-layout__bottom-pane .p-3 {
-    padding: 0.75rem !important;
+.chat-layout .app-inner-layout__top-pane {
+    padding: 0 !important;
 }
 
 /* 修正 modal backdrop 殘留導致畫面變黑 */

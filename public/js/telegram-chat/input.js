@@ -16,13 +16,11 @@
 
         inputArea.style.display = 'block';
         inputArea.innerHTML =
-            '<div class="p-3">' +
-            '<div class="input-group">' +
+            '<div class="d-flex align-items-end gap-2 px-3 py-2">' +
             '<input type="file" id="tg-image-input" accept="image/*" style="display:none">' +
-            '<button class="btn btn-outline-secondary" id="btn-tg-image" type="button" title="' + (T.i18n.btn_image || '傳送圖片') + '"><i class="fas fa-image"></i></button>' +
-            '<textarea id="tg-reply-text" class="form-control" placeholder="' + T.i18n.input_placeholder + '" rows="1" style="resize:none;max-height:120px"></textarea>' +
-            '<button class="btn btn-primary" id="btn-tg-send" type="button">' + T.i18n.btn_send + '</button>' +
-            '</div>' +
+            '<button class="btn btn-link text-muted p-1" id="btn-tg-image" type="button" title="' + (T.i18n.btn_image || '傳送圖片') + '" style="font-size:1.25rem"><i class="fas fa-paperclip"></i></button>' +
+            '<textarea id="tg-reply-text" class="form-control form-control-sm" placeholder="' + T.i18n.input_placeholder + '" rows="1" style="resize:none;max-height:100px;border-radius:1rem"></textarea>' +
+            '<button class="btn btn-primary btn-sm rounded-circle d-flex align-items-center justify-content-center" id="btn-tg-send" type="button" style="width:36px;height:36px;flex-shrink:0"><i class="fas fa-paper-plane" style="font-size:0.875rem"></i></button>' +
             '</div>';
 
         var textarea = document.getElementById('tg-reply-text');
@@ -66,7 +64,7 @@
         if (!content || !T.selectedGroupId) { return; }
 
         textarea.disabled = true;
-        if (sendBtn) { sendBtn.disabled = true; sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+        if (sendBtn) { sendBtn.disabled = true; sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin" style="font-size:0.875rem"></i>'; }
 
         T.apiFetch('/admin/telegram-chat/ajax-reply', {
             method: 'POST',
@@ -76,12 +74,12 @@
                 textarea.value = '';
                 textarea.style.height = '';
                 textarea.disabled = false;
-                if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = T.i18n.btn_send; }
+                if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = '<i class="fas fa-paper-plane" style="font-size:0.875rem"></i>'; }
                 textarea.focus();
             })
             .catch(function (error) {
                 textarea.disabled = false;
-                if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = T.i18n.btn_send; }
+                if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = '<i class="fas fa-paper-plane" style="font-size:0.875rem"></i>'; }
                 alert(error.message || T.i18n.msg.reply_failed);
             });
     }
