@@ -98,7 +98,7 @@
                                 <td><small class="text-muted">{{ $station->synced_at ? $station->synced_at->format('m/d H:i') : '-' }}</small></td>
                                 <td>
                                     <button class="btn btn-sm btn-outline-info js-station-detail" data-id="{{ $station->id }}">
-                                        <i class="fas fa-info-circle"></i>
+                                        <i class="fas fa-info-circle me-1"></i>詳細
                                     </button>
                                     @if(Auth::user()->hasPermission('station.update'))
                                         <button class="btn btn-sm btn-outline-secondary js-edit-station"
@@ -110,10 +110,10 @@
                                                 data-api-key="{{ $station->api_key }}"
                                                 data-telegram-chat-id="{{ $station->telegram_chat_id }}"
                                                 data-note="{{ $station->note }}">
-                                            <i class="fas fa-edit"></i>
+                                            <i class="fas fa-edit me-1"></i>編輯
                                         </button>
                                         <button class="btn btn-sm btn-outline-secondary js-sync-credits" data-id="{{ $station->id }}">
-                                            <i class="fas fa-sync-alt"></i>
+                                            <i class="fas fa-sync-alt me-1"></i>同步
                                         </button>
                                     @endif
                                 </td>
