@@ -37,12 +37,26 @@
     .chat-layout .app-inner-layout__wrapper {
         flex-direction: column !important;
     }
-    /* 覆蓋 Architect 預設的 display:none */
+    /* 覆蓋 Architect 預設的 display:none，固定全屏 */
     .chat-layout .app-inner-layout__sidebar.app-inner-layout__sidebar {
-        display: block !important;
+        display: flex !important;
+        flex-direction: column !important;
+        position: fixed !important;
+        top: 60px;
+        left: 0;
+        right: 0;
+        bottom: 0;
         width: 100% !important;
         max-width: 100% !important;
         flex: none !important;
+        z-index: 20;
+        border-radius: 0 !important;
+        margin: 0 !important;
+    }
+    .chat-layout .app-inner-layout__sidebar #tg-group-list {
+        flex: 1 !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
     }
     .chat-layout .app-inner-layout__content {
         width: 100% !important;
