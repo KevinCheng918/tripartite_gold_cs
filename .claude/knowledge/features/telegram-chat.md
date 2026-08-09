@@ -25,6 +25,7 @@
 | 表情回應 | 收：處理 message_reaction webhook，合併計數存入 reactions JSON；發：透過 setMessageReaction Bot API，前端提供 6 個快速 emoji 選擇器 |
 | 值班自動指派 | 依排班自動指派當前值班客服 |
 | 即時推送 | Pusher/WebSocket broadcasting |
+| Web Push PWA | 收到 Telegram 訊息時推播通知到所有已訂閱客服的瀏覽器，支援 PWA 離線通知 |
 | 未回覆告警 | 超時未回覆告警（工作日 5 分鐘、假日 30 分鐘） |
 
 ## 待釐清
