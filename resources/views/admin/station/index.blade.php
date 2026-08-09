@@ -7,16 +7,22 @@
 @section('content')
 
     <div class="main-card mb-3 card">
-        {{-- 頂部：新增按鈕 --}}
-        <div class="card-header d-flex align-items-center">
-            @if(Auth::user()->hasPermission('station.create'))
-                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modal-station">
-                    <i class="fas fa-plus me-1"></i>{{ trans('station.action_create') }}
-                </button>
-            @endif
+        {{-- 頂部：新增按鈕 + 折疊 --}}
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <div>
+                @if(Auth::user()->hasPermission('station.create'))
+                    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modal-station">
+                        <i class="fas fa-plus me-1"></i>{{ trans('station.action_create') }}
+                    </button>
+                @endif
+            </div>
+            <a href="javascript:void(0)" class="text-muted text-decoration-none" data-bs-toggle="collapse" data-bs-target="#station-search-collapse" aria-expanded="true">
+                — 折疊 —
+            </a>
         </div>
 
-        {{-- 搜尋區 --}}
+        {{-- 搜尋區（可折疊） --}}
+        <div class="collapse show" id="station-search-collapse">
         <div class="card-body pt-3">
             <form method="GET">
                 <div class="row g-3 mb-3">
@@ -91,6 +97,7 @@
                 </div>
             </form>
         </div>
+        </div>{{-- end collapse --}}
     </div>
 
     {{-- 站台列表 --}}
@@ -327,6 +334,12 @@
 <script>
 $(function () {
     var csrfToken = $('meta[name="csrf-token"]').attr('content');
+
+    // 折疊/展開文字切換
+    var $collapseEl = $('#station-search-collapse');
+    var $toggleLink = $('[data-bs-target="#station-search-collapse"]');
+    $collapseEl.on('show.bs.collapse', function () { $toggleLink.text('— 折疊 —'); });
+    $collapseEl.on('hide.bs.collapse', function () { $toggleLink.text('— 展開 —'); });
 
     function showMessage(msg) {
         $('#modal-station-msg-text').text(msg);
