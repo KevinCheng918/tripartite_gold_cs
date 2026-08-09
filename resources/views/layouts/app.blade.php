@@ -81,46 +81,26 @@
                     <span class="fw-bold me-3" id="topbar-clock" style="font-size:0.9375rem; white-space:nowrap;"></span>
                 </div>
                 <div class="app-header-right">
-                    <div class="header-btn-lg pe-0">
-                        <div class="widget-content p-0">
-                            <div class="widget-content-wrapper">
-                                {{-- 推播 --}}
-                                <button class="btn btn-link p-1 me-1" title="推播通知" onclick="window.requestPushPermission && window.requestPushPermission()">
-                                    <i class="fas fa-bell"></i>
-                                </button>
-                                {{-- 深色模式 --}}
-                                <button class="btn btn-link p-1 me-2" id="theme-toggle" title="切換深色/淺色模式">
-                                    <i class="fas fa-moon theme-icon-dark"></i>
-                                    <i class="fas fa-sun theme-icon-light" style="display:none"></i>
-                                </button>
-                                {{-- 使用者 --}}
-                                <div class="widget-content-left me-3 header-user-info" id="btn-open-profile" style="cursor:pointer" title="個人設定">
-                                    <div class="widget-heading">{{ Auth::user()->nickname }}</div>
-                                    <div class="widget-subheading">{{ Auth::user()->account }}</div>
-                                </div>
-                                <div class="widget-content-left">
-                                    <div class="btn-group">
-                                        <a class="p-0 btn" data-bs-toggle="dropdown" aria-expanded="false">
-                                            <div class="icon-wrapper icon-wrapper-alt rounded-circle" style="width:36px;height:36px;background:linear-gradient(135deg,#d4af37,#a67c00);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;">
-                                                {{ mb_substr(Auth::user()->nickname, 0, 1) }}
-                                            </div>
-                                        </a>
-                                        <div class="dropdown-menu dropdown-menu-end">
-                                            <button class="dropdown-item" id="btn-open-profile-dropdown">
-                                                <i class="fas fa-user-cog me-2"></i>{{ trans('profile.title') }}
-                                            </button>
-                                            <div class="dropdown-divider"></div>
-                                            <form action="{{ route('logout') }}" method="POST" class="m-0">
-                                                @csrf
-                                                <button type="submit" class="dropdown-item text-danger">
-                                                    <i class="fas fa-sign-out-alt me-2"></i>{{ trans('auth.logout') }}
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="d-flex align-items-center">
+                        <a href="javascript:void(0)" class="p-0 btn btn-link me-2" title="推播通知" onclick="window.requestPushPermission && window.requestPushPermission()">
+                            <span class="icon-wrapper icon-wrapper-alt rounded-circle">
+                                <span class="icon-wrapper-bg bg-focus"></span>
+                                <i class="fas fa-bell text-focus"></i>
+                            </span>
+                        </a>
+                        <a href="javascript:void(0)" class="p-0 btn btn-link me-2" id="theme-toggle" title="切換深色/淺色模式">
+                            <span class="icon-wrapper icon-wrapper-alt rounded-circle">
+                                <span class="icon-wrapper-bg bg-focus"></span>
+                                <i class="fas fa-moon text-focus theme-icon-dark"></i>
+                                <i class="fas fa-sun text-focus theme-icon-light" style="display:none"></i>
+                            </span>
+                        </a>
+                        <form action="{{ route('logout') }}" method="POST" class="m-0 ms-2">
+                            @csrf
+                            <button type="submit" class="btn btn-outline-danger" style="font-size:0.9375rem">
+                                <i class="fas fa-sign-out-alt me-1"></i>{{ trans('auth.logout') }}
+                            </button>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -154,6 +134,18 @@
                 </div>
                 <div class="scrollbar-sidebar">
                     <div class="app-sidebar__inner">
+                        {{-- 使用者資訊（點擊開啟個人設定） --}}
+                        <a href="javascript:void(0)" class="d-flex align-items-center px-3 py-3 border-bottom mb-2 text-decoration-none" id="btn-open-profile-sidebar" title="{{ trans('profile.title') }}">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center me-2" style="width:36px;height:36px;background:linear-gradient(135deg,#d4af37,#a67c00);color:#fff;font-weight:700;font-size:0.875rem;flex-shrink:0">
+                                {{ mb_substr(Auth::user()->nickname, 0, 1) }}
+                            </div>
+                            <div style="min-width:0">
+                                <div class="fw-bold text-truncate text-dark" style="font-size:0.9375rem">{{ Auth::user()->nickname }}</div>
+                                <div class="text-muted text-truncate" style="font-size:0.75rem">{{ Auth::user()->account }}</div>
+                            </div>
+                            <i class="fas fa-edit ms-auto text-muted" style="font-size:0.75rem"></i>
+                        </a>
+
                         <ul class="vertical-nav-menu">
                             <li class="app-sidebar__heading">{{ config('app.name') }}</li>
                             <li>
@@ -375,7 +367,7 @@
         });
 
         // 個人資訊 Modal
-        $('#btn-open-profile, #btn-open-profile-dropdown').on('click', function () {
+        $('#btn-open-profile, #btn-open-profile-dropdown, #btn-open-profile-sidebar').on('click', function () {
             showBsModal('modal-profile');
         });
 

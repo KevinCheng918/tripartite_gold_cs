@@ -36,6 +36,11 @@ class StationRepository
             });
         }
 
+        // 域名
+        if (filled($criteria['domain'] ?? null)) {
+            $query->where('domain', 'like', "%{$criteria['domain']}%");
+        }
+
         // 系統
         if (filled($criteria['system_id'] ?? null)) {
             $query->where('system_id', (int) $criteria['system_id']);

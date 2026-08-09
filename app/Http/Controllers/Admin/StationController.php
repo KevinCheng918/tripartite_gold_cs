@@ -28,7 +28,7 @@ class StationController extends Controller
      */
     public function index(Request $request)
     {
-        $params = $request->only(['keyword', 'system_id', 'status', 'per_page']);
+        $params = $request->only(['keyword', 'domain', 'system_id', 'status', 'credits_min', 'credits_max', 'support_shop', 'score_runner', 'per_page']);
         $stations = $this->stationService->list($params);
         $systems = $this->stationService->getActiveSystems();
 

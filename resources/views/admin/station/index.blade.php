@@ -6,53 +6,103 @@
 
 @section('content')
 
-    {{-- 搜尋列 --}}
     <div class="main-card mb-3 card">
-        <div class="card-body">
-            <form method="GET" class="row g-2 align-items-end">
-                <div class="col-md-3">
-                    <label class="form-label small">關鍵字</label>
-                    <input type="text" class="form-control form-control-sm" name="keyword" value="{{ $filters['keyword'] ?? '' }}" placeholder="名稱或域名">
+        {{-- 頂部：新增按鈕 + 折疊 --}}
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <div>
+                @if(Auth::user()->hasPermission('station.create'))
+                    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modal-station">
+                        <i class="fas fa-plus me-1"></i>{{ trans('station.action_create') }}
+                    </button>
+                @endif
+            </div>
+            <a href="javascript:void(0)" class="text-muted text-decoration-none" data-bs-toggle="collapse" data-bs-target="#station-search-collapse" aria-expanded="true">
+                — 折疊 —
+            </a>
+        </div>
+
+        {{-- 搜尋區（可折疊） --}}
+        <div class="collapse show" id="station-search-collapse">
+        <div class="card-body pt-3">
+            <form method="GET">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3 col-6">
+                        <label class="form-label fw-bold">{{ trans('station.field_name') }}：</label>
+                        <input type="text" class="form-control" name="keyword" value="{{ $filters['keyword'] ?? '' }}" placeholder="{{ trans('station.field_name') }}">
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label fw-bold">域名：</label>
+                        <input type="text" class="form-control" name="domain" value="{{ $filters['domain'] ?? '' }}" placeholder="域名">
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label fw-bold">系統：</label>
+                        <select name="system_id" class="form-select">
+                            <option value="">全部</option>
+                            @foreach($systems as $sys)
+                                <option value="{{ $sys->id }}" {{ ($filters['system_id'] ?? '') == $sys->id ? 'selected' : '' }}>{{ $sys->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label fw-bold">{{ trans('station.field_status') }}：</label>
+                        <select name="status" class="form-select">
+                            <option value="">全部</option>
+                            <option value="1" {{ ($filters['status'] ?? '') === '1' ? 'selected' : '' }}>{{ trans('station.status_active') }}</option>
+                            <option value="2" {{ ($filters['status'] ?? '') === '2' ? 'selected' : '' }}>{{ trans('station.status_frozen') }}</option>
+                            <option value="0" {{ ($filters['status'] ?? '') === '0' ? 'selected' : '' }}>{{ trans('station.status_disabled') }}</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="col-md-2">
-                    <label class="form-label small">系統</label>
-                    <select name="system_id" class="form-select form-select-sm">
-                        <option value="">全部</option>
-                        @foreach($systems as $sys)
-                            <option value="{{ $sys->id }}" {{ ($filters['system_id'] ?? '') == $sys->id ? 'selected' : '' }}>{{ $sys->name }}</option>
-                        @endforeach
-                    </select>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3 col-6">
+                        <label class="form-label fw-bold">點數 ≥：</label>
+                        <input type="number" class="form-control" name="credits_min" value="{{ $filters['credits_min'] ?? '' }}" placeholder="最小值" step="0.01">
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label fw-bold">點數 ≤：</label>
+                        <input type="number" class="form-control" name="credits_max" value="{{ $filters['credits_max'] ?? '' }}" placeholder="最大值" step="0.01">
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label fw-bold">商城：</label>
+                        <select name="support_shop" class="form-select">
+                            <option value="">全部</option>
+                            <option value="true" {{ ($filters['support_shop'] ?? '') === 'true' ? 'selected' : '' }}>啟用</option>
+                            <option value="false" {{ ($filters['support_shop'] ?? '') === 'false' ? 'selected' : '' }}>未啟用</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label fw-bold">跑分員：</label>
+                        <select name="score_runner" class="form-select">
+                            <option value="">全部</option>
+                            <option value="true" {{ ($filters['score_runner'] ?? '') === 'true' ? 'selected' : '' }}>啟用</option>
+                            <option value="false" {{ ($filters['score_runner'] ?? '') === 'false' ? 'selected' : '' }}>未啟用</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="col-md-2">
-                    <label class="form-label small">狀態</label>
-                    <select name="status" class="form-select form-select-sm">
-                        <option value="">全部</option>
-                        <option value="1" {{ ($filters['status'] ?? '') === '1' ? 'selected' : '' }}>{{ trans('station.status_active') }}</option>
-                        <option value="2" {{ ($filters['status'] ?? '') === '2' ? 'selected' : '' }}>{{ trans('station.status_frozen') }}</option>
-                        <option value="0" {{ ($filters['status'] ?? '') === '0' ? 'selected' : '' }}>{{ trans('station.status_disabled') }}</option>
-                    </select>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3 col-6">
+                        <label class="form-label fw-bold">每頁：</label>
+                        <select name="per_page" class="form-select">
+                            @foreach([15, 30, 50, 100] as $n)
+                                <option value="{{ $n }}" {{ ($filters['per_page'] ?? 15) == $n ? 'selected' : '' }}>{{ $n }} 筆</option>
+                            @endforeach
+                        </select>
+                    </div>
                 </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary btn-sm w-100">
+                <div class="d-flex justify-content-end gap-2">
+                    <a href="{{ route('admin.stations.index') }}" class="btn btn-outline-secondary">重置</a>
+                    <button type="submit" class="btn btn-primary">
                         <i class="fas fa-search me-1"></i>搜尋
                     </button>
                 </div>
-                <div class="col-md-1">
-                    <a href="{{ route('admin.stations.index') }}" class="btn btn-outline-secondary btn-sm w-100">重置</a>
-                </div>
-                @if(Auth::user()->hasPermission('station.create'))
-                <div class="col-md-2 text-end">
-                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-station">
-                        <i class="fas fa-plus me-1"></i>{{ trans('station.action_create') }}
-                    </button>
-                </div>
-                @endif
             </form>
         </div>
+        </div>{{-- end collapse --}}
     </div>
 
     {{-- 站台列表 --}}
-    <div class="main-card mb-3 card">
+    {{-- 桌面版：表格 --}}
+    <div class="main-card mb-3 card d-none d-md-block">
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover table-striped align-middle mb-0">
@@ -97,8 +147,8 @@
                                 </td>
                                 <td><small class="text-muted">{{ $station->synced_at ? $station->synced_at->format('m/d H:i') : '-' }}</small></td>
                                 <td>
-                                    <button class="btn btn-sm btn-outline-info js-station-detail" data-id="{{ $station->id }}">
-                                        <i class="fas fa-info-circle"></i>
+                                    <button class="btn btn-sm btn-outline-secondary js-station-detail" data-id="{{ $station->id }}">
+                                        <i class="fas fa-info-circle me-1"></i>詳細
                                     </button>
                                     @if(Auth::user()->hasPermission('station.update'))
                                         <button class="btn btn-sm btn-outline-secondary js-edit-station"
@@ -110,10 +160,10 @@
                                                 data-api-key="{{ $station->api_key }}"
                                                 data-telegram-chat-id="{{ $station->telegram_chat_id }}"
                                                 data-note="{{ $station->note }}">
-                                            <i class="fas fa-edit"></i>
+                                            <i class="fas fa-edit me-1"></i>編輯
                                         </button>
                                         <button class="btn btn-sm btn-outline-secondary js-sync-credits" data-id="{{ $station->id }}">
-                                            <i class="fas fa-sync-alt"></i>
+                                            <i class="fas fa-sync-alt me-1"></i>同步
                                         </button>
                                     @endif
                                 </td>
@@ -129,6 +179,74 @@
         </div>
         @if($stations->hasPages())
             <div class="card-footer">{{ $stations->withQueryString()->links() }}</div>
+        @endif
+    </div>
+
+    {{-- 手機版：卡片 --}}
+    <div class="d-md-none">
+        @forelse($stations as $station)
+            @php
+                $settings = $station->settings ?? [];
+                $depositRate = isset($settings['system_rate']) ? number_format($settings['system_rate'] * 100, 2) . '%' : '-';
+                $withdrawRate = isset($settings['system_rate_withdraw']) ? number_format($settings['system_rate_withdraw'] * 100, 2) . '%' : '-';
+            @endphp
+            <div class="card mb-2 shadow-sm">
+                <div class="card-body py-3">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <strong style="font-size:1.0625rem">{{ $station->name }}</strong>
+                            <div class="text-muted" style="font-size:0.8125rem">{{ $station->system ? $station->system->name : '-' }}</div>
+                        </div>
+                        @if($station->status == 1)
+                            <span class="badge bg-success">{{ trans('station.status_active') }}</span>
+                        @elseif($station->status == 2)
+                            <span class="badge bg-warning text-dark">{{ trans('station.status_frozen') }}</span>
+                        @else
+                            <span class="badge bg-danger">{{ trans('station.status_disabled') }}</span>
+                        @endif
+                    </div>
+                    @if(filled($station->domain))
+                        <div class="d-flex justify-content-between mb-1" style="font-size:0.875rem">
+                            <span class="text-muted">域名</span>
+                            <span>{{ $station->domain }}</span>
+                        </div>
+                    @endif
+                    <div class="d-flex justify-content-between mb-1" style="font-size:0.875rem">
+                        <span class="text-muted">{{ trans('station.field_credits') }}</span>
+                        <strong>{{ number_format($station->credits, 2) }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2" style="font-size:0.875rem">
+                        <span class="text-muted">費率（收/付）</span>
+                        <span>{{ $depositRate }} / {{ $withdrawRate }}</span>
+                    </div>
+                    <div class="d-flex gap-1 flex-wrap">
+                        <button class="btn btn-sm btn-outline-secondary js-station-detail" data-id="{{ $station->id }}">
+                            <i class="fas fa-info-circle me-1"></i>詳細
+                        </button>
+                        @if(Auth::user()->hasPermission('station.update'))
+                            <button class="btn btn-sm btn-outline-secondary js-edit-station"
+                                    data-id="{{ $station->id }}"
+                                    data-name="{{ $station->name }}"
+                                    data-domain="{{ $station->domain }}"
+                                    data-system-id="{{ $station->system_id }}"
+                                    data-api-url="{{ $station->api_url }}"
+                                    data-api-key="{{ $station->api_key }}"
+                                    data-telegram-chat-id="{{ $station->telegram_chat_id }}"
+                                    data-note="{{ $station->note }}">
+                                <i class="fas fa-edit me-1"></i>編輯
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary js-sync-credits" data-id="{{ $station->id }}">
+                                <i class="fas fa-sync-alt me-1"></i>同步
+                            </button>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        @empty
+            <div class="text-center text-muted py-4">暫無資料</div>
+        @endforelse
+        @if($stations->hasPages())
+            <div class="mt-2">{{ $stations->withQueryString()->links() }}</div>
         @endif
     </div>
 
@@ -216,6 +334,12 @@
 <script>
 $(function () {
     var csrfToken = $('meta[name="csrf-token"]').attr('content');
+
+    // 折疊/展開文字切換
+    var $collapseEl = $('#station-search-collapse');
+    var $toggleLink = $('[data-bs-target="#station-search-collapse"]');
+    $collapseEl.on('show.bs.collapse', function () { $toggleLink.text('— 折疊 —'); });
+    $collapseEl.on('hide.bs.collapse', function () { $toggleLink.text('— 展開 —'); });
 
     function showMessage(msg) {
         $('#modal-station-msg-text').text(msg);
