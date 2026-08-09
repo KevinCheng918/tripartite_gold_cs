@@ -11,7 +11,7 @@
     T.renderLayout = function () {
         T.root.innerHTML =
             '<div class="app-inner-layout app-inner-layout-page chat-layout">' +
-            '<div class="app-inner-layout__wrapper row g-0" style="min-height:calc(100vh - 180px)">' +
+            '<div class="app-inner-layout__wrapper row g-0">' +
 
             '<div class="app-inner-layout__sidebar card col-md-4 col-lg-3" style="border-radius:0">' +
             '<div class="app-inner-layout__top-pane">' +
