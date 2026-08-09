@@ -41,7 +41,11 @@ class AccountController extends Controller
      */
     public function index()
     {
-        return view('admin.accounts.index');
+        $accounts = $this->accountService->list([]);
+
+        return view('admin.accounts.index', [
+            'accounts' => $accounts,
+        ]);
     }
 
     /**
