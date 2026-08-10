@@ -43,7 +43,7 @@
             return (
                 '<div class="chat-box-wrapper" data-msg-id="' + m.id + '" style="display:flex;justify-content:flex-end">' +
                 '<div style="text-align:right">' +
-                '<div class="chat-box" style="background:#e0f3ff;display:inline-block">' + mediaHtml + textHtml + reactBtn + '</div>' +
+                '<div class="chat-box" style="background:rgba(166,124,0,0.08);display:inline-block">' + mediaHtml + textHtml + reactBtn + '</div>' +
                 reactHtml +
                 '<small class="text-muted">' + timeLabel + ' | ' + m.sender_name + '</small>' +
                 '</div>' +
@@ -56,7 +56,7 @@
             '<div class="chat-box-wrapper" data-msg-id="' + m.id + '">' +
             '<div class="me-2 flex-shrink-0">' + avatar + '</div>' +
             '<div>' +
-            '<div class="chat-box" style="background:#e0f3ff">' + mediaHtml + textHtml + reactBtn + '</div>' +
+            '<div class="chat-box" style="background:rgba(166,124,0,0.08)">' + mediaHtml + textHtml + reactBtn + '</div>' +
             reactHtml +
             '<small class="text-muted">' + timeLabel + ' | ' + m.sender_name + '</small>' +
             '</div>' +
