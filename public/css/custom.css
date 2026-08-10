@@ -152,10 +152,6 @@
 }
 .app-header-right .icon-wrapper i {
     font-size: 1rem !important;
-    color: #3f6ad8 !important;
-}
-.app-header-right .icon-wrapper .icon-wrapper-bg {
-    opacity: 0.08 !important;
 }
 
 /* 修正 modal backdrop 殘留導致畫面變黑 */
@@ -222,21 +218,6 @@ h6, .h6 { font-size: 1rem; font-weight: 600; color: #212529; }
     border-top: none;
 }
 
-/* 按鈕 hover — 明顯的互動回饋 */
-.btn-outline-secondary:hover,
-.btn-outline-secondary:hover:active {
-    background-color: #212529 !important;
-    color: #fff !important;
-    border-color: #212529 !important;
-    box-shadow: none !important;
-}
-.btn-outline-secondary:focus {
-    background-color: #343a40 !important;
-    color: #fff !important;
-    border-color: #343a40 !important;
-    box-shadow: none !important;
-}
-
 /* 表單文字加深 */
 .form-control, .form-select { font-size: 1rem; color: #212529; }
 .form-label, label { font-size: 0.9375rem; font-weight: 500; color: #212529; }
@@ -278,13 +259,57 @@ h6, .h6 { font-size: 1rem; font-weight: 600; color: #212529; }
     border-color: #b8860b !important;
 }
 
-/* Sidebar active 金色 */
+/* bg-primary badge 金色 */
+.bg-primary { background-color: #a67c00 !important; }
+
+/* Radio / Checkbox 金色 */
+.form-check-input:checked {
+    background-color: #a67c00 !important;
+    border-color: #a67c00 !important;
+}
+.form-check-input:focus {
+    border-color: #a67c00 !important;
+    box-shadow: 0 0 0 0.2rem rgba(166,124,0,0.15) !important;
+}
+
+/* Link 金色取代藍色 */
+a { color: #a67c00; }
+a:hover { color: #85640a; }
+
+/* ================================================================
+   Light mode — 白底金色（無藍色）
+   ================================================================ */
+
+/* Sidebar — 金色取代藍色 */
 .vertical-nav-menu li a.mm-active {
     color: #a67c00 !important;
     font-weight: 600;
+    background: rgba(166,124,0,0.08) !important;
 }
 .vertical-nav-menu li a.mm-active > i.metismenu-icon {
     color: #a67c00 !important;
+}
+/* Sidebar hover 背景：淡金色取代淺藍 */
+.vertical-nav-menu li a:hover {
+    background: rgba(166,124,0,0.05) !important;
+}
+.app-sidebar__heading {
+    color: #a67c00 !important;
+}
+/* Sidebar icon 預設色：灰色取代藍色 */
+.vertical-nav-menu li a i.metismenu-icon {
+    color: #6c757d !important;
+}
+.vertical-nav-menu li a:hover i.metismenu-icon {
+    color: #495057 !important;
+}
+
+/* Header logo 文字 */
+.app-header .app-header__logo a { color: #a67c00 !important; }
+
+/* Hamburger 深灰取代藍色 */
+.hamburger-inner, .hamburger-inner::before, .hamburger-inner::after {
+    background-color: #495057 !important;
 }
 
 /* Page title icon 金色 */
@@ -293,145 +318,160 @@ h6, .h6 { font-size: 1rem; font-weight: 600; color: #212529; }
     color: #fff !important;
 }
 
-/* 深色模式 */
+/* Tabs 金色 */
+.nav-tabs .nav-link { color: #495057 !important; }
+.nav-tabs .nav-link:hover { color: #a67c00 !important; }
+.nav-tabs .nav-link.active { color: #a67c00 !important; border-bottom-color: #a67c00 !important; }
+
+/* Header icon 金色 */
+.app-header-right .icon-wrapper .icon-wrapper-bg { background: rgba(166,124,0,0.12) !important; opacity: 1 !important; }
+.app-header-right .icon-wrapper i { color: #a67c00 !important; }
+
+/* Form focus 金色 */
+.form-control:focus, .form-select:focus {
+    border-color: #a67c00 !important;
+    box-shadow: 0 0 0 0.2rem rgba(166,124,0,0.15) !important;
+}
+
+/* 按鈕 hover 金色 */
+.btn-outline-secondary:hover,
+.btn-outline-secondary:hover:active {
+    background-color: #212529 !important;
+    color: #fff !important;
+    border-color: #212529 !important;
+    box-shadow: none !important;
+}
+.btn-outline-secondary:focus {
+    background-color: #343a40 !important;
+    color: #fff !important;
+    border-color: #343a40 !important;
+    box-shadow: none !important;
+}
+
+/* Pagination active 金色 */
+.page-item.active .page-link { background: #a67c00 !important; border-color: #a67c00 !important; color: #fff !important; }
+
+/* Sidebar 使用者區 light */
+.app-sidebar .btn-outline-secondary:hover {
+    background-color: #f8f9fa !important;
+    color: #212529 !important;
+    border-color: #dee2e6 !important;
+}
+
+/* ================================================================
+   Dark mode — 黑底金色
+   ================================================================ */
+
 [data-theme="dark"] body,
-[data-theme="dark"] .app-container {
-    background: #0f1117 !important;
-    color: #e5e7eb;
-}
+[data-theme="dark"] .app-container { background: #0f0f0f !important; color: #e0e0e0; }
+[data-theme="dark"] .app-main__outer { background: #141414 !important; }
 
-[data-theme="dark"] .app-sidebar {
-    background: #1a1d27 !important;
-}
+/* Header */
+[data-theme="dark"] .app-header { background: #0a0a0a !important; border-bottom: 1px solid rgba(212,175,55,0.1) !important; }
+[data-theme="dark"] .app-header .app-header__logo { background: #0a0a0a !important; }
+[data-theme="dark"] .app-header .app-header__logo a { color: #d4af37 !important; }
 
-[data-theme="dark"] .app-header {
-    background: #1a1d27 !important;
-}
+/* Sidebar */
+[data-theme="dark"] .app-sidebar { background: #0a0a0a !important; }
+[data-theme="dark"] .app-sidebar.sidebar-shadow { box-shadow: 2px 0 20px rgba(0,0,0,0.3) !important; }
+[data-theme="dark"] .vertical-nav-menu li a { color: rgba(255,255,255,0.7) !important; }
+[data-theme="dark"] .vertical-nav-menu li a:hover { color: #fff !important; background: rgba(212,175,55,0.08) !important; }
+[data-theme="dark"] .vertical-nav-menu li a i.metismenu-icon { color: rgba(255,255,255,0.4) !important; }
+[data-theme="dark"] .vertical-nav-menu li a:hover i.metismenu-icon { color: rgba(255,255,255,0.7) !important; }
+[data-theme="dark"] .vertical-nav-menu li a.mm-active { color: #d4af37 !important; background: rgba(212,175,55,0.1) !important; }
+[data-theme="dark"] .vertical-nav-menu li a.mm-active > i.metismenu-icon { color: #d4af37 !important; }
+[data-theme="dark"] .app-sidebar__heading { color: #d4af37 !important; opacity: 0.7; }
 
-[data-theme="dark"] .app-main__outer {
-    background: #0f1117 !important;
-}
+/* Sidebar 使用者區 */
+[data-theme="dark"] .app-sidebar .border-bottom { border-color: rgba(255,255,255,0.08) !important; }
+[data-theme="dark"] .app-sidebar .fw-bold { color: #fff !important; }
+[data-theme="dark"] .app-sidebar .text-muted { color: rgba(255,255,255,0.4) !important; }
+[data-theme="dark"] .app-sidebar .text-dark { color: #fff !important; }
+[data-theme="dark"] .app-sidebar .btn-outline-secondary { color: rgba(255,255,255,0.6) !important; border-color: rgba(255,255,255,0.15) !important; }
+[data-theme="dark"] .app-sidebar .btn-outline-secondary:hover { color: #d4af37 !important; border-color: #d4af37 !important; background: transparent !important; }
 
-[data-theme="dark"] .card,
-[data-theme="dark"] .main-card {
-    background: #1a1d27 !important;
-    border-color: #2d3039 !important;
-}
+/* Hamburger */
+[data-theme="dark"] .hamburger-inner, [data-theme="dark"] .hamburger-inner::before, [data-theme="dark"] .hamburger-inner::after { background-color: rgba(255,255,255,0.7) !important; }
 
-[data-theme="dark"] .app-page-title {
-    background: rgba(0, 0, 0, 0.15) !important;
-}
+/* Page title */
+[data-theme="dark"] .app-page-title { background: rgba(0,0,0,0.2) !important; }
+[data-theme="dark"] .page-title-heading > div { color: #f0e6c8 !important; }
+[data-theme="dark"] .page-title-subheading { color: rgba(255,255,255,0.4) !important; }
 
-[data-theme="dark"] .page-title-heading > div {
-    color: #f3f4f6;
-}
+/* Card */
+[data-theme="dark"] .card, [data-theme="dark"] .main-card { background: #1a1a1a !important; border-color: rgba(255,255,255,0.06) !important; }
+[data-theme="dark"] .card-header { background: rgba(255,255,255,0.03) !important; border-color: rgba(255,255,255,0.06) !important; color: #f0e6c8 !important; }
+[data-theme="dark"] .card-body { color: #e0e0e0 !important; }
+[data-theme="dark"] .card-footer { background: rgba(255,255,255,0.02) !important; border-color: rgba(255,255,255,0.06) !important; }
 
-[data-theme="dark"] .page-title-subheading {
-    color: #9ca3af !important;
-}
+/* Table */
+[data-theme="dark"] .table { color: #e0e0e0 !important; }
+[data-theme="dark"] .table > thead > tr > th { color: rgba(255,255,255,0.5) !important; border-color: rgba(255,255,255,0.08) !important; }
+[data-theme="dark"] .table > tbody > tr > td { color: #e0e0e0 !important; border-color: rgba(255,255,255,0.06) !important; }
+[data-theme="dark"] .table > tbody > tr:last-child > td { border-color: rgba(255,255,255,0.08) !important; }
+[data-theme="dark"] .table-hover > tbody > tr:hover { background: rgba(212,175,55,0.04) !important; }
+[data-theme="dark"] .table-striped > tbody > tr:nth-of-type(odd) { background: rgba(255,255,255,0.02) !important; }
+[data-theme="dark"] .table-light, [data-theme="dark"] th.table-light { background: rgba(255,255,255,0.04) !important; color: rgba(255,255,255,0.5) !important; }
 
-[data-theme="dark"] .table {
-    color: #d1d5db;
-}
+/* Tabs */
+[data-theme="dark"] .nav-tabs { border-color: rgba(255,255,255,0.08) !important; }
+[data-theme="dark"] .nav-tabs .nav-link { color: rgba(255,255,255,0.5) !important; }
+[data-theme="dark"] .nav-tabs .nav-link.active { color: #d4af37 !important; border-color: #d4af37 transparent transparent !important; background: transparent !important; }
+[data-theme="dark"] .nav-tabs .nav-link:hover { color: #fff !important; }
 
-[data-theme="dark"] .table td,
-[data-theme="dark"] .table th {
-    border-color: #2d3039 !important;
-}
+/* Form */
+[data-theme="dark"] .form-control, [data-theme="dark"] .form-select { background: rgba(255,255,255,0.05) !important; border-color: rgba(255,255,255,0.12) !important; color: #e0e0e0 !important; }
+[data-theme="dark"] .form-control:focus, [data-theme="dark"] .form-select:focus { border-color: rgba(212,175,55,0.5) !important; background: rgba(255,255,255,0.08) !important; box-shadow: 0 0 0 0.2rem rgba(212,175,55,0.15) !important; }
+[data-theme="dark"] .form-label, [data-theme="dark"] label { color: #e0e0e0 !important; }
+[data-theme="dark"] .form-control::placeholder { color: rgba(255,255,255,0.3) !important; }
 
-[data-theme="dark"] .table thead th {
-    background: #151821;
-    color: #9ca3af;
-}
+/* Modal */
+[data-theme="dark"] .modal-content { background: #1a1a1a !important; color: #e0e0e0 !important; border-color: rgba(255,255,255,0.1) !important; }
+[data-theme="dark"] .modal-header { border-color: rgba(255,255,255,0.08) !important; }
+[data-theme="dark"] .modal-header .modal-title { color: #f0e6c8 !important; }
+[data-theme="dark"] .btn-close { filter: invert(1) !important; }
 
-[data-theme="dark"] .table tbody tr:hover {
-    background: rgba(255, 255, 255, 0.03);
-}
+/* Dropdown */
+[data-theme="dark"] .dropdown-menu { background: #1a1a1a !important; border-color: rgba(255,255,255,0.1) !important; }
+[data-theme="dark"] .dropdown-item { color: #e0e0e0 !important; }
+[data-theme="dark"] .dropdown-item:hover { background: rgba(212,175,55,0.1) !important; color: #d4af37 !important; }
+[data-theme="dark"] .dropdown-header { color: #d4af37 !important; }
+[data-theme="dark"] .dropdown-divider { border-color: rgba(255,255,255,0.08) !important; }
 
-[data-theme="dark"] .modal-content {
-    background: #1a1d27 !important;
-    color: #e5e7eb;
-}
+/* Header icon */
+[data-theme="dark"] .app-header-right .icon-wrapper .icon-wrapper-bg { background: rgba(212,175,55,0.15) !important; }
+[data-theme="dark"] .app-header-right .icon-wrapper i { color: #d4af37 !important; }
+[data-theme="dark"] .app-header-right .btn-outline-danger { border-color: rgba(220,38,38,0.4) !important; }
 
-[data-theme="dark"] .form-control,
-[data-theme="dark"] .form-select {
-    background: #151821 !important;
-    border-color: #2d3039 !important;
-    color: #e5e7eb !important;
-}
+/* 文字 */
+[data-theme="dark"] .text-dark { color: #e0e0e0 !important; }
+[data-theme="dark"] .text-muted { color: rgba(255,255,255,0.4) !important; }
+[data-theme="dark"] h1, [data-theme="dark"] h2, [data-theme="dark"] h3, [data-theme="dark"] h4, [data-theme="dark"] h5, [data-theme="dark"] h6 { color: #f0e6c8 !important; }
+[data-theme="dark"] strong { color: #f0e6c8; }
 
-[data-theme="dark"] .dropdown-menu {
-    background: #1a1d27;
-    border-color: #2d3039;
-}
+/* 按鈕 */
+[data-theme="dark"] .btn-outline-secondary { color: rgba(255,255,255,0.7) !important; border-color: rgba(255,255,255,0.15) !important; }
+[data-theme="dark"] .btn-outline-secondary:hover { background-color: #d4af37 !important; color: #1a1200 !important; border-color: #d4af37 !important; }
 
-[data-theme="dark"] .dropdown-item {
-    color: #d1d5db;
-}
+/* Widget */
+[data-theme="dark"] .widget-content { background: transparent !important; }
+[data-theme="dark"] .widget-heading { color: #e0e0e0 !important; }
+[data-theme="dark"] .widget-subheading { color: rgba(255,255,255,0.4) !important; }
+[data-theme="dark"] .widget-numbers { color: #f0e6c8 !important; }
 
-[data-theme="dark"] .dropdown-item:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: #fff;
-}
+/* Alert */
+[data-theme="dark"] .alert { background: rgba(255,255,255,0.05) !important; border-color: rgba(255,255,255,0.1) !important; color: #e0e0e0 !important; }
 
-[data-theme="dark"] .vertical-nav-menu li a {
-    color: rgba(255, 255, 255, 0.7);
-}
+/* Pagination */
+[data-theme="dark"] .page-link { background: rgba(255,255,255,0.05) !important; border-color: rgba(255,255,255,0.1) !important; color: #e0e0e0 !important; }
+[data-theme="dark"] .page-item.active .page-link { background: #d4af37 !important; border-color: #d4af37 !important; color: #1a1200 !important; }
 
-[data-theme="dark"] .vertical-nav-menu li a:hover {
-    color: #fff;
-}
+/* Scrollbar */
+[data-theme="dark"] ::-webkit-scrollbar-track { background: #0a0a0a; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb { background: rgba(212,175,55,0.3); border-radius: 3px; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: rgba(212,175,55,0.5); }
 
-[data-theme="dark"] .vertical-nav-menu li a.mm-active {
-    color: #fbbf24 !important;
-}
-
-[data-theme="dark"] .app-sidebar__heading {
-    color: rgba(255, 255, 255, 0.4) !important;
-}
-
-[data-theme="dark"] .hamburger-inner,
-[data-theme="dark"] .hamburger-inner::before,
-[data-theme="dark"] .hamburger-inner::after {
-    background-color: rgba(255, 255, 255, 0.7) !important;
-}
-
-[data-theme="dark"] .app-header__content {
-    color: #e5e7eb;
-}
-
-[data-theme="dark"] .widget-heading {
-    color: #f3f4f6 !important;
-}
-
-[data-theme="dark"] .widget-subheading {
-    color: #9ca3af !important;
-}
-
-[data-theme="dark"] .btn-link {
-    color: rgba(255, 255, 255, 0.7) !important;
-}
-
-[data-theme="dark"] .alert {
-    background: #1a1d27;
-    border-color: #2d3039;
-    color: #d1d5db;
-}
-
-[data-theme="dark"] .badge {
-    opacity: 0.9;
-}
-
-[data-theme="dark"] .text-muted {
-    color: #9ca3af !important;
-}
-
-[data-theme="dark"] h1, [data-theme="dark"] h2, [data-theme="dark"] h3,
-[data-theme="dark"] h4, [data-theme="dark"] h5, [data-theme="dark"] h6,
-[data-theme="dark"] .h1, [data-theme="dark"] .h2, [data-theme="dark"] .h3,
-[data-theme="dark"] .h4, [data-theme="dark"] .h5, [data-theme="dark"] .h6 {
-    color: #f3f4f6;
-}
+/* （舊 dark mode 已移至上方黑金色區塊） */
 
 /* 深色模式切換按鈕圖示 */
 .theme-icon-dark, .theme-icon-light { pointer-events: none; }
