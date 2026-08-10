@@ -14,7 +14,8 @@
                 </button>
             @endif
         </div>
-        <div class="card-body p-0">
+        {{-- 桌面版：表格 --}}
+        <div class="card-body p-0 d-none d-md-block">
             <div class="table-responsive">
                 <table class="table table-hover table-striped align-middle mb-0">
                     <thead class="table-light">
@@ -74,10 +75,62 @@
                 </table>
             </div>
         </div>
+
         @if($accounts instanceof \Illuminate\Pagination\LengthAwarePaginator && $accounts->hasPages())
-            <div class="card-footer">
+            <div class="card-footer d-none d-md-block">
                 {{ $accounts->links() }}
             </div>
+        @endif
+    </div>
+
+    {{-- 手機版：獨立卡片 --}}
+    <div class="d-md-none">
+        @php $idx = 0; @endphp
+        @forelse($accounts as $account)
+            @if($account->level == config('constants.USER.LEVEL.ADMIN'))
+                @continue
+            @endif
+            @php $idx++; @endphp
+            <div class="card mb-2 shadow-sm">
+                <div class="card-body py-3">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <strong style="font-size:1.0625rem">{{ $account->nickname }}</strong>
+                            <div class="text-muted" style="font-size:0.8125rem">{{ $account->account }}</div>
+                        </div>
+                        <div class="d-flex gap-1 align-items-center">
+                            @if($account->status == config('constants.USER.STATUS.NORMAL'))
+                                <span class="badge bg-success">{{ trans('account.status_normal') }}</span>
+                            @elseif($account->status == config('constants.USER.STATUS.LOCK'))
+                                <span class="badge bg-warning text-dark">{{ trans('account.status_lock') }}</span>
+                            @else
+                                <span class="badge bg-danger">{{ trans('account.status_deactivate') }}</span>
+                            @endif
+                        </div>
+                    </div>
+                    <div class="d-grid gap-1" style="grid-template-columns: 1fr 1fr">
+                        <button class="btn btn-sm btn-outline-secondary js-edit"
+                                data-id="{{ $account->id }}"
+                                data-nickname="{{ $account->nickname }}">
+                            <i class="fas fa-edit me-1"></i>{{ trans('account.action_edit') }}
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary js-change-status"
+                                data-id="{{ $account->id }}"
+                                data-status="{{ $account->status }}">
+                            <i class="fas fa-exchange-alt me-1"></i>{{ trans('account.action_change_status') }}
+                        </button>
+                        <a href="{{ route('admin.accounts.permissions', $account->id) }}"
+                           class="btn btn-sm btn-outline-secondary" style="grid-column: 1 / -1">
+                            <i class="fas fa-key me-1"></i>{{ trans('account.action_assign_permissions') }}
+                        </a>
+                    </div>
+                </div>
+            </div>
+        @empty
+            <div class="text-center text-muted py-4">暫無資料</div>
+        @endforelse
+        @if($accounts instanceof \Illuminate\Pagination\LengthAwarePaginator && $accounts->hasPages())
+            <div class="mt-2">{{ $accounts->links() }}</div>
         @endif
     </div>
 
