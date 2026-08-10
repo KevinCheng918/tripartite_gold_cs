@@ -145,6 +145,13 @@
     }
 }
 
+/* 手機版：app sidebar 展開時必須蓋過聊天區 */
+@media (max-width: 767.98px) {
+    .sidebar-mobile-open .app-sidebar {
+        z-index: 30 !important;
+    }
+}
+
 /* Header icon 樣式 */
 .app-header-right .icon-wrapper {
     width: 36px !important;
