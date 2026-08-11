@@ -43,19 +43,28 @@
         openPicker(msgId, e.clientX, e.clientY);
     }
 
+    var longPressTriggered = false;
+
     function handleTouchStart(e) {
         if (!T.canReply) { return; }
         var wrapper = e.currentTarget;
         var msgId = wrapper.dataset.msgId;
         if (!msgId) { return; }
+        longPressTriggered = false;
         var touch = e.touches[0];
         longPressTimer = setTimeout(function () {
+            longPressTriggered = true;
             openPicker(msgId, touch.clientX, touch.clientY);
         }, 500);
     }
 
-    function handleTouchEnd() {
+    function handleTouchEnd(e) {
         if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+        // 長按觸發後阻止後續的 click 事件關閉面板
+        if (longPressTriggered) {
+            e.preventDefault();
+            longPressTriggered = false;
+        }
     }
 
     function openPicker(msgId, x, y) {
@@ -80,6 +89,13 @@
 
         picker.querySelectorAll('.tg-reaction-picker__item').forEach(function (item) {
             item.addEventListener('click', function (ev) {
+                ev.stopPropagation();
+                sendReaction(parseInt(msgId, 10), item.dataset.emoji);
+                closeReactionPicker();
+            });
+            // 手機觸控支援
+            item.addEventListener('touchend', function (ev) {
+                ev.preventDefault();
                 ev.stopPropagation();
                 sendReaction(parseInt(msgId, 10), item.dataset.emoji);
                 closeReactionPicker();

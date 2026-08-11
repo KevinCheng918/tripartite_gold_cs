@@ -219,6 +219,36 @@ class ShiftService
             ]);
         }
 
+        // 檢查時間限制：任一方排班開始前 3 小時內不可換班
+        $now = now();
+        foreach ([$requesterAssignment, $targetAssignment] as $assignment) {
+            $shift = $assignment->shift;
+            if ($shift) {
+                $shiftStart = \Carbon\Carbon::parse("{$assignment->date->format('Y-m-d')} {$shift->start_time}");
+                $hoursUntilStart = $now->diffInMinutes($shiftStart, false) / 60;
+                if ($hoursUntilStart < 3) {
+                    throw ValidationException::withMessages([
+                        'swap' => [trans('shift.swap_too_late')],
+                    ]);
+                }
+            }
+        }
+
+        // 檢查發起方在對方班別那天是否已有其他排班（時間衝突）
+        $targetDate = $targetAssignment->date->format('Y-m-d');
+        if ($this->assignmentRepository->hasOtherAssignmentOnDate($requesterId, $targetDate, $requesterAssignment->id)) {
+            throw ValidationException::withMessages([
+                'swap' => [trans('shift.swap_conflict')],
+            ]);
+        }
+
+        // 檢查是否已有相同的待確認換班紀錄
+        if ($this->assignmentRepository->hasPendingSwap($requesterAssignment->id, $targetAssignment->id)) {
+            throw ValidationException::withMessages([
+                'swap' => [trans('shift.swap_duplicate_pending')],
+            ]);
+        }
+
         return DB::transaction(function () use ($requesterId, $requesterAssignment, $targetAssignment) {
             return $this->assignmentRepository->createSwap([
                 'requester_id'            => $requesterId,

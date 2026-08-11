@@ -29,12 +29,12 @@
                 </label>
             </div>
             <div class="mb-3" id="assign-shift-group">
-                <label for="assign-shift">{{ trans('shift.field_shift') }}</label>
-                <select id="assign-shift" name="shift_id"></select>
+                <label class="form-label" for="assign-shift">{{ trans('shift.field_shift') }}</label>
+                <select id="assign-shift" name="shift_id" class="form-select"></select>
             </div>
             <div class="mb-3">
-                <label for="assign-date">{{ trans('shift.field_date') }}</label>
-                <input id="assign-date" type="text" name="date" required placeholder="選擇日期" autocomplete="off">
+                <label class="form-label" for="assign-date">{{ trans('shift.field_date') }}</label>
+                <input id="assign-date" type="text" name="date" class="form-control" required placeholder="選擇日期" autocomplete="off">
             </div>
             <div class="text-end mt-3">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('shift.modal_cancel') }}</button>
@@ -48,22 +48,22 @@
         <form id="form-swap">
             <p class="modal-section-label">{{ trans('shift.swap_my_section') }}</p>
             <div class="mb-3">
-                <label for="swap-my-date">{{ trans('shift.field_date') }}</label>
-                <input id="swap-my-date" type="text" required placeholder="選擇日期" autocomplete="off">
+                <label class="form-label" for="swap-my-date">{{ trans('shift.field_date') }}</label>
+                <input id="swap-my-date" type="text" class="form-control" required placeholder="選擇日期" autocomplete="off">
             </div>
             <div class="mb-3">
-                <label for="swap-my-shift">{{ trans('shift.field_shift') }}</label>
-                <select id="swap-my-shift"></select>
+                <label class="form-label" for="swap-my-shift">{{ trans('shift.field_shift') }}</label>
+                <select id="swap-my-shift" class="form-select"></select>
             </div>
 
             <p class="modal-section-label">{{ trans('shift.swap_target_section') }}</p>
             <div class="mb-3">
-                <label for="swap-target-date">{{ trans('shift.field_date') }}</label>
-                <input id="swap-target-date" type="text" required placeholder="選擇日期" autocomplete="off">
+                <label class="form-label" for="swap-target-date">{{ trans('shift.field_date') }}</label>
+                <input id="swap-target-date" type="text" class="form-control" required placeholder="選擇日期" autocomplete="off">
             </div>
             <div class="mb-3">
-                <label for="swap-target-shift">{{ trans('shift.field_shift') }}</label>
-                <select id="swap-target-shift"></select>
+                <label class="form-label" for="swap-target-shift">{{ trans('shift.field_shift') }}</label>
+                <select id="swap-target-shift" class="form-select"></select>
             </div>
 
             <div class="text-end mt-3">
@@ -78,16 +78,16 @@
         <form id="form-edit-shift">
             <input type="hidden" id="edit-shift-id">
             <div class="mb-3">
-                <label for="edit-display-name">{{ trans('shift.field_display_name') }}</label>
-                <input id="edit-display-name" type="text" name="display_name" required>
+                <label class="form-label" for="edit-display-name">{{ trans('shift.field_display_name') }}</label>
+                <input id="edit-display-name" type="text" name="display_name" class="form-control" required>
             </div>
             <div class="mb-3">
-                <label for="edit-start-time">{{ trans('shift.field_start_time') }}</label>
-                <input id="edit-start-time" type="text" name="start_time" required placeholder="HH:mm" autocomplete="off">
+                <label class="form-label" for="edit-start-time">{{ trans('shift.field_start_time') }}</label>
+                <input id="edit-start-time" type="text" name="start_time" class="form-control" required placeholder="HH:mm" autocomplete="off">
             </div>
             <div class="mb-3">
-                <label for="edit-end-time">{{ trans('shift.field_end_time') }}</label>
-                <input id="edit-end-time" type="text" name="end_time" required placeholder="HH:mm" autocomplete="off">
+                <label class="form-label" for="edit-end-time">{{ trans('shift.field_end_time') }}</label>
+                <input id="edit-end-time" type="text" name="end_time" class="form-control" required placeholder="HH:mm" autocomplete="off">
             </div>
             <div class="text-end mt-3">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('shift.modal_cancel') }}</button>
@@ -101,13 +101,15 @@
         <input type="hidden" id="modal-assignment-action-id">
         <div id="modal-assignment-action-body"></div>
         <div class="text-end mt-3">
-            @if(Auth::user()->hasPermission('shift.cover'))
-            <button type="button" id="btn-cover-assignment" class="btn-primary">{{ trans('cover.action_request') }}</button>
-            @endif
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('shift.modal_cancel') }}</button>
-            @if(Auth::user()->hasPermission('shift.delete'))
-            <button type="button" id="btn-delete-assignment" class="btn-danger-full">{{ trans('shift.action_delete_assignment') }}</button>
-            @endif
+            <div class="d-flex gap-2">
+                @if(Auth::user()->hasPermission('shift.cover'))
+                <button type="button" id="btn-cover-assignment" class="btn btn-primary">{{ trans('cover.action_request') }}</button>
+                @endif
+                @if(Auth::user()->hasPermission('shift.delete'))
+                <button type="button" id="btn-delete-assignment" class="btn btn-danger">{{ trans('shift.action_delete_assignment') }}</button>
+                @endif
+            </div>
         </div>
     @endcomponent
 
@@ -117,20 +119,20 @@
         <form id="form-cover-request">
             <input type="hidden" id="cover-assignment-id">
             <div class="mb-3">
-                <label for="cover-user-id">{{ trans('cover.field_cover_user') }}</label>
-                <select id="cover-user-id" name="cover_user_id"></select>
+                <label class="form-label" for="cover-user-id">{{ trans('cover.field_cover_user') }}</label>
+                <select id="cover-user-id" name="cover_user_id" class="form-select"></select>
             </div>
             <div class="mb-3">
-                <label for="cover-start">{{ trans('shift.field_start_time') }}</label>
-                <input id="cover-start" type="text" name="cover_start" required placeholder="HH:mm" autocomplete="off">
+                <label class="form-label" for="cover-start">{{ trans('shift.field_start_time') }}</label>
+                <input id="cover-start" type="text" name="cover_start" class="form-control" required placeholder="HH:mm" autocomplete="off">
             </div>
             <div class="mb-3">
-                <label for="cover-end">{{ trans('shift.field_end_time') }}</label>
-                <input id="cover-end" type="text" name="cover_end" required placeholder="HH:mm" autocomplete="off">
+                <label class="form-label" for="cover-end">{{ trans('shift.field_end_time') }}</label>
+                <input id="cover-end" type="text" name="cover_end" class="form-control" required placeholder="HH:mm" autocomplete="off">
             </div>
             <div class="mb-3">
-                <label for="cover-reason">{{ trans('cover.field_reason') }}</label>
-                <input id="cover-reason" type="text" name="reason" placeholder="選填" autocomplete="off">
+                <label class="form-label" for="cover-reason">{{ trans('cover.field_reason') }}</label>
+                <input id="cover-reason" type="text" name="reason" class="form-control" placeholder="選填" autocomplete="off">
             </div>
             <div class="text-end mt-3">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('cover.modal_cancel') }}</button>
@@ -144,8 +146,8 @@
     @component('components.modal', ['id' => 'modal-cover-confirm', 'title' => ''])
         <div id="modal-cover-confirm-body"></div>
         <div class="text-end mt-3">
-            <button type="button" data-bs-dismiss="modal" class="btn-cancel">{{ trans('cover.modal_cancel') }}</button>
-            <button type="button" id="btn-cover-confirm-ok" class="btn-primary">{{ trans('cover.modal_confirm') }}</button>
+            <button type="button" data-bs-dismiss="modal" class="btn btn-secondary">{{ trans('cover.modal_cancel') }}</button>
+            <button type="button" id="btn-cover-confirm-ok" class="btn btn-primary">{{ trans('cover.modal_confirm') }}</button>
         </div>
     @endcomponent
 
@@ -153,7 +155,7 @@
     @component('components.modal', ['id' => 'modal-message', 'title' => ''])
         <p id="modal-message-text"></p>
         <div class="text-end mt-3">
-            <button type="button" data-bs-dismiss="modal" class="btn-primary">OK</button>
+            <button type="button" data-bs-dismiss="modal" class="btn btn-primary">OK</button>
         </div>
     @endcomponent
 @endsection

@@ -478,8 +478,8 @@
         if (inst) { inst.hide(); }
     };
 
-    // Modal 關閉後清除殘留 backdrop + body class
-    document.addEventListener('hidden.bs.modal', function () {
+    // Modal 關閉後清除殘留 backdrop + body class + 重設表單
+    document.addEventListener('hidden.bs.modal', function (e) {
         var backdrops = document.querySelectorAll('.modal-backdrop');
         var openModals = document.querySelectorAll('.modal.show');
         if (openModals.length === 0) {
@@ -487,6 +487,12 @@
             document.body.classList.remove('modal-open');
             document.body.style.removeProperty('padding-right');
             document.body.style.removeProperty('overflow');
+        }
+        // 清空關閉的 modal 內的表單
+        var modal = e.target;
+        if (modal && modal.classList.contains('modal')) {
+            var form = modal.querySelector('form');
+            if (form) { form.reset(); }
         }
     });
     </script>

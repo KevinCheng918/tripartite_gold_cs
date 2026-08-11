@@ -92,7 +92,8 @@
 
     function openModal(id) {
         var el = document.getElementById(id);
-        if (el) { showBsModal(el); }
+        if (!el) { return; }
+        showBsModal(el);
     }
 
     function closeModal(id) {
@@ -101,11 +102,23 @@
     }
 
     function showMessage(message) {
+        // 先關閉所有已開啟的 modal，避免疊加
+        document.querySelectorAll('.modal.show').forEach(function (m) {
+            if (m.id !== 'modal-message') {
+                hideBsModal(m);
+            }
+        });
         var textEl = document.getElementById('modal-message-text');
         var headerEl = document.querySelector('#modal-message .modal-header h3');
         if (textEl) { textEl.textContent = message; }
         if (headerEl) { headerEl.textContent = ''; }
-        openModal('modal-message');
+        // 檢查是否有 backdrop 殘留或 modal 正在關閉中
+        var hasBackdrop = document.querySelectorAll('.modal-backdrop').length > 0;
+        if (hasBackdrop) {
+            setTimeout(function () { openModal('modal-message'); }, 400);
+        } else {
+            openModal('modal-message');
+        }
     }
 
     function getErrorMessage(error) {
@@ -504,7 +517,7 @@
             actionBar += '<button class="btn-primary" id="js-open-assign">' + i18n.action_assign + '</button> ';
         }
         if (!isAdmin && hasPerm('shift.swap')) {
-            actionBar += '<button class="btn-sm" id="js-open-swap">' + i18n.action_swap + '</button>';
+            actionBar += '<button class="btn-primary" id="js-open-swap">' + i18n.action_swap + '</button>';
         }
         actionBar += '</div>';
 
@@ -540,6 +553,15 @@
         var swapBtn = document.getElementById('js-open-swap');
         if (swapBtn) {
             swapBtn.addEventListener('click', function () {
+                // 清空日期和班別
+                var myDate = document.getElementById('swap-my-date');
+                var tgtDate = document.getElementById('swap-target-date');
+                if (myDate) { myDate.value = ''; }
+                if (tgtDate) { tgtDate.value = ''; }
+                var myShift = document.getElementById('swap-my-shift');
+                var tgtShift = document.getElementById('swap-target-shift');
+                if (myShift) { myShift.innerHTML = ''; }
+                if (tgtShift) { tgtShift.innerHTML = ''; }
                 openModal('modal-swap');
             });
         }
@@ -689,8 +711,8 @@
 
             if (swap.status === 0 && swap.target_id === currentUserId) {
                 actions =
-                    '<button class="btn-primary js-respond-swap" data-id="' + swap.id + '" data-status="1">' + i18n.action_approve + '</button> ' +
-                    '<button class="btn-sm js-respond-swap" data-id="' + swap.id + '" data-status="2">' + i18n.action_reject + '</button>';
+                    '<button class="btn btn-primary js-respond-swap" data-id="' + swap.id + '" data-status="1">' + i18n.action_approve + '</button> ' +
+                    '<button class="btn btn-secondary js-respond-swap" data-id="' + swap.id + '" data-status="2">' + i18n.action_reject + '</button>';
             }
 
             return (
@@ -722,8 +744,8 @@
             if (swap.status === 0 && swap.target_id === currentUserId) {
                 actions =
                     '<div class="shift-card__actions">' +
-                    '<button class="btn-primary btn-sm js-respond-swap" data-id="' + swap.id + '" data-status="1">' + i18n.action_approve + '</button>' +
-                    '<button class="btn-sm js-respond-swap" data-id="' + swap.id + '" data-status="2">' + i18n.action_reject + '</button>' +
+                    '<button class="btn btn-primary btn-sm js-respond-swap" data-id="' + swap.id + '" data-status="1">' + i18n.action_approve + '</button>' +
+                    '<button class="btn btn-secondary btn-sm js-respond-swap" data-id="' + swap.id + '" data-status="2">' + i18n.action_reject + '</button>' +
                     '</div>';
             }
 
@@ -754,7 +776,41 @@
 
         root.querySelectorAll('.js-respond-swap').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                respondSwap(parseInt(btn.dataset.id, 10), parseInt(btn.dataset.status, 10));
+                var swapId = parseInt(btn.dataset.id, 10);
+                var status = parseInt(btn.dataset.status, 10);
+                // 從表格行取得詳細資訊
+                var row = btn.closest('tr') || btn.closest('.shift-card');
+                var cells = row ? row.querySelectorAll('td') : [];
+                var requester = cells[0] ? cells[0].textContent.trim() : '-';
+                var reqDate = cells[1] ? cells[1].textContent.trim() : '-';
+                var reqShift = cells[2] ? cells[2].textContent.trim() : '-';
+                var target = cells[3] ? cells[3].textContent.trim() : '-';
+                var tgtDate = cells[4] ? cells[4].textContent.trim() : '-';
+                var tgtShift = cells[5] ? cells[5].textContent.trim() : '-';
+
+                var actionWord = status === 1 ? '同意' : '拒絕';
+                var confirmHtml =
+                    '<p><strong>確定要' + actionWord + '此換班請求？</strong></p>' +
+                    '<table class="table table-sm mt-2"><tbody>' +
+                    '<tr><th>發起方</th><td>' + requester + '</td></tr>' +
+                    '<tr><th>日期 / 班別</th><td>' + reqDate + ' ' + reqShift + '</td></tr>' +
+                    '<tr><th>對方</th><td>' + target + '</td></tr>' +
+                    '<tr><th>日期 / 班別</th><td>' + tgtDate + ' ' + tgtShift + '</td></tr>' +
+                    '</tbody></table>';
+
+                var confirmBody = document.getElementById('modal-cover-confirm-body');
+                if (confirmBody) { confirmBody.innerHTML = confirmHtml; }
+                var confirmOk = document.getElementById('btn-cover-confirm-ok');
+                if (confirmOk) {
+                    var newBtn = confirmOk.cloneNode(true);
+                    confirmOk.parentNode.replaceChild(newBtn, confirmOk);
+                    newBtn.id = 'btn-cover-confirm-ok';
+                    newBtn.addEventListener('click', function () {
+                        closeModal('modal-cover-confirm');
+                        respondSwap(swapId, status);
+                    });
+                }
+                openModal('modal-cover-confirm');
             });
         });
     }
@@ -1141,15 +1197,15 @@
             // 代班人可以回應（待確認時）
             if (c.cover_user_status === 0 && c.cover_user_id === currentUserId) {
                 actions =
-                    '<button class="btn-primary btn-sm js-cover-respond" data-id="' + c.id + '" data-status="1">' + (coverI18n.action_approve || '同意') + '</button> ' +
-                    '<button class="btn-sm js-cover-respond" data-id="' + c.id + '" data-status="2">' + (coverI18n.action_reject || '拒絕') + '</button>';
+                    '<button class="btn btn-primary btn-sm js-cover-respond" data-id="' + c.id + '" data-status="1">' + (coverI18n.action_approve || '同意') + '</button> ' +
+                    '<button class="btn btn-secondary btn-sm js-cover-respond" data-id="' + c.id + '" data-status="2">' + (coverI18n.action_reject || '拒絕') + '</button>';
             }
 
             // 管理者可以審核（代班人已同意、待審核時）
             if (isAdmin && c.cover_user_status === 1 && c.admin_status === 0) {
                 actions =
-                    '<button class="btn-primary btn-sm js-cover-admin" data-id="' + c.id + '" data-status="1">' + (coverI18n.action_admin_approve || '核准') + '</button> ' +
-                    '<button class="btn-sm js-cover-admin" data-id="' + c.id + '" data-status="2">' + (coverI18n.action_admin_reject || '駁回') + '</button>';
+                    '<button class="btn btn-primary btn-sm js-cover-admin" data-id="' + c.id + '" data-status="1">' + (coverI18n.action_admin_approve || '核准') + '</button> ' +
+                    '<button class="btn btn-secondary btn-sm js-cover-admin" data-id="' + c.id + '" data-status="2">' + (coverI18n.action_admin_reject || '駁回') + '</button>';
             }
 
             return (
@@ -1180,15 +1236,15 @@
             if (c.cover_user_status === 0 && c.cover_user_id === currentUserId) {
                 actions =
                     '<div class="shift-card__actions">' +
-                    '<button class="btn-primary btn-sm js-cover-respond" data-id="' + c.id + '" data-status="1">' + (coverI18n.action_approve || '同意') + '</button>' +
-                    '<button class="btn-sm js-cover-respond" data-id="' + c.id + '" data-status="2">' + (coverI18n.action_reject || '拒絕') + '</button>' +
+                    '<button class="btn btn-primary btn-sm js-cover-respond" data-id="' + c.id + '" data-status="1">' + (coverI18n.action_approve || '同意') + '</button>' +
+                    '<button class="btn btn-secondary btn-sm js-cover-respond" data-id="' + c.id + '" data-status="2">' + (coverI18n.action_reject || '拒絕') + '</button>' +
                     '</div>';
             }
             if (isAdmin && c.cover_user_status === 1 && c.admin_status === 0) {
                 actions =
                     '<div class="shift-card__actions">' +
-                    '<button class="btn-primary btn-sm js-cover-admin" data-id="' + c.id + '" data-status="1">' + (coverI18n.action_admin_approve || '核准') + '</button>' +
-                    '<button class="btn-sm js-cover-admin" data-id="' + c.id + '" data-status="2">' + (coverI18n.action_admin_reject || '駁回') + '</button>' +
+                    '<button class="btn btn-primary btn-sm js-cover-admin" data-id="' + c.id + '" data-status="1">' + (coverI18n.action_admin_approve || '核准') + '</button>' +
+                    '<button class="btn btn-secondary btn-sm js-cover-admin" data-id="' + c.id + '" data-status="2">' + (coverI18n.action_admin_reject || '駁回') + '</button>' +
                     '</div>';
             }
 
@@ -1226,15 +1282,44 @@
 
         document.getElementById('tab-content').innerHTML = html;
 
+        // 從表格行取得代班詳細資訊
+        function getCoverDetailFromRow(btn) {
+            var row = btn.closest('tr');
+            if (!row) { return {}; }
+            var cells = row.querySelectorAll('td');
+            return {
+                date: cells[0] ? cells[0].textContent.trim() : '-',
+                shift: cells[1] ? cells[1].textContent.trim() : '-',
+                requester: cells[2] ? cells[2].textContent.trim() : '-',
+                coverUser: cells[3] ? cells[3].textContent.trim() : '-',
+                time: cells[4] ? cells[4].textContent.trim() : '-',
+                reason: cells[5] ? cells[5].textContent.trim() : '-'
+            };
+        }
+
+        function buildCoverConfirmHtml(actionWord, detail) {
+            return '<p><strong>確定要' + actionWord + '此代班請求？</strong></p>' +
+                '<table class="table table-sm mt-2"><tbody>' +
+                '<tr><th>日期</th><td>' + detail.date + '</td></tr>' +
+                '<tr><th>班別</th><td>' + detail.shift + '</td></tr>' +
+                '<tr><th>原班人</th><td>' + detail.requester + '</td></tr>' +
+                '<tr><th>代班人</th><td>' + detail.coverUser + '</td></tr>' +
+                '<tr><th>代班時段</th><td>' + detail.time + '</td></tr>' +
+                '<tr><th>原因</th><td>' + detail.reason + '</td></tr>' +
+                '</tbody></table>';
+        }
+
         // 綁定代班人回應按鈕（含二次確認）
         root.querySelectorAll('.js-cover-respond').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 var coverId = parseInt(btn.dataset.id, 10);
                 var status = parseInt(btn.dataset.status, 10);
-                var actionLabel = status === 1 ? (coverI18n.action_approve || '同意') : (coverI18n.action_reject || '拒絕');
-                showCoverConfirm(actionLabel, status === 2, function () {
-                    respondCoverUser(coverId, status);
-                });
+                var actionWord = status === 1 ? '同意' : '拒絕';
+                var detail = getCoverDetailFromRow(btn);
+                var confirmBody = document.getElementById('modal-cover-confirm-body');
+                if (confirmBody) { confirmBody.innerHTML = buildCoverConfirmHtml(actionWord, detail); }
+                pendingCoverAction = function () { respondCoverUser(coverId, status); };
+                openModal('modal-cover-confirm');
             });
         });
 
@@ -1243,10 +1328,12 @@
             btn.addEventListener('click', function () {
                 var coverId = parseInt(btn.dataset.id, 10);
                 var status = parseInt(btn.dataset.status, 10);
-                var actionLabel = status === 1 ? (coverI18n.action_admin_approve || '核准') : (coverI18n.action_admin_reject || '駁回');
-                showCoverConfirm(actionLabel, status === 2, function () {
-                    respondCoverAdmin(coverId, status);
-                });
+                var actionWord = status === 1 ? '核准' : '駁回';
+                var detail = getCoverDetailFromRow(btn);
+                var confirmBody = document.getElementById('modal-cover-confirm-body');
+                if (confirmBody) { confirmBody.innerHTML = buildCoverConfirmHtml(actionWord, detail); }
+                pendingCoverAction = function () { respondCoverAdmin(coverId, status); };
+                openModal('modal-cover-confirm');
             });
         });
     }
@@ -1381,7 +1468,9 @@
         btnCover.addEventListener('click', function () {
             var assignmentId = parseInt(document.getElementById('modal-assignment-action-id').value, 10);
             closeModal('modal-assignment-action');
-            openCoverRequestModal(assignmentId);
+            setTimeout(function () {
+                openCoverRequestModal(assignmentId);
+            }, 350);
         });
     }
 

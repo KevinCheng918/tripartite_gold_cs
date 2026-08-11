@@ -187,6 +187,39 @@ class ShiftAssignmentRepository
      * @param array $attributes
      * @return ShiftSwap
      */
+    /**
+     * 檢查是否已有相同的待確認換班紀錄
+     *
+     * @param int $requesterAssignmentId
+     * @param int $targetAssignmentId
+     * @return bool
+     */
+    /**
+     * 檢查某人在某日是否已有其他排班（排除指定 assignment）
+     *
+     * @param int    $userId
+     * @param string $date
+     * @param int    $excludeAssignmentId
+     * @return bool
+     */
+    public function hasOtherAssignmentOnDate($userId, $date, $excludeAssignmentId)
+    {
+        return ShiftAssignment::query()
+            ->where('user_id', $userId)
+            ->where('date', $date)
+            ->where('id', '!=', $excludeAssignmentId)
+            ->exists();
+    }
+
+    public function hasPendingSwap($requesterAssignmentId, $targetAssignmentId)
+    {
+        return ShiftSwap::query()
+            ->where('requester_assignment_id', $requesterAssignmentId)
+            ->where('target_assignment_id', $targetAssignmentId)
+            ->where('status', ShiftSwap::STATUS_PENDING)
+            ->exists();
+    }
+
     public function createSwap($attributes)
     {
         return ShiftSwap::query()->create($attributes);
