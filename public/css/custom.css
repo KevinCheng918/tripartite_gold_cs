@@ -161,15 +161,25 @@
     font-size: 1rem !important;
 }
 
-/* Modal body 限高可滾動 */
+/* Modal 限高 + 滾動 */
+.modal-dialog-scrollable {
+    height: auto !important;
+    max-height: calc(100% - 2rem) !important;
+}
+.modal-dialog-scrollable .modal-content {
+    max-height: 75vh !important;
+}
 .modal-dialog-scrollable .modal-body {
-    max-height: 70vh !important;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch;
 }
+.modal {
+    align-items: flex-start !important;
+    padding-top: 2rem !important;
+}
 
 /* 修正 modal backdrop 殘留導致畫面變黑 */
-.modal-backdrop + .modal-backdrop { display: none; }
+.modal-backdrop ~ .modal-backdrop { display: none !important; }
 
 /* 內容區用瀏覽器原生捲動，不用 perfect-scrollbar */
 .app-main__outer {
