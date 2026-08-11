@@ -467,6 +467,8 @@
     window.showBsModal = function (el) {
         if (typeof el === 'string') { el = document.getElementById(el); }
         if (!el) { return; }
+        // 先清除所有殘留 backdrop
+        document.querySelectorAll('.modal-backdrop').forEach(function (b) { b.remove(); });
         bootstrap.Modal.getOrCreateInstance(el).show();
     };
     window.hideBsModal = function (el) {
@@ -475,6 +477,18 @@
         var inst = bootstrap.Modal.getInstance(el);
         if (inst) { inst.hide(); }
     };
+
+    // Modal 關閉後清除殘留 backdrop + body class
+    document.addEventListener('hidden.bs.modal', function () {
+        var backdrops = document.querySelectorAll('.modal-backdrop');
+        var openModals = document.querySelectorAll('.modal.show');
+        if (openModals.length === 0) {
+            backdrops.forEach(function (b) { b.remove(); });
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('padding-right');
+            document.body.style.removeProperty('overflow');
+        }
+    });
     </script>
 
     {{-- 相容層 --}}
