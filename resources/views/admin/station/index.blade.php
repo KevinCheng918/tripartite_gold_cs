@@ -303,7 +303,13 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('station.field_telegram_chat_id') }}</label>
-                            <input id="station-telegram-chat-id" type="text" class="form-control" name="telegram_chat_id" placeholder="-100xxxxxxxxxx">
+                            <div class="input-group">
+                                <input id="station-telegram-chat-id" type="text" class="form-control" name="telegram_chat_id" placeholder="-100xxxxxxxxxx">
+                                <button type="button" class="btn btn-outline-secondary" id="btn-detect-group">
+                                    <i class="fas fa-search me-1"></i>偵測
+                                </button>
+                            </div>
+                            <div id="bot-group-list" class="mt-2" style="display:none"></div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('station.field_note') }}</label>
@@ -410,6 +416,45 @@ $(function () {
         $('#station-id').val('');
         $('#form-station')[0].reset();
         $('#modal-station .modal-title').text('{{ trans("station.action_create") }}');
+    });
+
+    // 偵測 Telegram Bot 群組
+    $('#btn-detect-group').on('click', function () {
+        var $btn = $(this);
+        var $list = $('#bot-group-list');
+        $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>偵測中...');
+
+        $.ajax({
+            url: '/admin/stations/ajax-bot-groups',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            success: function (groups) {
+                if (!groups || groups.length === 0) {
+                    $list.html('<p class="text-muted mb-0">未找到群組</p>').show();
+                    $btn.prop('disabled', false).html('<i class="fas fa-search me-1"></i>偵測');
+                    return;
+                }
+                var html = '<div class="list-group">';
+                groups.forEach(function (g) {
+                    html += '<a href="javascript:void(0)" class="list-group-item list-group-item-action js-select-group" data-chat-id="' + g.chat_id + '">' +
+                        '<strong>' + g.title + '</strong>' +
+                        '<small class="text-muted ms-2">' + g.chat_id + '</small>' +
+                        '</a>';
+                });
+                html += '</div>';
+                $list.html(html).show();
+
+                $list.find('.js-select-group').on('click', function () {
+                    $('#station-telegram-chat-id').val($(this).data('chat-id'));
+                    $list.hide();
+                });
+
+                $btn.prop('disabled', false).html('<i class="fas fa-search me-1"></i>偵測');
+            },
+            error: function (xhr) {
+                $btn.prop('disabled', false).html('<i class="fas fa-search me-1"></i>偵測');
+                showMessage((xhr.responseJSON && xhr.responseJSON.message) || '偵測失敗');
+            }
+        });
     });
 
     // 同步點數
