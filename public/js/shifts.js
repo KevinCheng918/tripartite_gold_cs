@@ -28,12 +28,35 @@
     /** 星期名稱 */
     var weekdayNames = ['週一', '週二', '週三', '週四', '週五', '週六', '週日'];
 
-    /** 班別色塊對應（依班別 name） */
-    var shiftColors = {
-        morning:   { bg: '#fef3c7', border: '#f59e0b', text: '#92400e' },
-        afternoon: { bg: '#dbeafe', border: '#3b82f6', text: '#1e40af' },
-        night:     { bg: '#ede9fe', border: '#8b5cf6', text: '#5b21b6' }
-    };
+    /** 人員色盤（柔和色系，自動循環分配） */
+    var userPalette = [
+        { bg: '#fef3c7', border: '#f59e0b', text: '#92400e' },
+        { bg: '#dbeafe', border: '#3b82f6', text: '#1e40af' },
+        { bg: '#ede9fe', border: '#8b5cf6', text: '#5b21b6' },
+        { bg: '#dcfce7', border: '#22c55e', text: '#166534' },
+        { bg: '#ffe4e6', border: '#f43f5e', text: '#9f1239' },
+        { bg: '#e0f2fe', border: '#0ea5e9', text: '#0c4a6e' },
+        { bg: '#fce7f3', border: '#ec4899', text: '#9d174d' },
+        { bg: '#f0fdf4', border: '#4ade80', text: '#15803d' },
+        { bg: '#fef9c3', border: '#eab308', text: '#854d0e' },
+        { bg: '#e0e7ff', border: '#6366f1', text: '#3730a3' }
+    ];
+    var userColorMap = {};
+    var userColorIndex = 0;
+
+    /**
+     * 依 user_id 取得專屬顏色（同一人永遠同色）
+     *
+     * @param {number} userId
+     * @return {{ bg: string, border: string, text: string }}
+     */
+    function getUserColor(userId) {
+        if (!userColorMap[userId]) {
+            userColorMap[userId] = userPalette[userColorIndex % userPalette.length];
+            userColorIndex++;
+        }
+        return userColorMap[userId];
+    }
 
     /** 預設色塊 */
     var defaultColor = { bg: '#f3f4f6', border: '#9ca3af', text: '#374151' };
@@ -305,21 +328,24 @@
         var labelRendered = {};
 
         /**
-         * 為某日某小時建立所有需要顯示的色塊
-         * 同班別合併成一個色塊，人名用頓號連接
+         * 為某日某小時建立色塊
+         * 欄位固定為原班人員（userId），代班時改顏色和名稱但佔原班人的位置
+         *
+         * @param {string} date
+         * @param {number} hour
+         * @param {Array} dayUserIds 該天固定的人員順序
+         * @return {Array}
          */
-        function buildCellBlocks(date, hour) {
-            var blocks = [];
-            if (!lookup[date]) { return blocks; }
-
-            // 先收集這個小時所有匹配的排班，按 shift.name 分組
-            var shiftGroups = {};  // key: shift.name → { shift, users: [], assignmentIds: [], covers: [] }
+        function buildCellBlocks(date, hour, dayUserIds) {
+            // userId → { color, label, dataId, cls }
+            var slotMap = {};
+            if (!lookup[date]) { return []; }
 
             lookup[date].forEach(function (a) {
                 if (!a.shift) { return; }
-                var inRange = isTimeInRange(a.shift.start_time, a.shift.end_time, hour);
-                if (!inRange) { return; }
+                if (!isTimeInRange(a.shift.start_time, a.shift.end_time, hour)) { return; }
 
+                var originalUserId = a.user ? a.user.id : 0;
                 var covers = coverLookup[a.id] || [];
                 var coveredBy = null;
                 covers.forEach(function (c) {
@@ -329,7 +355,9 @@
                 });
 
                 if (coveredBy) {
-                    // 代班獨立處理
+                    // 代班：佔原班人的欄位，但用代班人的顏色
+                    var coverUserId = coveredBy.cover_user ? coveredBy.cover_user.id : 0;
+                    var coverColor = getUserColor(coverUserId);
                     var coverName = coveredBy.cover_user ? coveredBy.cover_user.nickname : '';
                     var originalName = a.user ? a.user.nickname : '';
                     var coverKey = date + '_cover_' + coveredBy.id;
@@ -337,48 +365,72 @@
                     if (!labelRendered[coverKey]) {
                         labelRendered[coverKey] = true;
                         coverLabel = '<div class="tt-block-info">' +
-                            '<div class="tt-block-name">' + coverName + '</div>' +
-                            '<div class="tt-block-user">代 ' + originalName + ' 的班</div>' +
+                            '<div class="tt-block-name" style="color:' + coverColor.text + '">' + coverName + '</div>' +
+                            '<div class="tt-block-user">代 ' + originalName + '</div>' +
                             '</div>';
                     }
-                    blocks.push({ cls: 'tt-shift-cover', label: coverLabel, dataId: a.id });
+                    slotMap[originalUserId] = { cls: 'tt-shift-user', label: coverLabel, dataId: a.id, color: coverColor };
                 } else {
-                    // 按班別分組
-                    var key = a.shift.name;
-                    if (!shiftGroups[key]) {
-                        shiftGroups[key] = { shift: a.shift, users: [], assignmentIds: [] };
+                    // 正常班
+                    if (!slotMap[originalUserId]) {
+                        slotMap[originalUserId] = { cls: 'tt-shift-user', shifts: [], assignmentIds: [], userName: a.user ? a.user.nickname : '', userId: originalUserId };
                     }
-                    var userName = a.user ? a.user.nickname : '';
-                    if (userName && shiftGroups[key].users.indexOf(userName) === -1) {
-                        shiftGroups[key].users.push(userName);
+                    var s = slotMap[originalUserId];
+                    var shiftName = a.shift.display_name || '';
+                    if (shiftName && (!s.shifts || s.shifts.indexOf(shiftName) === -1)) {
+                        if (!s.shifts) { s.shifts = []; }
+                        s.shifts.push(shiftName);
                     }
-                    shiftGroups[key].assignmentIds.push(a.id);
+                    if (!s.assignmentIds) { s.assignmentIds = []; }
+                    s.assignmentIds.push(a.id);
                 }
             });
 
-            // 把分組後的班別轉成色塊（同班別一個色塊）
-            Object.keys(shiftGroups).forEach(function (key) {
-                var group = shiftGroups[key];
-                var shiftCls = 'tt-shift-' + group.shift.name;
-                var shiftName = group.shift.display_name || '';
-                var usersStr = group.users.join('、');
-                var labelKey = date + '_shift_' + key;
-                var label = '';
-
-                if (!labelRendered[labelKey]) {
-                    labelRendered[labelKey] = true;
-                    label = '<div class="tt-block-info">' +
-                        '<div class="tt-block-name">' + shiftName + '</div>' +
-                        '<div class="tt-block-user">' + usersStr + '</div>' +
-                        '</div>';
+            // 轉成 blocks 陣列，按固定順序
+            var blocks = [];
+            dayUserIds.forEach(function (uid) {
+                var s = slotMap[uid];
+                if (!s) {
+                    blocks.push({ empty: true });
+                    return;
                 }
-
-                // dataId 用第一個 assignment 的 ID（點擊用）
-                blocks.push({ cls: shiftCls, label: label, dataId: group.assignmentIds[0] });
+                // 正常班需要最終組裝 label
+                if (s.shifts) {
+                    var color = getUserColor(uid);
+                    var labelKey = date + '_user_' + uid;
+                    var label = '';
+                    if (!labelRendered[labelKey]) {
+                        labelRendered[labelKey] = true;
+                        label = '<div class="tt-block-info">' +
+                            '<div class="tt-block-name" style="color:' + color.text + '">' + s.userName + '</div>' +
+                            '<div class="tt-block-user">' + s.shifts.join('、') + '</div>' +
+                            '</div>';
+                    }
+                    blocks.push({ cls: 'tt-shift-user', label: label, dataId: s.assignmentIds[0], color: color });
+                } else {
+                    // 代班已組裝好
+                    blocks.push(s);
+                }
             });
 
             return blocks;
         }
+
+        // 算出每天的原班人員（不含代班人），固定欄位順序
+        var dayUserOrder = {};
+        weekDays.forEach(function (day) {
+            var seen = {};
+            var userIds = [];
+            if (!lookup[day.date]) { dayUserOrder[day.date] = userIds; return; }
+
+            lookup[day.date].forEach(function (a) {
+                if (!a.user) { return; }
+                var uid = a.user.id;
+                if (!seen[uid]) { seen[uid] = true; userIds.push(uid); }
+            });
+            userIds.sort(function (a, b) { return a - b; });
+            dayUserOrder[day.date] = userIds;
+        });
 
         // 25 行（00:00 ~ 24:00）
         var bodyHtml = '';
@@ -388,23 +440,38 @@
             bodyHtml += '<td class="tt-time-cell">' + hourLabel + '</td>';
 
             weekDays.forEach(function (day) {
-                if (hour === 24) {
+                var dayUserIds = dayUserOrder[day.date] || [];
+                var colCount = dayUserIds.length || 1;
+
+                if (hour === 24 || dayUserIds.length === 0) {
                     bodyHtml += '<td class="tt-cell"></td>';
                     return;
                 }
 
-                var blocks = buildCellBlocks(day.date, hour);
+                var blocks = buildCellBlocks(day.date, hour, dayUserIds);
 
-                if (blocks.length === 0) {
+                // 檢查是否全部都是空的
+                var hasContent = false;
+                blocks.forEach(function (b) { if (!b.empty) { hasContent = true; } });
+
+                if (!hasContent) {
                     bodyHtml += '<td class="tt-cell"></td>';
                     return;
                 }
 
                 var cellClass = 'tt-cell tt-cell-multi';
-                var innerHtml = '<div class="tt-multi-wrap" style="grid-template-columns: repeat(' + blocks.length + ', 1fr)">';
+                var innerHtml = '<div class="tt-multi-wrap" style="grid-template-columns: repeat(' + colCount + ', 1fr)">';
 
                 blocks.forEach(function (b) {
-                    innerHtml += '<div class="tt-block ' + b.cls + ' js-assignment-cell" data-assignment-id="' + b.dataId + '">' + b.label + '</div>';
+                    if (b.empty) {
+                        innerHtml += '<div></div>';
+                    } else {
+                        var style = '';
+                        if (b.color) {
+                            style = ' style="background:' + b.color.bg + ';border-left:3px solid ' + b.color.border + '"';
+                        }
+                        innerHtml += '<div class="tt-block ' + b.cls + ' js-assignment-cell" data-assignment-id="' + b.dataId + '"' + style + '>' + b.label + '</div>';
+                    }
                 });
 
                 innerHtml += '</div>';
@@ -532,10 +599,9 @@
 
     function renderShiftsTable(shifts) {
         var rows = shifts.map(function (shift) {
-            var color = shiftColors[shift.name] || defaultColor;
             return (
                 '<tr data-id="' + shift.id + '">' +
-                '<td><span class="tt-legend" style="background:' + color.bg + ';border-color:' + color.border + ';color:' + color.text + '">' + shift.display_name + '</span></td>' +
+                '<td><span class="tt-legend" style="background:' + defaultColor.bg + ';border-color:' + defaultColor.border + ';color:' + defaultColor.text + '">' + shift.display_name + '</span></td>' +
                 '<td>' + shift.start_time + '</td>' +
                 '<td>' + shift.end_time + '</td>' +
                 '<td>' + (shift.is_active ? '<span class="badge bg-success">' + i18n.field_is_active + '</span>' : '<span class="badge bg-secondary">-</span>') + '</td>' +
@@ -545,11 +611,10 @@
         }).join('');
 
         var cards = shifts.map(function (shift) {
-            var color = shiftColors[shift.name] || defaultColor;
             return (
                 '<div class="shift-card" data-id="' + shift.id + '">' +
                 '<div class="shift-card__header">' +
-                '<span class="tt-legend" style="background:' + color.bg + ';border-color:' + color.border + ';color:' + color.text + '">' + shift.display_name + '</span>' +
+                '<span class="tt-legend" style="background:' + defaultColor.bg + ';border-color:' + defaultColor.border + ';color:' + defaultColor.text + '">' + shift.display_name + '</span>' +
                 (shift.is_active ? '<span class="badge bg-success">' + i18n.field_is_active + '</span>' : '<span class="badge bg-secondary">-</span>') +
                 '</div>' +
                 '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_start_time + '</span><span>' + shift.start_time + '</span></div>' +

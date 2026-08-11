@@ -2111,10 +2111,6 @@ table tbody tr:hover { background: rgba(0, 0, 0, 0.02); }
         min-width: 600px;
     }
 
-    .tt-multi-wrap {
-        grid-template-columns: 1fr !important;
-    }
-
     /* ---- Tabs ---- */
     .tabs {
         overflow-x: auto;
