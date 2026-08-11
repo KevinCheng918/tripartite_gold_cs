@@ -161,6 +161,13 @@
     font-size: 1rem !important;
 }
 
+/* Modal body 限高可滾動 */
+.modal-dialog-scrollable .modal-body {
+    max-height: 70vh !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+}
+
 /* 修正 modal backdrop 殘留導致畫面變黑 */
 .modal-backdrop + .modal-backdrop { display: none; }
 

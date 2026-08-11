@@ -123,7 +123,15 @@
                             @php
                                 $settings = $station->settings ?? [];
                                 $depositRate = isset($settings['system_rate']) ? number_format($settings['system_rate'] * 100, 2) . '%' : '-';
-                                $withdrawRate = isset($settings['system_rate_withdraw']) ? number_format($settings['system_rate_withdraw'] * 100, 2) . '%' : '-';
+                                if (empty($settings['withdraw'])) {
+                                    $withdrawRate = '未開啟';
+                                } elseif (empty($settings['withdraw_withholding_system'])) {
+                                    $withdrawRate = '不收費';
+                                } elseif (isset($settings['system_rate_withdraw'])) {
+                                    $withdrawRate = number_format($settings['system_rate_withdraw'] * 100, 2) . '%';
+                                } else {
+                                    $withdrawRate = '-';
+                                }
                             @endphp
                             <tr>
                                 <td>{{ $loop->iteration }}</td>
@@ -188,7 +196,15 @@
             @php
                 $settings = $station->settings ?? [];
                 $depositRate = isset($settings['system_rate']) ? number_format($settings['system_rate'] * 100, 2) . '%' : '-';
-                $withdrawRate = isset($settings['system_rate_withdraw']) ? number_format($settings['system_rate_withdraw'] * 100, 2) . '%' : '-';
+                if (empty($settings['withdraw'])) {
+                    $withdrawRate = '未開啟';
+                } elseif (empty($settings['withdraw_withholding_system'])) {
+                    $withdrawRate = '不收費';
+                } elseif (isset($settings['system_rate_withdraw'])) {
+                    $withdrawRate = number_format($settings['system_rate_withdraw'] * 100, 2) . '%';
+                } else {
+                    $withdrawRate = '-';
+                }
             @endphp
             <div class="card mb-2 shadow-sm">
                 <div class="card-body py-3">
@@ -305,7 +321,7 @@
 
     {{-- 詳細資訊 Modal --}}
     <div class="modal fade" id="modal-station-detail" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">站台詳細資訊</h5>
@@ -439,7 +455,17 @@ $(function () {
                 html += '<tr><th>系統</th><td>' + (station.system ? station.system.name : '-') + '</td></tr>';
                 html += '<tr><th>點數</th><td><strong>' + station.credits + '</strong></td></tr>';
                 html += '<tr><th>代收費率</th><td>' + (s.system_rate ? (s.system_rate * 100).toFixed(2) + '%' : '-') + '</td></tr>';
-                html += '<tr><th>代付費率</th><td>' + (s.system_rate_withdraw ? (s.system_rate_withdraw * 100).toFixed(2) + '%' : '-') + '</td></tr>';
+                var withdrawRateText = '-';
+                if (!s.withdraw) {
+                    withdrawRateText = '未開啟';
+                } else if (!s.withdraw_withholding_system) {
+                    withdrawRateText = '不收費';
+                } else if (s.system_rate_withdraw) {
+                    withdrawRateText = (s.system_rate_withdraw * 100).toFixed(2) + '%';
+                }
+                html += '<tr><th>代付費率</th><td>' + withdrawRateText + '</td></tr>';
+                html += '<tr><th>同系統轉單代收費率</th><td>' + (s.self_system_rate ? (s.self_system_rate * 100).toFixed(2) + '%' : '0%') + '</td></tr>';
+                html += '<tr><th>同系統轉單代付費率</th><td>' + (s.self_system_rate_withdraw ? (s.self_system_rate_withdraw * 100).toFixed(2) + '%' : '0%') + '</td></tr>';
                 html += '<tr><th>USDT 代收</th><td>' + (s.usdt_deposit ? on : off) + '</td></tr>';
                 html += '<tr><th>ATM 代收</th><td>' + (s.atm_deposit ? on : off) + '</td></tr>';
                 html += '<tr><th>超商代收</th><td>' + (s.cvs_deposit ? on : off) + '</td></tr>';
