@@ -165,8 +165,8 @@
                                                 data-domain="{{ $station->domain }}"
                                                 data-system-id="{{ $station->system_id }}"
                                                 data-api-url="{{ $station->api_url }}"
-                                                data-api-key="{{ $station->api_key }}"
-                                                data-telegram-chat-id="{{ $station->telegram_chat_id }}"
+                                                data-key-masked="{{ filled($station->api_key) ? Str::substr($station->api_key, 0, 4) . str_repeat('*', max(0, Str::length($station->api_key) - 8)) . Str::substr($station->api_key, -4) : '' }}"
+                                                data-tg-masked="{{ $station->telegramGroup && filled($station->telegramGroup->chat_id) ? Str::substr((string)$station->telegramGroup->chat_id, 0, 4) . str_repeat('*', max(0, Str::length((string)$station->telegramGroup->chat_id) - 8)) . Str::substr((string)$station->telegramGroup->chat_id, -4) : '' }}"
                                                 data-note="{{ $station->note }}">
                                             <i class="fas fa-edit me-1"></i>編輯
                                         </button>
@@ -246,8 +246,8 @@
                                     data-domain="{{ $station->domain }}"
                                     data-system-id="{{ $station->system_id }}"
                                     data-api-url="{{ $station->api_url }}"
-                                    data-api-key="{{ $station->api_key }}"
-                                    data-telegram-chat-id="{{ $station->telegram_chat_id }}"
+                                    data-key-masked="{{ filled($station->api_key) ? Str::substr($station->api_key, 0, 4) . str_repeat('*', max(0, Str::length($station->api_key) - 8)) . Str::substr($station->api_key, -4) : '' }}"
+                                    data-tg-masked="{{ $station->telegramGroup && filled($station->telegramGroup->chat_id) ? Str::substr((string)$station->telegramGroup->chat_id, 0, 4) . str_repeat('*', max(0, Str::length((string)$station->telegramGroup->chat_id) - 8)) . Str::substr((string)$station->telegramGroup->chat_id, -4) : '' }}"
                                     data-note="{{ $station->note }}">
                                 <i class="fas fa-edit me-1"></i>編輯
                             </button>
@@ -368,18 +368,25 @@ $(function () {
         showBsModal('modal-station-msg');
     }
 
-    // 編輯站台
+    // 編輯站台（敏感欄位顯示遮罩值）
+    var editApiKeyMasked = '';
+    var editChatIdMasked = '';
+
     $('.js-edit-station').on('click', function () {
         var $btn = $(this);
+        editApiKeyMasked = $btn.data('key-masked') || '';
+        editChatIdMasked = $btn.data('tg-masked') || '';
+
         $('#station-id').val($btn.data('id'));
         $('#station-name').val($btn.data('name'));
         $('#station-domain').val($btn.data('domain'));
         $('#station-system').val($btn.data('system-id'));
         $('#station-api-url').val($btn.data('api-url'));
-        $('#station-api-key').val($btn.data('api-key'));
-        $('#station-telegram-chat-id').val($btn.data('telegram-chat-id'));
+        $('#station-api-key').val(editApiKeyMasked);
+        $('#station-telegram-chat-id').val(editChatIdMasked);
         $('#station-note').val($btn.data('note'));
         $('#modal-station .modal-title').text('{{ trans("station.action_edit") }}');
+        $('#bot-group-list').hide();
         showBsModal('modal-station');
     });
 
@@ -390,19 +397,29 @@ $(function () {
         var url = id ? '/admin/stations/ajax-update/' + id : '/admin/stations/ajax-store';
         var method = id ? 'PUT' : 'POST';
 
+        var apiKeyVal = $('#station-api-key').val();
+        var chatIdVal = $('#station-telegram-chat-id').val();
+        var payload = {
+            system_id: $('#station-system').val(),
+            name: $('#station-name').val(),
+            domain: $('#station-domain').val(),
+            api_url: $('#station-api-url').val(),
+            note: $('#station-note').val(),
+        };
+        // 敏感欄位：只有被修改時才傳送（遮罩值不傳）
+        if (apiKeyVal !== editApiKeyMasked) { payload.api_key = apiKeyVal; }
+        if (chatIdVal !== editChatIdMasked) { payload.telegram_chat_id = chatIdVal; }
+        // 新增時一律傳
+        if (!id) {
+            payload.api_key = apiKeyVal;
+            payload.telegram_chat_id = chatIdVal;
+        }
+
         $.ajax({
             url: url, method: method,
             headers: { 'X-CSRF-TOKEN': csrfToken },
             contentType: 'application/json',
-            data: JSON.stringify({
-                system_id: $('#station-system').val(),
-                name: $('#station-name').val(),
-                domain: $('#station-domain').val(),
-                api_url: $('#station-api-url').val(),
-                api_key: $('#station-api-key').val(),
-                telegram_chat_id: $('#station-telegram-chat-id').val(),
-                note: $('#station-note').val(),
-            }),
+            data: JSON.stringify(payload),
             success: function () { location.reload(); },
             error: function (xhr) {
                 var msg = (xhr.responseJSON && xhr.responseJSON.message) || '操作失敗';
