@@ -178,6 +178,18 @@
     padding-top: 2rem !important;
 }
 
+/* 排班色塊等寬 */
+.tt-multi-wrap > .tt-block,
+.tt-multi-wrap > div {
+    min-width: 0 !important;
+    overflow: hidden;
+}
+.tt-block-name,
+.tt-block-user {
+    word-break: break-all;
+    font-size: 0.75rem;
+}
+
 /* 修正 modal backdrop 殘留導致畫面變黑 */
 .modal-backdrop ~ .modal-backdrop { display: none !important; }
 
