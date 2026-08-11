@@ -416,20 +416,26 @@
             return blocks;
         }
 
-        // 算出每天的原班人員（不含代班人），固定欄位順序
+        // 算出每天的原班人員，按班別開始時間排序（早→午→晚），同班再按 userId
         var dayUserOrder = {};
         weekDays.forEach(function (day) {
             var seen = {};
-            var userIds = [];
-            if (!lookup[day.date]) { dayUserOrder[day.date] = userIds; return; }
+            var userEntries = [];  // { userId, shiftStart }
+            if (!lookup[day.date]) { dayUserOrder[day.date] = []; return; }
 
             lookup[day.date].forEach(function (a) {
                 if (!a.user) { return; }
                 var uid = a.user.id;
-                if (!seen[uid]) { seen[uid] = true; userIds.push(uid); }
+                if (seen[uid]) { return; }
+                seen[uid] = true;
+                var shiftStart = a.shift ? parseHour(a.shift.start_time) : 99;
+                userEntries.push({ userId: uid, shiftStart: shiftStart });
             });
-            userIds.sort(function (a, b) { return a - b; });
-            dayUserOrder[day.date] = userIds;
+            userEntries.sort(function (a, b) {
+                if (a.shiftStart !== b.shiftStart) { return a.shiftStart - b.shiftStart; }
+                return a.userId - b.userId;
+            });
+            dayUserOrder[day.date] = userEntries.map(function (e) { return e.userId; });
         });
 
         // 25 行（00:00 ~ 24:00）
