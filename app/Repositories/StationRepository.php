@@ -80,7 +80,7 @@ class StationRepository
     public function getActiveWithTelegram()
     {
         return Station::query()
-            ->select(['id', 'name', 'domain', 'telegram_group_id'])
+            ->select(['id', 'system_id', 'name', 'domain', 'telegram_group_id'])
             ->with(['system', 'telegramGroup'])
             ->where('status', config('constants.STATION.STATUS.ACTIVE'))
             ->whereNotNull('telegram_group_id')

@@ -239,7 +239,11 @@ $(function () {
             data: formData,
             processData: false,
             contentType: false,
-            success: function () { location.reload(); },
+            success: function (body) {
+                hideBsModal(document.getElementById('modal-payment-config'));
+                showMessage(body.message || '{{ trans("payment_config.msg.updated") }}');
+                setTimeout(function () { location.reload(); }, 1500);
+            },
             error: function (xhr) {
                 showMessage((xhr.responseJSON && xhr.responseJSON.message) || '操作失敗');
             }

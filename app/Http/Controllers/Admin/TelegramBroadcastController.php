@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Services\StationService;
 use App\Services\TelegramBroadcastService;
 use App\Services\TelegramChatService;
 use Illuminate\Http\Request;
@@ -16,13 +17,16 @@ class TelegramBroadcastController extends Controller
 {
     private $broadcastService;
     private $chatService;
+    private $stationService;
 
     public function __construct(
         TelegramBroadcastService $broadcastService,
-        TelegramChatService $chatService
+        TelegramChatService $chatService,
+        StationService $stationService
     ) {
         $this->broadcastService = $broadcastService;
         $this->chatService = $chatService;
+        $this->stationService = $stationService;
     }
 
     /**
@@ -33,10 +37,12 @@ class TelegramBroadcastController extends Controller
     public function index()
     {
         $groups = $this->broadcastService->getTargetStations();
+        $systems = $this->stationService->getActiveSystems();
         $history = $this->broadcastService->list(20);
 
         return view('admin.telegram-broadcast.index', [
             'groups'  => $groups,
+            'systems' => $systems,
             'history' => $history,
         ]);
     }

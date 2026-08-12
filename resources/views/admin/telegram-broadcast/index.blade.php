@@ -23,39 +23,90 @@
     <div class="tab-content">
         {{-- 發送公告 Tab --}}
         <div class="tab-pane fade show active" id="tab-broadcast-send">
-            <div class="main-card mb-3 card">
-                <div class="card-body">
-                    <form id="form-broadcast">
-                        <div class="mb-3">
-                            <label class="form-label">{{ trans('broadcast.field_content') }}</label>
-                            <textarea id="bc-content" class="form-control" rows="5" required placeholder="{{ trans('broadcast.field_content') }}..."></textarea>
+            <form id="form-broadcast">
+            <div class="row">
+                {{-- 左側：公告內容 --}}
+                <div class="col-md-7 mb-3 d-flex">
+                    <div class="main-card card w-100">
+                        <div class="card-header fw-bold">
+                            <i class="fas fa-paper-plane me-2 text-muted"></i>{{ trans('broadcast.tab_send') }}
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">{{ trans('broadcast.field_target') }}</label>
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" name="target_type" value="1" id="target-all" checked>
-                                <label class="form-check-label" for="target-all">{{ trans('broadcast.target_all') }}</label>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">{{ trans('broadcast.field_content') }} <span class="text-danger">*</span></label>
+                                <textarea id="bc-content" class="form-control" rows="10" required placeholder="{{ trans('broadcast.field_content') }}..."></textarea>
                             </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" name="target_type" value="2" id="target-selected">
-                                <label class="form-check-label" for="target-selected">{{ trans('broadcast.target_selected') }}</label>
-                            </div>
-                        </div>
-                        <div class="mb-3" id="group-list-wrap" style="display:none">
-                            <label class="form-label">{{ trans('broadcast.field_groups') }}</label>
-                            @foreach($groups as $g)
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="group_ids[]" value="{{ $g['id'] }}" id="grp-{{ $g['id'] }}">
-                                    <label class="form-check-label" for="grp-{{ $g['id'] }}">{{ $g['title'] }}</label>
+                            <div class="mb-3">
+                                <label class="form-label">{{ trans('broadcast.field_target') }} <span class="text-danger">*</span></label>
+                                <div class="d-flex gap-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="target_type" value="1" id="target-all" checked>
+                                        <label class="form-check-label" for="target-all">{{ trans('broadcast.target_all') }}</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="target_type" value="2" id="target-selected">
+                                        <label class="form-check-label" for="target-selected">{{ trans('broadcast.target_selected') }}</label>
+                                    </div>
                                 </div>
-                            @endforeach
+                            </div>
+                            <div class="text-end">
+                                <button type="submit" class="btn btn-primary" id="btn-send">
+                                    <i class="fas fa-paper-plane me-1"></i>{{ trans('broadcast.btn_send') }}
+                                </button>
+                            </div>
                         </div>
-                        <button type="submit" class="btn btn-primary" id="btn-send">
-                            <i class="fas fa-paper-plane me-1"></i>{{ trans('broadcast.btn_send') }}
-                        </button>
-                    </form>
+                    </div>
+                </div>
+
+                {{-- 右側：發送範圍 --}}
+                <div class="col-md-5 mb-3 d-flex">
+                    <div class="main-card card w-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="fw-bold"><i class="fas fa-users me-2 text-muted"></i>發送範圍</span>
+                            <div class="d-flex gap-2">
+                                <select id="bc-system-filter" class="form-select form-select-sm" style="width:auto">
+                                    <option value="">全部系統</option>
+                                    @foreach($systems as $sys)
+                                        <option value="{{ $sys->id }}">{{ $sys->name }}</option>
+                                    @endforeach
+                                </select>
+                                <input type="text" id="bc-search" class="form-control form-control-sm" placeholder="搜尋..." style="width:120px">
+                            </div>
+                        </div>
+                        <div class="card-body" id="group-list-wrap" style="overflow-y:auto;flex:1">
+                            {{-- 全部群組時顯示提示 --}}
+                            <div id="bc-all-hint" class="text-center text-muted py-4">
+                                <i class="fas fa-users fa-2x mb-2 d-block"></i>
+                                將發送給所有正常狀態的群組
+                            </div>
+                            {{-- 指定群組時顯示勾選列表 --}}
+                            <div id="bc-group-checkboxes" style="display:none">
+                                <div class="mb-2">
+                                    <label class="form-check d-inline-block me-3">
+                                        <input type="checkbox" class="form-check-input" id="bc-select-all">
+                                        <span class="form-check-label fw-bold">全選</span>
+                                    </label>
+                                    <small class="text-muted" id="bc-selected-count">已選 0 個</small>
+                                </div>
+                                <div id="bc-group-list">
+                                    @foreach($groups as $g)
+                                        <div class="form-check bc-group-item" data-system-id="{{ $g['system_id'] ?? '' }}" data-name="{{ strtolower($g['title']) }}">
+                                            <input class="form-check-input bc-group-cb" type="checkbox" name="group_ids[]" value="{{ $g['id'] }}" id="grp-{{ $g['id'] }}">
+                                            <label class="form-check-label" for="grp-{{ $g['id'] }}">
+                                                {{ $g['title'] }}
+                                                @if(!empty($g['system']))
+                                                    <small class="text-muted">({{ $g['system'] }})</small>
+                                                @endif
+                                            </label>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
+            </form>
         </div>
 
         {{-- 歷史紀錄 Tab --}}
@@ -186,8 +237,42 @@ $(function () {
 
     // 切換全部/指定
     $('input[name="target_type"]').on('change', function () {
-        $('#group-list-wrap').toggle($(this).val() === '2');
+        var isSelected = $(this).val() === '2';
+        $('#bc-all-hint').toggle(!isSelected);
+        $('#bc-group-checkboxes').toggle(isSelected);
     });
+
+    // 系統篩選
+    $('#bc-system-filter').on('change', function () {
+        var sysId = $(this).val();
+        $('.bc-group-item').each(function () {
+            var match = !sysId || $(this).data('system-id') == sysId;
+            $(this).toggle(match);
+        });
+    });
+
+    // 搜尋
+    $('#bc-search').on('input', function () {
+        var kw = $(this).val().toLowerCase();
+        $('.bc-group-item').each(function () {
+            var name = $(this).data('name') || '';
+            $(this).toggle(name.indexOf(kw) !== -1);
+        });
+    });
+
+    // 全選
+    $('#bc-select-all').on('change', function () {
+        var checked = $(this).prop('checked');
+        $('.bc-group-item:visible .bc-group-cb').prop('checked', checked);
+        updateSelectedCount();
+    });
+
+    // 計數
+    function updateSelectedCount() {
+        var count = $('.bc-group-cb:checked').length;
+        $('#bc-selected-count').text('已選 ' + count + ' 個');
+    }
+    $(document).on('change', '.bc-group-cb', updateSelectedCount);
 
     // 發送
     $('#form-broadcast').on('submit', function (e) {
@@ -200,7 +285,7 @@ $(function () {
 
         if (targetType === 2) {
             var ids = [];
-            $('input[name="group_ids[]"]:checked').each(function () { ids.push(parseInt($(this).val(), 10)); });
+            $('.bc-group-cb:checked').each(function () { ids.push(parseInt($(this).val(), 10)); });
             if (ids.length === 0) { showMessage('{{ trans("broadcast.msg.no_group_selected") }}'); return; }
             data.group_ids = ids;
         }
