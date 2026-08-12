@@ -11,6 +11,7 @@ use App\Services\PaymentConfigService;
 use App\Services\TelegramChatService;
 use App\Services\VmService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 /**
