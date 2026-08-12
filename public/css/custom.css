@@ -37,9 +37,11 @@
 /* 修正 chat-box 泡泡寬度 */
 .chat-box-wrapper .chat-box {
     min-width: auto !important;
-    max-width: none !important;
+    max-width: 85% !important;
     flex: none !important;
     display: inline-block !important;
+    word-break: break-all;
+    white-space: pre-wrap;
 }
 
 /* 發送方靠右 */
@@ -180,6 +182,17 @@
 .modal {
     align-items: flex-start !important;
     padding-top: 2rem !important;
+}
+
+/* 手機版 header 防跑版 */
+@media (max-width: 767.98px) {
+    #topbar-clock {
+        font-size: 0.75rem !important;
+    }
+    .app-header-right .btn-outline-danger span,
+    .app-header-right .btn-outline-danger .logout-text {
+        display: none;
+    }
 }
 
 /* 打卡面板置中修正 */
