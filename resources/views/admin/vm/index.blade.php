@@ -748,46 +748,43 @@ $(function () {
             });
         });
 
-        // 發送通知到 Telegram
+        // 發送通知到 Telegram（含圖片）
+        var sendingBilling = false;
         $('.js-send-billing').off('click').on('click', function () {
+            if (sendingBilling) { return; }
+            sendingBilling = true;
             var $btn = $(this);
-            var systemId = $btn.data('system-id');
-            var groupId = $btn.data('group-id');
-            var station = $btn.data('station');
-            var amount = $btn.data('amount');
-            var month = $btn.data('month');
+            var originalHtml = $btn.html();
+            $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>發送中...');
+            // 鎖定所有發送按鈕
+            $('.js-send-billing').prop('disabled', true);
 
             $.ajax({
-                url: '/admin/payment-config/ajax-by-system?system_id=' + systemId,
+                url: '/admin/vm/ajax-send-payment-notice',
+                method: 'POST',
                 headers: { 'X-CSRF-TOKEN': csrfToken },
-                success: function (configs) {
-                    if (!configs || configs.length === 0) {
-                        showMessage('{{ trans("payment_config.msg.no_config") }}');
-                        return;
-                    }
-                    var config = configs[0];
-                    var template = config.template || config.content;
-                    var text = template
-                        .replace(/\{station\}/g, station)
-                        .replace(/\{amount\}/g, amount)
-                        .replace(/\{month\}/g, month);
-
-                    text += '\n\n' + config.content;
-
-                    // 發送到站台的 Telegram 群組
-                    $.ajax({
-                        url: '/admin/telegram-chat/ajax-reply',
-                        method: 'POST',
-                        headers: { 'X-CSRF-TOKEN': csrfToken },
-                        contentType: 'application/json',
-                        data: JSON.stringify({ group_id: groupId, content: text }),
-                        success: function () {
-                            showMessage('{{ trans("payment_config.msg.sent") }}');
-                        },
-                        error: function () {
-                            showMessage('{{ trans("payment_config.msg.send_failed") }}');
-                        }
-                    });
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    group_id: $btn.data('group-id'),
+                    system_id: $btn.data('system-id'),
+                    station: $btn.data('station'),
+                    amount: String($btn.data('amount')),
+                    month: $btn.data('month'),
+                }),
+                success: function () {
+                    $btn.html('<i class="fas fa-check me-1"></i>已發送');
+                    setTimeout(function () {
+                        sendingBilling = false;
+                        $btn.prop('disabled', false).html(originalHtml);
+                        $('.js-send-billing').prop('disabled', false);
+                    }, 2000);
+                    showMessage('{{ trans("payment_config.msg.sent") }}');
+                },
+                error: function (xhr) {
+                    sendingBilling = false;
+                    $btn.prop('disabled', false).html(originalHtml);
+                    $('.js-send-billing').prop('disabled', false);
+                    showMessage((xhr.responseJSON && xhr.responseJSON.message) || '{{ trans("payment_config.msg.send_failed") }}');
                 }
             });
         });

@@ -7,6 +7,8 @@ use App\Http\Resources\VmBillingResource;
 use App\Http\Resources\VmServerResource;
 use App\Models\VmBilling;
 use App\Models\VmServer;
+use App\Services\PaymentConfigService;
+use App\Services\TelegramChatService;
 use App\Services\VmService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -17,10 +19,17 @@ use Illuminate\Support\Facades\Log;
 class VmController extends Controller
 {
     private $vmService;
+    private $paymentConfigService;
+    private $chatService;
 
-    public function __construct(VmService $vmService)
-    {
+    public function __construct(
+        VmService $vmService,
+        PaymentConfigService $paymentConfigService,
+        TelegramChatService $chatService
+    ) {
         $this->vmService = $vmService;
+        $this->paymentConfigService = $paymentConfigService;
+        $this->chatService = $chatService;
     }
 
     /**
@@ -246,6 +255,60 @@ class VmController extends Controller
             Log::error('帳單產生失敗', ['error' => $e->getMessage()]);
 
             return response()->json(['message' => trans('vm.msg.generate_failed')], 500);
+        }
+    }
+
+    /**
+     * Ajax 發送繳款通知到 Telegram（含圖片）
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxSendPaymentNotice(Request $request)
+    {
+        $params = $request->validate([
+            'group_id'  => 'required|integer',
+            'system_id' => 'required|integer',
+            'station'   => 'required|string',
+            'amount'    => 'required|string',
+            'month'     => 'required|string',
+        ]);
+
+        try {
+            $configs = $this->paymentConfigService->getActiveBySystem((int) $params['system_id']);
+
+            if ($configs->isEmpty()) {
+                return response()->json(['message' => trans('payment_config.msg.no_config')], 422);
+            }
+
+            $config = $configs->first();
+            $template = filled($config->template) ? $config->template : $config->content;
+            $text = $this->paymentConfigService->renderTemplate($template, [
+                'station' => $params['station'],
+                'amount'  => $params['amount'],
+                'month'   => $params['month'],
+            ]);
+
+            $text .= "\n\n{$config->content}";
+
+            $imageUrl = null;
+            if (filled($config->image)) {
+                $imageUrl = asset("storage/{$config->image}");
+            }
+
+            $this->chatService->sendReply(
+                (int) $params['group_id'],
+                $text,
+                Auth::id(),
+                Auth::user()->nickname,
+                $imageUrl
+            );
+
+            return response()->json(['message' => trans('payment_config.msg.sent')]);
+        } catch (\Exception $e) {
+            Log::error('繳款通知發送失敗', ['error' => $e->getMessage()]);
+
+            return response()->json(['message' => trans('payment_config.msg.send_failed')], 500);
         }
     }
 }
