@@ -136,6 +136,61 @@ class StationRepository
      *
      * @return \Illuminate\Database\Eloquent\Collection
      */
+    /**
+     * 統計各系統正常狀態站台數量
+     *
+     * @return \Illuminate\Support\Collection
+     */
+    /**
+     * 統計各系統站台數量（按狀態分組）
+     *
+     * @return array ['by_system' => [...], 'by_status' => [...], 'total' => N]
+     */
+    public function countActiveBySystem()
+    {
+        $all = Station::query()
+            ->selectRaw('system_id, status, COUNT(*) as count')
+            ->groupBy('system_id', 'status')
+            ->with(['system'])
+            ->get();
+
+        $activeStatus = config('constants.STATION.STATUS.ACTIVE');
+
+        $frozenStatus = config('constants.STATION.STATUS.FROZEN');
+        $disabledStatus = config('constants.STATION.STATUS.DISABLED');
+
+        // 按系統（含正常/凍結/關閉）
+        $bySystem = $all->groupBy('system_id')
+            ->map(function ($rows) use ($activeStatus, $frozenStatus, $disabledStatus) {
+                $first = $rows->first();
+                $active = $rows->where('status', $activeStatus)->sum('count');
+                $frozen = $rows->where('status', $frozenStatus)->sum('count');
+                $disabled = $rows->where('status', $disabledStatus)->sum('count');
+                return [
+                    'system_id' => $first->system_id,
+                    'name'      => $first->system ? $first->system->name : '未分類',
+                    'active'    => $active,
+                    'frozen'   => $frozen,
+                    'disabled' => $disabled,
+                    'total'    => $active + $frozen + $disabled,
+                ];
+            })->values();
+
+        // 按狀態
+        $activeCount = $all->where('status', config('constants.STATION.STATUS.ACTIVE'))->sum('count');
+        $frozenCount = $all->where('status', config('constants.STATION.STATUS.FROZEN'))->sum('count');
+        $disabledCount = $all->where('status', config('constants.STATION.STATUS.DISABLED'))->sum('count');
+        $total = $all->sum('count');
+
+        return [
+            'by_system'  => $bySystem,
+            'active'     => $activeCount,
+            'frozen'     => $frozenCount,
+            'disabled'   => $disabledCount,
+            'total'      => $total,
+        ];
+    }
+
     public function getActiveSystems()
     {
         return System::query()

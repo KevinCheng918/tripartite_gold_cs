@@ -104,6 +104,58 @@
     </div>
 
     {{-- 站台列表 --}}
+    {{-- 系統狀態總覽 --}}
+    <div class="main-card mb-3 card">
+        <div class="card-header py-2">
+            <strong><i class="fas fa-chart-bar me-2 text-muted"></i>系統狀態總覽</strong>
+            <small class="text-muted ms-2">即時掌握各系統運作狀態</small>
+        </div>
+        <div class="card-body py-3">
+            <div class="row g-3">
+                @php
+                    $cardColors = ['#6f42c1', '#0d9488', '#2563eb', '#e85d04', '#d63384', '#0ea5e9'];
+                @endphp
+                @foreach($systemStats['by_system'] as $idx => $stat)
+                    @php
+                        $initials = mb_strtoupper(mb_substr($stat['name'], 0, 2));
+                        $color = $cardColors[$idx % count($cardColors)];
+                    @endphp
+                    <div class="col">
+                        <a href="{{ route('admin.stations.index', ['system_id' => $stat['system_id'] ?? '']) }}" class="text-decoration-none">
+                            <div class="border rounded-3 p-3 d-flex align-items-center gap-3" style="border-left:4px solid {{ $color }} !important;cursor:pointer;transition:box-shadow .2s"
+                                 onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)'" onmouseout="this.style.boxShadow='none'">
+                                <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white"
+                                     style="width:40px;height:40px;min-width:40px;background:{{ $color }};font-size:0.8125rem">{{ $initials }}</div>
+                                <div>
+                                    <div class="fw-bold" style="color:#212529">{{ $stat['name'] }} <i class="fas fa-chevron-right" style="font-size:0.5rem;color:#adb5bd"></i></div>
+                                    <div class="d-flex gap-3 mt-1">
+                                        <span class="badge bg-success">正常 {{ $stat['active'] }}</span>
+                                        <span class="badge bg-warning text-dark">凍結 {{ $stat['frozen'] }}</span>
+                                        <span class="badge bg-danger">關閉 {{ $stat['disabled'] }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                @endforeach
+                <div class="col">
+                    <div class="border rounded-3 p-3 d-flex align-items-center gap-3" style="border-left:4px solid #0d9488 !important;background:#f8f9fa">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold"
+                             style="width:40px;height:40px;min-width:40px;background:#e9ecef;color:#495057;font-size:0.875rem"><i class="fas fa-clipboard-list"></i></div>
+                        <div>
+                            <div class="fw-bold">總計 <strong>{{ $systemStats['total'] }} 站</strong></div>
+                            <div class="d-flex gap-3 mt-1">
+                                <span class="badge bg-success">正常 {{ $systemStats['active'] }}</span>
+                                <span class="badge bg-warning text-dark">凍結 {{ $systemStats['frozen'] }}</span>
+                                <span class="badge bg-danger">關閉 {{ $systemStats['disabled'] }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- 桌面版：表格 --}}
     <div class="main-card mb-3 card d-none d-md-block">
         <div class="card-body p-0">
@@ -175,6 +227,11 @@
                                         </button>
                                         <button class="btn btn-sm btn-outline-secondary js-sync-credits" data-id="{{ $station->id }}">
                                             <i class="fas fa-sync-alt me-1"></i>同步
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary js-change-station-status"
+                                                data-id="{{ $station->id }}"
+                                                data-status="{{ $station->status }}">
+                                            <i class="fas fa-exchange-alt me-1"></i>狀態
                                         </button>
                                     @endif
                                 </td>
@@ -256,6 +313,11 @@
                             </button>
                             <button class="btn btn-sm btn-outline-secondary js-sync-credits" data-id="{{ $station->id }}">
                                 <i class="fas fa-sync-alt me-1"></i>同步
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary js-change-station-status"
+                                    data-id="{{ $station->id }}"
+                                    data-status="{{ $station->status }}">
+                                <i class="fas fa-exchange-alt me-1"></i>狀態
                             </button>
                         @endif
                     </div>
@@ -348,6 +410,47 @@
                 <div class="modal-body text-center py-4">
                     <p id="modal-station-msg-text" class="mb-3"></p>
                     <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- 調整狀態 Modal --}}
+    <div class="modal fade" id="modal-station-status" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">調整站台狀態</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="form-station-status">
+                        <input type="hidden" id="status-station-id">
+                        <div class="mb-3">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="radio" name="station_status" value="1" id="st-status-active">
+                                <label class="form-check-label" for="st-status-active">
+                                    <strong>{{ trans('station.status_active') }}</strong>
+                                </label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="radio" name="station_status" value="2" id="st-status-frozen">
+                                <label class="form-check-label" for="st-status-frozen">
+                                    <strong>{{ trans('station.status_frozen') }}</strong>
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="station_status" value="0" id="st-status-disabled">
+                                <label class="form-check-label" for="st-status-disabled">
+                                    <strong>{{ trans('station.status_disabled') }}</strong>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                            <button type="submit" class="btn btn-primary">確認</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -616,6 +719,32 @@ $(function () {
             }
         });
     });
+    // 調整狀態
+    $('.js-change-station-status').on('click', function () {
+        var $btn = $(this);
+        $('#status-station-id').val($btn.data('id'));
+        $('input[name="station_status"][value="' + $btn.data('status') + '"]').prop('checked', true);
+        showBsModal('modal-station-status');
+    });
+
+    $('#form-station-status').on('submit', function (e) {
+        e.preventDefault();
+        var id = $('#status-station-id').val();
+        var status = parseInt($('input[name="station_status"]:checked').val(), 10);
+
+        $.ajax({
+            url: '/admin/stations/ajax-update/' + id,
+            method: 'PUT',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            contentType: 'application/json',
+            data: JSON.stringify({ status: status }),
+            success: function () { location.reload(); },
+            error: function (xhr) {
+                showMessage((xhr.responseJSON && xhr.responseJSON.message) || '操作失敗');
+            }
+        });
+    });
+
     // 系統管理
     $('#btn-open-system-mgmt').on('click', function () {
         showBsModal('modal-system-mgmt');

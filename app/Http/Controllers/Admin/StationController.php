@@ -31,11 +31,13 @@ class StationController extends Controller
         $params = $request->only(['keyword', 'domain', 'system_id', 'status', 'credits_min', 'credits_max', 'support_shop', 'score_runner', 'per_page']);
         $stations = $this->stationService->list($params);
         $systems = $this->stationService->getActiveSystems();
+        $systemStats = $this->stationService->getSystemStats();
 
         return view('admin.station.index', [
-            'stations' => $stations,
-            'systems'  => $systems,
-            'filters'  => $params,
+            'stations'    => $stations,
+            'systems'     => $systems,
+            'filters'     => $params,
+            'systemStats' => $systemStats,
         ]);
     }
 
