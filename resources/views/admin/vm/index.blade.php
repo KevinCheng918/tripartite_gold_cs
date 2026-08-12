@@ -529,7 +529,7 @@ $(function () {
                     actions += '<button class="btn btn-sm btn-outline-secondary js-send-billing"' +
                         ' data-system-id="' + systemId + '"' +
                         ' data-station="' + stationName + '"' +
-                        ' data-station-id="' + b.vm_server.station.id + '"' +
+                        ' data-group-id="' + b.vm_server.station.telegram_group_id + '"' +
                         ' data-amount="' + b.amount + '"' +
                         ' data-month="' + b.billing_month + '">' +
                         '<i class="fas fa-paper-plane me-1"></i>{{ trans("payment_config.action_send") }}</button> ';
@@ -752,7 +752,7 @@ $(function () {
         $('.js-send-billing').off('click').on('click', function () {
             var $btn = $(this);
             var systemId = $btn.data('system-id');
-            var stationId = $btn.data('station-id');
+            var groupId = $btn.data('group-id');
             var station = $btn.data('station');
             var amount = $btn.data('amount');
             var month = $btn.data('month');
@@ -780,7 +780,7 @@ $(function () {
                         method: 'POST',
                         headers: { 'X-CSRF-TOKEN': csrfToken },
                         contentType: 'application/json',
-                        data: JSON.stringify({ station_id: stationId, content: text }),
+                        data: JSON.stringify({ group_id: groupId, content: text }),
                         success: function () {
                             showMessage('{{ trans("payment_config.msg.sent") }}');
                         },
