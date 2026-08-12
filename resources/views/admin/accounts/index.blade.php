@@ -5,15 +5,61 @@
 
 @section('content')
 
+    {{-- 搜尋區 --}}
     <div class="main-card mb-3 card">
-        <div class="card-header d-flex align-items-center">
-            <span class="me-auto fw-bold">{{ trans('account.page_title') }}</span>
-            @if(Auth::user()->isAdmin())
-                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-create-account">
-                    <i class="fas fa-plus me-1"></i>{{ trans('account.action_create') }}
-                </button>
-            @endif
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <div class="d-flex gap-2">
+                @if(Auth::user()->isAdmin())
+                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-create-account">
+                        <i class="fas fa-plus me-1"></i>{{ trans('account.action_create') }}
+                    </button>
+                @endif
+            </div>
+            <a href="javascript:void(0)" class="text-muted text-decoration-none" data-bs-toggle="collapse" data-bs-target="#account-search-collapse" aria-expanded="true">
+                — 折疊 —
+            </a>
         </div>
+        <div class="collapse show" id="account-search-collapse">
+            <div class="card-body pt-3">
+                <form method="GET">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3 col-6">
+                            <label class="form-label fw-bold">{{ trans('account.field_account') }}：</label>
+                            <input type="text" class="form-control" name="account" value="{{ $filters['account'] ?? '' }}" placeholder="{{ trans('account.field_account') }}">
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <label class="form-label fw-bold">{{ trans('account.field_nickname') }}：</label>
+                            <input type="text" class="form-control" name="nickname" value="{{ $filters['nickname'] ?? '' }}" placeholder="{{ trans('account.field_nickname') }}">
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <label class="form-label fw-bold">{{ trans('account.field_status') }}：</label>
+                            <select name="status" class="form-select">
+                                <option value="">全部</option>
+                                <option value="1" {{ ($filters['status'] ?? '') === '1' ? 'selected' : '' }}>{{ trans('account.status_normal') }}</option>
+                                <option value="2" {{ ($filters['status'] ?? '') === '2' ? 'selected' : '' }}>{{ trans('account.status_lock') }}</option>
+                                <option value="0" {{ ($filters['status'] ?? '') === '0' ? 'selected' : '' }}>{{ trans('account.status_deactivate') }}</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <label class="form-label fw-bold">{{ trans('account.field_level') }}：</label>
+                            <select name="level" class="form-select">
+                                <option value="">全部</option>
+                                <option value="1" {{ ($filters['level'] ?? '') === '1' ? 'selected' : '' }}>{{ trans('account.level_cs') }}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{{ route('admin.accounts.index') }}" class="btn btn-outline-secondary">重置</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search me-1"></i>搜尋
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-card mb-3 card">
         {{-- 桌面版：表格 --}}
         <div class="card-body p-0 d-none d-md-block">
             <div class="table-responsive">
@@ -257,6 +303,12 @@
 <script>
 $(function () {
     var csrfToken = $('meta[name="csrf-token"]').attr('content');
+
+    // 折疊文字切換
+    var $acCollapse = $('#account-search-collapse');
+    var $acToggle = $('[data-bs-target="#account-search-collapse"]');
+    $acCollapse.on('show.bs.collapse', function () { $acToggle.text('— 折疊 —'); });
+    $acCollapse.on('hide.bs.collapse', function () { $acToggle.text('— 展開 —'); });
 
     function showMessage(msg) {
         $('#modal-account-message-text').text(msg);

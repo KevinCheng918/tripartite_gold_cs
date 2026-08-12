@@ -39,12 +39,14 @@ class AccountController extends Controller
      *
      * @return \Illuminate\View\View
      */
-    public function index()
+    public function index(Request $request)
     {
-        $accounts = $this->accountService->list([]);
+        $params = $request->only(['account', 'nickname', 'status', 'level', 'per_page']);
+        $accounts = $this->accountService->list($params);
 
         return view('admin.accounts.index', [
             'accounts' => $accounts,
+            'filters'  => $params,
         ]);
     }
 

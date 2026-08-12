@@ -657,8 +657,8 @@ $(function () {
             var hasTelegram = b.vm_server && b.vm_server.station && b.vm_server.station.telegram_group_id;
 
             var actions = '';
-            // 複製文案 + 發送（所有狀態皆可）
-            if (systemId) {
+            // 複製文案 + 發送（未收款和待審核時才顯示）
+            if (systemId && b.paid !== 1) {
                 actions += '<button class="btn btn-sm btn-outline-secondary js-copy-billing"' +
                     ' data-system-id="' + systemId + '"' +
                     ' data-station="' + stationName + '"' +
