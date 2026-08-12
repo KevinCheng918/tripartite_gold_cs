@@ -13,7 +13,7 @@ return [
     'field_status'     => '状态',
     'field_sort'       => '排序',
 
-    'template_hint'    => '可用变量：{station} 站台、{amount} 金额、{month} 月份、{content} 缴款资讯。用 <code>文字</code> 包住可让 Telegram 点击复制',
+    'template_hint'    => '可用变量：{station} 站台、{amount} 金额、{month} 月份、{due_date} 缴款日、{content} 缴款资讯。用 <code>文字</code> 包住可让 Telegram 点击复制',
     'template_example' => "【缴款通知】\n站台：{station}\n月份：{month}\n金额：<code>{amount}</code>\n\n{content}",
 
     'status_active'   => '启用',

@@ -91,10 +91,11 @@ class PaymentConfigService
     public function renderTemplate($template, $vars)
     {
         $replacements = [
-            '{station}' => $vars['station'] ?? '',
-            '{amount}'  => $vars['amount'] ?? '',
-            '{month}'   => $vars['month'] ?? '',
-            '{content}' => $vars['content'] ?? '',
+            '{station}'  => $vars['station'] ?? '',
+            '{amount}'   => $vars['amount'] ?? '',
+            '{month}'    => $vars['month'] ?? '',
+            '{due_date}' => $vars['due_date'] ?? '',
+            '{content}'  => $vars['content'] ?? '',
         ];
 
         return str_replace(array_keys($replacements), array_values($replacements), $template);
