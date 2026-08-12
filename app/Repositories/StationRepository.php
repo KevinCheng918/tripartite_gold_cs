@@ -139,7 +139,7 @@ class StationRepository
     public function getActiveSystems()
     {
         return System::query()
-            ->select(['id', 'name'])
+            ->select(['id', 'name', 'bot_token'])
             ->where('status', 1)
             ->orderBy('name')
             ->get();
