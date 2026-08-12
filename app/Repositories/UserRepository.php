@@ -21,16 +21,28 @@ class UserRepository
     /**
      * 依條件分頁查詢使用者
      *
-     * @param array $criteria
+     * @param array $filters 篩選條件（account, nickname, status, level）
      * @param int   $perPage
      * @return LengthAwarePaginator
      */
-    public function paginate($criteria = [], $perPage = 20)
+    public function paginate($filters = [], $perPage = 20)
     {
         $query = User::query()->select(self::LIST_COLUMNS)->with('permissions');
 
-        foreach ($criteria as $criterion) {
-            $query = $criterion->apply($query);
+        if (filled($filters['account'] ?? null)) {
+            $query->where('account', 'like', "%{$filters['account']}%");
+        }
+
+        if (filled($filters['nickname'] ?? null)) {
+            $query->where('nickname', 'like', "%{$filters['nickname']}%");
+        }
+
+        if (isset($filters['status']) && $filters['status'] !== '' && $filters['status'] !== null) {
+            $query->where('status', (int) $filters['status']);
+        }
+
+        if (isset($filters['level']) && $filters['level'] !== '' && $filters['level'] !== null) {
+            $query->where('level', (int) $filters['level']);
         }
 
         return $query->orderByDesc('id')->paginate($perPage);

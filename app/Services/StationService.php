@@ -208,6 +208,16 @@ class StationService
      * @param array $params
      * @return \App\Models\System
      */
+    /**
+     * 取得各系統正常狀態站台數量統計
+     *
+     * @return array [ ['name' => '...', 'count' => N], ... ]
+     */
+    public function getSystemStats()
+    {
+        return $this->stationRepository->countActiveBySystem();
+    }
+
     public function updateSystem($system, $params)
     {
         return $this->stationRepository->updateSystem($system, $params);

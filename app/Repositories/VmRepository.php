@@ -60,6 +60,24 @@ class VmRepository
             $query->where('station_id', $criteria['station_id']);
         }
 
+        if (filled($criteria['system_id'] ?? null)) {
+            $query->whereHas('station', function ($q) use ($criteria) {
+                $q->where('system_id', $criteria['system_id']);
+            });
+        }
+
+        if (filled($criteria['hostname'] ?? null)) {
+            $query->where('hostname', 'like', "%{$criteria['hostname']}%");
+        }
+
+        if (filled($criteria['internal_ip'] ?? null)) {
+            $query->where('internal_ip', 'like', "%{$criteria['internal_ip']}%");
+        }
+
+        if (filled($criteria['external_ip'] ?? null)) {
+            $query->where('external_ip', 'like', "%{$criteria['external_ip']}%");
+        }
+
         if (isset($criteria['status']) && $criteria['status'] !== '' && $criteria['status'] !== null) {
             $query->where('status', (int) $criteria['status']);
         }

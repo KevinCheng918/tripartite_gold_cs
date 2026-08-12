@@ -30,14 +30,15 @@ class AccountService
      */
     public function list($params)
     {
-        $criteria = [];
-
-        if (filled($params['keyword'] ?? null)) {
-            $criteria[] = new \App\Criteria\User\UserKeywordSearchCriteria($params['keyword']);
-        }
+        $filters = [
+            'account'  => $params['account'] ?? null,
+            'nickname' => $params['nickname'] ?? null,
+            'status'   => $params['status'] ?? null,
+            'level'    => $params['level'] ?? null,
+        ];
 
         return $this->userRepository->paginate(
-            $criteria,
+            $filters,
             (int) ($params['per_page'] ?? config('constants.PAGINATION.USER', 20))
         );
     }

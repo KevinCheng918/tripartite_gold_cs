@@ -251,7 +251,7 @@ table tbody tr:hover { background: rgba(0, 0, 0, 0.02); }
 /* 今日排班班別分組 */
 .dash-today-shifts {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 1rem;
 }
 
