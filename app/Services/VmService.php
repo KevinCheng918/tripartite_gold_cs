@@ -33,6 +33,10 @@ class VmService
         $criteria = [
             'keyword'      => $params['keyword'] ?? null,
             'station_id'   => $params['station_id'] ?? null,
+            'system_id'    => $params['system_id'] ?? null,
+            'hostname'     => $params['hostname'] ?? null,
+            'internal_ip'  => $params['internal_ip'] ?? null,
+            'external_ip'  => $params['external_ip'] ?? null,
             'status'       => $params['status'] ?? null,
             'power_status' => $params['power_status'] ?? null,
         ];

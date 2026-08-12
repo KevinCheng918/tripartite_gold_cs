@@ -28,13 +28,72 @@
         {{-- 虛擬機列表 Tab --}}
         @if(Auth::user()->hasPermission('vm.view'))
         <div class="tab-pane fade {{ Auth::user()->hasPermission('vm.view') ? 'show active' : '' }}" id="tab-vm-servers">
-            @if(Auth::user()->hasPermission('vm.create'))
-            <div class="mb-3">
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-vm">
-                    <i class="fas fa-plus me-1"></i>{{ trans('vm.action_create') }}
-                </button>
+            {{-- 搜尋區 --}}
+            <div class="main-card mb-3 card">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <div class="d-flex gap-2">
+                        @if(Auth::user()->hasPermission('vm.create'))
+                            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-vm">
+                                <i class="fas fa-plus me-1"></i>{{ trans('vm.action_create') }}
+                            </button>
+                        @endif
+                    </div>
+                    <a href="javascript:void(0)" class="text-muted text-decoration-none" data-bs-toggle="collapse" data-bs-target="#vm-search-collapse" aria-expanded="true">
+                        — 折疊 —
+                    </a>
+                </div>
+                <div class="collapse show" id="vm-search-collapse">
+                    <div class="card-body pt-3">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-3 col-6">
+                                <label class="form-label fw-bold">系統：</label>
+                                <select id="vm-search-system" class="form-select">
+                                    <option value="">全部</option>
+                                    @foreach($systems as $sys)
+                                        <option value="{{ $sys->id }}">{{ $sys->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-3 col-6">
+                                <label class="form-label fw-bold">{{ trans('vm.field_hostname') }}：</label>
+                                <input type="text" class="form-control" id="vm-search-hostname" placeholder="{{ trans('vm.field_hostname') }}">
+                            </div>
+                            <div class="col-md-3 col-6">
+                                <label class="form-label fw-bold">{{ trans('vm.field_internal_ip') }}：</label>
+                                <input type="text" class="form-control" id="vm-search-internal-ip" placeholder="{{ trans('vm.field_internal_ip') }}">
+                            </div>
+                            <div class="col-md-3 col-6">
+                                <label class="form-label fw-bold">{{ trans('vm.field_external_ip') }}：</label>
+                                <input type="text" class="form-control" id="vm-search-external-ip" placeholder="{{ trans('vm.field_external_ip') }}">
+                            </div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-3 col-6">
+                                <label class="form-label fw-bold">{{ trans('vm.field_power') }}：</label>
+                                <select id="vm-search-power" class="form-select">
+                                    <option value="">全部</option>
+                                    <option value="1">{{ trans('vm.power_on') }}</option>
+                                    <option value="0">{{ trans('vm.power_off') }}</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 col-6">
+                                <label class="form-label fw-bold">{{ trans('vm.field_status') }}：</label>
+                                <select id="vm-search-status" class="form-select">
+                                    <option value="">全部</option>
+                                    <option value="1">{{ trans('vm.status_active') }}</option>
+                                    <option value="0">{{ trans('vm.status_disabled') }}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-end gap-2">
+                            <button type="button" class="btn btn-outline-secondary" id="btn-vm-reset">重置</button>
+                            <button type="button" class="btn btn-primary" id="btn-vm-search">
+                                <i class="fas fa-search me-1"></i>搜尋
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
-            @endif
 
             <div id="vm-stats" class="mb-3"></div>
 
@@ -259,8 +318,22 @@ $(function () {
     // ---------------------------------------------------------------
 
     function loadServers() {
+        var params = 'per_page=100';
+        var systemId = $('#vm-search-system').val();
+        var hostname = $('#vm-search-hostname').val();
+        var internalIp = $('#vm-search-internal-ip').val();
+        var externalIp = $('#vm-search-external-ip').val();
+        var power = $('#vm-search-power').val();
+        var status = $('#vm-search-status').val();
+        if (systemId) { params += '&system_id=' + systemId; }
+        if (hostname) { params += '&hostname=' + encodeURIComponent(hostname); }
+        if (internalIp) { params += '&internal_ip=' + encodeURIComponent(internalIp); }
+        if (externalIp) { params += '&external_ip=' + encodeURIComponent(externalIp); }
+        if (power !== '') { params += '&power_status=' + power; }
+        if (status !== '') { params += '&status=' + status; }
+
         $.ajax({
-            url: '/admin/vm/ajax-list?per_page=100',
+            url: '/admin/vm/ajax-list?' + params,
             headers: { 'X-CSRF-TOKEN': csrfToken },
             success: function (body) { renderServers(body.data || []); }
         });
@@ -973,6 +1046,24 @@ $(function () {
         var target = $(e.target).data('bs-target');
         if (target === '#tab-vm-billing') { loadBillings(); }
     });
+
+    // 搜尋 / 重置
+    $('#btn-vm-search').on('click', function () { loadServers(); });
+    $('#btn-vm-reset').on('click', function () {
+        $('#vm-search-system').val('');
+        $('#vm-search-hostname').val('');
+        $('#vm-search-internal-ip').val('');
+        $('#vm-search-external-ip').val('');
+        $('#vm-search-power').val('');
+        $('#vm-search-status').val('');
+        loadServers();
+    });
+
+    // 折疊文字切換
+    var $vmCollapse = $('#vm-search-collapse');
+    var $vmToggle = $('[data-bs-target="#vm-search-collapse"]');
+    $vmCollapse.on('show.bs.collapse', function () { $vmToggle.text('— 折疊 —'); });
+    $vmCollapse.on('hide.bs.collapse', function () { $vmToggle.text('— 展開 —'); });
 
     // 即時計算總金額
     function updateTotalFee() {

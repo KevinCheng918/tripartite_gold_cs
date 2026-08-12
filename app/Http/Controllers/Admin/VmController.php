@@ -8,6 +8,7 @@ use App\Http\Resources\VmServerResource;
 use App\Models\VmBilling;
 use App\Models\VmServer;
 use App\Services\PaymentConfigService;
+use App\Services\StationService;
 use App\Services\TelegramChatService;
 use App\Services\VmService;
 use Illuminate\Http\Request;
@@ -22,15 +23,18 @@ class VmController extends Controller
     private $vmService;
     private $paymentConfigService;
     private $chatService;
+    private $stationService;
 
     public function __construct(
         VmService $vmService,
         PaymentConfigService $paymentConfigService,
-        TelegramChatService $chatService
+        TelegramChatService $chatService,
+        StationService $stationService
     ) {
         $this->vmService = $vmService;
         $this->paymentConfigService = $paymentConfigService;
         $this->chatService = $chatService;
+        $this->stationService = $stationService;
     }
 
     /**
@@ -45,7 +49,9 @@ class VmController extends Controller
             abort(403);
         }
 
-        return view('admin.vm.index');
+        $systems = $this->stationService->getActiveSystems();
+
+        return view('admin.vm.index', ['systems' => $systems]);
     }
 
     /**
@@ -56,7 +62,7 @@ class VmController extends Controller
      */
     public function ajaxList(Request $request)
     {
-        $params = $request->only(['keyword', 'station_id', 'status', 'power_status', 'per_page']);
+        $params = $request->only(['keyword', 'station_id', 'system_id', 'hostname', 'internal_ip', 'external_ip', 'status', 'power_status', 'per_page']);
         $servers = $this->vmService->listServers($params);
 
         return VmServerResource::collection($servers);
