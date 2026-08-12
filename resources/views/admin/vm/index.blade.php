@@ -724,10 +724,8 @@ $(function () {
                     var text = template
                         .replace(/\{station\}/g, station)
                         .replace(/\{amount\}/g, amount)
-                        .replace(/\{month\}/g, month);
-
-                    // 附加繳款資訊
-                    text += '\n\n' + config.content;
+                        .replace(/\{month\}/g, month)
+                        .replace(/\{content\}/g, config.content);
 
                     if (navigator.clipboard) {
                         navigator.clipboard.writeText(text).then(function () {

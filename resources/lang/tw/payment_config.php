@@ -13,8 +13,8 @@ return [
     'field_status'     => '狀態',
     'field_sort'       => '排序',
 
-    'template_hint'    => '可用變數：{station} 站台名稱、{amount} 金額、{month} 月份',
-    'template_example' => "【繳款通知】\n站台：{station}\n月份：{month}\n金額：{amount}\n\n請依以下資訊繳款：",
+    'template_hint'    => '可用變數：{station} 站台、{amount} 金額、{month} 月份、{content} 繳款資訊。用 <code>文字</code> 包住可讓 Telegram 點擊複製',
+    'template_example' => "【繳款通知】\n站台：{station}\n月份：{month}\n金額：<code>{amount}</code>\n\n{content}",
 
     'status_active'   => '啟用',
     'status_disabled' => '停用',
