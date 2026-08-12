@@ -663,13 +663,21 @@ $(function () {
             contentType: 'application/json',
             data: JSON.stringify({ bot_token: val || null }),
             success: function (body) {
-                $btn.prop('disabled', false);
-                $input.data('original', val ? val.substring(0, 10) + '***' : '');
-                showMessage(body.message || '已更新');
+                hideBsModal(document.getElementById('modal-system-mgmt'));
+                setTimeout(function () {
+                    showMessage(body.message || '已更新');
+                    // OK 後 reload
+                    $('#modal-station-msg').off('hidden.bs.modal.reload').on('hidden.bs.modal.reload', function () {
+                        location.reload();
+                    });
+                }, 400);
             },
             error: function (xhr) {
                 $btn.prop('disabled', false);
-                showMessage((xhr.responseJSON && xhr.responseJSON.message) || '更新失敗');
+                hideBsModal(document.getElementById('modal-system-mgmt'));
+                setTimeout(function () {
+                    showMessage((xhr.responseJSON && xhr.responseJSON.message) || '更新失敗');
+                }, 400);
             }
         });
     });
