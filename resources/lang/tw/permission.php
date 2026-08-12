@@ -7,6 +7,7 @@ return [
         'attendance' => '打卡出勤',
         'station' => '站台管理',
         'vm' => '虛擬機管理',
+        'payment_config' => '繳款設定',
         'telegram_chat' => 'Telegram 客服',
     ],
     'account' => [
@@ -42,6 +43,10 @@ return [
         'billing_view'    => '檢視帳務紀錄',
         'billing_upload'  => '上傳繳款證明',
         'billing_approve' => '審核繳款',
+    ],
+    'payment_config' => [
+        'view'   => '檢視繳款設定',
+        'manage' => '管理繳款設定',
     ],
     'telegram_chat' => [
         'reply'     => '回覆訊息',

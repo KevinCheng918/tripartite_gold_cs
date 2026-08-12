@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\AttendanceController;
 use App\Http\Controllers\Admin\ShiftCoverController;
 use App\Http\Controllers\Admin\PushController;
 use App\Http\Controllers\Admin\VmController;
+use App\Http\Controllers\Admin\PaymentConfigController;
 use App\Http\Controllers\Auth\LoginController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -126,6 +127,17 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::put('/ajax-approve-paid/{billing}', [VmController::class, 'ajaxApprovePaid'])->middleware('can:vm.billing_approve')->name('ajax-approve-paid');
         Route::put('/ajax-mark-paid/{billing}', [VmController::class, 'ajaxMarkPaid'])->middleware('can:vm.billing_approve')->name('ajax-mark-paid');
         Route::post('/ajax-generate-billing', [VmController::class, 'ajaxGenerateBilling'])->middleware('can:vm.billing_approve')->name('ajax-generate-billing');
+    });
+
+    // 繳款設定
+    Route::prefix('payment-config')->name('payment-config.')->group(function () {
+        Route::get('/', [PaymentConfigController::class, 'index'])->middleware('can:payment_config.view')->name('index');
+        Route::get('/ajax-list', [PaymentConfigController::class, 'ajaxList'])->middleware('can:payment_config.view')->name('ajax-list');
+        Route::post('/ajax-store', [PaymentConfigController::class, 'ajaxStore'])->middleware('can:payment_config.manage')->name('ajax-store');
+        Route::post('/ajax-update/{config}', [PaymentConfigController::class, 'ajaxUpdate'])->middleware('can:payment_config.manage')->name('ajax-update');
+        Route::delete('/ajax-delete/{config}', [PaymentConfigController::class, 'ajaxDelete'])->middleware('can:payment_config.manage')->name('ajax-delete');
+        Route::get('/ajax-by-system', [PaymentConfigController::class, 'ajaxBySystem'])->middleware('can:payment_config.view')->name('ajax-by-system');
+        Route::post('/ajax-render-template', [PaymentConfigController::class, 'ajaxRenderTemplate'])->middleware('can:payment_config.view')->name('ajax-render-template');
     });
 
     // Web Push 訂閱

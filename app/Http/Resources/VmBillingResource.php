@@ -32,7 +32,12 @@ class VmBillingResource extends JsonResource
                     'id'         => $this->vmServer->id,
                     'hostname'   => $this->vmServer->hostname,
                     'station'    => $this->vmServer->station
-                        ? ['id' => $this->vmServer->station->id, 'name' => $this->vmServer->station->name]
+                        ? [
+                            'id'        => $this->vmServer->station->id,
+                            'name'      => $this->vmServer->station->name,
+                            'system_id' => $this->vmServer->station->system_id,
+                            'telegram_group_id' => $this->vmServer->station->telegram_group_id,
+                        ]
                         : null,
                 ];
             }),

@@ -44,7 +44,7 @@ class VmServer extends Model
 
     public function station(): BelongsTo
     {
-        return $this->belongsTo(Station::class)->select(['id', 'name', 'domain']);
+        return $this->belongsTo(Station::class)->select(['id', 'name', 'domain', 'system_id', 'telegram_group_id']);
     }
 
     public function billings(): HasMany

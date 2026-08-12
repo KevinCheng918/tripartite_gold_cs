@@ -513,7 +513,28 @@ $(function () {
             } else {
                 overdueText = '-';
             }
+            var systemId = b.vm_server && b.vm_server.station ? b.vm_server.station.system_id : '';
+            var hasTelegram = b.vm_server && b.vm_server.station && b.vm_server.station.telegram_group_id;
+
             var actions = '';
+            // 複製文案 + 發送（所有狀態皆可）
+            if (systemId) {
+                actions += '<button class="btn btn-sm btn-outline-secondary js-copy-billing"' +
+                    ' data-system-id="' + systemId + '"' +
+                    ' data-station="' + stationName + '"' +
+                    ' data-amount="' + b.amount + '"' +
+                    ' data-month="' + b.billing_month + '">' +
+                    '<i class="fas fa-copy me-1"></i>{{ trans("payment_config.action_copy") }}</button> ';
+                if (hasTelegram) {
+                    actions += '<button class="btn btn-sm btn-outline-secondary js-send-billing"' +
+                        ' data-system-id="' + systemId + '"' +
+                        ' data-station="' + stationName + '"' +
+                        ' data-station-id="' + b.vm_server.station.id + '"' +
+                        ' data-amount="' + b.amount + '"' +
+                        ' data-month="' + b.billing_month + '">' +
+                        '<i class="fas fa-paper-plane me-1"></i>{{ trans("payment_config.action_send") }}</button> ';
+                }
+            }
             // 未收款：有上傳權限可上傳證明，有審核權限可直接標記
             if (b.paid === 0) {
                 if (canUpload) {
@@ -679,6 +700,95 @@ $(function () {
                         showMessage((xhr.responseJSON && xhr.responseJSON.message) || '操作失敗');
                     }
                 });
+            });
+        });
+
+        // 複製文案
+        $('.js-copy-billing').off('click').on('click', function () {
+            var $btn = $(this);
+            var systemId = $btn.data('system-id');
+            var station = $btn.data('station');
+            var amount = $btn.data('amount');
+            var month = $btn.data('month');
+
+            $.ajax({
+                url: '/admin/payment-config/ajax-by-system?system_id=' + systemId,
+                headers: { 'X-CSRF-TOKEN': csrfToken },
+                success: function (configs) {
+                    if (!configs || configs.length === 0) {
+                        showMessage('{{ trans("payment_config.msg.no_config") }}');
+                        return;
+                    }
+                    var config = configs[0];
+                    var template = config.template || config.content;
+                    var text = template
+                        .replace(/\{station\}/g, station)
+                        .replace(/\{amount\}/g, amount)
+                        .replace(/\{month\}/g, month);
+
+                    // 附加繳款資訊
+                    text += '\n\n' + config.content;
+
+                    if (navigator.clipboard) {
+                        navigator.clipboard.writeText(text).then(function () {
+                            showMessage('{{ trans("payment_config.msg.copied") }}');
+                        });
+                    } else {
+                        var ta = document.createElement('textarea');
+                        ta.value = text;
+                        ta.style.position = 'fixed';
+                        ta.style.opacity = '0';
+                        document.body.appendChild(ta);
+                        ta.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(ta);
+                        showMessage('{{ trans("payment_config.msg.copied") }}');
+                    }
+                }
+            });
+        });
+
+        // 發送通知到 Telegram
+        $('.js-send-billing').off('click').on('click', function () {
+            var $btn = $(this);
+            var systemId = $btn.data('system-id');
+            var stationId = $btn.data('station-id');
+            var station = $btn.data('station');
+            var amount = $btn.data('amount');
+            var month = $btn.data('month');
+
+            $.ajax({
+                url: '/admin/payment-config/ajax-by-system?system_id=' + systemId,
+                headers: { 'X-CSRF-TOKEN': csrfToken },
+                success: function (configs) {
+                    if (!configs || configs.length === 0) {
+                        showMessage('{{ trans("payment_config.msg.no_config") }}');
+                        return;
+                    }
+                    var config = configs[0];
+                    var template = config.template || config.content;
+                    var text = template
+                        .replace(/\{station\}/g, station)
+                        .replace(/\{amount\}/g, amount)
+                        .replace(/\{month\}/g, month);
+
+                    text += '\n\n' + config.content;
+
+                    // 發送到站台的 Telegram 群組
+                    $.ajax({
+                        url: '/admin/telegram-chat/ajax-reply',
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': csrfToken },
+                        contentType: 'application/json',
+                        data: JSON.stringify({ station_id: stationId, content: text }),
+                        success: function () {
+                            showMessage('{{ trans("payment_config.msg.sent") }}');
+                        },
+                        error: function () {
+                            showMessage('{{ trans("payment_config.msg.send_failed") }}');
+                        }
+                    });
+                }
             });
         });
     }
