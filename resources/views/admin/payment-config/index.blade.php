@@ -242,7 +242,10 @@ $(function () {
             success: function (body) {
                 hideBsModal(document.getElementById('modal-payment-config'));
                 showMessage(body.message || '{{ trans("payment_config.msg.updated") }}');
-                setTimeout(function () { location.reload(); }, 1500);
+                // OK 按下後 reload
+                $('#modal-pc-msg').off('hidden.bs.modal.reload').on('hidden.bs.modal.reload', function () {
+                    location.reload();
+                });
             },
             error: function (xhr) {
                 showMessage((xhr.responseJSON && xhr.responseJSON.message) || '操作失敗');
