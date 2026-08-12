@@ -19,7 +19,12 @@ class VmServerResource extends JsonResource
             'id'           => $this->id,
             'station_id'   => $this->station_id,
             'station'      => $this->whenLoaded('station', function () {
-                return ['id' => $this->station->id, 'name' => $this->station->name];
+                return [
+                    'id'        => $this->station->id,
+                    'name'      => $this->station->name,
+                    'system_id' => $this->station->system_id,
+                    'system'    => $this->station->system ? $this->station->system->name : null,
+                ];
             }),
             'hostname'     => $this->hostname,
             'internal_ip'  => $this->internal_ip,
