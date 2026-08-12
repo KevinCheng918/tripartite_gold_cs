@@ -47,9 +47,11 @@ class TelegramBroadcastService
     {
         return $this->stationRepository->getActiveWithTelegram()->map(function ($s) {
             return [
-                'id'    => $s->id,
-                'name'  => $s->name,
-                'title' => $s->name . ($s->domain ? " ({$s->domain})" : ''),
+                'id'        => $s->id,
+                'name'      => $s->name,
+                'title'     => $s->name . ($s->domain ? " ({$s->domain})" : ''),
+                'system_id' => $s->system_id,
+                'system'    => $s->system ? $s->system->name : null,
             ];
         })->values()->all();
     }
