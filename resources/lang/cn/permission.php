@@ -6,6 +6,7 @@ return [
         'shift' => '排班管理',
         'attendance' => '打卡出勤',
         'station' => '站台管理',
+        'vm' => '虚拟机管理',
         'telegram_chat' => 'Telegram 客服',
     ],
     'account' => [
@@ -33,6 +34,14 @@ return [
         'view'   => '查看站台',
         'create' => '新增站台',
         'update' => '编辑站台',
+    ],
+    'vm' => [
+        'view'            => '查看虚拟机',
+        'create'          => '新增虚拟机',
+        'update'          => '编辑虚拟机',
+        'billing_view'    => '查看账务记录',
+        'billing_upload'  => '上传缴款证明',
+        'billing_approve' => '审核缴款',
     ],
     'telegram_chat' => [
         'reply'     => '回复消息',

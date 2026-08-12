@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\TelegramChatController;
 use App\Http\Controllers\Admin\AttendanceController;
 use App\Http\Controllers\Admin\ShiftCoverController;
 use App\Http\Controllers\Admin\PushController;
+use App\Http\Controllers\Admin\VmController;
 use App\Http\Controllers\Auth\LoginController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -111,6 +112,20 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-groups', [TelegramBroadcastController::class, 'ajaxGroups'])->middleware('can:telegram_chat.broadcast')->name('ajax-groups');
         Route::post('/ajax-send', [TelegramBroadcastController::class, 'ajaxSend'])->middleware('can:telegram_chat.broadcast')->name('ajax-send');
         Route::get('/ajax-history', [TelegramBroadcastController::class, 'ajaxHistory'])->middleware('can:telegram_chat.broadcast')->name('ajax-history');
+    });
+
+    // 虛擬機管理
+    Route::prefix('vm')->name('vm.')->group(function () {
+        Route::get('/', [VmController::class, 'index'])->name('index');
+        Route::get('/ajax-list', [VmController::class, 'ajaxList'])->middleware('can:vm.view')->name('ajax-list');
+        Route::post('/ajax-store', [VmController::class, 'ajaxStore'])->middleware('can:vm.create')->name('ajax-store');
+        Route::put('/ajax-update/{vm}', [VmController::class, 'ajaxUpdate'])->middleware('can:vm.update')->name('ajax-update');
+        Route::post('/ajax-toggle-power/{vm}', [VmController::class, 'ajaxTogglePower'])->middleware('can:vm.update')->name('ajax-toggle-power');
+        Route::get('/ajax-billing', [VmController::class, 'ajaxBillingList'])->middleware('can:vm.billing_view')->name('ajax-billing');
+        Route::post('/ajax-upload-proof/{billing}', [VmController::class, 'ajaxUploadProof'])->middleware('can:vm.billing_upload')->name('ajax-upload-proof');
+        Route::put('/ajax-approve-paid/{billing}', [VmController::class, 'ajaxApprovePaid'])->middleware('can:vm.billing_approve')->name('ajax-approve-paid');
+        Route::put('/ajax-mark-paid/{billing}', [VmController::class, 'ajaxMarkPaid'])->middleware('can:vm.billing_approve')->name('ajax-mark-paid');
+        Route::post('/ajax-generate-billing', [VmController::class, 'ajaxGenerateBilling'])->middleware('can:vm.billing_approve')->name('ajax-generate-billing');
     });
 
     // Web Push 訂閱
