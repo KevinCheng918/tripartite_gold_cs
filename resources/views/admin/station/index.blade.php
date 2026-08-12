@@ -9,10 +9,13 @@
     <div class="main-card mb-3 card">
         {{-- 頂部：新增按鈕 + 折疊 --}}
         <div class="card-header d-flex align-items-center justify-content-between">
-            <div>
+            <div class="d-flex gap-2">
                 @if(Auth::user()->hasPermission('station.create'))
                     <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modal-station">
                         <i class="fas fa-plus me-1"></i>{{ trans('station.action_create') }}
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="btn-open-system-mgmt">
+                        <i class="fas fa-cogs me-1"></i>系統管理
                     </button>
                 @endif
             </div>
@@ -350,6 +353,77 @@
         </div>
     </div>
 
+    {{-- 系統管理 Modal --}}
+    <div class="modal fade" id="modal-system-mgmt" tabindex="-1">
+        <div class="modal-dialog modal-dialog-scrollable modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">系統管理</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    {{-- 新增系統 --}}
+                    <div class="card mb-3">
+                        <div class="card-header fw-bold">新增系統</div>
+                        <div class="card-body">
+                            <form id="form-add-system">
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-4">
+                                        <label class="form-label">系統名稱 <span class="text-danger">*</span></label>
+                                        <input id="new-system-name" type="text" class="form-control" required>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label">Bot Token</label>
+                                        <input id="new-system-token" type="text" class="form-control" placeholder="選填">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <button type="submit" class="btn btn-primary w-100">
+                                            <i class="fas fa-plus me-1"></i>新增
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    {{-- 現有系統列表 --}}
+                    <div class="card">
+                        <div class="card-header fw-bold">現有系統</div>
+                        <div class="card-body p-0">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>系統名稱</th>
+                                        <th>Bot Token</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="system-list">
+                                    @foreach($systems as $sys)
+                                        <tr data-id="{{ $sys->id }}">
+                                            <td><strong>{{ $sys->name }}</strong></td>
+                                            <td>
+                                                <input type="text" class="form-control form-control-sm js-sys-token"
+                                                       value="{{ $sys->bot_token ? Str::substr($sys->bot_token, 0, 10) . '***' : '' }}"
+                                                       data-original="{{ $sys->bot_token ? Str::substr($sys->bot_token, 0, 10) . '***' : '' }}"
+                                                       placeholder="未設定">
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-sm btn-primary js-save-system" data-id="{{ $sys->id }}">
+                                                    <i class="fas fa-save me-1"></i>儲存
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 @endsection
 
 @section('scripts')
@@ -539,6 +613,63 @@ $(function () {
                 html += '</table>';
 
                 $('#station-detail-body').html(html);
+            }
+        });
+    });
+    // 系統管理
+    $('#btn-open-system-mgmt').on('click', function () {
+        showBsModal('modal-system-mgmt');
+    });
+
+    // 新增系統
+    $('#form-add-system').on('submit', function (e) {
+        e.preventDefault();
+        var name = $('#new-system-name').val().trim();
+        var token = $('#new-system-token').val().trim();
+        if (!name) { return; }
+
+        $.ajax({
+            url: '/admin/stations/ajax-store-system',
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            contentType: 'application/json',
+            data: JSON.stringify({ name: name, bot_token: token || null }),
+            success: function () { location.reload(); },
+            error: function (xhr) {
+                showMessage((xhr.responseJSON && xhr.responseJSON.message) || '新增失敗');
+            }
+        });
+    });
+
+    // 儲存系統 Bot Token
+    $('.js-save-system').on('click', function () {
+        var $btn = $(this);
+        var id = $btn.data('id');
+        var $input = $btn.closest('tr').find('.js-sys-token');
+        var val = $input.val().trim();
+        var original = $input.data('original');
+
+        // 沒改就不送
+        if (val === original) {
+            showMessage('未修改');
+            return;
+        }
+
+        $btn.prop('disabled', true);
+        $.ajax({
+            url: '/admin/stations/ajax-update-system/' + id,
+            method: 'PUT',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            contentType: 'application/json',
+            data: JSON.stringify({ bot_token: val || null }),
+            success: function (body) {
+                $btn.prop('disabled', false);
+                $input.data('original', val ? val.substring(0, 10) + '***' : '');
+                showMessage(body.message || '已更新');
+            },
+            error: function (xhr) {
+                $btn.prop('disabled', false);
+                showMessage((xhr.responseJSON && xhr.responseJSON.message) || '更新失敗');
             }
         });
     });

@@ -40,7 +40,7 @@ class Station extends Model
      */
     public function system()
     {
-        return $this->belongsTo(System::class, 'system_id')->select(['id', 'name']);
+        return $this->belongsTo(System::class, 'system_id')->select(['id', 'name', 'bot_token']);
     }
 
     /**

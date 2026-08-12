@@ -105,6 +105,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-systems', [StationController::class, 'ajaxSystems'])->middleware('can:station.view')->name('ajax-systems');
         Route::post('/ajax-store-system', [StationController::class, 'ajaxStoreSystem'])->middleware('can:station.create')->name('ajax-store-system');
         Route::get('/ajax-bot-groups', [StationController::class, 'ajaxBotGroups'])->middleware('can:station.update')->name('ajax-bot-groups');
+        Route::put('/ajax-update-system/{system}', [StationController::class, 'ajaxUpdateSystem'])->middleware('can:station.create')->name('ajax-update-system');
     });
 
     // Telegram 群發公告

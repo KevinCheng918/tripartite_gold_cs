@@ -104,18 +104,27 @@ class TelegramBroadcastService
             'sent_at'          => now(),
         ]);
 
-        // 逐一發送
+        // 逐一發送（根據站台系統切換 Bot Token）
         $success = 0;
         $fail = 0;
 
-        foreach ($groups as $group) {
-            $result = $this->botService->sendMessage($group->chat_id, $content);
+        foreach ($stations as $station) {
+            if (!$station->telegramGroup) {
+                continue;
+            }
+
+            // 切換到該站台系統的 Bot Token
+            if ($station->system && filled($station->system->bot_token)) {
+                $this->botService->setToken($station->system->bot_token);
+            }
+
+            $result = $this->botService->sendMessage($station->telegramGroup->chat_id, $content);
 
             if ($result && isset($result['ok']) && $result['ok']) {
                 $success++;
             } else {
                 $fail++;
-                Log::warning('群發公告發送失敗', ['chat_id' => $group->chat_id, 'broadcast_id' => $broadcast->id]);
+                Log::warning('群發公告發送失敗', ['chat_id' => $station->telegramGroup->chat_id, 'broadcast_id' => $broadcast->id]);
             }
         }
 

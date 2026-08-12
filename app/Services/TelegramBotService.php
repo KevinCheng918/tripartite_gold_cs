@@ -13,13 +13,36 @@ use Illuminate\Support\Facades\Log;
 class TelegramBotService
 {
     private $client;
-    private $baseUrl;
+    private $apiBase;
+    private $defaultToken;
 
     public function __construct()
     {
-        $token = config('telegram.bot_token');
-        $this->baseUrl = config('telegram.api_base') . $token;
+        $this->defaultToken = config('telegram.bot_token');
+        $this->apiBase = config('telegram.api_base');
         $this->client = new Client(['timeout' => 10]);
+    }
+
+    /**
+     * 取得指定 token 的 API base URL
+     *
+     * @param string|null $token 不傳則使用預設 token
+     * @return string
+     */
+    private function getBaseUrl($token = null)
+    {
+        return $this->apiBase . ($token ?: $this->defaultToken);
+    }
+
+    /**
+     * 設定預設 token（供切換系統用）
+     *
+     * @param string $token
+     * @return void
+     */
+    public function setToken($token)
+    {
+        $this->defaultToken = $token;
     }
 
     /**
@@ -32,7 +55,7 @@ class TelegramBotService
     public function sendMessage($chatId, $text)
     {
         try {
-            $response = $this->client->post("{$this->baseUrl}/sendMessage", [
+            $response = $this->client->post("{$this->getBaseUrl()}/sendMessage", [
                 'json' => [
                     'chat_id'    => $chatId,
                     'text'       => $text,
@@ -69,7 +92,7 @@ class TelegramBotService
                 $params['secret_token'] = $secret;
             }
 
-            $response = $this->client->post("{$this->baseUrl}/setWebhook", [
+            $response = $this->client->post("{$this->getBaseUrl()}/setWebhook", [
                 'json' => $params,
             ]);
 
@@ -102,7 +125,7 @@ class TelegramBotService
                 $data['parse_mode'] = 'HTML';
             }
 
-            $response = $this->client->post("{$this->baseUrl}/sendPhoto", [
+            $response = $this->client->post("{$this->getBaseUrl()}/sendPhoto", [
                 'json' => $data,
             ]);
 
@@ -128,7 +151,7 @@ class TelegramBotService
     public function setMessageReaction($chatId, $messageId, $emoji)
     {
         try {
-            $response = $this->client->post("{$this->baseUrl}/setMessageReaction", [
+            $response = $this->client->post("{$this->getBaseUrl()}/setMessageReaction", [
                 'json' => [
                     'chat_id'    => $chatId,
                     'message_id' => $messageId,
@@ -160,7 +183,7 @@ class TelegramBotService
     public function getFileUrl($fileId)
     {
         try {
-            $response = $this->client->post("{$this->baseUrl}/getFile", [
+            $response = $this->client->post("{$this->getBaseUrl()}/getFile", [
                 'json' => ['file_id' => $fileId],
             ]);
 
@@ -176,9 +199,7 @@ class TelegramBotService
                 return null;
             }
 
-            $token = config('telegram.bot_token');
-
-            return "https://api.telegram.org/file/bot{$token}/{$filePath}";
+            return "https://api.telegram.org/file/bot{$this->defaultToken}/{$filePath}";
         } catch (\Exception $e) {
             Log::error('Telegram getFile 失敗', ['file_id' => $fileId, 'error' => $e->getMessage()]);
 
@@ -195,7 +216,7 @@ class TelegramBotService
     public function getUpdates($limit = 100)
     {
         try {
-            $response = $this->client->post("{$this->baseUrl}/getUpdates", [
+            $response = $this->client->post("{$this->getBaseUrl()}/getUpdates", [
                 'json' => ['limit' => $limit],
             ]);
 
@@ -215,7 +236,7 @@ class TelegramBotService
     public function getWebhookInfo()
     {
         try {
-            $response = $this->client->get("{$this->baseUrl}/getWebhookInfo");
+            $response = $this->client->get("{$this->getBaseUrl()}/getWebhookInfo");
 
             return json_decode($response->getBody()->getContents(), true);
         } catch (\Exception $e) {
@@ -233,7 +254,7 @@ class TelegramBotService
     public function deleteWebhook()
     {
         try {
-            $response = $this->client->post("{$this->baseUrl}/deleteWebhook");
+            $response = $this->client->post("{$this->getBaseUrl()}/deleteWebhook");
 
             return json_decode($response->getBody()->getContents(), true);
         } catch (\Exception $e) {

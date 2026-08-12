@@ -2,12 +2,16 @@
 
 namespace App\Console\Commands;
 
+use App\Models\System;
 use GuzzleHttp\Client;
 use Illuminate\Console\Command;
 use Illuminate\Support\Arr;
 
 /**
  * 設定 / 刪除 / 查看 Telegram Bot Webhook
+ *
+ * 支援多系統 Bot：會自動為所有有 bot_token 的系統設定 webhook，
+ * 加上 .env 的預設 bot（如果有設定）。
  *
  * @example php artisan telegram:set-webhook
  * @example php artisan telegram:set-webhook --url=https://abc123.ngrok-free.app
@@ -21,46 +25,55 @@ class TelegramSetWebhookCommand extends Command
         {--delete : 刪除 webhook}
         {--info : 僅查看目前 webhook 資訊}';
 
-    protected $description = '設定／刪除／查看 Telegram Bot Webhook';
+    protected $description = '設定／刪除／查看 Telegram Bot Webhook（支援多系統）';
 
     public function handle()
     {
-        $token = config('telegram.bot_token');
+        $tokens = $this->collectTokens();
 
-        if (blank($token)) {
-            $this->error('TELEGRAM_BOT_TOKEN 未設定，請先在 .env 填入 Bot Token');
+        if (empty($tokens)) {
+            $this->error('沒有可用的 Bot Token（.env 未設定，系統表也沒有）');
             return;
         }
+
+        $this->info("找到 " . count($tokens) . " 個 Bot Token");
+        foreach ($tokens as $label => $token) {
+            $this->line("  - {$label}: " . substr($token, 0, 10) . '...');
+        }
+        $this->line('');
 
         $client = new Client(['timeout' => 10, 'http_errors' => false]);
 
-        // --info：僅查看
+        // --info
         if ($this->option('info')) {
-            $this->showWebhookInfo($client, $token);
-            return;
-        }
-
-        // --delete：刪除
-        if ($this->option('delete')) {
-            $response = $client->get("https://api.telegram.org/bot{$token}/deleteWebhook");
-            $body = json_decode($response->getBody()->getContents(), true);
-
-            if (Arr::get($body, 'ok', false)) {
-                $this->info('Webhook 已刪除');
-            } else {
-                $this->error('刪除失敗：' . Arr::get($body, 'description', '未知錯誤'));
+            foreach ($tokens as $label => $token) {
+                $this->warn("【{$label}】");
+                $this->showWebhookInfo($client, $token);
+                $this->line('');
             }
-
             return;
         }
 
-        // 提醒檢查事項
-        $this->line('');
+        // --delete
+        if ($this->option('delete')) {
+            foreach ($tokens as $label => $token) {
+                $response = $client->get("https://api.telegram.org/bot{$token}/deleteWebhook");
+                $body = json_decode($response->getBody()->getContents(), true);
+
+                if (Arr::get($body, 'ok', false)) {
+                    $this->info("【{$label}】Webhook 已刪除");
+                } else {
+                    $this->error("【{$label}】刪除失敗：" . Arr::get($body, 'description', '未知錯誤'));
+                }
+            }
+            return;
+        }
+
+        // 提醒
         $this->warn('⚠ 設定前請確認：');
-        $this->line('  1. Bot 已被加入 Telegram 群組');
-        $this->line('  2. Bot 的 Group Privacy 已關閉（@BotFather → Bot Settings → Group Privacy → Turn off）');
-        $this->line('     否則 Bot 只能收到 / 開頭的指令，收不到一般訊息');
-        $this->line('  3. TELEGRAM_WEBHOOK_SECRET 已設定（建議設定，防止偽造請求）');
+        $this->line('  1. 所有 Bot 已被加入對應的 Telegram 群組');
+        $this->line('  2. 所有 Bot 的 Group Privacy 已關閉');
+        $this->line('  3. TELEGRAM_WEBHOOK_SECRET 已設定');
         $this->line('');
 
         if (!$this->confirm('確認以上都已完成？')) {
@@ -68,37 +81,71 @@ class TelegramSetWebhookCommand extends Command
             return;
         }
 
-        // 設定 Webhook
         $baseUrl = $this->option('url') ?: config('app.url');
 
         if (blank($baseUrl) || $baseUrl === 'http://localhost') {
             $this->error('請指定 --url 參數，或在 .env 設定 APP_URL');
-            $this->line('');
-            $this->line('  範例（ngrok）：');
-            $this->line('  php artisan telegram:set-webhook --url=https://abc123.ngrok-free.app');
             return;
         }
 
         $webhookUrl = rtrim($baseUrl, '/') . '/api/telegram/webhook';
-
-        $params = ['url' => $webhookUrl];
         $secret = config('telegram.webhook_secret');
-        if (filled($secret)) {
-            $params['secret_token'] = $secret;
+
+        foreach ($tokens as $label => $token) {
+            $params = ['url' => $webhookUrl];
+            if (filled($secret)) {
+                $params['secret_token'] = $secret;
+            }
+
+            $response = $client->get("https://api.telegram.org/bot{$token}/setWebhook?" . http_build_query($params));
+            $body = json_decode($response->getBody()->getContents(), true);
+
+            if (Arr::get($body, 'ok', false)) {
+                $this->info("【{$label}】Webhook 設定成功：{$webhookUrl}");
+            } else {
+                $this->error("【{$label}】設定失敗：" . Arr::get($body, 'description', '未知錯誤'));
+            }
         }
 
-        $response = $client->get("https://api.telegram.org/bot{$token}/setWebhook?" . http_build_query($params));
-        $body = json_decode($response->getBody()->getContents(), true);
+        $this->line('');
+        foreach ($tokens as $label => $token) {
+            $this->warn("【{$label}】");
+            $this->showWebhookInfo($client, $token);
+            $this->line('');
+        }
+    }
 
-        if (Arr::get($body, 'ok', false)) {
-            $this->info("Webhook 設定成功：{$webhookUrl}");
-        } else {
-            $this->error('設定失敗：' . Arr::get($body, 'description', '未知錯誤'));
-            return;
+    /**
+     * 收集所有可用的 Bot Token（預設 + 各系統）
+     *
+     * @return array label => token
+     */
+    private function collectTokens()
+    {
+        $tokens = [];
+
+        // 預設 token
+        $defaultToken = config('telegram.bot_token');
+        if (filled($defaultToken)) {
+            $tokens['預設 (.env)'] = $defaultToken;
         }
 
-        // 顯示目前 webhook 資訊
-        $this->showWebhookInfo($client, $token);
+        // 各系統的 token
+        $systems = System::query()
+            ->select(['id', 'name', 'bot_token'])
+            ->whereNotNull('bot_token')
+            ->where('bot_token', '!=', '')
+            ->get();
+
+        foreach ($systems as $system) {
+            // 避免重複（跟預設一樣的 token 跳過）
+            if ($system->bot_token === $defaultToken) {
+                continue;
+            }
+            $tokens["系統：{$system->name}"] = $system->bot_token;
+        }
+
+        return $tokens;
     }
 
     /**
@@ -119,7 +166,6 @@ class TelegramSetWebhookCommand extends Command
             ['Last Error Date', Arr::get($info, 'result.last_error_date')
                 ? date('Y-m-d H:i:s', Arr::get($info, 'result.last_error_date'))
                 : '-'],
-            ['Has Secret',      Arr::get($info, 'result.has_custom_certificate') ? '是' : '否'],
         ]);
     }
 }

@@ -155,4 +155,18 @@ class StationRepository
     {
         return System::query()->create($attributes);
     }
+
+    /**
+     * 更新系統
+     *
+     * @param System $system
+     * @param array  $attributes
+     * @return System
+     */
+    public function updateSystem(System $system, $attributes)
+    {
+        $system->update($attributes);
+
+        return $system->refresh();
+    }
 }

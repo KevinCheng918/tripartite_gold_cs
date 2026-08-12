@@ -33,6 +33,25 @@ class TelegramChatService
         $this->webPushService = $webPushService;
     }
 
+    /**
+     * 根據群組的站台系統切換 Bot Token
+     *
+     * @param \App\Models\TelegramGroup $group
+     * @return void
+     */
+    private function switchBotToken($group)
+    {
+        $station = $group->station;
+        if (!$station || !$station->system_id) {
+            return;
+        }
+
+        $system = $station->system;
+        if ($system && filled($system->bot_token)) {
+            $this->botService->setToken($system->bot_token);
+        }
+    }
+
     // ---------------------------------------------------------------
     //  對話列表
     // ---------------------------------------------------------------
@@ -141,6 +160,9 @@ class TelegramChatService
                 'status'  => config('constants.TELEGRAM.GROUP_STATUS.ACTIVE'),
             ]);
         }
+
+        // 根據站台系統切換 Bot Token（用於下載圖片等）
+        $this->switchBotToken($group);
 
         // 群組名稱可能變更，同步更新
         if ($group->title !== $chatTitle) {
@@ -253,6 +275,11 @@ class TelegramChatService
             return null;
         }
 
+        // 根據群組對應的站台系統切換 Bot Token
+        if ($message->group) {
+            $this->switchBotToken($message->group);
+        }
+
         $result = $this->botService->setMessageReaction(
             $message->group->chat_id,
             $message->telegram_message_id,
@@ -288,6 +315,9 @@ class TelegramChatService
     public function sendReply($groupId, $content, $userId, $nickname, $imageUrl = null)
     {
         $group = $this->telegramRepository->findGroup($groupId);
+
+        // 根據站台系統切換 Bot Token
+        $this->switchBotToken($group);
 
         // 透過 Bot API 發送到 Telegram
         if (filled($imageUrl)) {
