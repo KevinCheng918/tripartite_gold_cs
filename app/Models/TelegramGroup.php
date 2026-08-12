@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Telegram 群組 Model
@@ -47,5 +48,15 @@ class TelegramGroup extends Model
     public function messages()
     {
         return $this->hasMany(TelegramMessage::class, 'telegram_group_id');
+    }
+
+    /**
+     * 對應的站台（反查）
+     *
+     * @return HasOne
+     */
+    public function station()
+    {
+        return $this->hasOne(Station::class, 'telegram_group_id')->select(['id', 'system_id', 'name', 'telegram_group_id']);
     }
 }

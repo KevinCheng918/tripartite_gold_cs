@@ -197,14 +197,33 @@ class StationService
     /**
      * 新增系統
      *
-     * @param string $name
+     * @param string      $name
+     * @param string|null $botToken
      * @return \App\Models\System
      */
-    public function createSystem($name)
+    /**
+     * 更新系統
+     *
+     * @param \App\Models\System $system
+     * @param array $params
+     * @return \App\Models\System
+     */
+    public function updateSystem($system, $params)
     {
-        return $this->stationRepository->createSystem([
+        return $this->stationRepository->updateSystem($system, $params);
+    }
+
+    public function createSystem($name, $botToken = null)
+    {
+        $attributes = [
             'name'   => $name,
             'status' => 1,
-        ]);
+        ];
+
+        if (filled($botToken)) {
+            $attributes['bot_token'] = $botToken;
+        }
+
+        return $this->stationRepository->createSystem($attributes);
     }
 }

@@ -178,17 +178,42 @@ class StationController extends Controller
     public function ajaxStoreSystem(Request $request)
     {
         $params = $request->validate([
-            'name' => 'required|string|max:100|unique:system,name',
+            'name'      => 'required|string|max:100|unique:system,name',
+            'bot_token' => 'nullable|string|max:255',
         ]);
 
         try {
-            $system = $this->stationService->createSystem($params['name']);
+            $system = $this->stationService->createSystem($params['name'], $params['bot_token'] ?? null);
 
             return response()->json($system);
         } catch (\Exception $e) {
             Log::error('系統新增失敗', ['error' => $e->getMessage()]);
 
             return response()->json(['message' => trans('station.msg.create_failed')], 500);
+        }
+    }
+
+    /**
+     * Ajax 更新系統（Bot Token）
+     *
+     * @param Request $request
+     * @param \App\Models\System $system
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxUpdateSystem(Request $request, \App\Models\System $system)
+    {
+        $params = $request->validate([
+            'bot_token' => 'nullable|string|max:255',
+        ]);
+
+        try {
+            $this->stationService->updateSystem($system, $params);
+
+            return response()->json(['message' => trans('station.msg.updated')]);
+        } catch (\Exception $e) {
+            Log::error('系統更新失敗', ['error' => $e->getMessage(), 'system_id' => $system->id]);
+
+            return response()->json(['message' => trans('station.msg.update_failed')], 500);
         }
     }
 }

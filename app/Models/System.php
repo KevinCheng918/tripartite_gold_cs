@@ -10,9 +10,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * 記錄可選擇的系統名稱，站台建立時需選擇所屬系統。
  *
- * @property int    $id
- * @property string $name   系統名稱
- * @property int    $status 1=啟用, 0=停用
+ * @property int         $id
+ * @property string      $name      系統名稱
+ * @property string|null $bot_token Telegram Bot Token
+ * @property int         $status    1=啟用, 0=停用
  */
 class System extends Model
 {
