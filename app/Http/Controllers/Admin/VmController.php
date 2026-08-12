@@ -287,9 +287,8 @@ class VmController extends Controller
                 'station' => $params['station'],
                 'amount'  => $params['amount'],
                 'month'   => $params['month'],
+                'content' => $config->content,
             ]);
-
-            $text .= "\n\n{$config->content}";
 
             $imageUrl = null;
             if (filled($config->image)) {

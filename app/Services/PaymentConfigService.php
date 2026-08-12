@@ -94,6 +94,7 @@ class PaymentConfigService
             '{station}' => $vars['station'] ?? '',
             '{amount}'  => $vars['amount'] ?? '',
             '{month}'   => $vars['month'] ?? '',
+            '{content}' => $vars['content'] ?? '',
         ];
 
         return str_replace(array_keys($replacements), array_values($replacements), $template);
