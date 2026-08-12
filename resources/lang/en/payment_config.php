@@ -13,7 +13,7 @@ return [
     'field_status'     => 'Status',
     'field_sort'       => 'Sort Order',
 
-    'template_hint'    => 'Variables: {station} station, {amount} amount, {month} month, {content} payment info. Wrap with <code>text</code> for tap-to-copy in Telegram',
+    'template_hint'    => 'Variables: {station} station, {amount} amount, {month} month, {due_date} due date, {content} payment info. Wrap with <code>text</code> for tap-to-copy in Telegram',
     'template_example' => "[Payment Notice]\nStation: {station}\nMonth: {month}\nAmount: <code>{amount}</code>\n\n{content}",
 
     'status_active'   => 'Active',

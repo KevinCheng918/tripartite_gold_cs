@@ -272,6 +272,7 @@ class VmController extends Controller
             'station'   => 'required|string',
             'amount'    => 'required|string',
             'month'     => 'required|string',
+            'due_date'  => 'nullable|string',
         ]);
 
         try {
@@ -284,10 +285,11 @@ class VmController extends Controller
             $config = $configs->first();
             $template = filled($config->template) ? $config->template : $config->content;
             $text = $this->paymentConfigService->renderTemplate($template, [
-                'station' => $params['station'],
-                'amount'  => $params['amount'],
-                'month'   => $params['month'],
-                'content' => $config->content,
+                'station'  => $params['station'],
+                'amount'   => $params['amount'],
+                'month'    => $params['month'],
+                'due_date' => $params['due_date'] ?? '',
+                'content'  => $config->content,
             ]);
 
             $imageUrl = null;

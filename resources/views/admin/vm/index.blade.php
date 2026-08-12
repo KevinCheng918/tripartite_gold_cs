@@ -523,7 +523,8 @@ $(function () {
                     ' data-system-id="' + systemId + '"' +
                     ' data-station="' + stationName + '"' +
                     ' data-amount="' + b.amount + '"' +
-                    ' data-month="' + b.billing_month + '">' +
+                    ' data-month="' + b.billing_month + '"' +
+                    ' data-due-date="' + (b.due_date || '') + '">' +
                     '<i class="fas fa-copy me-1"></i>{{ trans("payment_config.action_copy") }}</button> ';
                 if (hasTelegram) {
                     actions += '<button class="btn btn-sm btn-outline-secondary js-send-billing"' +
@@ -531,7 +532,8 @@ $(function () {
                         ' data-station="' + stationName + '"' +
                         ' data-group-id="' + b.vm_server.station.telegram_group_id + '"' +
                         ' data-amount="' + b.amount + '"' +
-                        ' data-month="' + b.billing_month + '">' +
+                        ' data-month="' + b.billing_month + '"' +
+                        ' data-due-date="' + (b.due_date || '') + '">' +
                         '<i class="fas fa-paper-plane me-1"></i>{{ trans("payment_config.action_send") }}</button> ';
                 }
             }
@@ -710,6 +712,7 @@ $(function () {
             var station = $btn.data('station');
             var amount = $btn.data('amount');
             var month = $btn.data('month');
+            var dueDate = $btn.data('due-date') || '';
 
             $.ajax({
                 url: '/admin/payment-config/ajax-by-system?system_id=' + systemId,
@@ -725,6 +728,7 @@ $(function () {
                         .replace(/\{station\}/g, station)
                         .replace(/\{amount\}/g, amount)
                         .replace(/\{month\}/g, month)
+                        .replace(/\{due_date\}/g, dueDate)
                         .replace(/\{content\}/g, config.content);
 
                     if (navigator.clipboard) {
@@ -768,6 +772,7 @@ $(function () {
                     station: $btn.data('station'),
                     amount: String($btn.data('amount')),
                     month: $btn.data('month'),
+                    due_date: $btn.data('due-date') || '',
                 }),
                 success: function () {
                     $btn.html('<i class="fas fa-check me-1"></i>已發送');
