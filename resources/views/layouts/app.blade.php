@@ -185,13 +185,29 @@
                                     {{ trans('telegram_chat.nav_label') }}
                                 </a>
                             </li>
-                            @if(Auth::user()->hasPermission('station.view') || Auth::user()->hasPermission('telegram_chat.broadcast'))
+                            @if(Auth::user()->hasPermission('station.view') || Auth::user()->hasPermission('telegram_chat.broadcast') || Auth::user()->hasPermission('vm.view') || Auth::user()->hasPermission('vm.billing_view') || Auth::user()->hasPermission('payment_config.view'))
                             <li class="app-sidebar__heading">{{ trans('station.section_label') }}</li>
                             @if(Auth::user()->hasPermission('station.view'))
                             <li>
                                 <a href="{{ route('admin.stations.index') }}" class="{{ request()->routeIs('admin.stations.*') ? 'mm-active' : '' }}">
                                     <i class="metismenu-icon fas fa-server"></i>
                                     {{ trans('station.nav_label') }}
+                                </a>
+                            </li>
+                            @endif
+                            @if(Auth::user()->hasPermission('vm.view') || Auth::user()->hasPermission('vm.billing_view'))
+                            <li>
+                                <a href="{{ route('admin.vm.index') }}" class="{{ request()->routeIs('admin.vm.*') ? 'mm-active' : '' }}">
+                                    <i class="metismenu-icon fas fa-hdd"></i>
+                                    {{ trans('vm.nav_label') }}
+                                </a>
+                            </li>
+                            @endif
+                            @if(Auth::user()->hasPermission('payment_config.view'))
+                            <li>
+                                <a href="{{ route('admin.payment-config.index') }}" class="{{ request()->routeIs('admin.payment-config.*') ? 'mm-active' : '' }}">
+                                    <i class="metismenu-icon fas fa-credit-card"></i>
+                                    {{ trans('payment_config.nav_label') }}
                                 </a>
                             </li>
                             @endif

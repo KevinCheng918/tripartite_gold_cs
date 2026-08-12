@@ -6,6 +6,8 @@ return [
         'shift' => 'Shifts',
         'attendance' => 'Attendance',
         'station' => 'Stations',
+        'vm' => 'VM Management',
+        'payment_config' => 'Payment Config',
         'telegram_chat' => 'Telegram Chat',
     ],
     'account' => [
@@ -33,6 +35,18 @@ return [
         'view'   => 'View stations',
         'create' => 'Create station',
         'update' => 'Update station',
+    ],
+    'vm' => [
+        'view'            => 'View VMs',
+        'create'          => 'Create VM',
+        'update'          => 'Update VM',
+        'billing_view'    => 'View billing',
+        'billing_upload'  => 'Upload payment proof',
+        'billing_approve' => 'Approve payment',
+    ],
+    'payment_config' => [
+        'view'   => 'View payment config',
+        'manage' => 'Manage payment config',
     ],
     'telegram_chat' => [
         'reply'     => 'Reply messages',

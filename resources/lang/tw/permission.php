@@ -6,6 +6,8 @@ return [
         'shift' => '排班管理',
         'attendance' => '打卡出勤',
         'station' => '站台管理',
+        'vm' => '虛擬機管理',
+        'payment_config' => '繳款設定',
         'telegram_chat' => 'Telegram 客服',
     ],
     'account' => [
@@ -33,6 +35,18 @@ return [
         'view'   => '檢視站台',
         'create' => '新增站台',
         'update' => '編輯站台',
+    ],
+    'vm' => [
+        'view'            => '檢視虛擬機',
+        'create'          => '新增虛擬機',
+        'update'          => '編輯虛擬機',
+        'billing_view'    => '檢視帳務紀錄',
+        'billing_upload'  => '上傳繳款證明',
+        'billing_approve' => '審核繳款',
+    ],
+    'payment_config' => [
+        'view'   => '檢視繳款設定',
+        'manage' => '管理繳款設定',
     ],
     'telegram_chat' => [
         'reply'     => '回覆訊息',

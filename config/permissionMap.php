@@ -57,6 +57,26 @@ return [
         ],
     ],
 
+    'vm' => [
+        'label' => 'permission.group.vm',
+        'keywords' => [
+            'vm.view'           => 'permission.vm.view',
+            'vm.create'         => 'permission.vm.create',
+            'vm.update'         => 'permission.vm.update',
+            'vm.billing_view'   => 'permission.vm.billing_view',
+            'vm.billing_upload' => 'permission.vm.billing_upload',
+            'vm.billing_approve' => 'permission.vm.billing_approve',
+        ],
+    ],
+
+    'payment_config' => [
+        'label' => 'permission.group.payment_config',
+        'keywords' => [
+            'payment_config.view'   => 'permission.payment_config.view',
+            'payment_config.manage' => 'permission.payment_config.manage',
+        ],
+    ],
+
     'telegram_chat' => [
         'label' => 'permission.group.telegram_chat',
         'keywords' => [

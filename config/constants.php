@@ -45,6 +45,23 @@ return [
         ],
     ],
 
+    'VM' => [
+        'POWER' => [
+            'ON'  => 1,
+            'OFF' => 0,
+        ],
+        'STATUS' => [
+            'ACTIVE'   => 1,
+            'DISABLED' => 0,
+        ],
+        'BILLING' => [
+            'UNPAID'   => 0,
+            'PAID'     => 1,
+            'PENDING'  => 2, // 待審核（已上傳繳款證明）
+            'GRACE_DAYS' => 3,
+        ],
+    ],
+
     'PAGINATION' => [
         'USER' => 20,
     ],
