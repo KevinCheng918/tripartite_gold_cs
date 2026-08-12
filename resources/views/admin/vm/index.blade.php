@@ -274,31 +274,64 @@ $(function () {
         }
 
         // 統計
+        var cardColors = ['#6f42c1', '#0d9488', '#2563eb', '#e85d04', '#d63384', '#0ea5e9'];
         var systemStats = {};
-        var totalCount = 0;
-        var totalAmount = 0;
+        var totalOn = 0, totalOff = 0, totalAmount = 0;
         servers.forEach(function (vm) {
             var sysName = vm.station && vm.station.system ? vm.station.system : '未分類';
-            if (!systemStats[sysName]) { systemStats[sysName] = { count: 0, amount: 0 }; }
-            systemStats[sysName].count++;
+            if (!systemStats[sysName]) { systemStats[sysName] = { on: 0, off: 0, amount: 0 }; }
+            if (vm.power_status === 1) { systemStats[sysName].on++; totalOn++; }
+            else { systemStats[sysName].off++; totalOff++; }
             systemStats[sysName].amount += parseFloat(vm.total_fee || 0);
-            totalCount++;
             totalAmount += parseFloat(vm.total_fee || 0);
         });
 
-        var statsHtml = '<div class="main-card card"><div class="card-body py-2">' +
-            '<div class="d-flex flex-wrap gap-3 align-items-center">';
+        var statsHtml = '<div class="main-card mb-3 card">' +
+            '<div class="card-header py-2"><strong><i class="fas fa-chart-bar me-2 text-muted"></i>虛擬機總覽</strong>' +
+            '<small class="text-muted ms-2">即時掌握各系統運作狀態</small></div>' +
+            '<div class="card-body py-3"><div class="row g-3">';
+
+        var colorIdx = 0;
         Object.keys(systemStats).forEach(function (name) {
             var s = systemStats[name];
-            statsHtml += '<div class="d-flex align-items-center gap-2">' +
-                '<span class="badge bg-secondary">' + name + '</span>' +
-                '<span>' + s.count + ' 台</span>' +
-                '<strong>' + s.amount.toFixed(2) + '</strong>' +
-                '</div>';
+            var color = cardColors[colorIdx % cardColors.length];
+            var initials = name.substring(0, 2).toUpperCase();
+            colorIdx++;
+            statsHtml +=
+                '<div class="col">' +
+                '<div class="border rounded-3 p-3 d-flex align-items-center gap-3" style="border-left:4px solid ' + color + ' !important">' +
+                '<div class="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white" ' +
+                'style="width:40px;height:40px;min-width:40px;background:' + color + ';font-size:0.8125rem">' + initials + '</div>' +
+                '<div class="flex-fill">' +
+                '<div class="fw-bold">' + name + '</div>' +
+                '<div class="d-flex gap-3 mt-1">' +
+                '<span class="badge bg-success">▶ 開機 ' + s.on + '</span>' +
+                '<span class="badge bg-danger">■ 關機 ' + s.off + '</span>' +
+                '</div></div>' +
+                '<div class="text-end">' +
+                '<div class="fw-bold" style="font-size:1.25rem;color:' + color + '">' + s.amount.toFixed(2) + '</div>' +
+                '<small class="text-muted">總費用</small>' +
+                '</div></div></div>';
         });
-        statsHtml += '<div class="ms-auto fw-bold" style="font-size:1rem">' +
-            '合計：' + totalCount + ' 台 / ' + totalAmount.toFixed(2) +
-            '</div></div></div></div>';
+
+        // 總計
+        statsHtml +=
+            '<div class="col">' +
+            '<div class="border rounded-3 p-3 d-flex align-items-center gap-3" style="border-left:4px solid #0d9488 !important;background:#f8f9fa">' +
+            '<div class="rounded-circle d-flex align-items-center justify-content-center fw-bold" ' +
+            'style="width:40px;height:40px;min-width:40px;background:#e9ecef;color:#495057;font-size:0.875rem"><i class="fas fa-server"></i></div>' +
+            '<div class="flex-fill">' +
+            '<div class="fw-bold">總計 ' + (totalOn + totalOff) + ' 台</div>' +
+            '<div class="d-flex gap-3 mt-1">' +
+            '<span class="badge bg-success">▶ 開機 ' + totalOn + '</span>' +
+            '<span class="badge bg-danger">■ 關機 ' + totalOff + '</span>' +
+            '</div></div>' +
+            '<div class="text-end">' +
+            '<div class="fw-bold" style="font-size:1.25rem;color:#0d9488">' + totalAmount.toFixed(2) + '</div>' +
+            '<small class="text-muted">總費用</small>' +
+            '</div></div></div>';
+
+        statsHtml += '</div></div></div>';
         $('#vm-stats').html(statsHtml);
 
         // 桌面版表格
