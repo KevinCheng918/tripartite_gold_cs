@@ -42,7 +42,7 @@ class VmRepository
     {
         $query = VmServer::query()
             ->select(self::SERVER_COLUMNS)
-            ->with(['station'])
+            ->with(['station.system'])
             ->orderByDesc('id');
 
         if (filled($criteria['keyword'] ?? null)) {
@@ -119,7 +119,7 @@ class VmRepository
     {
         return VmServer::query()
             ->select(self::SERVER_COLUMNS)
-            ->with(['station'])
+            ->with(['station.system'])
             ->where('status', 1)
             ->get();
     }

@@ -36,6 +36,8 @@
             </div>
             @endif
 
+            <div id="vm-stats" class="mb-3"></div>
+
             <div id="vm-server-list">
                 <p class="text-muted text-center py-4">Loading...</p>
             </div>
@@ -266,15 +268,45 @@ $(function () {
 
     function renderServers(servers) {
         if (servers.length === 0) {
+            $('#vm-stats').html('');
             $('#vm-server-list').html('<div class="text-center text-muted py-4">暫無資料</div>');
             return;
         }
+
+        // 統計
+        var systemStats = {};
+        var totalCount = 0;
+        var totalAmount = 0;
+        servers.forEach(function (vm) {
+            var sysName = vm.station && vm.station.system ? vm.station.system : '未分類';
+            if (!systemStats[sysName]) { systemStats[sysName] = { count: 0, amount: 0 }; }
+            systemStats[sysName].count++;
+            systemStats[sysName].amount += parseFloat(vm.total_fee || 0);
+            totalCount++;
+            totalAmount += parseFloat(vm.total_fee || 0);
+        });
+
+        var statsHtml = '<div class="main-card card"><div class="card-body py-2">' +
+            '<div class="d-flex flex-wrap gap-3 align-items-center">';
+        Object.keys(systemStats).forEach(function (name) {
+            var s = systemStats[name];
+            statsHtml += '<div class="d-flex align-items-center gap-2">' +
+                '<span class="badge bg-secondary">' + name + '</span>' +
+                '<span>' + s.count + ' 台</span>' +
+                '<strong>' + s.amount.toFixed(2) + '</strong>' +
+                '</div>';
+        });
+        statsHtml += '<div class="ms-auto fw-bold" style="font-size:1rem">' +
+            '合計：' + totalCount + ' 台 / ' + totalAmount.toFixed(2) +
+            '</div></div></div></div>';
+        $('#vm-stats').html(statsHtml);
 
         // 桌面版表格
         var tableHtml =
             '<div class="main-card mb-3 card d-none d-md-block"><div class="card-body p-0"><div class="table-responsive">' +
             '<table class="table table-hover table-striped align-middle mb-0"><thead class="table-light"><tr>' +
             '<th>#</th>' +
+            '<th>系統</th>' +
             '<th>' + '{{ trans("vm.field_station") }}' + '</th>' +
             '<th>' + '{{ trans("vm.field_hostname") }}' + '</th>' +
             '<th>' + '{{ trans("vm.field_model_type") }}' + '</th>' +
@@ -292,6 +324,7 @@ $(function () {
 
         servers.forEach(function (vm, idx) {
             var stationName = vm.station ? vm.station.name : '-';
+            var systemName = vm.station && vm.station.system ? vm.station.system : '-';
             var powerBadge = vm.power_status === 1
                 ? '<span class="badge bg-success">{{ trans("vm.power_on") }}</span>'
                 : '<span class="badge bg-danger">{{ trans("vm.power_off") }}</span>';
@@ -317,6 +350,7 @@ $(function () {
             tableHtml +=
                 '<tr>' +
                 '<td>' + (idx + 1) + '</td>' +
+                '<td>' + systemName + '</td>' +
                 '<td>' + stationName + '</td>' +
                 '<td><strong>' + vm.hostname + '</strong></td>' +
                 '<td>' + (vm.model_type || '-') + '</td>' +
@@ -333,7 +367,7 @@ $(function () {
                 '<div class="card mb-2 shadow-sm"><div class="card-body py-3">' +
                 '<div class="d-flex justify-content-between align-items-start mb-2">' +
                 '<div><strong style="font-size:1.0625rem">' + vm.hostname + '</strong>' +
-                '<div class="text-muted" style="font-size:0.8125rem">' + stationName + '</div></div>' +
+                '<div class="text-muted" style="font-size:0.8125rem">' + systemName + ' / ' + stationName + '</div></div>' +
                 '<div class="d-flex gap-1">' + powerBadge + statusBadge + '</div></div>' +
                 '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">機型</span><span>' + (vm.model_type || '-') + '</span></div>' +
                 '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">規格</span><span>' + vm.spec + '</span></div>' +
