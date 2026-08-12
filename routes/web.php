@@ -127,6 +127,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::put('/ajax-approve-paid/{billing}', [VmController::class, 'ajaxApprovePaid'])->middleware('can:vm.billing_approve')->name('ajax-approve-paid');
         Route::put('/ajax-mark-paid/{billing}', [VmController::class, 'ajaxMarkPaid'])->middleware('can:vm.billing_approve')->name('ajax-mark-paid');
         Route::post('/ajax-generate-billing', [VmController::class, 'ajaxGenerateBilling'])->middleware('can:vm.billing_approve')->name('ajax-generate-billing');
+        Route::post('/ajax-send-payment-notice', [VmController::class, 'ajaxSendPaymentNotice'])->middleware('can:vm.billing_view')->name('ajax-send-payment-notice');
     });
 
     // 繳款設定
