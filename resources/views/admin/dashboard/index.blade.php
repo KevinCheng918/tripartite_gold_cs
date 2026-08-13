@@ -225,25 +225,28 @@
                         </thead>
                         <tbody>
                             @foreach($weekByDate as $dateKey => $info)
-                                @if($info['is_allday'])
-                                    <tr>
-                                        <td>{{ $info['date']->format('m/d（D）') }}</td>
+                                <tr>
+                                    <td>{{ $info['date']->format('m/d（D）') }}</td>
+                                    @if($info['is_allday'])
                                         <td><span class="badge bg-success">{{ trans('dashboard.allday') }}</span></td>
                                         <td>-</td>
-                                    </tr>
-                                @else
-                                    @foreach($info['items'] as $a)
-                                        <tr>
-                                            <td>{{ $a->date->format('m/d（D）') }}</td>
-                                            <td>{{ $a->shift ? $a->shift->display_name : '-' }}</td>
-                                            <td>
+                                    @else
+                                        <td>
+                                            @foreach($info['items'] as $a)
                                                 @if($a->shift)
-                                                    {{ $a->shift->start_time }} - {{ $a->shift->end_time }}
+                                                    <span class="badge bg-secondary me-1">{{ $a->shift->display_name }}</span>
                                                 @endif
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                @endif
+                                            @endforeach
+                                        </td>
+                                        <td>
+                                            @foreach($info['items'] as $a)
+                                                @if($a->shift)
+                                                    <div>{{ $a->shift->start_time }} - {{ $a->shift->end_time }}</div>
+                                                @endif
+                                            @endforeach
+                                        </td>
+                                    @endif
+                                </tr>
                             @endforeach
                         </tbody>
                     </table>
