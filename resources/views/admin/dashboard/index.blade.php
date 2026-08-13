@@ -9,48 +9,41 @@
     @if(Auth::user()->isAdmin())
     {{-- ===== Admin Dashboard ===== --}}
 
-    {{-- 帳號統計 --}}
-    <div class="row g-3 mb-4">
-        <div class="col-md-3 col-6">
-            <div class="card widget-content bg-white shadow-sm">
-                <div class="widget-content-wrapper">
-                    <div class="widget-content-left">
-                        <div class="widget-heading text-muted">{{ trans('dashboard.total_cs') }}</div>
-                        <div class="widget-numbers text-dark">{{ $totalCs }}</div>
-                    </div>
-                    <div class="widget-content-right">
-                        <div class="widget-numbers text-primary"><i class="fas fa-users"></i></div>
-                    </div>
-                </div>
+    {{-- USDT 匯率 --}}
+    <div class="main-card mb-4 card">
+        <div class="card-header d-flex justify-content-between align-items-center py-2">
+            <strong><i class="fas fa-chart-line me-2 text-muted"></i>USDT/TWD 匯率</strong>
+            <div class="d-flex align-items-center gap-2">
+                <small class="text-muted" id="rate-updated-at"></small>
+                <button class="btn btn-sm btn-outline-secondary" id="btn-refresh-rate" title="重新整理">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
             </div>
         </div>
-        <div class="col-md-3 col-6">
-            <div class="card widget-content bg-white shadow-sm" style="border-left: 3px solid #198754;">
-                <div class="widget-content-wrapper">
-                    <div class="widget-content-left">
-                        <div class="widget-heading text-muted">{{ trans('dashboard.status_normal') }}</div>
-                        <div class="widget-numbers text-success">{{ $normalCs }}</div>
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-md-4 mb-3 mb-md-0">
+                    <div class="text-center">
+                        <div class="text-muted mb-1">即時匯率</div>
+                        <div id="rate-current" style="font-size:2rem;font-weight:700;color:#a67c00">-</div>
+                    </div>
+                    <div class="d-flex justify-content-center gap-4 mt-2">
+                        <div class="text-center">
+                            <small class="text-muted">4H 均價</small>
+                            <div id="rate-avg" class="fw-bold">-</div>
+                        </div>
+                        <div class="text-center">
+                            <small class="text-muted">最高</small>
+                            <div id="rate-high" class="fw-bold text-danger">-</div>
+                        </div>
+                        <div class="text-center">
+                            <small class="text-muted">最低</small>
+                            <div id="rate-low" class="fw-bold text-success">-</div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
-        <div class="col-md-3 col-6">
-            <div class="card widget-content bg-white shadow-sm" style="border-left: 3px solid #ffc107;">
-                <div class="widget-content-wrapper">
-                    <div class="widget-content-left">
-                        <div class="widget-heading text-muted">{{ trans('dashboard.status_lock') }}</div>
-                        <div class="widget-numbers text-warning">{{ $lockCs }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 col-6">
-            <div class="card widget-content bg-white shadow-sm" style="border-left: 3px solid #dc3545;">
-                <div class="widget-content-wrapper">
-                    <div class="widget-content-left">
-                        <div class="widget-heading text-muted">{{ trans('dashboard.status_deactivate') }}</div>
-                        <div class="widget-numbers text-danger">{{ $deactivateCs }}</div>
-                    </div>
+                <div class="col-md-8">
+                    <canvas id="rate-chart" height="120"></canvas>
                 </div>
             </div>
         </div>
@@ -247,4 +240,101 @@
     </div>
     @endif
 
+@endsection
+
+@section('scripts')
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+$(function () {
+    var csrfToken = $('meta[name="csrf-token"]').attr('content');
+    var rateChart = null;
+
+    function loadRate() {
+        var $btn = $('#btn-refresh-rate');
+        $btn.find('i').addClass('fa-spin');
+        $btn.prop('disabled', true);
+
+        $.ajax({
+            url: '/admin/dashboard/ajax-usdt-rate',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            success: function (data) {
+                $btn.find('i').removeClass('fa-spin');
+                $btn.prop('disabled', false);
+
+                $('#rate-current').text(data.current_rate ? data.current_rate.toFixed(2) : '-');
+                $('#rate-avg').text(data.avg_rate ? data.avg_rate.toFixed(2) : '-');
+                $('#rate-high').text(data.high ? data.high.toFixed(2) : '-');
+                $('#rate-low').text(data.low ? data.low.toFixed(2) : '-');
+                $('#rate-updated-at').text(data.updated_at || '');
+
+                renderChart(data.chart || []);
+            },
+            error: function (xhr) {
+                $btn.find('i').removeClass('fa-spin');
+                $btn.prop('disabled', false);
+                var msg = (xhr.responseJSON && xhr.responseJSON.message) || '取得失敗';
+                $('#rate-current').text(msg).css('font-size', '1rem');
+            }
+        });
+    }
+
+    function renderChart(chartData) {
+        var labels = chartData.map(function (d) { return d.time; });
+        var prices = chartData.map(function (d) { return d.price; });
+
+        var ctx = document.getElementById('rate-chart');
+        if (!ctx) { return; }
+
+        if (rateChart) { rateChart.destroy(); }
+
+        rateChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'USDT/TWD',
+                    data: prices,
+                    borderColor: '#a67c00',
+                    backgroundColor: 'rgba(166,124,0,0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 2,
+                    pointHoverRadius: 5,
+                    borderWidth: 2,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function (ctx) { return 'TWD ' + ctx.parsed.y.toFixed(2); }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { size: 11 }, maxTicksLimit: 8 }
+                    },
+                    y: {
+                        grid: { color: 'rgba(0,0,0,0.05)' },
+                        ticks: {
+                            font: { size: 11 },
+                            callback: function (v) { return v.toFixed(1); }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    $('#btn-refresh-rate').on('click', function () { loadRate(); });
+
+    // 初始載入
+    loadRate();
+});
+</script>
 @endsection

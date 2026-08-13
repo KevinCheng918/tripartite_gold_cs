@@ -33,6 +33,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
 
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/ajax-usdt-rate', [DashboardController::class, 'ajaxUsdtRate'])->name('dashboard.ajax-usdt-rate');
 
     // 個人資訊修改
     Route::put('/profile', [AccountController::class, 'ajaxUpdateProfile'])->name('profile.update');
