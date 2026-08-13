@@ -546,6 +546,7 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .form-control:focus, [data-theme="dark"] .form-select:focus { border-color: rgba(212,175,55,0.5) !important; background: rgba(255,255,255,0.08) !important; box-shadow: 0 0 0 0.2rem rgba(212,175,55,0.15) !important; }
 [data-theme="dark"] .form-label, [data-theme="dark"] label { color: #c8b88a !important; }
 [data-theme="dark"] .form-control::placeholder { color: rgba(255,255,255,0.3) !important; }
+[data-theme="dark"] .form-control-plaintext { color: #d4af37 !important; }
 
 /* Modal */
 [data-theme="dark"] .modal-content { background: #1a1a1a !important; color: #e0e0e0 !important; border-color: rgba(212,175,55,0.3) !important; box-shadow: 0 0 20px rgba(212,175,55,0.15) !important; }

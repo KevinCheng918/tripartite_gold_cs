@@ -490,7 +490,9 @@ $(function () {
                     'data-billing-day="' + vm.billing_day + '" data-note="' + (vm.note || '') + '" ' +
                     'data-status="' + vm.status + '">' +
                     '<i class="fas fa-edit me-1"></i>{{ trans("vm.action_edit") }}</button> ' +
-                    '<button class="btn btn-sm btn-outline-secondary js-toggle-power" data-id="' + vm.id + '">' +
+                    '<button class="btn btn-sm btn-outline-secondary js-toggle-power" data-id="' + vm.id + '"' +
+                    ' data-system="' + systemName + '" data-station="' + stationName + '" data-hostname="' + vm.hostname + '"' +
+                    ' data-power="' + vm.power_status + '">' +
                     '<i class="fas fa-power-off me-1"></i>' + (vm.power_status === 1 ? '關機' : '開機') + '</button>';
             }
 
@@ -558,18 +560,37 @@ $(function () {
 
         $('.js-toggle-power').off('click').on('click', function () {
             var $btn = $(this);
-            $btn.prop('disabled', true);
-            $.ajax({
-                url: '/admin/vm/ajax-toggle-power/' + $btn.data('id'),
-                method: 'POST',
-                headers: { 'X-CSRF-TOKEN': csrfToken },
-                contentType: 'application/json',
-                success: function () { loadServers(); },
-                error: function (xhr) {
-                    $btn.prop('disabled', false);
-                    showMessage((xhr.responseJSON && xhr.responseJSON.message) || '操作失敗');
-                }
-            });
+            var id = $btn.data('id');
+            var system = $btn.data('system');
+            var station = $btn.data('station');
+            var hostname = $btn.data('hostname');
+            var isOn = $btn.data('power') == 1;
+            var actionWord = isOn ? '關機' : '開機';
+
+            var confirmHtml = '<div class="text-center">' +
+                '<p><strong>確定要' + actionWord + '？</strong></p>' +
+                '<table class="table table-sm mt-2 text-center"><tbody>' +
+                '<tr><th style="width:80px">系統</th><td>' + system + '</td></tr>' +
+                '<tr><th>站台</th><td>' + station + '</td></tr>' +
+                '<tr><th>主機</th><td>' + hostname + '</td></tr>' +
+                '<tr><th>操作</th><td><strong class="' + (isOn ? 'text-danger' : 'text-success') + '">' + actionWord + '</strong></td></tr>' +
+                '</tbody></table></div>';
+
+            $('#modal-vm-confirm-title').text('操作確認');
+            $('#modal-vm-confirm-body').html(confirmHtml);
+            pendingVmAction = function () {
+                $.ajax({
+                    url: '/admin/vm/ajax-toggle-power/' + id,
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': csrfToken },
+                    contentType: 'application/json',
+                    success: function () { loadServers(); },
+                    error: function (xhr) {
+                        showMessage((xhr.responseJSON && xhr.responseJSON.message) || '操作失敗');
+                    }
+                });
+            };
+            showBsModal('modal-vm-confirm');
         });
     }
 
