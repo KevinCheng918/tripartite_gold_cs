@@ -172,6 +172,19 @@ class TelegramChatService
         // 自動指派當前值班客服
         $this->autoAssignOnDuty($group);
 
+        // 解析引用回覆
+        $replyToSender = null;
+        $replyToText = null;
+        if (isset($message['reply_to_message'])) {
+            $replyMsg = $message['reply_to_message'];
+            $replyToSender = $this->buildSenderName($replyMsg['from'] ?? []);
+            $replyToText = $replyMsg['text'] ?? ($replyMsg['caption'] ?? '');
+            // 截取前 200 字元
+            if (mb_strlen($replyToText) > 200) {
+                $replyToText = mb_substr($replyToText, 0, 200) . '...';
+            }
+        }
+
         // 存入訊息
         $msg = $this->telegramRepository->createMessage([
             'telegram_group_id'  => $group->id,
@@ -181,6 +194,8 @@ class TelegramChatService
             'content'            => $text,
             'media_type'         => $mediaType,
             'media_url'          => $mediaUrl,
+            'reply_to_sender'    => $replyToSender,
+            'reply_to_text'      => $replyToText,
             'replied'            => false,
         ]);
 
