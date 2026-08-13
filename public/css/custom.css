@@ -590,6 +590,26 @@ a:hover { color: #85640a; }
 [data-theme="dark"] ::-webkit-scrollbar-thumb { background: rgba(212,175,55,0.3); border-radius: 3px; }
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: rgba(212,175,55,0.5); }
 
+/* Dashboard dark mode — 刷新按鈕 */
+[data-theme="dark"] #btn-refresh-rate {
+    background: transparent !important;
+    color: rgba(255,255,255,0.7) !important;
+    border-color: rgba(255,255,255,0.15) !important;
+}
+[data-theme="dark"] #btn-refresh-rate:hover {
+    background: #d4af37 !important;
+    color: #1a1200 !important;
+    border-color: #d4af37 !important;
+}
+
+/* Dashboard dark mode */
+[data-theme="dark"] .dash-shift-group { background: #1a1a1a !important; border-color: rgba(255,255,255,0.1) !important; }
+[data-theme="dark"] .dash-shift-group--active { background: rgba(212,175,55,0.1) !important; border-color: #d4af37 !important; }
+[data-theme="dark"] .dash-shift-group__name { color: #f0e6c8 !important; }
+[data-theme="dark"] .dash-shift-group__time { color: rgba(255,255,255,0.5) !important; }
+[data-theme="dark"] .dash-shift-group__badge { background: #d4af37 !important; color: #1a1200 !important; }
+[data-theme="dark"] .dash-user-chip { background: rgba(255,255,255,0.08) !important; color: #e0e0e0 !important; }
+
 /* （舊 dark mode 已移至上方黑金色區塊） */
 
 /* 深色模式切換按鈕圖示 */
