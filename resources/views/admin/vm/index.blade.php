@@ -202,7 +202,7 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('vm.field_billing_day') }}</label>
-                            <input id="vm-billing-day" type="number" class="form-control" name="billing_day" required min="1" max="28" value="1">
+                            <input id="vm-billing-day" type="number" class="form-control" name="billing_day" required min="1" max="31" value="1">
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('vm.field_note') }}</label>

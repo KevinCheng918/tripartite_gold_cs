@@ -86,7 +86,7 @@ class VmController extends Controller
             'monthly_fee'  => 'required|numeric|min:0',
             'vpn_fee'      => 'nullable|numeric|min:0',
             'google_fee'   => 'nullable|numeric|min:0',
-            'billing_day'  => 'required|integer|min:1|max:28',
+            'billing_day'  => 'required|integer|min:1|max:31',
             'note'         => 'nullable|string',
         ]);
 
