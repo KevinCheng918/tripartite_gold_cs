@@ -638,6 +638,21 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .tg-group-item { background: #1a1a1a !important; border-color: rgba(255,255,255,0.06) !important; color: #e0e0e0 !important; }
 [data-theme="dark"] .tg-group-item:hover { background: rgba(212,175,55,0.08) !important; }
 [data-theme="dark"] .tg-group-item.bg-light { background: rgba(212,175,55,0.15) !important; }
+[data-theme="dark"] .list-group-item { background: #1a1a1a !important; border-color: rgba(255,255,255,0.08) !important; color: #e0e0e0 !important; }
+[data-theme="dark"] .list-group-item:hover, [data-theme="dark"] .list-group-item-action:hover { background: rgba(212,175,55,0.1) !important; color: #f0e6c8 !important; }
+
+/* 系統狀態總覽 dark mode */
+[data-theme="dark"] .border.rounded-3 { background: #1a1a1a !important; border-color: rgba(255,255,255,0.1) !important; color: #e0e0e0 !important; }
+[data-theme="dark"] .border.rounded-3 .fw-bold { color: #f0e6c8 !important; }
+[data-theme="dark"] .border.rounded-3 .rounded-circle { background: rgba(255,255,255,0.1) !important; color: #d4af37 !important; }
+
+/* Modal 內 table */
+.modal .table th { width: 40%; vertical-align: middle; }
+.modal .table td { vertical-align: middle; }
+
+/* Modal 內 table dark mode */
+[data-theme="dark"] .modal .table th { color: #c8b88a !important; border-color: rgba(255,255,255,0.06) !important; }
+[data-theme="dark"] .modal .table td { color: #e0e0e0 !important; border-color: rgba(255,255,255,0.06) !important; }
 [data-theme="dark"] #tg-group-list { background: #1a1a1a !important; }
 [data-theme="dark"] .chat-wrapper { background: #141414 !important; }
 [data-theme="dark"] .scrollbar-container { background: #1a1a1a !important; }
