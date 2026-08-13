@@ -157,7 +157,7 @@ class VmRepository
     {
         $query = VmBilling::query()
             ->select(self::BILLING_COLUMNS)
-            ->with(['vmServer.station'])
+            ->with(['vmServer.station.system'])
             ->orderBy('due_date')
             ->orderBy('id');
 
@@ -182,6 +182,12 @@ class VmRepository
 
         if (filled($criteria['vm_server_id'] ?? null)) {
             $query->where('vm_server_id', $criteria['vm_server_id']);
+        }
+
+        if (filled($criteria['system_id'] ?? null)) {
+            $query->whereHas('vmServer.station', function ($q) use ($criteria) {
+                $q->where('system_id', $criteria['system_id']);
+            });
         }
 
         return $query->paginate($perPage);

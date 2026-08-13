@@ -166,7 +166,7 @@ class VmController extends Controller
      */
     public function ajaxBillingList(Request $request)
     {
-        $params = $request->only(['billing_month', 'paid', 'overdue', 'vm_server_id', 'per_page']);
+        $params = $request->only(['billing_month', 'paid', 'overdue', 'vm_server_id', 'system_id', 'per_page']);
         $billings = $this->vmService->listBillings($params);
 
         return VmBillingResource::collection($billings);

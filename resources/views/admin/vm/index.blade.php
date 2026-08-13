@@ -111,6 +111,15 @@
                 <div class="card-body">
                     <div class="row g-3 align-items-end">
                         <div class="col-auto">
+                            <label class="form-label fw-bold">系統</label>
+                            <select id="billing-system" class="form-select">
+                                <option value="">全部</option>
+                                @foreach($systems as $sys)
+                                    <option value="{{ $sys->id }}">{{ $sys->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-auto">
                             <label class="form-label fw-bold">{{ trans('vm.field_month') }}</label>
                             <input type="month" id="billing-month" class="form-control" value="{{ date('Y-m') }}">
                         </div>
@@ -631,7 +640,9 @@ $(function () {
     function loadBillings() {
         var month = $('#billing-month').val();
         var filter = $('#billing-filter').val();
+        var systemId = $('#billing-system').val();
         var params = 'per_page=100';
+        if (systemId) { params += '&system_id=' + systemId; }
         if (month) { params += '&billing_month=' + month; }
         if (filter === 'overdue') {
             params += '&overdue=true';
@@ -656,6 +667,7 @@ $(function () {
             '<div class="main-card mb-3 card d-none d-md-block"><div class="card-body p-0"><div class="table-responsive">' +
             '<table class="table table-hover table-striped align-middle mb-0"><thead class="table-light"><tr>' +
             '<th>#</th>' +
+            '<th>系統</th>' +
             '<th>{{ trans("vm.field_station") }}</th>' +
             '<th>{{ trans("vm.field_month") }}</th>' +
             '<th>{{ trans("vm.field_amount") }}</th>' +
@@ -670,6 +682,7 @@ $(function () {
         billings.forEach(function (b, idx) {
             var vmLabel = b.vm_server ? b.vm_server.hostname : '-';
             var stationName = b.vm_server && b.vm_server.station ? b.vm_server.station.name : '-';
+            var billingSystemName = b.vm_server && b.vm_server.station && b.vm_server.station.system ? b.vm_server.station.system : '-';
             var vmPowerOff = b.vm_server && b.vm_server.power_status === 0;
             var paidBadge = '';
             if (vmPowerOff) {
@@ -751,6 +764,7 @@ $(function () {
             tableHtml +=
                 '<tr>' +
                 '<td>' + (idx + 1) + '</td>' +
+                '<td>' + billingSystemName + '</td>' +
                 '<td>' + stationName + '</td>' +
                 '<td>' + b.billing_month + '</td>' +
                 '<td>' + b.amount + '</td>' +
@@ -763,7 +777,8 @@ $(function () {
             cardsHtml +=
                 '<div class="card mb-2 shadow-sm"><div class="card-body py-3">' +
                 '<div class="d-flex justify-content-between align-items-start mb-2">' +
-                '<div><strong style="font-size:1.0625rem">' + stationName + '</strong></div>' +
+                '<div><strong style="font-size:1.0625rem">' + stationName + '</strong>' +
+                '<div class="text-muted" style="font-size:0.8125rem">' + billingSystemName + '</div></div>' +
                 paidBadge + '</div>' +
                 '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">月份</span><span>' + b.billing_month + '</span></div>' +
                 '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">金額</span><strong>' + b.amount + '</strong></div>' +

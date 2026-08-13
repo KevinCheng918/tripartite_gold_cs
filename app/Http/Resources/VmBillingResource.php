@@ -39,6 +39,7 @@ class VmBillingResource extends JsonResource
                             'id'        => $this->vmServer->station->id,
                             'name'      => $this->vmServer->station->name,
                             'system_id' => $this->vmServer->station->system_id,
+                            'system'    => $this->vmServer->station->system ? $this->vmServer->station->system->name : null,
                             'telegram_group_id' => $this->vmServer->station->telegram_group_id,
                         ]
                         : null,

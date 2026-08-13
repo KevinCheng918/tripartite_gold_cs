@@ -104,6 +104,7 @@ class VmService
             'paid'          => $params['paid'] ?? null,
             'overdue'       => $params['overdue'] ?? null,
             'vm_server_id'  => $params['vm_server_id'] ?? null,
+            'system_id'     => $params['system_id'] ?? null,
         ];
 
         return $this->vmRepository->paginateBillings($criteria, (int) ($params['per_page'] ?? 20));
