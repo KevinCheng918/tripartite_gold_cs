@@ -654,39 +654,61 @@
                     return;
                 }
 
-                var html = '<table class="table table-hover"><thead><tr>' +
+                var dataAttrs = function (a) {
+                    return ' data-id="' + a.id + '" data-user="' + a.user + '" data-date="' + a.date + '" data-type="' + a.type + '" data-time="' + a.clock_time + '"';
+                };
+
+                // 桌面版表格
+                var tableHtml = '<div class="d-none d-md-block"><table class="table table-hover"><thead><tr>' +
                     '<th>員工</th>' +
-                    '<th>' + (i18n.amend_field_date || '日期') + '</th>' +
-                    '<th>' + (i18n.amend_field_type || '類型') + '</th>' +
-                    '<th>' + (i18n.amend_field_time || '時間') + '</th>' +
-                    '<th>' + (i18n.amend_field_reason || '原因') + '</th>' +
-                    '<th>' + (i18n.amend_field_status || '狀態') + '</th>' +
+                    '<th>' + i18n.amend_field_date + '</th>' +
+                    '<th>' + i18n.amend_field_type + '</th>' +
+                    '<th>' + i18n.amend_field_time + '</th>' +
+                    '<th>' + i18n.amend_field_reason + '</th>' +
+                    '<th>' + i18n.amend_field_status + '</th>' +
                     '<th>操作</th>' +
                     '</tr></thead><tbody>';
 
+                // 手機版卡片
+                var cardsHtml = '<div class="d-md-none">';
+
                 data.forEach(function (a) {
                     var st = amendStatusMap[a.status] || { text: '-', css: '' };
+                    var typeName = amendTypeMap[a.type] || '-';
                     var actions = '';
                     if (a.status === 0) {
-                        actions = '<button class="btn btn-sm btn-primary js-amend-respond" data-id="' + a.id + '" data-status="1" data-user="' + a.user + '" data-date="' + a.date + '" data-type="' + a.type + '" data-time="' + a.clock_time + '">' +
+                        actions = '<button class="btn btn-sm btn-primary js-amend-respond"' + dataAttrs(a) + ' data-status="1">' +
                             '<i class="fas fa-check me-1"></i>通過</button> ' +
-                            '<button class="btn btn-sm btn-secondary js-amend-respond" data-id="' + a.id + '" data-status="2" data-user="' + a.user + '" data-date="' + a.date + '" data-type="' + a.type + '" data-time="' + a.clock_time + '">' +
+                            '<button class="btn btn-sm btn-secondary js-amend-respond"' + dataAttrs(a) + ' data-status="2">' +
                             '<i class="fas fa-times me-1"></i>拒絕</button>';
                     }
 
-                    html += '<tr>' +
+                    tableHtml += '<tr>' +
                         '<td><strong>' + a.user + '</strong></td>' +
                         '<td>' + a.date + '</td>' +
-                        '<td>' + (amendTypeMap[a.type] || '-') + '</td>' +
+                        '<td>' + typeName + '</td>' +
                         '<td>' + a.clock_time + '</td>' +
                         '<td>' + (a.reason || '-') + '</td>' +
                         '<td><span class="badge ' + st.css + '">' + st.text + '</span></td>' +
                         '<td>' + actions + '</td>' +
                         '</tr>';
+
+                    cardsHtml += '<div class="card mb-2 shadow-sm"><div class="card-body py-3">' +
+                        '<div class="d-flex justify-content-between align-items-start mb-2">' +
+                        '<div><strong style="font-size:1.0625rem">' + a.user + '</strong>' +
+                        '<div class="text-muted" style="font-size:0.8125rem">' + a.date + '</div></div>' +
+                        '<span class="badge ' + st.css + '">' + st.text + '</span></div>' +
+                        '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">類型</span><span>' + typeName + '</span></div>' +
+                        '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">時間</span><span>' + a.clock_time + '</span></div>' +
+                        (a.reason ? '<div class="d-flex justify-content-between mb-2" style="font-size:0.875rem"><span class="text-muted">原因</span><span>' + a.reason + '</span></div>' : '') +
+                        '<div class="d-flex gap-1">' + actions + '</div>' +
+                        '</div></div>';
                 });
 
-                html += '</tbody></table>';
-                document.getElementById('att-content').innerHTML = html;
+                tableHtml += '</tbody></table></div>';
+                cardsHtml += '</div>';
+
+                document.getElementById('att-content').innerHTML = tableHtml + cardsHtml;
 
                 // 綁定審核按鈕
                 document.querySelectorAll('.js-amend-respond').forEach(function (btn) {
