@@ -465,7 +465,9 @@ a:hover { color: #85640a; }
     box-shadow: none !important;
 }
 
-/* Pagination active 金色 */
+/* Pagination 金色 */
+.page-link { color: #a67c00 !important; }
+.page-link:hover { color: #85640a !important; background: rgba(166,124,0,0.08) !important; }
 .page-item.active .page-link { background: #a67c00 !important; border-color: #a67c00 !important; color: #fff !important; }
 
 /* Sidebar 使用者區 light */
