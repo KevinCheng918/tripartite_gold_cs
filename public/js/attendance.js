@@ -197,14 +197,13 @@
             html += '<button class="btn btn-outline-secondary att-clock-btn ms-2" id="btn-open-amend">' +
                 '<i class="fas fa-edit me-1"></i>' + (i18n.amend_title || '申請補打卡') + '</button>';
         }
-        html += '</div>';
+        html += '</div></div>';
 
-        // 個人補打卡紀錄
+        // 左右佈局：打卡面板左，補打卡紀錄右
         if (hasPerm('attendance.amend')) {
-            html += '<div id="my-amend-list" class="mt-4"></div>';
+            html = '<div class="row"><div class="col-md-6">' + html + '</div>' +
+                '<div class="col-md-6"><div id="my-amend-list"></div></div></div>';
         }
-
-        html += '</div>';
 
         content.innerHTML = html;
 
@@ -549,39 +548,73 @@
     amendTypeMap[1] = i18n.amend_type_in || '補上班卡';
     amendTypeMap[2] = i18n.amend_type_out || '補下班卡';
 
-    // 個人補打卡紀錄
+    // 個人補打卡紀錄（前端分頁）
+    var myAmendPage = 1;
+    var myAmendPerPage = 10;
+    var myAmendData = [];
+
     function loadMyAmendments() {
         var container = document.getElementById('my-amend-list');
         if (!container) { return; }
 
         apiFetch('/admin/attendance/ajax-my-amendments')
             .then(function (data) {
-                if (!data || data.length === 0) {
-                    container.innerHTML = '';
-                    return;
-                }
-
-                var html = '<h6 class="fw-bold mb-2">' + (i18n.amend_my_records || '我的補打卡申請') + '</h6>' +
-                    '<table class="table table-sm"><thead><tr>' +
-                    '<th>' + (i18n.amend_field_date || '日期') + '</th>' +
-                    '<th>' + (i18n.amend_field_type || '類型') + '</th>' +
-                    '<th>' + (i18n.amend_field_time || '時間') + '</th>' +
-                    '<th>' + (i18n.amend_field_status || '狀態') + '</th>' +
-                    '</tr></thead><tbody>';
-
-                data.forEach(function (a) {
-                    var st = amendStatusMap[a.status] || { text: '-', css: '' };
-                    html += '<tr>' +
-                        '<td>' + a.date + '</td>' +
-                        '<td>' + (amendTypeMap[a.type] || '-') + '</td>' +
-                        '<td>' + a.clock_time + '</td>' +
-                        '<td><span class="badge ' + st.css + '">' + st.text + '</span></td>' +
-                        '</tr>';
-                });
-
-                html += '</tbody></table>';
-                container.innerHTML = html;
+                myAmendData = data || [];
+                myAmendPage = 1;
+                renderMyAmendPage();
             });
+    }
+
+    function renderMyAmendPage() {
+        var container = document.getElementById('my-amend-list');
+        if (!container) { return; }
+
+        if (myAmendData.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        var totalPages = Math.ceil(myAmendData.length / myAmendPerPage);
+        var start = (myAmendPage - 1) * myAmendPerPage;
+        var pageData = myAmendData.slice(start, start + myAmendPerPage);
+
+        var html = '<h6 class="fw-bold mb-2">' + (i18n.amend_my_records || '我的補打卡申請') + '</h6>' +
+            '<table class="table table-sm"><thead><tr>' +
+            '<th>' + (i18n.amend_field_date || '日期') + '</th>' +
+            '<th>' + (i18n.amend_field_type || '類型') + '</th>' +
+            '<th>' + (i18n.amend_field_time || '時間') + '</th>' +
+            '<th>' + (i18n.amend_field_status || '狀態') + '</th>' +
+            '</tr></thead><tbody>';
+
+        pageData.forEach(function (a) {
+            var st = amendStatusMap[a.status] || { text: '-', css: '' };
+            html += '<tr>' +
+                '<td>' + a.date + '</td>' +
+                '<td>' + (amendTypeMap[a.type] || '-') + '</td>' +
+                '<td>' + a.clock_time + '</td>' +
+                '<td><span class="badge ' + st.css + '">' + st.text + '</span></td>' +
+                '</tr>';
+        });
+
+        html += '</tbody></table>';
+
+        // 分頁按鈕
+        if (totalPages > 1) {
+            html += '<div class="d-flex justify-content-center gap-1 mt-2">';
+            for (var p = 1; p <= totalPages; p++) {
+                html += '<button class="btn btn-sm ' + (p === myAmendPage ? 'btn-primary' : 'btn-outline-secondary') + ' js-amend-page" data-page="' + p + '">' + p + '</button>';
+            }
+            html += '</div>';
+        }
+
+        container.innerHTML = html;
+
+        container.querySelectorAll('.js-amend-page').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                myAmendPage = parseInt(btn.dataset.page, 10);
+                renderMyAmendPage();
+            });
+        });
     }
 
     // 管理者：補打卡審核列表
