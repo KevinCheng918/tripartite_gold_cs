@@ -34,6 +34,8 @@ return [
         'view' => '查看出勤',
         'clock' => '打卡',
         'report' => '月报表',
+        'amend' => '申请补打卡',
+        'amend_review' => '审核补打卡',
     ],
     'station' => [
         'view'   => '查看站台',

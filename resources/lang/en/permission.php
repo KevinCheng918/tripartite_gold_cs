@@ -34,6 +34,8 @@ return [
         'view' => 'View attendance',
         'clock' => 'Clock in/out',
         'report' => 'Monthly report',
+        'amend' => 'Request clock amendment',
+        'amend_review' => 'Review clock amendment',
     ],
     'station' => [
         'view'   => 'View stations',

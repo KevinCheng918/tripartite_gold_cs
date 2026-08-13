@@ -85,6 +85,9 @@
         if (isAdmin && hasPerm('attendance.report')) {
             allTabs.push({ key: 'report', label: i18n.tab_report });
         }
+        if (hasPerm('attendance.amend_review')) {
+            allTabs.push({ key: 'amend_review', label: i18n.tab_amend || '補打卡審核' });
+        }
 
         var tabs = allTabs.filter(function (t) { return t; });
 
@@ -115,6 +118,8 @@
             loadMyRecords(currentMonth);
         } else if (activeTab === 'report') {
             loadReport(currentMonth);
+        } else if (activeTab === 'amend_review') {
+            loadAmendments();
         }
     }
 
@@ -188,9 +193,29 @@
         } else if (!clockedOut) {
             html += '<button class="btn-danger-full att-clock-btn" id="btn-clock-out">' + i18n.btn_clock_out + '</button>';
         }
-        html += '</div></div>';
+        if (hasPerm('attendance.amend')) {
+            html += '<button class="btn btn-outline-secondary att-clock-btn ms-2" id="btn-open-amend">' +
+                '<i class="fas fa-edit me-1"></i>' + (i18n.amend_title || '申請補打卡') + '</button>';
+        }
+        html += '</div>';
+
+        // 個人補打卡紀錄
+        if (hasPerm('attendance.amend')) {
+            html += '<div id="my-amend-list" class="mt-4"></div>';
+        }
+
+        html += '</div>';
 
         content.innerHTML = html;
+
+        // 申請補打卡按鈕
+        var btnAmend = document.getElementById('btn-open-amend');
+        if (btnAmend) {
+            btnAmend.addEventListener('click', function () {
+                showBsModal('modal-amend');
+            });
+            loadMyAmendments();
+        }
 
         var btnIn = document.getElementById('btn-clock-in');
         if (btnIn) {
@@ -279,7 +304,9 @@
         confirmBtn.addEventListener('click', function () {
             hideBsModal('modal-attendance-confirm');
 
-            if (pendingClockAction === 'in') {
+            if (typeof pendingClockAction === 'function') {
+                pendingClockAction();
+            } else if (pendingClockAction === 'in') {
                 clockIn();
             } else if (pendingClockAction === 'out') {
                 clockOut();
@@ -506,6 +533,177 @@
                     window.location.href = '/admin/attendance/detail/' + uid;
                 }
             });
+        });
+    }
+
+    // ---------------------------------------------------------------
+    //  補打卡
+    // ---------------------------------------------------------------
+
+    var amendStatusMap = {};
+    amendStatusMap[0] = { text: i18n.amend_status_pending || '待審核', css: 'bg-warning text-dark' };
+    amendStatusMap[1] = { text: i18n.amend_status_approved || '已通過', css: 'bg-success' };
+    amendStatusMap[2] = { text: i18n.amend_status_rejected || '已拒絕', css: 'bg-danger' };
+
+    var amendTypeMap = {};
+    amendTypeMap[1] = i18n.amend_type_in || '補上班卡';
+    amendTypeMap[2] = i18n.amend_type_out || '補下班卡';
+
+    // 個人補打卡紀錄
+    function loadMyAmendments() {
+        var container = document.getElementById('my-amend-list');
+        if (!container) { return; }
+
+        apiFetch('/admin/attendance/ajax-my-amendments')
+            .then(function (data) {
+                if (!data || data.length === 0) {
+                    container.innerHTML = '';
+                    return;
+                }
+
+                var html = '<h6 class="fw-bold mb-2">' + (i18n.amend_my_records || '我的補打卡申請') + '</h6>' +
+                    '<table class="table table-sm"><thead><tr>' +
+                    '<th>' + (i18n.amend_field_date || '日期') + '</th>' +
+                    '<th>' + (i18n.amend_field_type || '類型') + '</th>' +
+                    '<th>' + (i18n.amend_field_time || '時間') + '</th>' +
+                    '<th>' + (i18n.amend_field_status || '狀態') + '</th>' +
+                    '</tr></thead><tbody>';
+
+                data.forEach(function (a) {
+                    var st = amendStatusMap[a.status] || { text: '-', css: '' };
+                    html += '<tr>' +
+                        '<td>' + a.date + '</td>' +
+                        '<td>' + (amendTypeMap[a.type] || '-') + '</td>' +
+                        '<td>' + a.clock_time + '</td>' +
+                        '<td><span class="badge ' + st.css + '">' + st.text + '</span></td>' +
+                        '</tr>';
+                });
+
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            });
+    }
+
+    // 管理者：補打卡審核列表
+    function loadAmendments() {
+        apiFetch('/admin/attendance/ajax-amendments')
+            .then(function (data) {
+                if (!data || data.length === 0) {
+                    document.getElementById('att-content').innerHTML = '<p class="text-muted text-center py-4">暫無申請</p>';
+                    return;
+                }
+
+                var html = '<table class="table table-hover"><thead><tr>' +
+                    '<th>員工</th>' +
+                    '<th>' + (i18n.amend_field_date || '日期') + '</th>' +
+                    '<th>' + (i18n.amend_field_type || '類型') + '</th>' +
+                    '<th>' + (i18n.amend_field_time || '時間') + '</th>' +
+                    '<th>' + (i18n.amend_field_reason || '原因') + '</th>' +
+                    '<th>' + (i18n.amend_field_status || '狀態') + '</th>' +
+                    '<th>操作</th>' +
+                    '</tr></thead><tbody>';
+
+                data.forEach(function (a) {
+                    var st = amendStatusMap[a.status] || { text: '-', css: '' };
+                    var actions = '';
+                    if (a.status === 0) {
+                        actions = '<button class="btn btn-sm btn-primary js-amend-respond" data-id="' + a.id + '" data-status="1" data-user="' + a.user + '" data-date="' + a.date + '" data-type="' + a.type + '" data-time="' + a.clock_time + '">' +
+                            '<i class="fas fa-check me-1"></i>通過</button> ' +
+                            '<button class="btn btn-sm btn-secondary js-amend-respond" data-id="' + a.id + '" data-status="2" data-user="' + a.user + '" data-date="' + a.date + '" data-type="' + a.type + '" data-time="' + a.clock_time + '">' +
+                            '<i class="fas fa-times me-1"></i>拒絕</button>';
+                    }
+
+                    html += '<tr>' +
+                        '<td><strong>' + a.user + '</strong></td>' +
+                        '<td>' + a.date + '</td>' +
+                        '<td>' + (amendTypeMap[a.type] || '-') + '</td>' +
+                        '<td>' + a.clock_time + '</td>' +
+                        '<td>' + (a.reason || '-') + '</td>' +
+                        '<td><span class="badge ' + st.css + '">' + st.text + '</span></td>' +
+                        '<td>' + actions + '</td>' +
+                        '</tr>';
+                });
+
+                html += '</tbody></table>';
+                document.getElementById('att-content').innerHTML = html;
+
+                // 綁定審核按鈕
+                document.querySelectorAll('.js-amend-respond').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        var id = btn.dataset.id;
+                        var status = parseInt(btn.dataset.status, 10);
+                        var actionWord = status === 1 ? '通過' : '拒絕';
+                        var user = btn.dataset.user;
+                        var date = btn.dataset.date;
+                        var type = amendTypeMap[parseInt(btn.dataset.type, 10)] || '-';
+                        var time = btn.dataset.time;
+
+                        var confirmHtml = '<div class="text-center">' +
+                            '<p><strong>確定要' + actionWord + '此補打卡申請？</strong></p>' +
+                            '<table class="table table-sm mt-2 text-center"><tbody>' +
+                            '<tr><th style="width:80px">員工</th><td>' + user + '</td></tr>' +
+                            '<tr><th>日期</th><td>' + date + '</td></tr>' +
+                            '<tr><th>類型</th><td>' + type + '</td></tr>' +
+                            '<tr><th>時間</th><td>' + time + '</td></tr>' +
+                            '</tbody></table></div>';
+
+                        var confirmBody = document.getElementById('modal-attendance-confirm-body');
+                        if (confirmBody) { confirmBody.innerHTML = confirmHtml; }
+
+                        pendingClockAction = function () {
+                            apiFetch('/admin/attendance/ajax-respond-amend/' + id, {
+                                method: 'PUT',
+                                body: JSON.stringify({ status: status })
+                            })
+                                .then(function () {
+                                    showMessage(status === 1 ? (i18n.amend_approved || '已通過') : (i18n.amend_rejected || '已拒絕'));
+                                    loadAmendments();
+                                })
+                                .catch(function (error) { showMessage(getErrorMessage(error)); });
+                        };
+
+                        openModal('modal-attendance-confirm');
+                    });
+                });
+            });
+    }
+
+    // 補打卡申請表單
+    var formAmend = document.getElementById('form-amend');
+    if (formAmend) {
+        flatpickr('#amend-date', {
+            dateFormat: 'Y-m-d',
+            disableMobile: true,
+            maxDate: 'today'
+        });
+
+        flatpickr('#amend-time', {
+            enableTime: true,
+            noCalendar: true,
+            dateFormat: 'H:i',
+            time_24hr: true,
+            disableMobile: true
+        });
+
+        formAmend.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var data = {
+                date: document.getElementById('amend-date').value,
+                type: parseInt(document.getElementById('amend-type').value, 10),
+                clock_time: document.getElementById('amend-time').value,
+                reason: document.getElementById('amend-reason').value,
+            };
+
+            apiFetch('/admin/attendance/ajax-request-amend', {
+                method: 'POST',
+                body: JSON.stringify(data)
+            })
+                .then(function () {
+                    hideBsModal(document.getElementById('modal-amend'));
+                    showMessage(i18n.amend_submitted || '補打卡申請已送出');
+                    loadMyAmendments();
+                })
+                .catch(function (error) { showMessage(getErrorMessage(error)); });
         });
     }
 

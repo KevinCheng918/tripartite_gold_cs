@@ -74,6 +74,10 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-monthly-report', [AttendanceController::class, 'ajaxMonthlyReport'])->middleware('can:attendance.report')->name('ajax-monthly-report');
         Route::get('/detail/{userId}', [AttendanceController::class, 'detail'])->middleware('can:attendance.report')->name('detail');
         Route::get('/ajax-user-monthly', [AttendanceController::class, 'ajaxUserMonthly'])->middleware('can:attendance.report')->name('ajax-user-monthly');
+        Route::post('/ajax-request-amend', [AttendanceController::class, 'ajaxRequestAmend'])->middleware('can:attendance.amend')->name('ajax-request-amend');
+        Route::get('/ajax-my-amendments', [AttendanceController::class, 'ajaxMyAmendments'])->middleware('can:attendance.amend')->name('ajax-my-amendments');
+        Route::get('/ajax-amendments', [AttendanceController::class, 'ajaxAmendments'])->middleware('can:attendance.amend_review')->name('ajax-amendments');
+        Route::put('/ajax-respond-amend/{amendment}', [AttendanceController::class, 'ajaxRespondAmend'])->middleware('can:attendance.amend_review')->name('ajax-respond-amend');
     });
 
     // 代班管理

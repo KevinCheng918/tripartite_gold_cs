@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AttendanceResource;
+use App\Models\ClockAmendment;
 use App\Services\AttendanceService;
+use App\Services\ClockAmendmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -18,10 +20,12 @@ use Illuminate\Support\Facades\Log;
 class AttendanceController extends Controller
 {
     private $attendanceService;
+    private $amendmentService;
 
-    public function __construct(AttendanceService $attendanceService)
+    public function __construct(AttendanceService $attendanceService, ClockAmendmentService $amendmentService)
     {
         $this->attendanceService = $attendanceService;
+        $this->amendmentService = $amendmentService;
     }
 
     /**
@@ -170,5 +174,111 @@ class AttendanceController extends Controller
         $report = $this->attendanceService->getMonthlyReport($yearMonth);
 
         return response()->json($report);
+    }
+
+    // ---------------------------------------------------------------
+    //  補打卡
+    // ---------------------------------------------------------------
+
+    /**
+     * Ajax 申請補打卡
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxRequestAmend(Request $request)
+    {
+        $params = $request->validate([
+            'date'       => 'required|date',
+            'type'       => 'required|integer|in:1,2',
+            'clock_time' => 'required|date_format:H:i',
+            'reason'     => 'nullable|string|max:500',
+        ]);
+
+        try {
+            $this->amendmentService->request($params, Auth::id());
+
+            return response()->json(['message' => trans('attendance.amend_submitted')]);
+        } catch (\Exception $e) {
+            Log::error('補打卡申請失敗', ['error' => $e->getMessage()]);
+
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * Ajax 個人補打卡紀錄
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxMyAmendments()
+    {
+        $amendments = $this->amendmentService->getByUser(Auth::id());
+
+        return response()->json($amendments->map(function ($a) {
+            return [
+                'id'          => $a->id,
+                'date'        => $a->date->format('Y-m-d'),
+                'type'        => $a->type,
+                'clock_time'  => $a->clock_time,
+                'reason'      => $a->reason,
+                'status'      => $a->status,
+                'reviewer'    => $a->reviewer ? $a->reviewer->nickname : null,
+                'reviewed_at' => $a->reviewed_at ? $a->reviewed_at->format('Y-m-d H:i') : null,
+                'created_at'  => $a->created_at->format('Y-m-d H:i'),
+            ];
+        }));
+    }
+
+    /**
+     * Ajax 補打卡審核列表（全部）
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxAmendments()
+    {
+        $amendments = $this->amendmentService->getAll();
+
+        return response()->json($amendments->map(function ($a) {
+            return [
+                'id'          => $a->id,
+                'user'        => $a->user ? $a->user->nickname : '-',
+                'date'        => $a->date->format('Y-m-d'),
+                'type'        => $a->type,
+                'clock_time'  => $a->clock_time,
+                'reason'      => $a->reason,
+                'status'      => $a->status,
+                'reviewer'    => $a->reviewer ? $a->reviewer->nickname : null,
+                'reviewed_at' => $a->reviewed_at ? $a->reviewed_at->format('Y-m-d H:i') : null,
+                'created_at'  => $a->created_at->format('Y-m-d H:i'),
+            ];
+        }));
+    }
+
+    /**
+     * Ajax 審核補打卡
+     *
+     * @param Request        $request
+     * @param ClockAmendment $amendment
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxRespondAmend(Request $request, ClockAmendment $amendment)
+    {
+        $params = $request->validate([
+            'status' => 'required|integer|in:1,2',
+        ]);
+
+        try {
+            $this->amendmentService->respond($amendment, (int) $params['status'], Auth::id());
+            $msg = (int) $params['status'] === 1
+                ? trans('attendance.amend_approved')
+                : trans('attendance.amend_rejected');
+
+            return response()->json(['message' => $msg]);
+        } catch (\Exception $e) {
+            Log::error('補打卡審核失敗', ['error' => $e->getMessage(), 'amendment_id' => $amendment->id]);
+
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 }

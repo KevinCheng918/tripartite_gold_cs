@@ -52,6 +52,8 @@ return [
             'attendance.view' => 'permission.attendance.view',
             'attendance.clock' => 'permission.attendance.clock',
             'attendance.report' => 'permission.attendance.report',
+            'attendance.amend' => 'permission.attendance.amend',
+            'attendance.amend_review' => 'permission.attendance.amend_review',
         ],
     ],
 
