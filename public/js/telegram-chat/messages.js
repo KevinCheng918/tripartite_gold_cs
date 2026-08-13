@@ -20,6 +20,14 @@
             mediaHtml = '<div class="mb-1"><img src="' + m.media_url + '" alt="sticker" loading="lazy" style="max-width:120px;max-height:120px;display:block"></div>';
         }
 
+        var replyHtml = '';
+        if (m.reply_to_sender || m.reply_to_text) {
+            replyHtml = '<div style="border-left:3px solid #a67c00;padding:4px 8px;margin-bottom:6px;background:rgba(0,0,0,0.04);border-radius:4px;font-size:0.8125rem">' +
+                '<div style="font-weight:700;color:#a67c00">' + T.escapeHtml(m.reply_to_sender || '') + '</div>' +
+                '<div style="color:#6c757d;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">' + T.escapeHtml(m.reply_to_text || '') + '</div>' +
+                '</div>';
+        }
+
         var textHtml = m.content ? T.escapeHtml(m.content) : '';
 
         var reactHtml = '';
@@ -43,7 +51,7 @@
             return (
                 '<div class="chat-box-wrapper" data-msg-id="' + m.id + '" style="display:flex;justify-content:flex-end">' +
                 '<div style="text-align:right">' +
-                '<div class="chat-box" style="background:rgba(166,124,0,0.08);display:inline-block">' + mediaHtml + textHtml + reactBtn + '</div>' +
+                '<div class="chat-box" style="background:rgba(166,124,0,0.08);display:inline-block">' + replyHtml + mediaHtml + textHtml + reactBtn + '</div>' +
                 reactHtml +
                 '<small class="text-muted">' + timeLabel + ' | ' + m.sender_name + '</small>' +
                 '</div>' +
@@ -56,7 +64,7 @@
             '<div class="chat-box-wrapper" data-msg-id="' + m.id + '">' +
             '<div class="me-2 flex-shrink-0">' + avatar + '</div>' +
             '<div>' +
-            '<div class="chat-box" style="background:rgba(166,124,0,0.08)">' + mediaHtml + textHtml + reactBtn + '</div>' +
+            '<div class="chat-box" style="background:rgba(166,124,0,0.08)">' + replyHtml + mediaHtml + textHtml + reactBtn + '</div>' +
             reactHtml +
             '<small class="text-muted">' + timeLabel + ' | ' + m.sender_name + '</small>' +
             '</div>' +

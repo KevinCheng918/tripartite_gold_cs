@@ -23,6 +23,8 @@ class TelegramMessageResource extends JsonResource
             'content'             => $this->content,
             'media_type'          => $this->media_type,
             'media_url'           => $this->media_url,
+            'reply_to_sender'     => $this->reply_to_sender,
+            'reply_to_text'       => $this->reply_to_text,
             'reactions'           => $this->reactions,
             'replied'             => $this->replied,
             'created_at'          => \Carbon\Carbon::parse($this->created_at)->toDateTimeString(),
