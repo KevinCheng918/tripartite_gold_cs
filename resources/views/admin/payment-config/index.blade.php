@@ -62,7 +62,7 @@
                                 data-sort="{{ $config->sort_order }}">
                             <i class="fas fa-edit me-1"></i>{{ trans('payment_config.action_edit') }}
                         </button>
-                        <button class="btn btn-sm btn-outline-secondary js-delete-config" data-id="{{ $config->id }}">
+                        <button class="btn btn-sm btn-outline-secondary js-delete-config" data-id="{{ $config->id }}" data-title="{{ $config->title }}" data-system="{{ $config->system ? $config->system->name : '-' }}">
                             <i class="fas fa-trash me-1"></i>{{ trans('payment_config.action_delete') }}
                         </button>
                     </div>
@@ -72,10 +72,10 @@
                     <div class="row">
                         <div class="{{ $config->image ? 'col-md-8' : 'col-12' }}">
                             <p class="text-muted mb-1">{{ trans('payment_config.field_content') }}：</p>
-                            <div style="white-space:pre-wrap;background:#f8f9fa;padding:0.75rem;border-radius:0.375rem;font-size:0.875rem">{{ $config->content }}</div>
+                            <div class="pc-content-box" style="white-space:pre-wrap;background:#f8f9fa;padding:0.75rem;border-radius:0.375rem;font-size:0.875rem">{{ $config->content }}</div>
                             @if(filled($config->template))
                                 <p class="text-muted mb-1 mt-3">{{ trans('payment_config.field_template') }}：</p>
-                                <div style="white-space:pre-wrap;background:#fef3c7;padding:0.75rem;border-radius:0.375rem;font-size:0.875rem">{{ $config->template }}</div>
+                                <div class="pc-template-box" style="white-space:pre-wrap;background:#fef3c7;padding:0.75rem;border-radius:0.375rem;font-size:0.875rem">{{ $config->template }}</div>
                             @endif
                         </div>
                         @if($config->image)
@@ -161,7 +161,8 @@
         <div class="modal-dialog modal-sm">
             <div class="modal-content">
                 <div class="modal-body py-4">
-                    <p class="mb-3">確定要刪除此繳款設定？</p>
+                    <p><strong>確定要刪除此繳款設定？</strong></p>
+                    <div id="pc-delete-detail" class="mb-3"></div>
                     <div class="text-end">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                         <button type="button" class="btn btn-danger" id="btn-confirm-delete">刪除</button>
@@ -257,6 +258,14 @@ $(function () {
     var deleteId = null;
     $('.js-delete-config').on('click', function () {
         deleteId = $(this).data('id');
+        var title = $(this).data('title');
+        var system = $(this).data('system');
+        $('#pc-delete-detail').html(
+            '<table class="table table-sm text-center"><tbody>' +
+            '<tr><th style="width:80px">系統</th><td>' + system + '</td></tr>' +
+            '<tr><th>名稱</th><td>' + title + '</td></tr>' +
+            '</tbody></table>'
+        );
         showBsModal('modal-pc-confirm');
     });
 
