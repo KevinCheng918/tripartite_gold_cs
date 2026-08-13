@@ -37,17 +37,23 @@
 /* 修正 chat-box 泡泡寬度 */
 .chat-box-wrapper .chat-box {
     min-width: auto !important;
-    max-width: 85% !important;
+    max-width: 75% !important;
     flex: none !important;
     display: inline-block !important;
     word-break: break-all;
     white-space: pre-wrap;
 }
 
+/* 收到方靠左 */
+.chat-box-wrapper {
+    justify-content: flex-start !important;
+    padding-left: 0.125rem !important;
+    padding-right: 0.125rem !important;
+}
+
 /* 發送方靠右 */
-.chat-box-wrapper.chat-box-wrapper-right {
+.chat-box-wrapper[style*="flex-end"] {
     justify-content: flex-end !important;
-    text-align: right !important;
 }
 
 /* 時間戳記 */
