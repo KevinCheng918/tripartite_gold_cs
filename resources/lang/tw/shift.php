@@ -70,6 +70,7 @@ return [
         'user_not_found'       => '員工不存在',
         'select_user'          => '請選擇客服人員',
         'delete_failed'        => '刪除排班失敗',
+        'create_failed'        => '班別新增失敗',
         'update_failed'        => '班別更新失敗',
         'assign_failed'        => '報班失敗',
         'swap_failed'          => '換班請求失敗',

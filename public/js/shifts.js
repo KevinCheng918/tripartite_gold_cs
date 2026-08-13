@@ -652,7 +652,11 @@
             );
         }).join('');
 
-        var html =
+        var addBtn = hasPerm('shift.update')
+            ? '<div class="mb-3"><button class="btn btn-primary" id="js-open-create-shift"><i class="fas fa-plus me-1"></i>新增班別</button></div>'
+            : '';
+
+        var html = addBtn +
             '<table><thead><tr>' +
             '<th>' + i18n.field_display_name + '</th>' +
             '<th>' + i18n.field_start_time + '</th>' +
@@ -663,6 +667,14 @@
             '<div class="shift-cards">' + cards + '</div>';
 
         document.getElementById('tab-content').innerHTML = html;
+
+        // 新增班別按鈕
+        var createBtn = document.getElementById('js-open-create-shift');
+        if (createBtn) {
+            createBtn.addEventListener('click', function () {
+                openModal('modal-create-shift');
+            });
+        }
 
         root.querySelectorAll('.js-edit-shift').forEach(function (btn) {
             btn.addEventListener('click', function () {
@@ -1429,6 +1441,27 @@
     document.getElementById('form-swap').addEventListener('submit', submitSwap);
     document.getElementById('form-edit-shift').addEventListener('submit', submitEditShift);
 
+    // 新增班別表單
+    var formCreateShift = document.getElementById('form-create-shift');
+    if (formCreateShift) {
+        formCreateShift.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var data = {
+                display_name: document.getElementById('create-display-name').value,
+                start_time: document.getElementById('create-start-time').value,
+                end_time: document.getElementById('create-end-time').value,
+            };
+
+            apiFetch('/admin/shifts/ajax-store-shift', { method: 'POST', body: JSON.stringify(data) })
+                .then(function () {
+                    closeModal('modal-create-shift');
+                    showMessage('班別已新增');
+                    loadShifts();
+                })
+                .catch(function (error) { showMessage(getErrorMessage(error)); });
+        });
+    }
+
     // 初始化 flatpickr — 報班日期
     flatpickr('#assign-date', {
         dateFormat: 'Y-m-d',
@@ -1437,6 +1470,23 @@
     });
 
     // 初始化 flatpickr — 班別時間
+    // 初始化 flatpickr — 新增班別時間
+    flatpickr('#create-start-time', {
+        enableTime: true,
+        noCalendar: true,
+        dateFormat: 'H:i',
+        time_24hr: true,
+        disableMobile: true
+    });
+
+    flatpickr('#create-end-time', {
+        enableTime: true,
+        noCalendar: true,
+        dateFormat: 'H:i',
+        time_24hr: true,
+        disableMobile: true
+    });
+
     flatpickr('#edit-start-time', {
         enableTime: true,
         noCalendar: true,

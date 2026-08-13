@@ -64,6 +64,31 @@ class ShiftController extends Controller
     }
 
     /**
+     * Ajax 新增班別（僅 Admin）
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse|ShiftResource
+     */
+    public function ajaxStoreShift(Request $request)
+    {
+        $params = $request->validate([
+            'display_name' => 'required|string|max:50',
+            'start_time'   => 'required|date_format:H:i',
+            'end_time'     => 'required|date_format:H:i',
+        ]);
+
+        try {
+            $shift = $this->shiftService->createShift($params);
+
+            return new ShiftResource($shift);
+        } catch (\Exception $e) {
+            Log::error('班別新增失敗', ['error' => $e->getMessage()]);
+
+            return response()->json(['message' => trans('shift.msg.create_failed')], 500);
+        }
+    }
+
+    /**
      * Ajax 更新班別時段（僅 Admin）
      *
      * @param UpdateShiftRequest $request

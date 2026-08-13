@@ -54,6 +54,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/', [ShiftController::class, 'index'])->middleware('can:shift.view')->name('index');
         Route::get('/ajax-shift-list', [ShiftController::class, 'ajaxShiftList'])->middleware('can:shift.view')->name('ajax-shift-list');
         Route::get('/ajax-cs-users', [ShiftController::class, 'ajaxCsUsers'])->middleware('can:shift.view')->name('ajax-cs-users');
+        Route::post('/ajax-store-shift', [ShiftController::class, 'ajaxStoreShift'])->middleware('can:shift.update')->name('ajax-store-shift');
         Route::put('/ajax-update-shift/{shift}', [ShiftController::class, 'ajaxUpdateShift'])->middleware('can:shift.update')->name('ajax-update-shift');
         Route::get('/ajax-assignment-list', [ShiftController::class, 'ajaxAssignmentList'])->middleware('can:shift.view')->name('ajax-assignment-list');
         Route::post('/ajax-assign', [ShiftController::class, 'ajaxAssign'])->middleware('can:shift.assign')->name('ajax-assign');

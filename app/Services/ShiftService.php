@@ -70,6 +70,26 @@ class ShiftService
      * @param array $params
      * @return Shift
      */
+    /**
+     * 新增班別
+     *
+     * @param array $params
+     * @return Shift
+     */
+    public function createShift($params)
+    {
+        // 自動產生 name（英文小寫，用 display_name 的拼音或時間）
+        $name = 'shift_' . str_replace(':', '', $params['start_time']);
+
+        return $this->shiftRepository->create([
+            'name'         => $name,
+            'display_name' => $params['display_name'],
+            'start_time'   => $params['start_time'],
+            'end_time'     => $params['end_time'],
+            'is_active'    => true,
+        ]);
+    }
+
     public function updateShift(Shift $shift, $params)
     {
         $attributes = array_filter([

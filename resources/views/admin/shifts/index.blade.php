@@ -73,6 +73,28 @@
         </form>
     @endcomponent
 
+    {{-- 新增班別 Modal (Admin) --}}
+    @component('components.modal', ['id' => 'modal-create-shift', 'title' => '新增班別'])
+        <form id="form-create-shift">
+            <div class="mb-3">
+                <label class="form-label" for="create-display-name">{{ trans('shift.field_display_name') }}</label>
+                <input id="create-display-name" type="text" name="display_name" class="form-control" required placeholder="例：大夜班">
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="create-start-time">{{ trans('shift.field_start_time') }}</label>
+                <input id="create-start-time" type="text" name="start_time" class="form-control" required placeholder="HH:mm" autocomplete="off">
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="create-end-time">{{ trans('shift.field_end_time') }}</label>
+                <input id="create-end-time" type="text" name="end_time" class="form-control" required placeholder="HH:mm" autocomplete="off">
+            </div>
+            <div class="text-end mt-3">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('shift.modal_cancel') }}</button>
+                <button type="submit" class="btn btn-primary">{{ trans('shift.modal_confirm') }}</button>
+            </div>
+        </form>
+    @endcomponent
+
     {{-- 編輯班別 Modal (Admin) --}}
     @component('components.modal', ['id' => 'modal-edit-shift', 'title' => trans('shift.modal_edit_shift_title')])
         <form id="form-edit-shift">
