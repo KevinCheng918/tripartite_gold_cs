@@ -614,9 +614,20 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .tabs button.active { color: #d4af37 !important; border-bottom-color: #d4af37 !important; }
 [data-theme="dark"] .tt-actions .btn-primary { background: linear-gradient(135deg,#d4af37,#a67c00) !important; color: #1f1a05 !important; }
 [data-theme="dark"] .tt-legend { background: rgba(255,255,255,0.05) !important; border-color: rgba(255,255,255,0.15) !important; color: #e0e0e0 !important; }
-[data-theme="dark"] #shift-app table { color: #e0e0e0 !important; }
-[data-theme="dark"] #shift-app table th { color: #c8b88a !important; border-color: rgba(255,255,255,0.1) !important; }
-[data-theme="dark"] #shift-app table td { color: #e0e0e0 !important; border-color: rgba(255,255,255,0.06) !important; }
+[data-theme="dark"] #shift-app table, [data-theme="dark"] #attendance-app table { color: #e0e0e0 !important; }
+[data-theme="dark"] #shift-app table th, [data-theme="dark"] #attendance-app table th { color: #c8b88a !important; border-color: rgba(255,255,255,0.1) !important; }
+[data-theme="dark"] #shift-app table td, [data-theme="dark"] #attendance-app table td { color: #e0e0e0 !important; border-color: rgba(255,255,255,0.06) !important; }
+[data-theme="dark"] #attendance-app table td small, [data-theme="dark"] #attendance-app .text-muted { color: rgba(255,255,255,0.5) !important; }
+[data-theme="dark"] #attendance-app .widget-heading { color: #c8b88a !important; }
+[data-theme="dark"] #attendance-app .widget-numbers, [data-theme="dark"] #attendance-app .widget-content .fsize-2 { color: #f0e6c8 !important; }
+[data-theme="dark"] #attendance-app .widget-content { background: #1a1a1a !important; border-color: rgba(255,255,255,0.08) !important; }
+[data-theme="dark"] #attendance-app .widget-subheading, [data-theme="dark"] #attendance-app .widget-content small { color: rgba(255,255,255,0.6) !important; }
+[data-theme="dark"] #attendance-app p, [data-theme="dark"] #attendance-app span, [data-theme="dark"] #attendance-app div { color: #e0e0e0; }
+[data-theme="dark"] #attendance-app strong, [data-theme="dark"] #attendance-app h1, [data-theme="dark"] #attendance-app h2, [data-theme="dark"] #attendance-app h3, [data-theme="dark"] #attendance-app h4 { color: #f0e6c8 !important; }
+[data-theme="dark"] .card .h4.fw-light:not(.text-success):not(.text-danger):not(.text-warning):not(.text-info) { color: #f0e6c8 !important; }
+[data-theme="dark"] .card .small.text-muted { color: rgba(255,255,255,0.5) !important; }
+[data-theme="dark"] .assignment-info p { color: #e0e0e0 !important; }
+[data-theme="dark"] .assignment-info strong { color: #f0e6c8 !important; }
 [data-theme="dark"] #shift-app .tt-legend { background: rgba(255,255,255,0.08) !important; border-color: rgba(212,175,55,0.3) !important; color: #f0e6c8 !important; }
 [data-theme="dark"] .shift-card { background: #1a1a1a !important; border-color: rgba(255,255,255,0.08) !important; color: #e0e0e0 !important; }
 [data-theme="dark"] .shift-card__label { color: rgba(255,255,255,0.5) !important; }
