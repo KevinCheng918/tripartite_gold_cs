@@ -528,7 +528,8 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .table > thead > tr > th { color: rgba(255,255,255,0.5) !important; border-color: rgba(255,255,255,0.08) !important; }
 [data-theme="dark"] .table > tbody > tr > td { color: #e0e0e0 !important; border-color: rgba(255,255,255,0.06) !important; }
 [data-theme="dark"] .table > tbody > tr:last-child > td { border-color: rgba(255,255,255,0.08) !important; }
-[data-theme="dark"] .table-hover > tbody > tr:hover { background: rgba(212,175,55,0.04) !important; }
+[data-theme="dark"] .table-hover > tbody > tr:hover { --bs-table-hover-bg: rgba(212,175,55,0.1) !important; background-color: rgba(212,175,55,0.1) !important; }
+[data-theme="dark"] .table-hover > tbody > tr:hover > * { --bs-table-hover-bg: rgba(212,175,55,0.1) !important; background-color: rgba(212,175,55,0.1) !important; color: #f0e6c8 !important; }
 [data-theme="dark"] .table-striped > tbody > tr:nth-of-type(odd) { background: rgba(255,255,255,0.02) !important; }
 [data-theme="dark"] .table-light, [data-theme="dark"] th.table-light { background: rgba(255,255,255,0.04) !important; color: rgba(255,255,255,0.5) !important; }
 
@@ -539,13 +540,13 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .nav-tabs .nav-link:hover { color: #fff !important; }
 
 /* Form */
-[data-theme="dark"] .form-control, [data-theme="dark"] .form-select { background: rgba(255,255,255,0.05) !important; border-color: rgba(255,255,255,0.12) !important; color: #e0e0e0 !important; }
+[data-theme="dark"] .form-control, [data-theme="dark"] .form-select { background: rgba(255,255,255,0.05) !important; border-color: rgba(212,175,55,0.2) !important; color: #d4c9a8 !important; }
 [data-theme="dark"] .form-control:focus, [data-theme="dark"] .form-select:focus { border-color: rgba(212,175,55,0.5) !important; background: rgba(255,255,255,0.08) !important; box-shadow: 0 0 0 0.2rem rgba(212,175,55,0.15) !important; }
-[data-theme="dark"] .form-label, [data-theme="dark"] label { color: #e0e0e0 !important; }
+[data-theme="dark"] .form-label, [data-theme="dark"] label { color: #c8b88a !important; }
 [data-theme="dark"] .form-control::placeholder { color: rgba(255,255,255,0.3) !important; }
 
 /* Modal */
-[data-theme="dark"] .modal-content { background: #1a1a1a !important; color: #e0e0e0 !important; border-color: rgba(255,255,255,0.1) !important; }
+[data-theme="dark"] .modal-content { background: #1a1a1a !important; color: #e0e0e0 !important; border-color: rgba(212,175,55,0.3) !important; box-shadow: 0 0 20px rgba(212,175,55,0.15) !important; }
 [data-theme="dark"] .modal-header { border-color: rgba(255,255,255,0.08) !important; }
 [data-theme="dark"] .modal-header .modal-title { color: #f0e6c8 !important; }
 [data-theme="dark"] .btn-close { filter: invert(1) !important; }
@@ -609,6 +610,15 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .dash-shift-group__time { color: rgba(255,255,255,0.5) !important; }
 [data-theme="dark"] .dash-shift-group__badge { background: #d4af37 !important; color: #1a1200 !important; }
 [data-theme="dark"] .dash-user-chip { background: rgba(255,255,255,0.08) !important; color: #e0e0e0 !important; }
+
+/* Dark mode modal 修正 */
+[data-theme="dark"] .modal .modal-header { background: rgba(255,255,255,0.03) !important; border-color: rgba(255,255,255,0.08) !important; }
+[data-theme="dark"] .modal .modal-title { color: #d4af37 !important; opacity: 1 !important; }
+[data-theme="dark"] .modal .modal-body { background: #1a1a1a !important; }
+[data-theme="dark"] .modal .modal-footer { background: #1a1a1a !important; border-color: rgba(255,255,255,0.08) !important; }
+[data-theme="dark"] .modal .btn.btn-secondary { background-color: #4b5563 !important; border-color: #4b5563 !important; color: #fff !important; }
+[data-theme="dark"] .modal .btn.btn-secondary:hover { background-color: #6b7280 !important; border-color: #6b7280 !important; }
+[data-theme="dark"] .form-control[disabled], [data-theme="dark"] .form-control[readonly] { background: rgba(255,255,255,0.03) !important; color: rgba(255,255,255,0.5) !important; }
 
 /* （舊 dark mode 已移至上方黑金色區塊） */
 
