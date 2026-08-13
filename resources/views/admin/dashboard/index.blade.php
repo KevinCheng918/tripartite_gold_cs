@@ -320,7 +320,7 @@ $(function () {
         if (rateChart) { rateChart.destroy(); }
 
         var datasets = [{
-            label: 'USDT/TWD',
+            label: '即時匯率',
             data: prices,
             borderColor: '#a67c00',
             backgroundColor: 'rgba(166,124,0,0.1)',
