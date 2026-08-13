@@ -19,7 +19,7 @@
                 <div class="main-card card">
                     <div class="card-header py-2 d-flex justify-content-between align-items-center">
                         <strong style="font-size:0.875rem">{{ $group['label'] }}</strong>
-                        <button type="button" class="btn btn-sm btn-outline-primary js-toggle-all" style="font-size:0.75rem;padding:0.15rem 0.5rem">全選</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary js-toggle-all" style="font-size:0.75rem;padding:0.15rem 0.5rem">全選</button>
                     </div>
                     <div class="card-body py-1">
                         @foreach($group['keywords'] as $item)

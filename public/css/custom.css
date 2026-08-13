@@ -452,6 +452,8 @@ a:hover { color: #85640a; }
 
 /* 按鈕 hover 金色 */
 .btn-outline-secondary:hover,
+.btn-outline-secondary:active,
+.btn-outline-secondary.active,
 .btn-outline-secondary:hover:active {
     background-color: #212529 !important;
     color: #fff !important;
@@ -570,8 +572,10 @@ a:hover { color: #85640a; }
 [data-theme="dark"] strong { color: #f0e6c8; }
 
 /* 按鈕 */
-[data-theme="dark"] .btn-outline-secondary { color: rgba(255,255,255,0.7) !important; border-color: rgba(255,255,255,0.15) !important; }
-[data-theme="dark"] .btn-outline-secondary:hover { background-color: #d4af37 !important; color: #1a1200 !important; border-color: #d4af37 !important; }
+[data-theme="dark"] .btn-outline-secondary, [data-theme="dark"] .btn.btn-outline-secondary { color: rgba(255,255,255,0.7) !important; border-color: rgba(212,175,55,0.3) !important; background: transparent !important; }
+[data-theme="dark"] .btn-outline-secondary:hover, [data-theme="dark"] .btn.btn-outline-secondary:hover { background-color: #d4af37 !important; color: #1a1200 !important; border-color: #d4af37 !important; }
+[data-theme="dark"] .btn-outline-primary, [data-theme="dark"] .btn.btn-outline-primary { color: #d4af37 !important; border-color: rgba(212,175,55,0.3) !important; background: transparent !important; }
+[data-theme="dark"] .btn-outline-primary:hover, [data-theme="dark"] .btn.btn-outline-primary:hover { background-color: #d4af37 !important; color: #1a1200 !important; border-color: #d4af37 !important; }
 
 /* Widget */
 [data-theme="dark"] .widget-content { background: transparent !important; }
