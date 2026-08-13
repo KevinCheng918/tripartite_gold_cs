@@ -1466,6 +1466,7 @@
     flatpickr('#assign-date', {
         dateFormat: 'Y-m-d',
         defaultDate: 'today',
+        minDate: 'today',
         disableMobile: true
     });
 
