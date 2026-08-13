@@ -3,7 +3,7 @@
 return [
     'nav_label'        => '站台列表',
     'page_title'       => '站台管理',
-    'subtitle'         => '客人站台清單',
+    'subtitle'         => '站台清單',
     'section_label'    => '站台管理',
     'field_system'     => '系統',
     'field_name'       => '站台名稱',
