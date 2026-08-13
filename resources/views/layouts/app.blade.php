@@ -43,7 +43,12 @@
         .app-sidebar { transition: all .3s cubic-bezier(0.4, 0, 0.2, 1) !important; will-change: width, flex; }
         .closed-sidebar:not(.sidebar-mobile-open) .app-sidebar__heading,
         .closed-sidebar:not(.sidebar-mobile-open) .metismenu-link span,
-        .closed-sidebar:not(.sidebar-mobile-open) .sidebar-brand-sub { opacity: 0; visibility: hidden; white-space: nowrap; }
+        .closed-sidebar:not(.sidebar-mobile-open) .sidebar-brand-sub,
+        .closed-sidebar:not(.sidebar-mobile-open) .brand-logo-text,
+        .closed-sidebar:not(.sidebar-mobile-open) .app-header__logo .fw-semibold { opacity: 0; visibility: hidden; white-space: nowrap; width: 0; overflow: hidden; }
+        .closed-sidebar:not(.sidebar-mobile-open) #btn-open-profile-sidebar { justify-content: center; padding: 0.75rem 0 !important; }
+        .closed-sidebar:not(.sidebar-mobile-open) #btn-open-profile-sidebar .rounded-circle { margin: 0 auto !important; }
+        .closed-sidebar:not(.sidebar-mobile-open) #btn-open-profile-sidebar > *:not(.rounded-circle) { display: none; }
         .app-main__outer, .app-main__inner { overflow-x: hidden; }
         @yield('css')
     </style>
@@ -339,8 +344,10 @@
             $appContainer.addClass('page-loaded');
         });
 
-        // Sidebar 切換記憶
+        // Sidebar 收合切換（桌面版）
         $('.hamburger.close-sidebar-btn').on('click', function () {
+            $(this).toggleClass('is-active');
+            $appContainer.toggleClass('closed-sidebar');
             setTimeout(function () {
                 var isClosed = $appContainer.hasClass('closed-sidebar');
                 localStorage.setItem('sidebar-state', isClosed ? 'closed' : 'open');
