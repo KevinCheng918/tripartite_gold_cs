@@ -21,7 +21,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property float       $vpn_fee
  * @property float       $google_fee
  * @property int         $billing_day
- * @property int         $power_status  1=開機, 0=關機
+ * @property int         $power_status   1=開機, 0=關機
+ * @property string|null $powered_off_at 關機日期
  * @property int         $status        1=啟用, 0=停用
  * @property string|null $note
  */
@@ -38,7 +39,8 @@ class VmServer extends Model
         'vpn_fee'      => 'decimal:2',
         'google_fee'   => 'decimal:2',
         'billing_day'  => 'integer',
-        'power_status' => 'integer',
+        'power_status'   => 'integer',
+        'powered_off_at' => 'date',
         'status'       => 'integer',
     ];
 

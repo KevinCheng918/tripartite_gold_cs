@@ -18,7 +18,7 @@ class VmRepository
     private const SERVER_COLUMNS = [
         'id', 'station_id', 'hostname', 'internal_ip', 'external_ip',
         'model_type', 'spec', 'monthly_fee', 'vpn_fee', 'google_fee', 'billing_day',
-        'power_status', 'status', 'note', 'created_at',
+        'power_status', 'powered_off_at', 'status', 'note', 'created_at',
     ];
 
     /** @var array 帳單列表欄位 */

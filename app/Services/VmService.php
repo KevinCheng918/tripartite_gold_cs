@@ -76,8 +76,15 @@ class VmService
     public function togglePower($server)
     {
         $newStatus = $server->power_status === 1 ? 0 : 1;
+        $attrs = ['power_status' => $newStatus];
 
-        return $this->vmRepository->updateServer($server, ['power_status' => $newStatus]);
+        if ($newStatus === 0) {
+            $attrs['powered_off_at'] = now()->toDateString();
+        } else {
+            $attrs['powered_off_at'] = null;
+        }
+
+        return $this->vmRepository->updateServer($server, $attrs);
     }
 
     // ---------------------------------------------------------------
@@ -166,6 +173,10 @@ class VmService
         $mismatches = [];
 
         foreach ($servers as $server) {
+            // 關機的 VM 不產生帳單
+            if ($server->power_status === 0) {
+                continue;
+            }
             $totalFee = (float) $server->monthly_fee + (float) $server->vpn_fee + (float) $server->google_fee;
 
             $existing = $this->vmRepository->findBillingByMonth($server->id, $billingMonth);

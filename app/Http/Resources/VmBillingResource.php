@@ -29,8 +29,11 @@ class VmBillingResource extends JsonResource
             'vm_server_id'  => $this->vm_server_id,
             'vm_server'     => $this->whenLoaded('vmServer', function () {
                 return [
-                    'id'         => $this->vmServer->id,
-                    'hostname'   => $this->vmServer->hostname,
+                    'id'             => $this->vmServer->id,
+                    'hostname'       => $this->vmServer->hostname,
+                    'power_status'   => $this->vmServer->power_status,
+                    'powered_off_at' => $this->vmServer->powered_off_at
+                        ? Carbon::parse($this->vmServer->powered_off_at)->toDateString() : null,
                     'station'    => $this->vmServer->station
                         ? [
                             'id'        => $this->vmServer->station->id,
@@ -48,8 +51,38 @@ class VmBillingResource extends JsonResource
             'proof_image'   => $this->proof_image ? asset("storage/{$this->proof_image}") : null,
             'due_date'      => $this->due_date ? Carbon::parse($this->due_date)->toDateString() : null,
             'overdue_days'  => $overdueDays,
+            'prorated_fee'  => $this->calcProratedFee(),
             'note'          => $this->note,
             'created_at'    => Carbon::parse($this->created_at)->toDateTimeString(),
         ];
+    }
+
+    /**
+     * 計算逾時費用（關機時：帳單日到關機日的日費）
+     *
+     * @return float|null
+     */
+    private function calcProratedFee()
+    {
+        if (!$this->vmServer || $this->vmServer->power_status !== 0 || !$this->vmServer->powered_off_at) {
+            return null;
+        }
+
+        if (!$this->due_date) {
+            return null;
+        }
+
+        $dueDate = Carbon::parse($this->due_date);
+        $offDate = Carbon::parse($this->vmServer->powered_off_at);
+
+        // 關機日在帳單日之前，不算逾時
+        if ($offDate->lte($dueDate)) {
+            return null;
+        }
+
+        $usedDays = (int) $dueDate->diffInDays($offDate);
+        $dailyRate = (float) $this->amount / 30;
+
+        return round($dailyRate * $usedDays, 2);
     }
 }

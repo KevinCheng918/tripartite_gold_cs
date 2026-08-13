@@ -339,6 +339,96 @@ $(function () {
         });
     }
 
+    // ---------------------------------------------------------------
+    //  統計
+    // ---------------------------------------------------------------
+
+    var CARD_COLORS = ['#6f42c1', '#0d9488', '#2563eb', '#e85d04', '#d63384', '#0ea5e9'];
+
+    /**
+     * 計算各系統 VM 統計（開機台數才計金額）
+     */
+    function calcVmStats(servers) {
+        var systems = {};
+        var totalOn = 0, totalOff = 0, totalAmount = 0;
+
+        servers.forEach(function (vm) {
+            var sysName = vm.station && vm.station.system ? vm.station.system : '未分類';
+            if (!systems[sysName]) { systems[sysName] = { on: 0, off: 0, amount: 0 }; }
+            if (vm.power_status === 1) {
+                systems[sysName].on++;
+                totalOn++;
+                systems[sysName].amount += parseFloat(vm.total_fee || 0);
+                totalAmount += parseFloat(vm.total_fee || 0);
+            } else {
+                systems[sysName].off++;
+                totalOff++;
+            }
+        });
+
+        return { systems: systems, totalOn: totalOn, totalOff: totalOff, totalAmount: totalAmount };
+    }
+
+    /**
+     * 渲染單一統計卡片
+     */
+    function buildStatCard(label, initials, color, onCount, offCount, amount, isSummary) {
+        var bg = isSummary ? 'background:#f8f9fa' : '';
+        var iconHtml = isSummary
+            ? '<i class="fas fa-server"></i>'
+            : initials;
+        var iconStyle = isSummary
+            ? 'background:#e9ecef;color:#495057;font-size:0.875rem'
+            : 'background:' + color + ';font-size:0.8125rem';
+        var textColor = isSummary ? '' : 'color:#fff';
+
+        return '<div class="col">' +
+            '<div class="border rounded-3 p-3 d-flex align-items-center gap-3" style="border-left:4px solid ' + color + ' !important;' + bg + '">' +
+            '<div class="rounded-circle d-flex align-items-center justify-content-center fw-bold ' + (isSummary ? '' : 'text-white') + '" ' +
+            'style="width:40px;height:40px;min-width:40px;' + iconStyle + '">' + iconHtml + '</div>' +
+            '<div class="flex-fill">' +
+            '<div class="fw-bold">' + label + '</div>' +
+            '<div class="d-flex gap-3 mt-1">' +
+            '<span class="badge bg-success">▶ 開機 ' + onCount + '</span>' +
+            '<span class="badge bg-danger">■ 關機 ' + offCount + '</span>' +
+            '</div></div>' +
+            '<div class="text-end">' +
+            '<div class="fw-bold" style="font-size:1.25rem;color:' + color + '">' + amount.toFixed(2) + '</div>' +
+            '<small class="text-muted">總費用</small>' +
+            '</div></div></div>';
+    }
+
+    /**
+     * 渲染統計區
+     */
+    function renderVmStats(stats) {
+        var html = '<div class="main-card mb-3 card">' +
+            '<div class="card-header py-2"><strong><i class="fas fa-chart-bar me-2 text-muted"></i>虛擬機總覽</strong>' +
+            '<small class="text-muted ms-2">即時掌握各系統運作狀態</small></div>' +
+            '<div class="card-body py-3"><div class="row g-3">';
+
+        var colorIdx = 0;
+        Object.keys(stats.systems).forEach(function (name) {
+            var s = stats.systems[name];
+            var color = CARD_COLORS[colorIdx % CARD_COLORS.length];
+            var initials = name.substring(0, 2).toUpperCase();
+            colorIdx++;
+            html += buildStatCard(name, initials, color, s.on, s.off, s.amount, false);
+        });
+
+        html += buildStatCard(
+            '總計 ' + (stats.totalOn + stats.totalOff) + ' 台', '',
+            '#0d9488', stats.totalOn, stats.totalOff, stats.totalAmount, true
+        );
+
+        html += '</div></div></div>';
+        return html;
+    }
+
+    // ---------------------------------------------------------------
+    //  VM 列表
+    // ---------------------------------------------------------------
+
     function renderServers(servers) {
         if (servers.length === 0) {
             $('#vm-stats').html('');
@@ -346,66 +436,8 @@ $(function () {
             return;
         }
 
-        // 統計
-        var cardColors = ['#6f42c1', '#0d9488', '#2563eb', '#e85d04', '#d63384', '#0ea5e9'];
-        var systemStats = {};
-        var totalOn = 0, totalOff = 0, totalAmount = 0;
-        servers.forEach(function (vm) {
-            var sysName = vm.station && vm.station.system ? vm.station.system : '未分類';
-            if (!systemStats[sysName]) { systemStats[sysName] = { on: 0, off: 0, amount: 0 }; }
-            if (vm.power_status === 1) { systemStats[sysName].on++; totalOn++; }
-            else { systemStats[sysName].off++; totalOff++; }
-            systemStats[sysName].amount += parseFloat(vm.total_fee || 0);
-            totalAmount += parseFloat(vm.total_fee || 0);
-        });
-
-        var statsHtml = '<div class="main-card mb-3 card">' +
-            '<div class="card-header py-2"><strong><i class="fas fa-chart-bar me-2 text-muted"></i>虛擬機總覽</strong>' +
-            '<small class="text-muted ms-2">即時掌握各系統運作狀態</small></div>' +
-            '<div class="card-body py-3"><div class="row g-3">';
-
-        var colorIdx = 0;
-        Object.keys(systemStats).forEach(function (name) {
-            var s = systemStats[name];
-            var color = cardColors[colorIdx % cardColors.length];
-            var initials = name.substring(0, 2).toUpperCase();
-            colorIdx++;
-            statsHtml +=
-                '<div class="col">' +
-                '<div class="border rounded-3 p-3 d-flex align-items-center gap-3" style="border-left:4px solid ' + color + ' !important">' +
-                '<div class="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white" ' +
-                'style="width:40px;height:40px;min-width:40px;background:' + color + ';font-size:0.8125rem">' + initials + '</div>' +
-                '<div class="flex-fill">' +
-                '<div class="fw-bold">' + name + '</div>' +
-                '<div class="d-flex gap-3 mt-1">' +
-                '<span class="badge bg-success">▶ 開機 ' + s.on + '</span>' +
-                '<span class="badge bg-danger">■ 關機 ' + s.off + '</span>' +
-                '</div></div>' +
-                '<div class="text-end">' +
-                '<div class="fw-bold" style="font-size:1.25rem;color:' + color + '">' + s.amount.toFixed(2) + '</div>' +
-                '<small class="text-muted">總費用</small>' +
-                '</div></div></div>';
-        });
-
-        // 總計
-        statsHtml +=
-            '<div class="col">' +
-            '<div class="border rounded-3 p-3 d-flex align-items-center gap-3" style="border-left:4px solid #0d9488 !important;background:#f8f9fa">' +
-            '<div class="rounded-circle d-flex align-items-center justify-content-center fw-bold" ' +
-            'style="width:40px;height:40px;min-width:40px;background:#e9ecef;color:#495057;font-size:0.875rem"><i class="fas fa-server"></i></div>' +
-            '<div class="flex-fill">' +
-            '<div class="fw-bold">總計 ' + (totalOn + totalOff) + ' 台</div>' +
-            '<div class="d-flex gap-3 mt-1">' +
-            '<span class="badge bg-success">▶ 開機 ' + totalOn + '</span>' +
-            '<span class="badge bg-danger">■ 關機 ' + totalOff + '</span>' +
-            '</div></div>' +
-            '<div class="text-end">' +
-            '<div class="fw-bold" style="font-size:1.25rem;color:#0d9488">' + totalAmount.toFixed(2) + '</div>' +
-            '<small class="text-muted">總費用</small>' +
-            '</div></div></div>';
-
-        statsHtml += '</div></div></div>';
-        $('#vm-stats').html(statsHtml);
+        var stats = calcVmStats(servers);
+        $('#vm-stats').html(renderVmStats(stats));
 
         // 桌面版表格
         var tableHtml =
@@ -638,8 +670,14 @@ $(function () {
         billings.forEach(function (b, idx) {
             var vmLabel = b.vm_server ? b.vm_server.hostname : '-';
             var stationName = b.vm_server && b.vm_server.station ? b.vm_server.station.name : '-';
+            var vmPowerOff = b.vm_server && b.vm_server.power_status === 0;
             var paidBadge = '';
-            if (b.paid === 1) {
+            if (vmPowerOff) {
+                paidBadge = '<span class="badge bg-secondary">{{ trans("vm.power_off") }}</span>';
+                if (b.prorated_fee !== null && b.prorated_fee > 0) {
+                    paidBadge += ' <span class="text-danger fw-bold">' + b.prorated_fee + '</span>';
+                }
+            } else if (b.paid === 1) {
                 paidBadge = '<span class="badge bg-success">{{ trans("vm.paid_yes") }}</span>';
             } else if (b.paid === 2) {
                 paidBadge = '<span class="badge bg-primary">{{ trans("vm.paid_pending") }}</span>';
@@ -647,7 +685,7 @@ $(function () {
                 paidBadge = '<span class="badge bg-warning text-dark">{{ trans("vm.paid_no") }}</span>';
             }
             var overdueText = '';
-            if (b.paid === 0 && b.overdue_days > 0) {
+            if (!vmPowerOff && b.paid === 0 && b.overdue_days > 0) {
                 overdueText = '<span class="text-danger fw-bold">' + b.overdue_days + ' 天</span>';
                 paidBadge = '<span class="badge bg-danger">{{ trans("vm.overdue") }}</span>';
             } else {
@@ -657,8 +695,12 @@ $(function () {
             var hasTelegram = b.vm_server && b.vm_server.station && b.vm_server.station.telegram_group_id;
 
             var actions = '';
+            // 關機的不顯示任何按鈕
+            if (vmPowerOff) {
+                // 不顯示操作
+            }
             // 複製文案 + 發送（未收款和待審核時才顯示）
-            if (systemId && b.paid !== 1) {
+            else if (systemId && b.paid !== 1) {
                 actions += '<button class="btn btn-sm btn-outline-secondary js-copy-billing"' +
                     ' data-system-id="' + systemId + '"' +
                     ' data-station="' + stationName + '"' +
@@ -677,8 +719,8 @@ $(function () {
                         '<i class="fas fa-paper-plane me-1"></i>{{ trans("payment_config.action_send") }}</button> ';
                 }
             }
-            // 未收款：有上傳權限可上傳證明，有審核權限可直接標記
-            if (b.paid === 0) {
+            // 未收款：有上傳權限可上傳證明，有審核權限可直接標記（關機不顯示）
+            if (!vmPowerOff && b.paid === 0) {
                 if (canUpload) {
                     actions += '<button class="btn btn-sm btn-outline-secondary js-upload-proof" data-id="' + b.id + '">' +
                         '<i class="fas fa-upload me-1"></i>{{ trans("vm.action_upload_proof") }}</button> ';
@@ -691,8 +733,8 @@ $(function () {
                         '<i class="fas fa-check me-1"></i>{{ trans("vm.action_mark_paid") }}</button>';
                 }
             }
-            // 待審核：可查看證明，有審核權限可審核
-            if (b.paid === 2) {
+            // 待審核：可查看證明，有審核權限可審核（關機不顯示）
+            if (!vmPowerOff && b.paid === 2) {
                 if (b.proof_image) {
                     actions += '<button class="btn btn-sm btn-outline-secondary js-view-proof" data-img="' + b.proof_image + '">' +
                         '<i class="fas fa-image me-1"></i>{{ trans("vm.action_view_proof") }}</button> ';
