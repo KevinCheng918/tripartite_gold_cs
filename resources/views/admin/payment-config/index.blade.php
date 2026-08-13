@@ -23,7 +23,7 @@
                     <select id="filter-system" class="form-select">
                         <option value="">全部</option>
                         @foreach($systems as $sys)
-                            <option value="{{ $sys->id }}">{{ $sys->name }}</option>
+                            <option value="{{ $sys->id }}" {{ ($systemId ?? '') == $sys->id ? 'selected' : '' }}>{{ $sys->name }}</option>
                         @endforeach
                     </select>
                 </div>

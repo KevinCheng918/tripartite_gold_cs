@@ -28,14 +28,16 @@ class PaymentConfigController extends Controller
      *
      * @return \Illuminate\View\View
      */
-    public function index()
+    public function index(Request $request)
     {
+        $systemId = $request->input('system_id');
         $systems = $this->stationService->getActiveSystems();
-        $configs = $this->service->list();
+        $configs = $this->service->list($systemId);
 
         return view('admin.payment-config.index', [
-            'systems' => $systems,
-            'configs' => $configs,
+            'systems'  => $systems,
+            'configs'  => $configs,
+            'systemId' => $systemId,
         ]);
     }
 
