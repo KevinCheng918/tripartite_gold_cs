@@ -13,28 +13,32 @@
     </div>
 
     <form id="form-permissions">
+        <div class="row">
         @foreach($permissionMap as $group)
-            <div class="main-card mb-3 card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <strong>{{ $group['label'] }}</strong>
-                    <button type="button" class="btn btn-sm btn-outline-primary js-toggle-all">全選</button>
-                </div>
-                <div class="card-body py-2">
-                    @foreach($group['keywords'] as $item)
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox"
-                                   name="permissions[]"
-                                   value="{{ $item['keyword'] }}"
-                                   id="perm-{{ $item['keyword'] }}"
-                                   {{ in_array($item['keyword'], $currentKeywords) ? 'checked' : '' }}>
-                            <label class="form-check-label" for="perm-{{ $item['keyword'] }}">
-                                {{ $item['label'] }}
-                            </label>
-                        </div>
-                    @endforeach
+            <div class="col-md-4 mb-3">
+                <div class="main-card card">
+                    <div class="card-header py-2 d-flex justify-content-between align-items-center">
+                        <strong style="font-size:0.875rem">{{ $group['label'] }}</strong>
+                        <button type="button" class="btn btn-sm btn-outline-primary js-toggle-all" style="font-size:0.75rem;padding:0.15rem 0.5rem">全選</button>
+                    </div>
+                    <div class="card-body py-1">
+                        @foreach($group['keywords'] as $item)
+                            <div class="form-check" style="margin-bottom:0.15rem">
+                                <input class="form-check-input" type="checkbox"
+                                       name="permissions[]"
+                                       value="{{ $item['keyword'] }}"
+                                       id="perm-{{ $item['keyword'] }}"
+                                       {{ in_array($item['keyword'], $currentKeywords) ? 'checked' : '' }}>
+                                <label class="form-check-label" for="perm-{{ $item['keyword'] }}" style="font-size:0.8125rem">
+                                    {{ $item['label'] }}
+                                </label>
+                            </div>
+                        @endforeach
+                    </div>
                 </div>
             </div>
         @endforeach
+        </div>
 
         <div class="text-end mb-4">
             <button type="submit" class="btn btn-primary">

@@ -16,6 +16,13 @@
 
 return [
 
+    'dashboard' => [
+        'label' => 'permission.group.dashboard',
+        'keywords' => [
+            'dashboard.usdt_rate' => 'permission.dashboard.usdt_rate',
+        ],
+    ],
+
     'account' => [
         'label' => 'permission.group.account',
         'keywords' => [

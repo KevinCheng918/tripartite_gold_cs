@@ -2,6 +2,7 @@
 
 return [
     'group' => [
+        'dashboard' => 'Dashboard',
         'account' => 'Accounts',
         'shift' => 'Shifts',
         'attendance' => 'Attendance',
@@ -9,6 +10,9 @@ return [
         'vm' => 'VM Management',
         'payment_config' => 'Payment Config',
         'telegram_chat' => 'Telegram Chat',
+    ],
+    'dashboard' => [
+        'usdt_rate' => 'View USDT rate',
     ],
     'account' => [
         'view' => 'View accounts',

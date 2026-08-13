@@ -2,6 +2,7 @@
 
 return [
     'group' => [
+        'dashboard' => '首頁',
         'account' => '帳號管理',
         'shift' => '排班管理',
         'attendance' => '打卡出勤',
@@ -9,6 +10,9 @@ return [
         'vm' => '虛擬機管理',
         'payment_config' => '繳款設定',
         'telegram_chat' => 'Telegram 客服',
+    ],
+    'dashboard' => [
+        'usdt_rate' => '查看 USDT 匯率',
     ],
     'account' => [
         'view' => '檢視帳號',

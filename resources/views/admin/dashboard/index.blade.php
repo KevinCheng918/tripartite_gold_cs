@@ -6,9 +6,8 @@
 
 @section('content')
 
-    @if(Auth::user()->isAdmin())
-    {{-- ===== Admin Dashboard ===== --}}
-
+    {{-- USDT 匯率（有權限即可看） --}}
+    @if(Auth::user()->hasPermission('dashboard.usdt_rate'))
     {{-- USDT 匯率 --}}
     <div class="main-card mb-4 card">
         <div class="card-header d-flex justify-content-between align-items-center py-2">
@@ -58,6 +57,10 @@
             </div>
         </div>
     </div>
+    @endif
+
+    @if(Auth::user()->isAdmin())
+    {{-- ===== Admin Dashboard ===== --}}
 
     {{-- 今日排班 --}}
     <div class="main-card mb-3 card">
