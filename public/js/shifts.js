@@ -633,7 +633,7 @@
                 '<td>' + shift.start_time + '</td>' +
                 '<td>' + shift.end_time + '</td>' +
                 '<td>' + (shift.is_active ? '<span class="badge bg-success">' + i18n.field_is_active + '</span>' : '<span class="badge bg-secondary">-</span>') + '</td>' +
-                '<td><button class="btn-sm js-edit-shift">' + i18n.modal_edit_shift_title + '</button></td>' +
+                '<td><button class="btn btn-sm btn-outline-secondary js-edit-shift">' + i18n.modal_edit_shift_title + '</button></td>' +
                 '</tr>'
             );
         }).join('');
@@ -647,7 +647,7 @@
                 '</div>' +
                 '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_start_time + '</span><span>' + shift.start_time + '</span></div>' +
                 '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_end_time + '</span><span>' + shift.end_time + '</span></div>' +
-                '<div class="shift-card__actions"><button class="btn-sm js-edit-shift">' + i18n.modal_edit_shift_title + '</button></div>' +
+                '<div class="shift-card__actions"><button class="btn btn-sm btn-outline-secondary js-edit-shift">' + i18n.modal_edit_shift_title + '</button></div>' +
                 '</div>'
             );
         }).join('');

@@ -595,6 +595,33 @@ a:hover { color: #85640a; }
 [data-theme="dark"] ::-webkit-scrollbar-thumb { background: rgba(212,175,55,0.3); border-radius: 3px; }
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: rgba(212,175,55,0.5); }
 
+/* 排班表 dark mode */
+[data-theme="dark"] .timetable-wrap { background: #1a1a1a !important; }
+[data-theme="dark"] .timetable { background: #1a1a1a !important; }
+[data-theme="dark"] .timetable th { background: #222 !important; color: #c8b88a !important; border-color: rgba(255,255,255,0.08) !important; }
+[data-theme="dark"] .timetable td { border-color: rgba(255,255,255,0.06) !important; }
+[data-theme="dark"] .tt-time-cell { color: rgba(255,255,255,0.5) !important; background: #222 !important; }
+[data-theme="dark"] .tt-day-col.tt-today { background: rgba(212,175,55,0.08) !important; }
+[data-theme="dark"] .tt-cell { background: transparent !important; }
+[data-theme="dark"] .tt-block-name { color: inherit; }
+[data-theme="dark"] .tt-block-user { color: rgba(255,255,255,0.6) !important; }
+[data-theme="dark"] .tt-week-nav { background: #1a1a1a !important; }
+[data-theme="dark"] .tt-week-label { color: #f0e6c8 !important; }
+[data-theme="dark"] .tt-week-label:hover { background: rgba(212,175,55,0.1) !important; }
+[data-theme="dark"] .tt-week-nav .btn-sm { color: rgba(255,255,255,0.7) !important; border-color: rgba(212,175,55,0.3) !important; background: transparent !important; }
+[data-theme="dark"] .tt-week-nav .btn-sm:hover { background: #d4af37 !important; color: #1a1200 !important; }
+[data-theme="dark"] .tabs button { color: rgba(255,255,255,0.5) !important; }
+[data-theme="dark"] .tabs button.active { color: #d4af37 !important; border-bottom-color: #d4af37 !important; }
+[data-theme="dark"] .tt-actions .btn-primary { background: linear-gradient(135deg,#d4af37,#a67c00) !important; color: #1f1a05 !important; }
+[data-theme="dark"] .tt-legend { background: rgba(255,255,255,0.05) !important; border-color: rgba(255,255,255,0.15) !important; color: #e0e0e0 !important; }
+[data-theme="dark"] #shift-app table { color: #e0e0e0 !important; }
+[data-theme="dark"] #shift-app table th { color: #c8b88a !important; border-color: rgba(255,255,255,0.1) !important; }
+[data-theme="dark"] #shift-app table td { color: #e0e0e0 !important; border-color: rgba(255,255,255,0.06) !important; }
+[data-theme="dark"] #shift-app .tt-legend { background: rgba(255,255,255,0.08) !important; border-color: rgba(212,175,55,0.3) !important; color: #f0e6c8 !important; }
+[data-theme="dark"] .shift-card { background: #1a1a1a !important; border-color: rgba(255,255,255,0.08) !important; color: #e0e0e0 !important; }
+[data-theme="dark"] .shift-card__label { color: rgba(255,255,255,0.5) !important; }
+[data-theme="dark"] .shift-card__row { color: #e0e0e0 !important; border-color: rgba(255,255,255,0.06) !important; }
+
 /* Dashboard dark mode — 刷新按鈕 */
 [data-theme="dark"] #btn-refresh-rate {
     background: transparent !important;
