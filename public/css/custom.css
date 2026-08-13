@@ -310,7 +310,20 @@ h6, .h6 { font-size: 1rem; font-weight: 600; color: #212529; }
 .widget-subheading { font-size: 0.8125rem; color: #495057; }
 
 /* Badge 加大 */
-.badge { font-size: 0.8125rem; font-weight: 600; }
+/* Badge 全站統一：淡底色 pill 樣式 */
+.badge {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    border-radius: 9999px !important;
+    padding: 0.3em 0.75em !important;
+}
+.badge.bg-success { background: rgba(16,185,129,0.15) !important; color: #059669 !important; }
+.badge.bg-danger { background: rgba(239,68,68,0.12) !important; color: #dc2626 !important; }
+.badge.bg-warning { background: rgba(245,158,11,0.15) !important; color: #b45309 !important; }
+.badge.bg-primary { background: rgba(99,102,241,0.12) !important; color: #4f46e5 !important; }
+.badge.bg-secondary { background: rgba(107,114,128,0.12) !important; color: #4b5563 !important; }
+.badge.bg-info { background: rgba(14,165,233,0.12) !important; color: #0284c7 !important; }
+.badge.text-dark { color: inherit !important; }
 
 /* 按鈕文字 */
 .btn { font-size: 0.9375rem; font-weight: 500; }
@@ -701,6 +714,13 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .dash-card__label { color: #c8b88a !important; }
 [data-theme="dark"] .dash-card__value { color: #f0e6c8 !important; }
 [data-theme="dark"] .dash-card__sub { color: rgba(255,255,255,0.5) !important; }
+
+/* Badge dark mode */
+[data-theme="dark"] .badge.bg-success { background: rgba(16,185,129,0.2) !important; color: #34d399 !important; }
+[data-theme="dark"] .badge.bg-danger { background: rgba(239,68,68,0.15) !important; color: #f87171 !important; }
+[data-theme="dark"] .badge.bg-warning { background: rgba(245,158,11,0.2) !important; color: #fbbf24 !important; }
+[data-theme="dark"] .badge.bg-primary { background: rgba(99,102,241,0.15) !important; color: #a5b4fc !important; }
+[data-theme="dark"] .badge.bg-secondary { background: rgba(255,255,255,0.1) !important; color: rgba(255,255,255,0.7) !important; }
 
 /* 繳款設定 dark mode */
 [data-theme="dark"] .pc-content-box { background: rgba(255,255,255,0.05) !important; color: #e0e0e0 !important; border: 1px solid rgba(255,255,255,0.08); }
