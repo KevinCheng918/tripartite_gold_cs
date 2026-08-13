@@ -13,6 +13,16 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="{{ config('app.name') }}">
 
+    {{-- 防止 dark mode 閃白：在 CSS 載入前立刻套用主題 --}}
+    <script>
+    (function () {
+        var theme = localStorage.getItem('theme');
+        if (theme === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        }
+    })();
+    </script>
+
     {{-- Architect UI CSS --}}
     <link rel="stylesheet" href="{{ asset('vendors/architect-ui/styles/css/base.css') }}">
     <link rel="stylesheet" href="{{ asset('vendors/architect-ui/vendors/@fortawesome/fontawesome-free/css/all.min.css') }}">
