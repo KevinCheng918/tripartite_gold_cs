@@ -269,8 +269,10 @@ $(function () {
 
     // 計數
     function updateSelectedCount() {
-        var count = $('.bc-group-cb:checked').length;
-        $('#bc-selected-count').text('已選 ' + count + ' 個');
+        var visibleCbs = $('.bc-group-item:visible .bc-group-cb');
+        var checkedCount = visibleCbs.filter(':checked').length;
+        $('#bc-selected-count').text('已選 ' + checkedCount + ' 個');
+        $('#bc-select-all').prop('checked', visibleCbs.length > 0 && checkedCount === visibleCbs.length);
     }
     $(document).on('change', '.bc-group-cb', updateSelectedCount);
 
