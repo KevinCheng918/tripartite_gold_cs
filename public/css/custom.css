@@ -628,6 +628,19 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .card .small.text-muted { color: rgba(255,255,255,0.5) !important; }
 [data-theme="dark"] .assignment-info p { color: #e0e0e0 !important; }
 [data-theme="dark"] .assignment-info strong { color: #f0e6c8 !important; }
+
+/* Telegram 聊天 dark mode */
+[data-theme="dark"] .app-inner-layout__wrapper { background: #1a1a1a !important; }
+[data-theme="dark"] .app-inner-layout__sidebar, [data-theme="dark"] .app-inner-layout__sidebar.card { background: #1a1a1a !important; border-color: rgba(255,255,255,0.08) !important; }
+[data-theme="dark"] .app-inner-layout__content, [data-theme="dark"] .app-inner-layout__content.card { background: #141414 !important; border-color: rgba(255,255,255,0.08) !important; }
+[data-theme="dark"] .app-inner-layout__top-pane { background: #1a1a1a !important; border-color: rgba(255,255,255,0.08) !important; }
+[data-theme="dark"] .app-inner-layout__bottom-pane { background: #1a1a1a !important; border-color: rgba(255,255,255,0.08) !important; }
+[data-theme="dark"] .tg-group-item { background: #1a1a1a !important; border-color: rgba(255,255,255,0.06) !important; color: #e0e0e0 !important; }
+[data-theme="dark"] .tg-group-item:hover { background: rgba(212,175,55,0.08) !important; }
+[data-theme="dark"] .tg-group-item.bg-light { background: rgba(212,175,55,0.15) !important; }
+[data-theme="dark"] #tg-group-list { background: #1a1a1a !important; }
+[data-theme="dark"] .chat-wrapper { background: #141414 !important; }
+[data-theme="dark"] .scrollbar-container { background: #1a1a1a !important; }
 [data-theme="dark"] #shift-app .tt-legend { background: rgba(255,255,255,0.08) !important; border-color: rgba(212,175,55,0.3) !important; color: #f0e6c8 !important; }
 [data-theme="dark"] .shift-card { background: #1a1a1a !important; border-color: rgba(255,255,255,0.08) !important; color: #e0e0e0 !important; }
 [data-theme="dark"] .shift-card__label { color: rgba(255,255,255,0.5) !important; }
