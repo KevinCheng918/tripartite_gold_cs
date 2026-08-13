@@ -49,6 +49,41 @@ class UserRepository
     }
 
     /**
+     * 統計客服帳號各狀態數量（排除管理者）
+     *
+     * @return array
+     */
+    public function countByStatus()
+    {
+        $rows = User::query()
+            ->selectRaw('status, COUNT(*) as count')
+            ->where('level', config('constants.USER.LEVEL.CS'))
+            ->groupBy('status')
+            ->get();
+
+        $normal = 0;
+        $lock = 0;
+        $deactivate = 0;
+
+        foreach ($rows as $row) {
+            if ((int) $row->status === config('constants.USER.STATUS.NORMAL')) {
+                $normal = $row->count;
+            } elseif ((int) $row->status === config('constants.USER.STATUS.LOCK')) {
+                $lock = $row->count;
+            } elseif ((int) $row->status === config('constants.USER.STATUS.DEACTIVATE')) {
+                $deactivate = $row->count;
+            }
+        }
+
+        return [
+            'normal'     => $normal,
+            'lock'       => $lock,
+            'deactivate' => $deactivate,
+            'total'      => $normal + $lock + $deactivate,
+        ];
+    }
+
+    /**
      * 依 ID 查詢使用者
      *
      * @param int $id

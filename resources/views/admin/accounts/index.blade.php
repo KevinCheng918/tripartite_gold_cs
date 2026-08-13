@@ -59,6 +59,18 @@
         </div>
     </div>
 
+    {{-- 統計 --}}
+    <div class="main-card mb-3 card">
+        <div class="card-body py-2">
+            <div class="d-flex flex-wrap gap-4 align-items-center">
+                <span><span class="badge bg-success">{{ trans('account.status_normal') }}</span> <strong>{{ $accountStats['normal'] }}</strong></span>
+                <span><span class="badge bg-warning text-dark">{{ trans('account.status_lock') }}</span> <strong>{{ $accountStats['lock'] }}</strong></span>
+                <span><span class="badge bg-danger">{{ trans('account.status_deactivate') }}</span> <strong>{{ $accountStats['deactivate'] }}</strong></span>
+                <span class="ms-auto fw-bold">客服總數：{{ $accountStats['total'] }} 人</span>
+            </div>
+        </div>
+    </div>
+
     <div class="main-card mb-3 card">
         {{-- 桌面版：表格 --}}
         <div class="card-body p-0 d-none d-md-block">

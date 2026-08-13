@@ -44,6 +44,16 @@ class AccountService
     }
 
     /**
+     * 取得客服帳號狀態統計（排除管理者）
+     *
+     * @return array ['normal' => N, 'lock' => N, 'deactivate' => N, 'total' => N]
+     */
+    public function getStatusStats()
+    {
+        return $this->userRepository->countByStatus();
+    }
+
+    /**
      * 新增帳號（客服帳號，level=CS）
      *
      * @param array $params 含 account, nickname, password

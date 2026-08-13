@@ -43,10 +43,12 @@ class AccountController extends Controller
     {
         $params = $request->only(['account', 'nickname', 'status', 'level', 'per_page']);
         $accounts = $this->accountService->list($params);
+        $accountStats = $this->accountService->getStatusStats();
 
         return view('admin.accounts.index', [
-            'accounts' => $accounts,
-            'filters'  => $params,
+            'accounts'     => $accounts,
+            'filters'      => $params,
+            'accountStats' => $accountStats,
         ]);
     }
 
