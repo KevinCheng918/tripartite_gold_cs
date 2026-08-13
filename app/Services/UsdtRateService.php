@@ -33,48 +33,47 @@ class UsdtRateService
     public function getRateWithHistory()
     {
         $currentRate = $this->getCurrentRate();
-        $klines = $this->getKlines();
 
-        // 計算 4 小時最高+最低/2
-        $high = 0;
-        $low = PHP_FLOAT_MAX;
-        $chartData = [];
+        // 一根 4H K 線取 4H 最高最低
+        $kline4h = $this->getKlines(240, 1);
+        $high4h = 0;
+        $low4h = 0;
 
-        // debug: 記錄第一筆 K 線格式
-        if (!empty($klines)) {
-            Log::info('USDT K 線格式', ['first' => $klines[0]]);
+        if (!empty($kline4h[0])) {
+            $high4h = (float) $kline4h[0][2];
+            $low4h = (float) $kline4h[0][3];
         }
 
-        foreach ($klines as $k) {
-            // MAX API K 線格式：[timestamp, open, high, low, close, volume]
-            $time = $k[0];
-            $kHigh = (float) $k[2];
-            $kLow = (float) $k[3];
-            $kClose = (float) $k[4];
+        $avgRate = ($high4h > 0 && $low4h > 0) ? ($high4h + $low4h) / 2 : $currentRate;
 
-            if ($kHigh > $high) {
-                $high = $kHigh;
-            }
-            if ($kLow < $low) {
-                $low = $kLow;
-            }
+        // 一根 1D K 線取今日最高最低
+        $kline1d = $this->getKlines(1440, 1);
+        $highDay = 0;
+        $lowDay = 0;
 
+        if (!empty($kline1d[0])) {
+            $highDay = (float) $kline1d[0][2];
+            $lowDay = (float) $kline1d[0][3];
+        }
+
+        // 15 分鐘 K 線畫曲線圖
+        $klines15m = $this->getKlines(15, 16);
+        $chartData = [];
+
+        foreach ($klines15m as $k) {
             $chartData[] = [
-                'time'  => date('H:i', $time),
-                'price' => $kClose,
+                'time'  => date('H:i', $k[0]),
+                'price' => (float) $k[4],
             ];
         }
 
-        if ($low === PHP_FLOAT_MAX) {
-            $low = 0;
-        }
-        $avgRate = ($high > 0 && $low > 0) ? ($high + $low) / 2 : $currentRate;
-
         return [
             'current_rate' => $currentRate,
-            'avg_rate'     => round($avgRate, 2),
-            'high'         => $high,
-            'low'          => $low,
+            'avg_rate'     => round($avgRate, 3),
+            'high_4h'      => $high4h,
+            'low_4h'       => $low4h,
+            'high_day'     => $highDay,
+            'low_day'      => $lowDay,
             'chart'        => $chartData,
             'updated_at'   => now()->format('Y-m-d H:i:s'),
         ];
@@ -100,18 +99,20 @@ class UsdtRateService
     }
 
     /**
-     * 取得 4 小時 K 線（每 15 分鐘一根，共 16 根）
+     * 取得 K 線資料
      *
+     * @param int $period  K 線週期（分鐘）
+     * @param int $limit   取幾根
      * @return array
      */
-    private function getKlines()
+    private function getKlines($period = 240, $limit = 1)
     {
         try {
             $response = $this->client->get(self::KLINE_URL, [
                 'query' => [
                     'market' => 'usdttwd',
-                    'period' => 15,       // 15 分鐘
-                    'limit'  => 16,       // 4 小時 = 16 根
+                    'period' => $period,
+                    'limit'  => $limit,
                 ],
             ]);
 

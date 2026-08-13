@@ -27,23 +27,33 @@
                         <div class="text-muted mb-1">即時匯率</div>
                         <div id="rate-current" style="font-size:2rem;font-weight:700;color:#a67c00">-</div>
                     </div>
-                    <div class="d-flex justify-content-center gap-4 mt-2">
+                    <div class="d-flex justify-content-center gap-3 mt-2">
                         <div class="text-center">
                             <small class="text-muted">4H 均價</small>
                             <div id="rate-avg" class="fw-bold">-</div>
                         </div>
                         <div class="text-center">
-                            <small class="text-muted">最高</small>
-                            <div id="rate-high" class="fw-bold text-danger">-</div>
+                            <small class="text-muted">4H 最高</small>
+                            <div id="rate-high-4h" class="fw-bold text-danger">-</div>
                         </div>
                         <div class="text-center">
-                            <small class="text-muted">最低</small>
-                            <div id="rate-low" class="fw-bold text-success">-</div>
+                            <small class="text-muted">4H 最低</small>
+                            <div id="rate-low-4h" class="fw-bold text-success">-</div>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-center gap-3 mt-2">
+                        <div class="text-center">
+                            <small class="text-muted">今日最高</small>
+                            <div id="rate-high-day" class="fw-bold text-danger">-</div>
+                        </div>
+                        <div class="text-center">
+                            <small class="text-muted">今日最低</small>
+                            <div id="rate-low-day" class="fw-bold text-success">-</div>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-8">
-                    <canvas id="rate-chart" height="120"></canvas>
+                    <canvas id="rate-chart" height="280"></canvas>
                 </div>
             </div>
         </div>
@@ -261,12 +271,15 @@ $(function () {
                 $btn.find('i').removeClass('fa-spin');
                 $btn.prop('disabled', false);
 
-                $('#rate-current').text(data.current_rate ? data.current_rate.toFixed(2) : '-');
-                $('#rate-avg').text(data.avg_rate ? data.avg_rate.toFixed(2) : '-');
-                $('#rate-high').text(data.high ? data.high.toFixed(2) : '-');
-                $('#rate-low').text(data.low ? data.low.toFixed(2) : '-');
+                $('#rate-current').text(data.current_rate ? data.current_rate.toFixed(3) : '-');
+                $('#rate-avg').text(data.avg_rate ? data.avg_rate.toFixed(3) : '-');
+                $('#rate-high-4h').text(data.high_4h ? data.high_4h.toFixed(3) : '-');
+                $('#rate-low-4h').text(data.low_4h ? data.low_4h.toFixed(3) : '-');
+                $('#rate-high-day').text(data.high_day ? data.high_day.toFixed(3) : '-');
+                $('#rate-low-day').text(data.low_day ? data.low_day.toFixed(3) : '-');
                 $('#rate-updated-at').text(data.updated_at || '');
 
+                rateInfo = data;
                 renderChart(data.chart || []);
             },
             error: function (xhr) {
@@ -278,6 +291,22 @@ $(function () {
         });
     }
 
+    var rateInfo = {};
+
+    function makeLine(labels, value, label, color, dash) {
+        return {
+            label: label,
+            data: labels.map(function () { return value; }),
+            borderColor: color,
+            borderWidth: 1.5,
+            borderDash: dash || [],
+            pointRadius: 0,
+            pointHoverRadius: 0,
+            fill: false,
+            tension: 0,
+        };
+    }
+
     function renderChart(chartData) {
         var labels = chartData.map(function (d) { return d.time; });
         var prices = chartData.map(function (d) { return d.price; });
@@ -287,30 +316,43 @@ $(function () {
 
         if (rateChart) { rateChart.destroy(); }
 
+        var datasets = [{
+            label: 'USDT/TWD',
+            data: prices,
+            borderColor: '#a67c00',
+            backgroundColor: 'rgba(166,124,0,0.1)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 2,
+            pointHoverRadius: 5,
+            borderWidth: 2,
+        }];
+
+        // 水平標記線
+        if (rateInfo.high_4h) { datasets.push(makeLine(labels, rateInfo.high_4h, '4H 最高', '#dc3545', [])); }
+        if (rateInfo.low_4h) { datasets.push(makeLine(labels, rateInfo.low_4h, '4H 最低', '#198754', [])); }
+        if (rateInfo.high_day) { datasets.push(makeLine(labels, rateInfo.high_day, '今日最高', '#e85d04', [6, 4])); }
+        if (rateInfo.low_day) { datasets.push(makeLine(labels, rateInfo.low_day, '今日最低', '#0ea5e9', [6, 4])); }
+        if (rateInfo.avg_rate) { datasets.push(makeLine(labels, rateInfo.avg_rate, '4H 均價', '#6f42c1', [2, 2])); }
+
         rateChart = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: labels,
-                datasets: [{
-                    label: 'USDT/TWD',
-                    data: prices,
-                    borderColor: '#a67c00',
-                    backgroundColor: 'rgba(166,124,0,0.1)',
-                    fill: true,
-                    tension: 0.3,
-                    pointRadius: 2,
-                    pointHoverRadius: 5,
-                    borderWidth: 2,
-                }]
+                datasets: datasets
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { display: false },
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: { boxWidth: 20, font: { size: 11 } }
+                    },
                     tooltip: {
                         callbacks: {
-                            label: function (ctx) { return 'TWD ' + ctx.parsed.y.toFixed(2); }
+                            label: function (ctx) { return ctx.dataset.label + ' ' + ctx.parsed.y.toFixed(3); }
                         }
                     }
                 },
