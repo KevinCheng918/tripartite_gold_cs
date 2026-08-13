@@ -228,7 +228,7 @@ class ShiftController extends Controller
     public function ajaxMySwaps(Request $request)
     {
         $params = $request->only(['per_page']);
-        $perPage = (int) ($params['per_page'] ?? 20);
+        $perPage = (int) ($params['per_page'] ?? config('constants.PAGINATION.DEFAULT', 10));
 
         $swaps = $this->shiftService->listSwaps(Auth::id(), Auth::user()->isAdmin(), $perPage);
 

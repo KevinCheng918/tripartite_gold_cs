@@ -108,7 +108,7 @@ class ShiftCoverController extends Controller
     {
         $params = $request->only(['per_page']);
 
-        $covers = $this->coverService->listByUser(Auth::id(), (int) ($params['per_page'] ?? 20));
+        $covers = $this->coverService->listByUser(Auth::id(), (int) ($params['per_page'] ?? config('constants.PAGINATION.DEFAULT', 10)));
 
         return ShiftCoverResource::collection($covers);
     }
@@ -123,7 +123,7 @@ class ShiftCoverController extends Controller
     {
         $params = $request->only(['per_page']);
 
-        $covers = $this->coverService->listPendingAdmin((int) ($params['per_page'] ?? 20));
+        $covers = $this->coverService->listPendingAdmin((int) ($params['per_page'] ?? config('constants.PAGINATION.DEFAULT', 10)));
 
         return ShiftCoverResource::collection($covers);
     }
@@ -157,7 +157,7 @@ class ShiftCoverController extends Controller
     {
         $params = $request->only(['per_page']);
 
-        $covers = $this->coverService->listAll((int) ($params['per_page'] ?? 20));
+        $covers = $this->coverService->listAll((int) ($params['per_page'] ?? config('constants.PAGINATION.DEFAULT', 10)));
 
         return ShiftCoverResource::collection($covers);
     }

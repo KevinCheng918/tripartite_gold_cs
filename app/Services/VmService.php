@@ -41,7 +41,7 @@ class VmService
             'power_status' => $params['power_status'] ?? null,
         ];
 
-        return $this->vmRepository->paginateServers($criteria, (int) ($params['per_page'] ?? 20));
+        return $this->vmRepository->paginateServers($criteria, (int) ($params['per_page'] ?? config('constants.PAGINATION.DEFAULT', 10)));
     }
 
     /**
@@ -107,7 +107,7 @@ class VmService
             'system_id'     => $params['system_id'] ?? null,
         ];
 
-        return $this->vmRepository->paginateBillings($criteria, (int) ($params['per_page'] ?? 20));
+        return $this->vmRepository->paginateBillings($criteria, (int) ($params['per_page'] ?? config('constants.PAGINATION.DEFAULT', 10)));
     }
 
     /**

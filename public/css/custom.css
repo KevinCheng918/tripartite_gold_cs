@@ -201,6 +201,16 @@
     }
 }
 
+/* 分頁 SVG icon 修正 */
+nav[role="navigation"] svg {
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+}
+nav[role="navigation"] .flex {
+    display: flex;
+    align-items: center;
+}
+
 /* 打卡面板置中修正 */
 .att-clock-panel {
     text-align: center !important;

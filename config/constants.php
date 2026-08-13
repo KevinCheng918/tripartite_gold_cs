@@ -63,7 +63,8 @@ return [
     ],
 
     'PAGINATION' => [
-        'USER' => 20,
+        'DEFAULT' => 10,
+        'USER' => 10,
     ],
 
 ];

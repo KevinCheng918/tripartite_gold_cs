@@ -101,7 +101,7 @@ class TelegramBroadcastController extends Controller
      */
     public function ajaxHistory(Request $request)
     {
-        $perPage = (int) $request->input('per_page', 20);
+        $perPage = (int) $request->input('per_page', config('constants.PAGINATION.DEFAULT', 10));
 
         $broadcasts = $this->broadcastService->list($perPage);
 

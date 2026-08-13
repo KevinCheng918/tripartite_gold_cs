@@ -113,7 +113,7 @@ class ShiftService
             $criteria[] = new AssignmentShiftCriteria((int) $params['shift_id']);
         }
 
-        return $this->assignmentRepository->paginate($criteria, (int) ($params['per_page'] ?? 20));
+        return $this->assignmentRepository->paginate($criteria, (int) ($params['per_page'] ?? config('constants.PAGINATION.DEFAULT', 10)));
     }
 
     /**

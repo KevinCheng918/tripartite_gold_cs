@@ -39,7 +39,7 @@ class AccountService
 
         return $this->userRepository->paginate(
             $filters,
-            (int) ($params['per_page'] ?? config('constants.PAGINATION.USER', 20))
+            (int) ($params['per_page'] ?? config('constants.PAGINATION.DEFAULT', 10))
         );
     }
 

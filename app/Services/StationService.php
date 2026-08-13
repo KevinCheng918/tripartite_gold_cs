@@ -49,7 +49,7 @@ class StationService
             'score_runner' => $params['score_runner'] ?? null,
         ];
 
-        return $this->stationRepository->paginate($criteria, (int) ($params['per_page'] ?? 20));
+        return $this->stationRepository->paginate($criteria, (int) ($params['per_page'] ?? config('constants.PAGINATION.DEFAULT', 10)));
     }
 
     /**
