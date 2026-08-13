@@ -111,11 +111,6 @@ class TelegramChatService
         $chatId = $message['chat']['id'];
         $chatTitle = $message['chat']['title'] ?? "Chat {$chatId}";
 
-        // debug: 記錄完整 message keys
-        Log::info('Telegram incoming message keys', [
-            'keys'             => array_keys($message),
-            'has_reply'        => isset($message['reply_to_message']),
-        ]);
         $text = $message['text'] ?? ($message['caption'] ?? '');
         $senderName = $this->buildSenderName($message['from'] ?? []);
         $telegramMessageId = $message['message_id'] ?? null;

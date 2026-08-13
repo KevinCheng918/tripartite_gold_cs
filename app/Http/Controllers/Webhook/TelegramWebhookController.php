@@ -44,6 +44,14 @@ class TelegramWebhookController extends Controller
         try {
             $payload = $request->all();
 
+            // debug: 記錄 webhook 收到的 payload keys
+            Log::info('Webhook payload', [
+                'keys'      => array_keys($payload),
+                'has_msg'   => isset($payload['message']),
+                'msg_keys'  => isset($payload['message']) ? array_keys($payload['message']) : [],
+                'has_reply' => isset($payload['message']['reply_to_message']),
+            ]);
+
             if (isset($payload['message_reaction'])) {
                 $this->chatService->handleReactionUpdate($payload);
             } else {
