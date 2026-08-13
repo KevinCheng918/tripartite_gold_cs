@@ -193,7 +193,7 @@
 /* 手機版 header 防跑版 */
 @media (max-width: 767.98px) {
     #topbar-clock {
-        font-size: 0.75rem !important;
+        font-size: 0.875rem !important;
     }
     .app-header-right .btn-outline-danger span,
     .app-header-right .btn-outline-danger .logout-text {
@@ -663,6 +663,9 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .shift-card { background: #1a1a1a !important; border-color: rgba(255,255,255,0.08) !important; color: #e0e0e0 !important; }
 [data-theme="dark"] .shift-card__label { color: rgba(255,255,255,0.5) !important; }
 [data-theme="dark"] .shift-card__row { color: #e0e0e0 !important; border-color: rgba(255,255,255,0.06) !important; }
+
+/* 手機版 header 展開選單 dark mode */
+[data-theme="dark"] .app-header__content { background: #0a0a0a !important; }
 
 /* Dashboard dark mode — 刷新按鈕 */
 [data-theme="dark"] #btn-refresh-rate {

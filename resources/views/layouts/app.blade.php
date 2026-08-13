@@ -88,11 +88,11 @@
             </div>
             <div class="app-header__content">
                 <div class="app-header-left">
-                    <span class="fw-bold me-3" id="topbar-clock" style="font-size:0.9375rem; white-space:nowrap;"></span>
+                    <span class="fw-bold me-3" id="topbar-clock" style="font-size:1.25rem; white-space:nowrap;"></span>
                 </div>
                 <div class="app-header-right">
                     <div class="d-flex align-items-center">
-                        <a href="javascript:void(0)" class="p-0 btn btn-link me-2" title="推播通知" onclick="window.requestPushPermission && window.requestPushPermission()">
+                        <a href="javascript:void(0)" class="p-0 btn btn-link me-2 d-md-none" title="推播通知" onclick="window.requestPushPermission && window.requestPushPermission()">
                             <span class="icon-wrapper icon-wrapper-alt rounded-circle">
                                 <span class="icon-wrapper-bg bg-focus"></span>
                                 <i class="fas fa-bell text-focus"></i>
