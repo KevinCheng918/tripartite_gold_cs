@@ -691,6 +691,12 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .modal .btn.btn-secondary:hover { background-color: #6b7280 !important; border-color: #6b7280 !important; }
 [data-theme="dark"] .form-control[disabled], [data-theme="dark"] .form-control[readonly] { background: rgba(255,255,255,0.03) !important; color: rgba(255,255,255,0.5) !important; }
 
+/* 出勤統計卡片 dark mode */
+[data-theme="dark"] .dash-card { background: #1a1a1a !important; box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.3) !important; }
+[data-theme="dark"] .dash-card__label { color: #c8b88a !important; }
+[data-theme="dark"] .dash-card__value { color: #f0e6c8 !important; }
+[data-theme="dark"] .dash-card__sub { color: rgba(255,255,255,0.5) !important; }
+
 /* 繳款設定 dark mode */
 [data-theme="dark"] .pc-content-box { background: rgba(255,255,255,0.05) !important; color: #e0e0e0 !important; border: 1px solid rgba(255,255,255,0.08); }
 [data-theme="dark"] .pc-template-box { background: rgba(212,175,55,0.1) !important; color: #f0e6c8 !important; border: 1px solid rgba(212,175,55,0.2); }

@@ -41,7 +41,12 @@
     function showMessage(message) {
         var el = document.getElementById('modal-attendance-message-text');
         if (el) { el.textContent = message; }
-        openModal('modal-attendance-message');
+        var hasBackdrop = document.querySelectorAll('.modal-backdrop').length > 0;
+        if (hasBackdrop) {
+            setTimeout(function () { openModal('modal-attendance-message'); }, 400);
+        } else {
+            openModal('modal-attendance-message');
+        }
     }
 
     function getErrorMessage(error) {
