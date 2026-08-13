@@ -111,15 +111,11 @@ class TelegramChatService
         $chatId = $message['chat']['id'];
         $chatTitle = $message['chat']['title'] ?? "Chat {$chatId}";
 
-        // debug: 記錄是否有引用回覆
-        if (isset($message['reply_to_message'])) {
-            Log::info('Telegram 收到引用回覆', [
-                'chat_id'          => $chatId,
-                'reply_to_message' => array_keys($message['reply_to_message']),
-                'reply_from'       => $message['reply_to_message']['from'] ?? null,
-                'reply_text'       => $message['reply_to_message']['text'] ?? ($message['reply_to_message']['caption'] ?? ''),
-            ]);
-        }
+        // debug: 記錄完整 message keys
+        Log::info('Telegram incoming message keys', [
+            'keys'             => array_keys($message),
+            'has_reply'        => isset($message['reply_to_message']),
+        ]);
         $text = $message['text'] ?? ($message['caption'] ?? '');
         $senderName = $this->buildSenderName($message['from'] ?? []);
         $telegramMessageId = $message['message_id'] ?? null;
