@@ -42,11 +42,11 @@
                     </div>
                     <div class="d-flex justify-content-center gap-3 mt-2">
                         <div class="text-center">
-                            <small class="text-muted">今日最高</small>
+                            <small class="text-muted">24H 最高</small>
                             <div id="rate-high-day" class="fw-bold text-danger">-</div>
                         </div>
                         <div class="text-center">
-                            <small class="text-muted">今日最低</small>
+                            <small class="text-muted">24H 最低</small>
                             <div id="rate-low-day" class="fw-bold text-success">-</div>
                         </div>
                     </div>
@@ -337,8 +337,8 @@ $(function () {
         // 水平標記線
         if (rateInfo.high_4h) { datasets.push(makeLine(labels, rateInfo.high_4h, '4H 最高', '#dc3545', [])); }
         if (rateInfo.low_4h) { datasets.push(makeLine(labels, rateInfo.low_4h, '4H 最低', '#198754', [])); }
-        if (rateInfo.high_day) { datasets.push(makeLine(labels, rateInfo.high_day, '今日最高', '#e85d04', [6, 4])); }
-        if (rateInfo.low_day) { datasets.push(makeLine(labels, rateInfo.low_day, '今日最低', '#0ea5e9', [6, 4])); }
+        if (rateInfo.high_day) { datasets.push(makeLine(labels, rateInfo.high_day, '24H 最高', '#e85d04', [6, 4])); }
+        if (rateInfo.low_day) { datasets.push(makeLine(labels, rateInfo.low_day, '24H 最低', '#0ea5e9', [6, 4])); }
         if (rateInfo.avg_rate) { datasets.push(makeLine(labels, rateInfo.avg_rate, '4H 均價', '#6f42c1', [2, 2])); }
 
         rateChart = new Chart(ctx, {

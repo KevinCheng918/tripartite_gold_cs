@@ -46,15 +46,19 @@ class UsdtRateService
 
         $avgRate = ($high4h > 0 && $low4h > 0) ? ($high4h + $low4h) / 2 : $currentRate;
 
-        // 一根 1D K 線取今日最高最低
-        $kline1d = $this->getKlines(1440, 1);
+        // 6 根 4H K 線取 24H 最高最低
+        $kline24h = $this->getKlines(240, 6);
         $highDay = 0;
-        $lowDay = 0;
+        $lowDay = PHP_FLOAT_MAX;
 
-        if (!empty($kline1d[0])) {
-            $highDay = (float) $kline1d[0][2];
-            $lowDay = (float) $kline1d[0][3];
+        foreach ($kline24h as $k) {
+            $h = (float) $k[2];
+            $l = (float) $k[3];
+            if ($h > $highDay) { $highDay = $h; }
+            if ($l < $lowDay) { $lowDay = $l; }
         }
+
+        if ($lowDay === PHP_FLOAT_MAX) { $lowDay = 0; }
 
         // 15 分鐘 K 線畫曲線圖
         $klines15m = $this->getKlines(15, 16);
