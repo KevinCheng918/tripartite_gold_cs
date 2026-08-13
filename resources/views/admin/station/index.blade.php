@@ -704,7 +704,17 @@ $(function () {
                 }
                 html += '<tr><th>代付費率</th><td>' + withdrawRateText + '</td></tr>';
                 html += '<tr><th>同系統轉單代收費率</th><td>' + (s.self_system_rate ? (s.self_system_rate * 100).toFixed(2) + '%' : '0%') + '</td></tr>';
-                html += '<tr><th>同系統轉單代付費率</th><td>' + (s.self_system_rate_withdraw ? (s.self_system_rate_withdraw * 100).toFixed(2) + '%' : '0%') + '</td></tr>';
+                var selfWithdrawText = '-';
+                if (!s.withdraw) {
+                    selfWithdrawText = '未開啟';
+                } else if (!s.withdraw_withholding_system) {
+                    selfWithdrawText = '不收費';
+                } else if (s.self_system_rate_withdraw) {
+                    selfWithdrawText = (s.self_system_rate_withdraw * 100).toFixed(2) + '%';
+                } else {
+                    selfWithdrawText = '0%';
+                }
+                html += '<tr><th>同系統轉單代付費率</th><td>' + selfWithdrawText + '</td></tr>';
                 html += '<tr><th>USDT 代收</th><td>' + (s.usdt_deposit ? on : off) + '</td></tr>';
                 html += '<tr><th>ATM 代收</th><td>' + (s.atm_deposit ? on : off) + '</td></tr>';
                 html += '<tr><th>超商代收</th><td>' + (s.cvs_deposit ? on : off) + '</td></tr>';
