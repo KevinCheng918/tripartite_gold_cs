@@ -82,4 +82,5 @@ return [
     'amend_duplicate'       => 'A pending amendment already exists',
     'amend_already_reviewed' => 'Already reviewed',
     'amend_my_records'      => 'My Amendments',
+    'field_amend_count'     => 'Amendments',
 ];

@@ -89,4 +89,5 @@ return [
     'amend_duplicate'       => '已有相同的補打卡申請待審核',
     'amend_already_reviewed' => '此申請已審核過',
     'amend_my_records'      => '我的補打卡申請',
+    'field_amend_count'     => '補打卡次數',
 ];

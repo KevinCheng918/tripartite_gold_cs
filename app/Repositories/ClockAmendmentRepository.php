@@ -107,6 +107,39 @@ class ClockAmendmentRepository
      * @param int    $type
      * @return bool
      */
+    /**
+     * 查詢指定月份所有已通過的補打卡（按 user_id 分組計數）
+     *
+     * @param string $yearMonth Y-m
+     * @return \Illuminate\Support\Collection
+     */
+    public function getApprovedCountByMonth($yearMonth)
+    {
+        return ClockAmendment::query()
+            ->selectRaw('user_id, COUNT(*) as count')
+            ->where('status', ClockAmendment::STATUS_APPROVED)
+            ->where('date', 'like', "{$yearMonth}%")
+            ->groupBy('user_id')
+            ->pluck('count', 'user_id');
+    }
+
+    /**
+     * 查詢指定員工指定月份的已通過補打卡紀錄
+     *
+     * @param int    $userId
+     * @param string $yearMonth
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getApprovedByUserAndMonth($userId, $yearMonth)
+    {
+        return ClockAmendment::query()
+            ->select(['id', 'user_id', 'date', 'type', 'clock_time', 'status'])
+            ->where('user_id', $userId)
+            ->where('status', ClockAmendment::STATUS_APPROVED)
+            ->where('date', 'like', "{$yearMonth}%")
+            ->get();
+    }
+
     public function hasPending($userId, $date, $type)
     {
         return ClockAmendment::query()

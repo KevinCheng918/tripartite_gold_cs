@@ -301,4 +301,16 @@ class ClockAmendmentService
     {
         return $this->amendmentRepository->getByUser($userId);
     }
+
+    /**
+     * 取得指定員工指定月份的已通過補打卡
+     *
+     * @param int    $userId
+     * @param string $yearMonth
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getApprovedByUserAndMonth($userId, $yearMonth)
+    {
+        return $this->amendmentRepository->getApprovedByUserAndMonth($userId, $yearMonth);
+    }
 }

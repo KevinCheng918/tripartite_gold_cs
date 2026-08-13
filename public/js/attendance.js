@@ -345,16 +345,33 @@
     }
 
     function loadMyRecords(month) {
-        apiFetch('/admin/attendance/ajax-my-monthly?month=' + month)
-            .then(function (body) {
-                renderMyRecords(body.data || [], month);
+        var promises = [
+            apiFetch('/admin/attendance/ajax-my-monthly?month=' + month),
+        ];
+        if (hasPerm('attendance.amend')) {
+            promises.push(apiFetch('/admin/attendance/ajax-my-amendments'));
+        }
+
+        Promise.all(promises)
+            .then(function (results) {
+                var records = results[0].data || [];
+                var amendments = results[1] || [];
+                // 建立 lookup: date => [type1, type2]
+                var amendLookup = {};
+                amendments.forEach(function (a) {
+                    if (a.status !== 1) { return; }
+                    if (!amendLookup[a.date]) { amendLookup[a.date] = []; }
+                    amendLookup[a.date].push(a.type);
+                });
+                renderMyRecords(records, month, amendLookup);
             })
             .catch(function () {
                 document.getElementById('att-content').innerHTML = '<p>Failed to load records.</p>';
             });
     }
 
-    function renderMyRecords(records, month) {
+    function renderMyRecords(records, month, amendLookup) {
+        amendLookup = amendLookup || {};
         var thisMonth = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
         var lastMonth = getLastMonth();
 
@@ -385,13 +402,19 @@
             '</div>';
 
         // 每日明細（表格）
+        var amendBadge = '<span class="badge bg-primary ms-1" style="font-size:0.625rem">補</span>';
+
         var rows = records.map(function (r) {
             var st = statusMap[r.status] || { text: '-', css: '' };
+            var dateKey = r.date ? r.date.substring(0, 10) : '';
+            var types = amendLookup[dateKey] || [];
+            var inAmend = types.indexOf(1) !== -1;
+            var outAmend = types.indexOf(2) !== -1;
             return (
                 '<tr>' +
                 '<td>' + r.date + '</td>' +
-                '<td>' + (r.clock_in || '-') + '</td>' +
-                '<td>' + (r.clock_out || '-') + '</td>' +
+                '<td>' + (r.clock_in || '-') + (inAmend ? amendBadge : '') + '</td>' +
+                '<td>' + (r.clock_out || '-') + (outAmend ? amendBadge : '') + '</td>' +
                 '<td>' + (r.late_minutes > 0 ? r.late_minutes + ' ' + i18n.unit_minutes : '-') + '</td>' +
                 '<td>' + (r.early_leave_minutes > 0 ? r.early_leave_minutes + ' ' + i18n.unit_minutes : '-') + '</td>' +
                 '<td>' + (r.overtime_minutes > 0 ? r.overtime_minutes + ' ' + i18n.unit_minutes : '-') + '</td>' +
@@ -414,14 +437,16 @@
         // 手機版卡片
         var cards = records.map(function (r) {
             var st = statusMap[r.status] || { text: '-', css: '' };
+            var dk = r.date ? r.date.substring(0, 10) : '';
+            var ts = amendLookup[dk] || [];
             return (
                 '<div class="shift-card">' +
                 '<div class="shift-card__header">' +
                 '<span class="shift-card__title">' + r.date + '</span>' +
                 '<span class="badge ' + st.css + '">' + st.text + '</span>' +
                 '</div>' +
-                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_clock_in + '</span><span>' + (r.clock_in || '-') + '</span></div>' +
-                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_clock_out + '</span><span>' + (r.clock_out || '-') + '</span></div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_clock_in + '</span><span>' + (r.clock_in || '-') + (ts.indexOf(1) !== -1 ? amendBadge : '') + '</span></div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_clock_out + '</span><span>' + (r.clock_out || '-') + (ts.indexOf(2) !== -1 ? amendBadge : '') + '</span></div>' +
                 (r.late_minutes > 0 ? '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_late + '</span><span style="color:#dc2626;font-weight:600">' + r.late_minutes + ' ' + i18n.unit_minutes + '</span></div>' : '') +
                 (r.early_leave_minutes > 0 ? '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_early_leave + '</span><span style="color:#dc2626;font-weight:600">' + r.early_leave_minutes + ' ' + i18n.unit_minutes + '</span></div>' : '') +
                 (r.overtime_minutes > 0 ? '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_overtime + '</span><span style="color:#059669;font-weight:600">' + r.overtime_minutes + ' ' + i18n.unit_minutes + '</span></div>' : '') +
@@ -473,6 +498,7 @@
                 '<td>' + r.late_count + '<span class="att-sub">' + r.late_total_minutes + ' ' + i18n.unit_minutes + '</span></td>' +
                 '<td>' + r.early_count + '<span class="att-sub">' + r.early_total_minutes + ' ' + i18n.unit_minutes + '</span></td>' +
                 '<td>' + r.absent_count + '</td>' +
+                '<td>' + (r.amend_count || 0) + '</td>' +
                 '<td>' + r.overtime_total_minutes + ' ' + i18n.unit_minutes + '</td>' +
                 '</tr>'
             );
@@ -487,6 +513,7 @@
             '<th>' + i18n.field_late_count + '</th>' +
             '<th>' + i18n.field_early_count + '</th>' +
             '<th>' + i18n.field_absent_count + '</th>' +
+            '<th>' + i18n.field_amend_count + '</th>' +
             '<th>' + i18n.field_overtime_total + '</th>' +
             '</tr></thead><tbody>' + rows + '</tbody></table>';
 
@@ -504,6 +531,7 @@
                 '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_late_count + '</span><span>' + r.late_count + '（' + r.late_total_minutes + ' ' + i18n.unit_minutes + '）</span></div>' +
                 '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_early_count + '</span><span>' + r.early_count + '（' + r.early_total_minutes + ' ' + i18n.unit_minutes + '）</span></div>' +
                 '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_absent_count + '</span><span>' + r.absent_count + '</span></div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_amend_count + '</span><span>' + (r.amend_count || 0) + '</span></div>' +
                 '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_overtime_total + '</span><span>' + r.overtime_total_minutes + ' ' + i18n.unit_minutes + '</span></div>' +
                 '</div>'
             );

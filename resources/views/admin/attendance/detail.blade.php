@@ -71,6 +71,16 @@
         </div>
     </div>
 
+    @php
+        // 建立補打卡 lookup: date => [type1, type2]
+        $amendLookup = [];
+        foreach ($amendments ?? [] as $a) {
+            $dateKey = $a->date->format('Y-m-d');
+            if (!isset($amendLookup[$dateKey])) { $amendLookup[$dateKey] = []; }
+            $amendLookup[$dateKey][] = $a->type;
+        }
+    @endphp
+
     {{-- 每日明細 --}}
     <div class="main-card mb-3 card">
         <div class="card-body p-0">
@@ -92,8 +102,18 @@
                         @forelse($records as $r)
                             <tr>
                                 <td>{{ $r->date->format('Y-m-d') }}</td>
-                                <td>{{ $r->clock_in ? $r->clock_in->format('H:i:s') : '-' }}</td>
-                                <td>{{ $r->clock_out ? $r->clock_out->format('H:i:s') : '-' }}</td>
+                                <td>
+                                    {{ $r->clock_in ? $r->clock_in->format('H:i:s') : '-' }}
+                                    @if(in_array(1, $amendLookup[$r->date->format('Y-m-d')] ?? []))
+                                        <span class="badge bg-primary" style="font-size:0.625rem">補</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    {{ $r->clock_out ? $r->clock_out->format('H:i:s') : '-' }}
+                                    @if(in_array(2, $amendLookup[$r->date->format('Y-m-d')] ?? []))
+                                        <span class="badge bg-primary" style="font-size:0.625rem">補</span>
+                                    @endif
+                                </td>
                                 <td>
                                     @if($r->late_minutes > 0)
                                         <span class="text-danger fw-bold">{{ $r->late_minutes }} {{ trans('attendance.unit_minutes') }}</span>

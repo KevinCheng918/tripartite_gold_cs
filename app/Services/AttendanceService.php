@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\AttendanceRecord;
 use App\Repositories\AttendanceRepository;
+use App\Repositories\ClockAmendmentRepository;
 use App\Repositories\ShiftAssignmentRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\ValidationException;
@@ -17,13 +18,16 @@ class AttendanceService
 {
     private $attendanceRepository;
     private $assignmentRepository;
+    private $amendmentRepository;
 
     public function __construct(
         AttendanceRepository $attendanceRepository,
-        ShiftAssignmentRepository $assignmentRepository
+        ShiftAssignmentRepository $assignmentRepository,
+        ClockAmendmentRepository $amendmentRepository
     ) {
         $this->attendanceRepository = $attendanceRepository;
         $this->assignmentRepository = $assignmentRepository;
+        $this->amendmentRepository = $amendmentRepository;
     }
 
     /**
@@ -201,6 +205,7 @@ class AttendanceService
     public function getMonthlyReport($yearMonth)
     {
         $records = $this->attendanceRepository->getAllByMonth($yearMonth);
+        $amendCounts = $this->amendmentRepository->getApprovedCountByMonth($yearMonth);
 
         // 按員工分組統計
         $grouped = $records->groupBy('user_id');
@@ -218,6 +223,7 @@ class AttendanceService
                 'early_total_minutes'  => $userRecords->sum('early_leave_minutes'),
                 'absent_count'         => $userRecords->where('status', AttendanceRecord::STATUS_ABSENT)->count(),
                 'overtime_total_minutes' => $userRecords->sum('overtime_minutes'),
+                'amend_count'          => $amendCounts->get($userId, 0),
                 'records'              => $userRecords->values(),
             ];
         }

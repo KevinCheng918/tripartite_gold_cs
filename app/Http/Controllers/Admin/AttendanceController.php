@@ -130,10 +130,13 @@ class AttendanceController extends Controller
         $yearMonth = $request->input('month', now()->format('Y-m'));
         $records = $this->attendanceService->getMonthlyRecords((int) $userId, $yearMonth);
 
+        $amendments = $this->amendmentService->getApprovedByUserAndMonth((int) $userId, $yearMonth);
+
         return view('admin.attendance.detail', [
             'targetUserId' => $userId,
             'records'      => $records,
             'yearMonth'    => $yearMonth,
+            'amendments'   => $amendments,
         ]);
     }
 
