@@ -368,7 +368,7 @@ $(function () {
                         grid: { color: 'rgba(0,0,0,0.05)' },
                         ticks: {
                             font: { size: 11 },
-                            callback: function (v) { return v.toFixed(1); }
+                            callback: function (v) { return v.toFixed(3); }
                         }
                     }
                 }
