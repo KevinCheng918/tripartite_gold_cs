@@ -176,6 +176,7 @@ class TelegramChatService
         // 解析引用回覆
         $replyToSender = null;
         $replyToText = null;
+        Log::info('Telegram 訊息收到', ['has_reply' => isset($message['reply_to_message']), 'msg_id' => $telegramMessageId]);
         if (isset($message['reply_to_message'])) {
             $replyMsg = $message['reply_to_message'];
             $replyToSender = $this->buildSenderName($replyMsg['from'] ?? []);
