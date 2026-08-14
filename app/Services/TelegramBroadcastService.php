@@ -104,6 +104,10 @@ class TelegramBroadcastService
             'sent_at'          => now(),
         ]);
 
+        // 查發送者暱稱
+        $sender = \App\Models\User::query()->select(['id', 'nickname'])->find($senderId);
+        $senderName = $sender ? $sender->nickname : '系統';
+
         // 逐一發送（根據站台系統切換 Bot Token）
         $success = 0;
         $fail = 0;
@@ -122,6 +126,17 @@ class TelegramBroadcastService
 
             if ($result && isset($result['ok']) && $result['ok']) {
                 $success++;
+
+                // 存入 outbound 訊息到對話紀錄
+                $this->telegramRepository->createMessage([
+                    'telegram_group_id'  => $station->telegramGroup->id,
+                    'direction'          => config('constants.TELEGRAM.DIRECTION.OUTBOUND'),
+                    'telegram_message_id' => $result['result']['message_id'] ?? null,
+                    'sender_name'        => $senderName,
+                    'sender_user_id'     => $senderId,
+                    'content'            => $content,
+                    'replied'            => true,
+                ]);
             } else {
                 $fail++;
                 Log::warning('群發公告發送失敗', ['chat_id' => $station->telegramGroup->chat_id, 'broadcast_id' => $broadcast->id]);
