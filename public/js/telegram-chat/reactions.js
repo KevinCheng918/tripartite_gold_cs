@@ -20,6 +20,10 @@
     ];
 
     var longPressTimer = null;
+    var longPressTriggered = false;
+    var touchStartX = 0;
+    var touchStartY = 0;
+    var MOVE_THRESHOLD = 10; // 移動超過 10px 取消長按
 
     T.bindReactionButtons = function () {
         // 右鍵（桌面）
@@ -28,8 +32,10 @@
             wrapper.addEventListener('contextmenu', handleContext);
             // 長按（手機）
             wrapper.removeEventListener('touchstart', handleTouchStart);
+            wrapper.removeEventListener('touchmove', handleTouchMove);
             wrapper.removeEventListener('touchend', handleTouchEnd);
             wrapper.addEventListener('touchstart', handleTouchStart, { passive: true });
+            wrapper.addEventListener('touchmove', handleTouchMove, { passive: true });
             wrapper.addEventListener('touchend', handleTouchEnd);
         });
     };
@@ -43,32 +49,70 @@
         openPicker(msgId, e.clientX, e.clientY);
     }
 
-    var longPressTriggered = false;
+    var activeWrapper = null;
 
     function handleTouchStart(e) {
         if (!T.canReply) { return; }
         var wrapper = e.currentTarget;
         var msgId = wrapper.dataset.msgId;
         if (!msgId) { return; }
+
         longPressTriggered = false;
         var touch = e.touches[0];
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+
+        // 按壓效果
+        activeWrapper = wrapper;
+        wrapper.style.transition = 'transform 0.2s, opacity 0.2s';
+        wrapper.style.transform = 'scale(0.97)';
+        wrapper.style.opacity = '0.7';
+
         longPressTimer = setTimeout(function () {
             longPressTriggered = true;
+            // 震動回饋（如果支援）
+            if (navigator.vibrate) { navigator.vibrate(50); }
+            // 長按成功效果
+            wrapper.style.transform = 'scale(1.02)';
+            wrapper.style.opacity = '1';
+            setTimeout(function () {
+                resetWrapperStyle(wrapper);
+            }, 200);
             openPicker(msgId, touch.clientX, touch.clientY);
-        }, 500);
+        }, 800);
+    }
+
+    function resetWrapperStyle(wrapper) {
+        if (!wrapper) { return; }
+        wrapper.style.transform = '';
+        wrapper.style.opacity = '';
+    }
+
+    function handleTouchMove(e) {
+        // 滑動時取消長按 + 還原效果
+        if (!longPressTimer) { return; }
+        var touch = e.touches[0];
+        var dx = Math.abs(touch.clientX - touchStartX);
+        var dy = Math.abs(touch.clientY - touchStartY);
+        if (dx > MOVE_THRESHOLD || dy > MOVE_THRESHOLD) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+            resetWrapperStyle(activeWrapper);
+            activeWrapper = null;
+        }
     }
 
     function handleTouchEnd(e) {
         if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
-        // 長按觸發後阻止後續的 click 事件關閉面板
+        resetWrapperStyle(activeWrapper);
+        activeWrapper = null;
         if (longPressTriggered) {
             e.preventDefault();
-            longPressTriggered = false;
+            setTimeout(function () { longPressTriggered = false; }, 300);
         }
     }
 
     function openPicker(msgId, x, y) {
-
         closeReactionPicker();
 
         var picker = document.createElement('div');
@@ -87,29 +131,41 @@
         picker.style.left = left + 'px';
         picker.style.top = top + 'px';
 
+        // emoji 只用 click 事件，不用 touchend（避免誤觸）
         picker.querySelectorAll('.tg-reaction-picker__item').forEach(function (item) {
             item.addEventListener('click', function (ev) {
                 ev.stopPropagation();
                 sendReaction(parseInt(msgId, 10), item.dataset.emoji);
                 closeReactionPicker();
             });
-            // 手機觸控支援
-            item.addEventListener('touchend', function (ev) {
-                ev.preventDefault();
-                ev.stopPropagation();
-                sendReaction(parseInt(msgId, 10), item.dataset.emoji);
-                closeReactionPicker();
-            });
         });
 
+        // 點擊其他地方關閉 + 聊天區滑動時關閉（延遲綁定避免立刻觸發）
         setTimeout(function () {
-            document.addEventListener('click', closeReactionPicker, { once: true });
-        }, 0);
+            document.addEventListener('click', closeOnOutside);
+            document.addEventListener('touchstart', closeOnOutside);
+            var chatArea = document.querySelector('.chat-wrapper') || document.getElementById('tg-messages');
+            if (chatArea) {
+                chatArea.addEventListener('scroll', closeReactionPicker);
+                chatArea._reactionScrollBound = true;
+            }
+        }, 100);
+    }
+
+    function closeOnOutside(e) {
+        var picker = document.querySelector('.tg-reaction-picker');
+        if (picker && !picker.contains(e.target)) {
+            closeReactionPicker();
+        }
     }
 
     function closeReactionPicker() {
         var existing = document.querySelector('.tg-reaction-picker');
         if (existing) { existing.remove(); }
+        document.removeEventListener('click', closeOnOutside);
+        document.removeEventListener('touchstart', closeOnOutside);
+        var chatArea = document.querySelector('.chat-wrapper') || document.getElementById('tg-messages');
+        if (chatArea) { chatArea.removeEventListener('scroll', closeReactionPicker); }
     }
 
     function sendReaction(messageId, emoji) {
