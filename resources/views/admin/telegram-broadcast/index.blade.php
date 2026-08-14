@@ -281,28 +281,45 @@ $(function () {
     }
     $(document).on('change', '.bc-group-cb', updateSelectedCount);
 
-    // 多張圖片預覽
+    // 多張圖片累加 + 預覽
+    var bcImageFiles = [];
+
     $('#bc-images').on('change', function () {
-        var files = this.files;
+        var newFiles = this.files;
+        for (var i = 0; i < newFiles.length; i++) {
+            bcImageFiles.push(newFiles[i]);
+        }
+        renderImagePreviews();
+        // 清空 input 讓下次還能選同樣的檔案
+        $(this).val('');
+    });
+
+    function renderImagePreviews() {
         var $preview = $('#bc-image-preview');
         $preview.empty();
-        if (files.length === 0) { $preview.hide(); return; }
+        if (bcImageFiles.length === 0) { $preview.hide(); return; }
 
-        for (var i = 0; i < files.length; i++) {
-            (function (file) {
-                var reader = new FileReader();
-                reader.onload = function (e) {
-                    $preview.append(
-                        '<div class="position-relative">' +
-                        '<img src="' + e.target.result + '" style="width:80px;height:80px;object-fit:cover;border-radius:0.375rem" alt="preview">' +
-                        '</div>'
-                    );
-                };
-                reader.readAsDataURL(file);
-            })(files[i]);
-        }
+        bcImageFiles.forEach(function (file, idx) {
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                $preview.append(
+                    '<div class="position-relative" style="display:inline-block">' +
+                    '<img src="' + e.target.result + '" style="width:80px;height:80px;object-fit:cover;border-radius:0.375rem" alt="preview">' +
+                    '<button type="button" class="btn btn-sm btn-danger position-absolute" style="top:-5px;right:-5px;padding:0 4px;font-size:0.625rem;line-height:1.2;border-radius:50%" data-remove="' + idx + '">&times;</button>' +
+                    '</div>'
+                );
+            };
+            reader.readAsDataURL(file);
+        });
         $preview.show();
-    });
+
+        // 刪除單張
+        $preview.off('click', '[data-remove]').on('click', '[data-remove]', function () {
+            var rmIdx = parseInt($(this).data('remove'), 10);
+            bcImageFiles.splice(rmIdx, 1);
+            renderImagePreviews();
+        });
+    }
 
     // 發送
     $('#form-broadcast').on('submit', function (e) {
@@ -326,10 +343,9 @@ $(function () {
             ids.forEach(function (id) { formData.append('group_ids[]', id); });
         }
 
-        var imageFiles = document.getElementById('bc-images').files;
-        for (var i = 0; i < imageFiles.length; i++) {
-            formData.append('images[]', imageFiles[i]);
-        }
+        bcImageFiles.forEach(function (file) {
+            formData.append('images[]', file);
+        });
 
         var $btn = $('#btn-send');
         $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>發送中...');
