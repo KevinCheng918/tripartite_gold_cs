@@ -545,6 +545,10 @@
                 var shiftGroup = document.getElementById('assign-shift-group');
                 if (shiftGroup) { shiftGroup.style.display = ''; }
 
+                // 重置日期為今天
+                var fp = document.getElementById('assign-date')._flatpickr;
+                if (fp) { fp.clear(); }
+
                 populateAssignShiftSelect();
                 if (isAdmin) { populateAssignUserSelect(); }
                 openModal('modal-assign');
@@ -1476,7 +1480,6 @@
     // 初始化 flatpickr — 報班日期
     flatpickr('#assign-date', {
         dateFormat: 'Y-m-d',
-        defaultDate: 'today',
         minDate: 'today',
         mode: 'multiple',
         conjunction: ', ',

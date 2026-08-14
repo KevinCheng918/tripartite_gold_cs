@@ -521,11 +521,15 @@
             document.body.style.removeProperty('padding-right');
             document.body.style.removeProperty('overflow');
         }
-        // 清空關閉的 modal 內的表單
+        // 清空關閉的 modal 內的表單 + 關閉 flatpickr
         var modal = e.target;
         if (modal && modal.classList.contains('modal')) {
             var form = modal.querySelector('form');
             if (form) { form.reset(); }
+            // 關閉 modal 內所有 flatpickr
+            modal.querySelectorAll('input').forEach(function (input) {
+                if (input._flatpickr) { input._flatpickr.close(); }
+            });
         }
     });
     </script>

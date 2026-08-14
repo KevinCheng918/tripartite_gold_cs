@@ -732,6 +732,28 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .pc-content-box { background: rgba(255,255,255,0.05) !important; color: #e0e0e0 !important; border: 1px solid rgba(255,255,255,0.08); }
 [data-theme="dark"] .pc-template-box { background: rgba(212,175,55,0.1) !important; color: #f0e6c8 !important; border: 1px solid rgba(212,175,55,0.2); }
 
+/* Flatpickr light mode 金色 */
+.flatpickr-day.selected, .flatpickr-day.selected:hover { background: #a67c00 !important; border-color: #a67c00 !important; color: #fff !important; }
+.flatpickr-day.today { border-color: #d4af37 !important; background: rgba(212,175,55,0.1) !important; }
+.flatpickr-day:hover { background: rgba(166,124,0,0.2) !important; border-color: #a67c00 !important; color: #212529 !important; }
+
+/* Flatpickr dark mode */
+[data-theme="dark"] .flatpickr-calendar { background: #1a1a1a !important; border-color: rgba(212,175,55,0.3) !important; box-shadow: 0 4px 20px rgba(0,0,0,0.4) !important; }
+[data-theme="dark"] .flatpickr-months { background: #1a1a1a !important; }
+[data-theme="dark"] .flatpickr-month, [data-theme="dark"] .flatpickr-current-month { color: #f0e6c8 !important; }
+[data-theme="dark"] .flatpickr-weekdays { background: #1a1a1a !important; }
+[data-theme="dark"] .flatpickr-weekday { color: #c8b88a !important; }
+[data-theme="dark"] .flatpickr-day { color: #e0e0e0 !important; }
+[data-theme="dark"] .flatpickr-day:hover { background: rgba(212,175,55,0.3) !important; border-color: #d4af37 !important; }
+[data-theme="dark"] .flatpickr-day.selected, [data-theme="dark"] .flatpickr-day.selected:hover { background: #d4af37 !important; border-color: #d4af37 !important; color: #1a1200 !important; }
+[data-theme="dark"] .flatpickr-day.today { border-color: #d4af37 !important; }
+[data-theme="dark"] .flatpickr-day.flatpickr-disabled, [data-theme="dark"] .flatpickr-day.prevMonthDay, [data-theme="dark"] .flatpickr-day.nextMonthDay { color: rgba(255,255,255,0.2) !important; }
+[data-theme="dark"] .flatpickr-months .flatpickr-prev-month, [data-theme="dark"] .flatpickr-months .flatpickr-next-month { fill: #c8b88a !important; color: #c8b88a !important; }
+[data-theme="dark"] .flatpickr-months .flatpickr-prev-month:hover, [data-theme="dark"] .flatpickr-months .flatpickr-next-month:hover { fill: #d4af37 !important; color: #d4af37 !important; }
+[data-theme="dark"] .flatpickr-time { border-color: rgba(255,255,255,0.1) !important; }
+[data-theme="dark"] .flatpickr-time input, [data-theme="dark"] .flatpickr-time .flatpickr-am-pm { color: #e0e0e0 !important; background: transparent !important; }
+[data-theme="dark"] .numInputWrapper:hover { background: rgba(212,175,55,0.1) !important; }
+
 /* （舊 dark mode 已移至上方黑金色區塊） */
 
 /* 深色模式切換按鈕圖示 */
