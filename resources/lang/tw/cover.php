@@ -53,6 +53,7 @@ return [
         'invalid_status'        => '無效的狀態值',
         'not_own_assignment'    => '只能對自己的排班申請代班',
         'cannot_cover_self'     => '不能找自己代班',
+        'shift_ended'           => '此班別已結束，無法申請代班',
         'not_cover_user'        => '只有代班人可以回應',
         'already_responded'     => '此代班請求已回應過',
         'cover_user_not_approved' => '代班人尚未同意，無法審核',

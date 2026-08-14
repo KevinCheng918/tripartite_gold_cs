@@ -47,6 +47,7 @@ return [
         'invalid_status'        => 'Invalid status',
         'not_own_assignment'    => 'Can only request cover for your own assignment',
         'cannot_cover_self'     => 'Cannot cover your own shift',
+        'shift_ended'           => 'This shift has ended, cannot request cover',
         'not_cover_user'        => 'Only the cover user can respond',
         'already_responded'     => 'Already responded',
         'cover_user_not_approved' => 'Cover user has not approved yet',

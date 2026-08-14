@@ -47,6 +47,7 @@ return [
         'invalid_status'        => '无效的状态值',
         'not_own_assignment'    => '只能对自己的排班申请代班',
         'cannot_cover_self'     => '不能找自己代班',
+        'shift_ended'           => '此班别已结束，无法申请代班',
         'not_cover_user'        => '只有代班人可以回应',
         'already_responded'     => '此代班请求已回应过',
         'cover_user_not_approved' => '代班人尚未同意，无法审核',

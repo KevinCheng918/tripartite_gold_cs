@@ -47,6 +47,22 @@ class ShiftCoverService
             ]);
         }
 
+        // 已過的班不能申請代班
+        if ($assignment->shift) {
+            $shiftEnd = \Carbon\Carbon::parse("{$assignment->date->format('Y-m-d')} {$assignment->shift->end_time}");
+            // 跨日班處理（結束時間 <= 開始時間）
+            $startH = (int) explode(':', $assignment->shift->start_time)[0];
+            $endH = (int) explode(':', $assignment->shift->end_time)[0];
+            if ($endH <= $startH) {
+                $shiftEnd->addDay();
+            }
+            if (now()->gte($shiftEnd)) {
+                throw ValidationException::withMessages([
+                    'assignment_id' => [trans('cover.msg.shift_ended')],
+                ]);
+            }
+        }
+
         // 不能找自己代班
         if ((int) $params['cover_user_id'] === $requesterId) {
             throw ValidationException::withMessages([
