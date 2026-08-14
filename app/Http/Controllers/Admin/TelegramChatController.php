@@ -140,7 +140,7 @@ class TelegramChatController extends Controller
     {
         $params = $request->validate([
             'message_id' => 'required|integer',
-            'emoji'      => 'required|string|max:10',
+            'emoji'      => 'required|string|max:30',
         ]);
 
         try {
