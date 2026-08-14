@@ -965,10 +965,12 @@
     function submitAssign(e) {
         e.preventDefault();
         var form = document.getElementById('form-assign');
-        var date = form.querySelector('[name="date"]').value;
+        var dateStr = form.querySelector('[name="date"]').value;
+        var dates = dateStr.split(',').map(function (d) { return d.trim(); }).filter(function (d) { return d; });
+        if (dates.length === 0) { showMessage('請選擇日期'); return; }
+
         var isAllday = document.getElementById('assign-allday') && document.getElementById('assign-allday').checked;
 
-        // 全天班：取得所有啟用班別的 ID
         var shiftIds = [];
         if (isAllday) {
             shiftIds = shiftsData.filter(function (s) { return s.is_active; }).map(function (s) { return s.id; });
@@ -976,16 +978,14 @@
             shiftIds = [parseInt(form.querySelector('[name="shift_id"]').value, 10)];
         }
 
-        // Admin 多選：收集勾選的 user_id
         var checkboxes = form.querySelectorAll('[name="user_ids[]"]:checked');
         var userIds = [];
         checkboxes.forEach(function (cb) { userIds.push(parseInt(cb.value, 10)); });
 
-        // 組二次確認資訊
         var shiftName = isAllday ? (i18n.allday_shift || '全天班') : (form.querySelector('[name="shift_id"] option:checked').textContent || '-');
         var confirmHtml = '<p><strong>確定要報班？</strong></p>' +
             '<table class="table table-sm mt-2 text-center"><tbody>' +
-            '<tr><th style="width:80px">日期</th><td>' + date + '</td></tr>' +
+            '<tr><th style="width:80px">日期</th><td>' + dates.join('<br>') + '</td></tr>' +
             '<tr><th>班別</th><td>' + shiftName + '</td></tr>';
         if (userIds.length > 0) {
             var names = [];
@@ -994,49 +994,40 @@
         }
         confirmHtml += '</tbody></table>';
 
-        // 先關報班 modal，再開確認
         closeModal('modal-assign');
         var confirmBody = document.getElementById('modal-cover-confirm-body');
         if (confirmBody) { confirmBody.innerHTML = confirmHtml; }
-        pendingCoverAction = function () { doSubmitAssign(date, shiftIds, userIds, isAllday); };
+        pendingCoverAction = function () { doSubmitAssign(dates, shiftIds, userIds, isAllday); };
         setTimeout(function () { openModal('modal-cover-confirm'); }, 350);
     }
 
-    function doSubmitAssign(date, shiftIds, userIds, isAllday) {
+    function doSubmitAssign(dates, shiftIds, userIds, isAllday) {
         var promises = [];
 
-        if (userIds.length > 0) {
-            userIds.forEach(function (uid) {
+        dates.forEach(function (date) {
+            if (userIds.length > 0) {
+                userIds.forEach(function (uid) {
+                    shiftIds.forEach(function (sid) {
+                        promises.push(apiFetch('/admin/shifts/ajax-assign', {
+                            method: 'POST',
+                            body: JSON.stringify({ shift_id: sid, date: date, user_id: uid }),
+                        }));
+                    });
+                });
+            } else {
                 shiftIds.forEach(function (sid) {
                     promises.push(apiFetch('/admin/shifts/ajax-assign', {
                         method: 'POST',
-                        body: JSON.stringify({ shift_id: sid, date: date, user_id: uid }),
+                        body: JSON.stringify({ shift_id: sid, date: date }),
                     }));
                 });
-            });
-
-            Promise.all(promises)
-                .then(function () {
-                    closeModal('modal-assign');
-                    var msg = i18n.assigned + '（' + userIds.length + ' 人' + (isAllday ? '，全天班' : '') + '）';
-                    showMessage(msg);
-                    if (activeTab === 'timetable') { loadTimetable(); }
-                })
-                .catch(function (error) { showMessage(getErrorMessage(error)); });
-            return;
-        }
-
-        var selfPromises = shiftIds.map(function (sid) {
-            return apiFetch('/admin/shifts/ajax-assign', {
-                method: 'POST',
-                body: JSON.stringify({ shift_id: sid, date: date }),
-            });
+            }
         });
 
-        Promise.all(selfPromises)
+        Promise.all(promises)
             .then(function () {
-                closeModal('modal-assign');
-                showMessage(i18n.assigned);
+                var msg = i18n.assigned + '（' + dates.length + ' 天' + (userIds.length > 0 ? '，' + userIds.length + ' 人' : '') + (isAllday ? '，全天班' : '') + '）';
+                showMessage(msg);
                 if (activeTab === 'timetable') { loadTimetable(); }
             })
             .catch(function (error) { showMessage(getErrorMessage(error)); });
@@ -1487,6 +1478,8 @@
         dateFormat: 'Y-m-d',
         defaultDate: 'today',
         minDate: 'today',
+        mode: 'multiple',
+        conjunction: ', ',
         disableMobile: true
     });
 
