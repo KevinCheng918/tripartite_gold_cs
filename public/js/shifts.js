@@ -994,11 +994,12 @@
         }
         confirmHtml += '</tbody></table>';
 
-        // 二次確認
+        // 先關報班 modal，再開確認
+        closeModal('modal-assign');
         var confirmBody = document.getElementById('modal-cover-confirm-body');
         if (confirmBody) { confirmBody.innerHTML = confirmHtml; }
         pendingCoverAction = function () { doSubmitAssign(date, shiftIds, userIds, isAllday); };
-        openModal('modal-cover-confirm');
+        setTimeout(function () { openModal('modal-cover-confirm'); }, 350);
     }
 
     function doSubmitAssign(date, shiftIds, userIds, isAllday) {
