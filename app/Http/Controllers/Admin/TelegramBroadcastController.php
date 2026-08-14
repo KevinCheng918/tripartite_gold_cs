@@ -79,8 +79,8 @@ class TelegramBroadcastController extends Controller
         // 圖片上傳
         if ($request->hasFile('images')) {
             $imageUrls = [];
-            foreach ($request->file('images') as $file) {
-                $filename = time() . '_' . mt_rand(100, 999) . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
+            foreach ($request->file('images') as $idx => $file) {
+                $filename = time() . '_' . $idx . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
                 \Illuminate\Support\Facades\Storage::disk('public')->putFileAs('uploads/broadcast', $file, $filename);
                 $imageUrls[] = \Illuminate\Support\Facades\Storage::disk('public')->url("uploads/broadcast/{$filename}");
             }
