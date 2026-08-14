@@ -46,6 +46,27 @@ class TelegramBotService
     }
 
     /**
+     * 轉義 HTML 特殊字元，保留 Telegram 允許的標籤
+     *
+     * @param string $text
+     * @return string
+     */
+    private function escapeHtml($text)
+    {
+        // 先全部轉義
+        $text = htmlspecialchars($text, ENT_NOQUOTES, 'UTF-8');
+
+        // 還原 Telegram 允許的 HTML 標籤
+        $allowed = ['b', 'i', 'u', 's', 'code', 'pre', 'a'];
+        foreach ($allowed as $tag) {
+            $text = preg_replace('/&lt;(' . $tag . ')((?:\s[^&]*?)?)&gt;/i', '<$1$2>', $text);
+            $text = str_replace("&lt;/{$tag}&gt;", "</{$tag}>", $text);
+        }
+
+        return $text;
+    }
+
+    /**
      * 發送訊息到 Telegram 群組
      *
      * @param int    $chatId Telegram chat_id
@@ -58,7 +79,7 @@ class TelegramBotService
             $response = $this->client->post("{$this->getBaseUrl()}/sendMessage", [
                 'json' => [
                     'chat_id'    => $chatId,
-                    'text'       => $text,
+                    'text'       => $this->escapeHtml($text),
                     'parse_mode' => 'HTML',
                 ],
             ]);
@@ -121,7 +142,7 @@ class TelegramBotService
             ];
 
             if (filled($caption)) {
-                $data['caption'] = $caption;
+                $data['caption'] = $this->escapeHtml($caption);
                 $data['parse_mode'] = 'HTML';
             }
 
