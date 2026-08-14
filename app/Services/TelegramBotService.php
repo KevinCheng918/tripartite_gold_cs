@@ -53,6 +53,15 @@ class TelegramBotService
      */
     private function escapeHtml($text)
     {
+        if (!filled($text)) {
+            return $text ?: '';
+        }
+
+        // 沒有需要轉義的字元就直接回傳
+        if (strpos($text, '<') === false && strpos($text, '&') === false) {
+            return $text;
+        }
+
         // 先全部轉義
         $text = htmlspecialchars($text, ENT_NOQUOTES, 'UTF-8');
 
