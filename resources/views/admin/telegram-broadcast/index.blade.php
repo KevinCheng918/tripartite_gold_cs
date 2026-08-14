@@ -37,12 +37,9 @@
                                 <textarea id="bc-content" class="form-control" rows="10" required placeholder="{{ trans('broadcast.field_content') }}..."></textarea>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label">圖片（選填）</label>
-                                <input id="bc-image" type="file" class="form-control" accept="image/*">
-                                <div id="bc-image-preview" class="mt-2" style="display:none">
-                                    <img id="bc-image-preview-img" style="max-width:200px;border-radius:0.375rem" alt="preview">
-                                    <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="bc-image-remove">移除</button>
-                                </div>
+                                <label class="form-label">圖片（選填，可多選）</label>
+                                <input id="bc-images" type="file" class="form-control" accept="image/*" multiple>
+                                <div id="bc-image-preview" class="mt-2 d-flex flex-wrap gap-2" style="display:none"></div>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">{{ trans('broadcast.field_target') }} <span class="text-danger">*</span></label>
@@ -284,23 +281,27 @@ $(function () {
     }
     $(document).on('change', '.bc-group-cb', updateSelectedCount);
 
-    // 圖片預覽
-    $('#bc-image').on('change', function () {
-        var file = this.files[0];
-        if (file) {
-            var reader = new FileReader();
-            reader.onload = function (e) {
-                $('#bc-image-preview-img').attr('src', e.target.result);
-                $('#bc-image-preview').show();
-            };
-            reader.readAsDataURL(file);
-        } else {
-            $('#bc-image-preview').hide();
+    // 多張圖片預覽
+    $('#bc-images').on('change', function () {
+        var files = this.files;
+        var $preview = $('#bc-image-preview');
+        $preview.empty();
+        if (files.length === 0) { $preview.hide(); return; }
+
+        for (var i = 0; i < files.length; i++) {
+            (function (file) {
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    $preview.append(
+                        '<div class="position-relative">' +
+                        '<img src="' + e.target.result + '" style="width:80px;height:80px;object-fit:cover;border-radius:0.375rem" alt="preview">' +
+                        '</div>'
+                    );
+                };
+                reader.readAsDataURL(file);
+            })(files[i]);
         }
-    });
-    $('#bc-image-remove').on('click', function () {
-        $('#bc-image').val('');
-        $('#bc-image-preview').hide();
+        $preview.show();
     });
 
     // 發送
@@ -325,8 +326,10 @@ $(function () {
             ids.forEach(function (id) { formData.append('group_ids[]', id); });
         }
 
-        var imageFile = document.getElementById('bc-image').files[0];
-        if (imageFile) { formData.append('image', imageFile); }
+        var imageFiles = document.getElementById('bc-images').files;
+        for (var i = 0; i < imageFiles.length; i++) {
+            formData.append('images[]', imageFiles[i]);
+        }
 
         var $btn = $('#btn-send');
         $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>發送中...');

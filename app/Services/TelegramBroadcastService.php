@@ -122,27 +122,39 @@ class TelegramBroadcastService
                 $this->botService->setToken($station->system->bot_token);
             }
 
-            $imageUrl = $params['image_url'] ?? null;
+            $imageUrls = $params['image_urls'] ?? [];
+            $chatId = $station->telegramGroup->chat_id;
 
-            if (filled($imageUrl)) {
-                $result = $this->botService->sendPhoto($station->telegramGroup->chat_id, $imageUrl, $content);
+            if (count($imageUrls) > 1) {
+                $result = $this->botService->sendMediaGroup($chatId, $imageUrls, $content);
+            } elseif (count($imageUrls) === 1) {
+                $result = $this->botService->sendPhoto($chatId, $imageUrls[0], $content);
             } else {
-                $result = $this->botService->sendMessage($station->telegramGroup->chat_id, $content);
+                $result = $this->botService->sendMessage($chatId, $content);
             }
 
             if ($result && isset($result['ok']) && $result['ok']) {
                 $success++;
 
-                // 存入 outbound 訊息到對話紀錄
+                // 存入 outbound 訊息到對話紀錄（多張取第一張）
+                $firstImage = !empty($imageUrls) ? $imageUrls[0] : null;
+                $msgId = null;
+                if (isset($result['result'])) {
+                    // sendMediaGroup 回傳陣列，取第一個
+                    $msgResult = is_array($result['result']) && isset($result['result'][0])
+                        ? $result['result'][0] : $result['result'];
+                    $msgId = $msgResult['message_id'] ?? null;
+                }
+
                 $this->telegramRepository->createMessage([
                     'telegram_group_id'  => $station->telegramGroup->id,
                     'direction'          => config('constants.TELEGRAM.DIRECTION.OUTBOUND'),
-                    'telegram_message_id' => $result['result']['message_id'] ?? null,
+                    'telegram_message_id' => $msgId,
                     'sender_name'        => $senderName,
                     'sender_user_id'     => $senderId,
                     'content'            => $content ?: '',
-                    'media_type'         => filled($imageUrl) ? 'photo' : null,
-                    'media_url'          => $imageUrl,
+                    'media_type'         => filled($firstImage) ? 'photo' : null,
+                    'media_url'          => $firstImage,
                     'replied'            => true,
                 ]);
             } else {

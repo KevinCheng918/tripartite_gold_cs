@@ -171,6 +171,48 @@ class TelegramBotService
     }
 
     /**
+     * 發送多張圖片（相簿）到 Telegram 群組
+     *
+     * @param int         $chatId
+     * @param array       $photoUrls 圖片 URL 陣列
+     * @param string|null $caption   說明文字（僅顯示在第一張）
+     * @return array|null
+     */
+    public function sendMediaGroup($chatId, $photoUrls, $caption = null)
+    {
+        try {
+            $media = [];
+            foreach ($photoUrls as $idx => $url) {
+                $item = [
+                    'type'  => 'photo',
+                    'media' => $url,
+                ];
+                if ($idx === 0 && filled($caption)) {
+                    $item['caption'] = $this->escapeHtml($caption);
+                    $item['parse_mode'] = 'HTML';
+                }
+                $media[] = $item;
+            }
+
+            $response = $this->client->post("{$this->getBaseUrl()}/sendMediaGroup", [
+                'json' => [
+                    'chat_id' => $chatId,
+                    'media'   => $media,
+                ],
+            ]);
+
+            return json_decode($response->getBody()->getContents(), true);
+        } catch (\Exception $e) {
+            Log::error('Telegram sendMediaGroup 失敗', [
+                'chat_id' => $chatId,
+                'error'   => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
      * 對指定訊息設定表情回應
      *
      * @param int    $chatId    Telegram chat_id
