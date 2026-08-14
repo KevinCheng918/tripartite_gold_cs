@@ -981,10 +981,30 @@
         var userIds = [];
         checkboxes.forEach(function (cb) { userIds.push(parseInt(cb.value, 10)); });
 
+        // 組二次確認資訊
+        var shiftName = isAllday ? (i18n.allday_shift || '全天班') : (form.querySelector('[name="shift_id"] option:checked').textContent || '-');
+        var confirmHtml = '<p><strong>確定要報班？</strong></p>' +
+            '<table class="table table-sm mt-2 text-center"><tbody>' +
+            '<tr><th style="width:80px">日期</th><td>' + date + '</td></tr>' +
+            '<tr><th>班別</th><td>' + shiftName + '</td></tr>';
+        if (userIds.length > 0) {
+            var names = [];
+            checkboxes.forEach(function (cb) { names.push(cb.parentElement.textContent.trim()); });
+            confirmHtml += '<tr><th>員工</th><td>' + names.join('、') + '</td></tr>';
+        }
+        confirmHtml += '</tbody></table>';
+
+        // 二次確認
+        var confirmBody = document.getElementById('modal-cover-confirm-body');
+        if (confirmBody) { confirmBody.innerHTML = confirmHtml; }
+        pendingCoverAction = function () { doSubmitAssign(date, shiftIds, userIds, isAllday); };
+        openModal('modal-cover-confirm');
+    }
+
+    function doSubmitAssign(date, shiftIds, userIds, isAllday) {
         var promises = [];
 
         if (userIds.length > 0) {
-            // Admin：每個人 × 每個班別
             userIds.forEach(function (uid) {
                 shiftIds.forEach(function (sid) {
                     promises.push(apiFetch('/admin/shifts/ajax-assign', {
@@ -1005,7 +1025,6 @@
             return;
         }
 
-        // 客服自己報班
         var selfPromises = shiftIds.map(function (sid) {
             return apiFetch('/admin/shifts/ajax-assign', {
                 method: 'POST',
