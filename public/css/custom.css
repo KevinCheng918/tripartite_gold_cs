@@ -44,6 +44,12 @@
     white-space: pre-wrap;
 }
 
+/* 聊天泡泡禁止選取（避免長按觸發選字） */
+.chat-box-wrapper {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
 /* 收到方靠左 */
 .chat-box-wrapper {
     justify-content: flex-start !important;
