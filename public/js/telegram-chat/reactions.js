@@ -169,11 +169,18 @@
     }
 
     function sendReaction(messageId, emoji) {
+        // 記住捲動位置
+        var chatArea = document.querySelector('.chat-wrapper') || document.getElementById('tg-messages');
+        var scrollPos = chatArea ? chatArea.scrollTop : 0;
+
         T.apiFetch('/admin/telegram-chat/ajax-react', {
             method: 'POST',
             body: JSON.stringify({ message_id: messageId, emoji: emoji }),
         }).then(function () {
-            T.loadMessages(T.selectedGroupId);
+            T.loadMessages(T.selectedGroupId, function () {
+                // 恢復捲動位置
+                if (chatArea) { chatArea.scrollTop = scrollPos; }
+            });
         }).catch(function () {});
     }
 })();

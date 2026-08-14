@@ -75,14 +75,17 @@
     /**
      * 載入指定群組的訊息
      */
-    T.loadMessages = function (groupId) {
+    T.loadMessages = function (groupId, callback) {
         var container = document.getElementById('tg-messages');
-        container.innerHTML = '<div class="text-center text-muted py-5">Loading...</div>';
+        if (!callback) {
+            container.innerHTML = '<div class="text-center text-muted py-5">Loading...</div>';
+        }
 
         T.apiFetch('/admin/telegram-chat/ajax-messages?group_id=' + groupId + '&per_page=100')
             .then(function (body) {
                 var messages = (body.data || []).reverse();
                 T.renderMessages(messages);
+                if (callback) { callback(); }
             });
     };
 
