@@ -15,7 +15,7 @@
 
         var mediaHtml = '';
         if (m.media_type === 'photo' && m.media_url) {
-            mediaHtml = '<div class="mb-1"><img src="' + m.media_url + '" alt="photo" loading="lazy" style="max-width:240px;max-height:240px;border-radius:8px;cursor:pointer;display:block"></div>';
+            mediaHtml = '<div class="mb-1"><img src="' + m.media_url + '" alt="photo" loading="lazy" style="max-width:100%;max-height:240px;border-radius:8px;cursor:pointer;display:block;object-fit:contain"></div>';
         } else if (m.media_type === 'sticker' && m.media_url) {
             mediaHtml = '<div class="mb-1"><img src="' + m.media_url + '" alt="sticker" loading="lazy" style="max-width:120px;max-height:120px;display:block"></div>';
         }
