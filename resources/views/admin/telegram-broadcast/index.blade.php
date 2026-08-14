@@ -37,6 +37,14 @@
                                 <textarea id="bc-content" class="form-control" rows="10" required placeholder="{{ trans('broadcast.field_content') }}..."></textarea>
                             </div>
                             <div class="mb-3">
+                                <label class="form-label">圖片（選填）</label>
+                                <input id="bc-image" type="file" class="form-control" accept="image/*">
+                                <div id="bc-image-preview" class="mt-2" style="display:none">
+                                    <img id="bc-image-preview-img" style="max-width:200px;border-radius:0.375rem" alt="preview">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="bc-image-remove">移除</button>
+                                </div>
+                            </div>
+                            <div class="mb-3">
                                 <label class="form-label">{{ trans('broadcast.field_target') }} <span class="text-danger">*</span></label>
                                 <div class="d-flex gap-3">
                                     <div class="form-check">
@@ -276,6 +284,25 @@ $(function () {
     }
     $(document).on('change', '.bc-group-cb', updateSelectedCount);
 
+    // 圖片預覽
+    $('#bc-image').on('change', function () {
+        var file = this.files[0];
+        if (file) {
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                $('#bc-image-preview-img').attr('src', e.target.result);
+                $('#bc-image-preview').show();
+            };
+            reader.readAsDataURL(file);
+        } else {
+            $('#bc-image-preview').hide();
+        }
+    });
+    $('#bc-image-remove').on('click', function () {
+        $('#bc-image').val('');
+        $('#bc-image-preview').hide();
+    });
+
     // 發送
     $('#form-broadcast').on('submit', function (e) {
         e.preventDefault();
@@ -283,14 +310,23 @@ $(function () {
         if (!content) { showMessage('{{ trans("broadcast.msg.content_required") }}'); return; }
 
         var targetType = parseInt($('input[name="target_type"]:checked').val(), 10);
-        var data = { content: content, target_type: targetType };
 
         if (targetType === 2) {
             var ids = [];
             $('.bc-group-cb:checked').each(function () { ids.push(parseInt($(this).val(), 10)); });
             if (ids.length === 0) { showMessage('{{ trans("broadcast.msg.no_group_selected") }}'); return; }
-            data.group_ids = ids;
         }
+
+        var formData = new FormData();
+        formData.append('content', content);
+        formData.append('target_type', targetType);
+
+        if (targetType === 2) {
+            ids.forEach(function (id) { formData.append('group_ids[]', id); });
+        }
+
+        var imageFile = document.getElementById('bc-image').files[0];
+        if (imageFile) { formData.append('image', imageFile); }
 
         var $btn = $('#btn-send');
         $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>發送中...');
@@ -299,8 +335,9 @@ $(function () {
             url: '/admin/telegram-broadcast/ajax-send',
             method: 'POST',
             headers: { 'X-CSRF-TOKEN': csrfToken },
-            contentType: 'application/json',
-            data: JSON.stringify(data),
+            data: formData,
+            processData: false,
+            contentType: false,
             success: function (body) {
                 $btn.prop('disabled', false).html('<i class="fas fa-paper-plane me-1"></i>{{ trans("broadcast.btn_send") }}');
                 $('#bc-content').val('');

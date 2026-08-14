@@ -72,7 +72,16 @@ class TelegramBroadcastController extends Controller
             'target_type' => 'required|integer|in:1,2',
             'group_ids'   => 'nullable|array',
             'group_ids.*' => 'integer',
+            'image'       => 'nullable|image|max:5120',
         ]);
+
+        // 圖片上傳
+        if ($request->hasFile('image')) {
+            $file = $request->file('image');
+            $filename = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
+            \Illuminate\Support\Facades\Storage::disk('public')->putFileAs('uploads/broadcast', $file, $filename);
+            $params['image_url'] = \Illuminate\Support\Facades\Storage::disk('public')->url("uploads/broadcast/{$filename}");
+        }
 
         try {
             $broadcast = $this->broadcastService->send($params, Auth::id());

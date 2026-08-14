@@ -122,7 +122,13 @@ class TelegramBroadcastService
                 $this->botService->setToken($station->system->bot_token);
             }
 
-            $result = $this->botService->sendMessage($station->telegramGroup->chat_id, $content);
+            $imageUrl = $params['image_url'] ?? null;
+
+            if (filled($imageUrl)) {
+                $result = $this->botService->sendPhoto($station->telegramGroup->chat_id, $imageUrl, $content);
+            } else {
+                $result = $this->botService->sendMessage($station->telegramGroup->chat_id, $content);
+            }
 
             if ($result && isset($result['ok']) && $result['ok']) {
                 $success++;
@@ -134,7 +140,9 @@ class TelegramBroadcastService
                     'telegram_message_id' => $result['result']['message_id'] ?? null,
                     'sender_name'        => $senderName,
                     'sender_user_id'     => $senderId,
-                    'content'            => $content,
+                    'content'            => $content ?: '',
+                    'media_type'         => filled($imageUrl) ? 'photo' : null,
+                    'media_url'          => $imageUrl,
                     'replied'            => true,
                 ]);
             } else {
