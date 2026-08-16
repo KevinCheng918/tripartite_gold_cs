@@ -53,6 +53,7 @@ class CreditTopupService
             'credit_amount' => $params['credit_amount'],
             'requested_by'  => $requesterId,
             'note'          => $params['note'] ?? null,
+            'images'        => $params['images'] ?? [],
         ]);
     }
 

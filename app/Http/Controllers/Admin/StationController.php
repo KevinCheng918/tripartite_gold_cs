@@ -8,6 +8,7 @@ use App\Http\Resources\StationResource;
 use App\Models\CreditTopup;
 use App\Models\Station;
 use App\Services\CreditTopupService;
+use App\Services\ImageUploadService;
 use App\Services\StationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,11 +21,16 @@ class StationController extends Controller
 {
     private $stationService;
     private $topupService;
+    private $imageUploadService;
 
-    public function __construct(StationService $stationService, CreditTopupService $topupService)
-    {
+    public function __construct(
+        StationService $stationService,
+        CreditTopupService $topupService,
+        ImageUploadService $imageUploadService
+    ) {
         $this->stationService = $stationService;
         $this->topupService = $topupService;
+        $this->imageUploadService = $imageUploadService;
     }
 
     /**
@@ -267,9 +273,15 @@ class StationController extends Controller
             'exchange_rate' => 'required|numeric|min:0.0001',
             'credit_amount' => 'required|numeric|min:0.01',
             'note'          => 'nullable|string|max:500',
+            'images'        => 'nullable|array',
+            'images.*'      => 'image|max:5120',
         ]);
 
         try {
+            $params['images'] = $request->hasFile('images')
+                ? $this->imageUploadService->uploadMultiple($request->file('images'), 'topup')
+                : [];
+
             $this->topupService->request($params, Auth::id());
 
             return response()->json(['message' => trans('station.topup_submitted')]);

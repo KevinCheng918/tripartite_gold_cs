@@ -34,6 +34,9 @@ class CreditTopupResource extends JsonResource
             'reviewer'      => $this->reviewer ? $this->reviewer->nickname : null,
             'reviewed_at'   => $this->reviewed_at ? $this->reviewed_at->format('Y-m-d H:i') : null,
             'note'          => $this->note,
+            'images'        => array_map(function ($path) {
+                return asset("storage/{$path}");
+            }, $this->images ?? []),
             'created_at'    => $this->created_at->format('Y-m-d H:i'),
         ];
     }

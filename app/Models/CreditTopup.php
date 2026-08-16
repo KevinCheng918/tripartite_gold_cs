@@ -49,6 +49,7 @@ class CreditTopup extends Model
         'credit_amount' => 'decimal:2',
         'status'        => 'integer',
         'reviewed_at'   => 'datetime',
+        'images'        => 'array',
     ];
 
     /**

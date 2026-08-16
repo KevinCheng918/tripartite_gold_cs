@@ -531,6 +531,11 @@
                             <label class="form-label">{{ trans('station.topup_field_note') }}</label>
                             <textarea id="topup-note" class="form-control" rows="2" maxlength="500"></textarea>
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label">上傳圖片</label>
+                            <input type="file" class="form-control" id="topup-images" accept="image/*" multiple>
+                            <div id="topup-image-previews" class="d-flex flex-wrap gap-2 mt-2"></div>
+                        </div>
                         <div class="text-end">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                             <button type="submit" class="btn btn-primary">送出申請</button>
@@ -553,6 +558,21 @@
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                         <button type="button" class="btn btn-primary" id="btn-topup-confirm-ok">確認</button>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- 圖片查看 Modal --}}
+    <div class="modal fade" id="modal-topup-images" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">上傳圖片</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="topup-images-body" class="row g-2"></div>
                 </div>
             </div>
         </div>
@@ -1148,6 +1168,9 @@ $(function () {
             if (t.reviewer) {
                 html += ' <small class="text-muted">審核：' + t.reviewer + '</small>';
             }
+            if (t.images && t.images.length > 0) {
+                html += ' <button class="btn btn-sm btn-outline-secondary js-topup-images" data-images=\'' + JSON.stringify(t.images) + '\'><i class="fas fa-image me-1"></i>' + t.images.length + '張</button>';
+            }
             if (t.note) {
                 html += ' <button class="btn btn-sm btn-outline-secondary js-topup-note" data-note="' + t.note.replace(/"/g, '&quot;') + '"><i class="fas fa-sticky-note me-1"></i>備註</button>';
             }
@@ -1178,6 +1201,9 @@ $(function () {
             html += '<div class="d-flex justify-content-between mb-2" style="font-size:0.8125rem"><span class="text-muted">' + t.created_at + '</span>';
             if (t.reviewer) html += '<span class="text-muted">審核：' + t.reviewer + '</span>';
             html += '</div>';
+            if (t.images && t.images.length > 0) {
+                html += '<div class="mb-2"><button class="btn btn-sm btn-outline-secondary js-topup-images" data-images=\'' + JSON.stringify(t.images) + '\'><i class="fas fa-image me-1"></i>查看圖片（' + t.images.length + '張）</button></div>';
+            }
             if (t.note) html += '<div class="text-muted mb-2" style="font-size:0.8125rem"><i class="fas fa-sticky-note me-1"></i>' + t.note + '</div>';
             if (parseInt(t.status, 10) === 0 && hasTopupApprove) {
                 html += '<div class="d-flex gap-1">';
@@ -1214,6 +1240,16 @@ $(function () {
         $('.js-topup-note').off('click').on('click', function () {
             $('#modal-station-msg-text').text($(this).data('note'));
             showBsModal('modal-station-msg');
+        });
+
+        $('.js-topup-images').off('click').on('click', function () {
+            var images = $(this).data('images') || [];
+            var html = '';
+            images.forEach(function (url) {
+                html += '<div class="col-6 col-md-4"><a href="' + url + '" target="_blank"><img src="' + url + '" class="img-fluid rounded" style="width:100%;cursor:pointer"></a></div>';
+            });
+            $('#topup-images-body').html(html || '<p class="text-muted">無圖片</p>');
+            showBsModal('modal-topup-images');
         });
     }
 
@@ -1253,6 +1289,40 @@ $(function () {
     // 搜尋
     $('#btn-topup-search').on('click', function () { loadTopupList(); });
 
+    // 圖片上傳
+    var topupImageFiles = [];
+
+    function renderTopupImagePreviews() {
+        var $container = $('#topup-image-previews');
+        $container.empty();
+        topupImageFiles.forEach(function (file, idx) {
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                var html = '<div class="position-relative" style="width:80px;height:80px">';
+                html += '<img src="' + e.target.result + '" style="width:80px;height:80px;object-fit:cover;border-radius:0.375rem;border:1px solid #dee2e6">';
+                html += '<button type="button" class="btn-close position-absolute top-0 end-0 bg-white rounded-circle" style="font-size:0.5rem;padding:0.25rem" data-remove="' + idx + '"></button>';
+                html += '</div>';
+                $container.append(html);
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    $('#topup-images').on('change', function () {
+        var files = this.files;
+        for (var i = 0; i < files.length; i++) {
+            topupImageFiles.push(files[i]);
+        }
+        this.value = '';
+        renderTopupImagePreviews();
+    });
+
+    $(document).on('click', '#topup-image-previews .btn-close', function () {
+        var idx = parseInt($(this).data('remove'), 10);
+        topupImageFiles.splice(idx, 1);
+        renderTopupImagePreviews();
+    });
+
     // 打開申請 Modal
     $('#btn-open-topup-apply').on('click', function () {
         $('#form-topup-apply')[0].reset();
@@ -1260,6 +1330,8 @@ $(function () {
         $('#topup-station-search').val('');
         $('#topup-calc-amount').text('0.00');
         $('#topup-rate-hint').text('');
+        topupImageFiles = [];
+        $('#topup-image-previews').empty();
         fetchUsdtRate();
         showBsModal('modal-topup-apply');
     });
@@ -1314,22 +1386,27 @@ $(function () {
             return;
         }
 
-        var payload = {
-            station_id: parseInt(stationId, 10),
-            action_type: parseInt($('input[name="topup_action"]:checked').val(), 10),
-            credit_type: $('#topup-credit-type').val(),
-            usdt_amount: usdt,
-            exchange_rate: rate,
-            credit_amount: parseFloat((usdt * rate).toFixed(2)),
-            note: $('#topup-note').val() || null
-        };
+        var formData = new FormData();
+        formData.append('station_id', stationId);
+        formData.append('action_type', $('input[name="topup_action"]:checked').val());
+        formData.append('credit_type', $('#topup-credit-type').val());
+        formData.append('usdt_amount', usdt);
+        formData.append('exchange_rate', rate);
+        formData.append('credit_amount', (usdt * rate).toFixed(2));
+        if ($('#topup-note').val()) {
+            formData.append('note', $('#topup-note').val());
+        }
+        topupImageFiles.forEach(function (file) {
+            formData.append('images[]', file);
+        });
 
         $.ajax({
             url: '/admin/stations/ajax-topup-store',
             method: 'POST',
             headers: { 'X-CSRF-TOKEN': csrfToken },
-            contentType: 'application/json',
-            data: JSON.stringify(payload),
+            processData: false,
+            contentType: false,
+            data: formData,
             success: function (body) {
                 hideBsModal(document.getElementById('modal-topup-apply'));
                 setTimeout(function () {
