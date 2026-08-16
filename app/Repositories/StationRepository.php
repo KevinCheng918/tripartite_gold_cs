@@ -127,6 +127,19 @@ class StationRepository
         return $station;
     }
 
+    /**
+     * 取得所有站台名稱（下拉選單用）
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function allForDropdown()
+    {
+        return Station::query()
+            ->select(['id', 'name'])
+            ->orderBy('name')
+            ->get();
+    }
+
     // ---------------------------------------------------------------
     //  系統（System）
     // ---------------------------------------------------------------

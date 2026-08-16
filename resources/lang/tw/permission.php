@@ -40,7 +40,10 @@ return [
     'station' => [
         'view'   => '檢視站台',
         'create' => '新增站台',
-        'update' => '編輯站台',
+        'update'       => '編輯站台',
+        'topup_view'   => '檢視補點紀錄',
+        'topup_apply'  => '申請補點/扣點',
+        'topup_approve' => '審核補點/扣點',
     ],
     'vm' => [
         'view'            => '檢視虛擬機',

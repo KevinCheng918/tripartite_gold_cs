@@ -94,4 +94,61 @@ class MainSystemApiService
             return null;
         }
     }
+
+    /**
+     * 站台加點/扣點
+     *
+     * @param string $apiUrl    站台 API 網址
+     * @param string $apiKey    站台 API Key
+     * @param float  $amount    點數（正=加點，負=扣點）
+     * @param string $column    credit 或 shop_credit
+     * @return array|null API 回傳，失敗回傳 null
+     */
+    public function addCredit($apiUrl, $apiKey, $amount, $column = 'credit')
+    {
+        if (blank($apiUrl) || blank($apiKey)) {
+            Log::warning('MainSystemApi: api_url 或 api_key 未設定（補點）');
+
+            return null;
+        }
+
+        try {
+            $timestamp = time();
+            $sign = hash('sha256', $apiKey . $timestamp);
+
+            $response = $this->client->post(rtrim($apiUrl, '/') . '/api/admin/credit-add', [
+                'headers' => [
+                    'Accept' => 'application/json',
+                ],
+                'json' => [
+                    'amount'    => $amount,
+                    'column'    => $column,
+                    'timestamp' => $timestamp,
+                    'sign'      => $sign,
+                ],
+            ]);
+
+            $body = json_decode($response->getBody()->getContents(), true);
+
+            if (($body['code'] ?? 0) !== 1) {
+                Log::warning('MainSystemApi: 補點 API 回傳非成功', [
+                    'api_url' => $apiUrl,
+                    'code'    => $body['code'] ?? null,
+                    'msg'     => $body['msg'] ?? null,
+                ]);
+
+                return $body;
+            }
+
+            return $body;
+        } catch (\Exception $e) {
+            Log::error('MainSystemApi: 補點失敗', [
+                'api_url' => $apiUrl,
+                'amount'  => $amount,
+                'error'   => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
 }

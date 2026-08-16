@@ -40,7 +40,10 @@ return [
     'station' => [
         'view'   => 'View stations',
         'create' => 'Create station',
-        'update' => 'Update station',
+        'update'       => 'Update station',
+        'topup_view'   => 'View credit topup',
+        'topup_apply'  => 'Apply credit topup',
+        'topup_approve' => 'Approve credit topup',
     ],
     'vm' => [
         'view'            => 'View VMs',

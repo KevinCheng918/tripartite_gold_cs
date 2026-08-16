@@ -185,6 +185,16 @@ class StationService
     }
 
     /**
+     * 取得所有站台名稱（下拉選單用）
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function allForDropdown()
+    {
+        return $this->stationRepository->allForDropdown();
+    }
+
+    /**
      * 取得所有啟用中的系統（下拉選單用）
      *
      * @return \Illuminate\Database\Eloquent\Collection

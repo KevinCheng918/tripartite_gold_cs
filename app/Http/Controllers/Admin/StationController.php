@@ -3,10 +3,14 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\CreditTopupResource;
 use App\Http\Resources\StationResource;
+use App\Models\CreditTopup;
 use App\Models\Station;
+use App\Services\CreditTopupService;
 use App\Services\StationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -15,10 +19,12 @@ use Illuminate\Support\Facades\Log;
 class StationController extends Controller
 {
     private $stationService;
+    private $topupService;
 
-    public function __construct(StationService $stationService)
+    public function __construct(StationService $stationService, CreditTopupService $topupService)
     {
         $this->stationService = $stationService;
+        $this->topupService = $topupService;
     }
 
     /**
@@ -28,13 +34,21 @@ class StationController extends Controller
      */
     public function index(Request $request)
     {
+        $user = Auth::user();
+        if (!$user->hasPermission('station.view') && !$user->hasPermission('station.topup_view')) {
+            abort(403);
+        }
+
         $params = $request->only(['keyword', 'domain', 'system_id', 'status', 'credits_min', 'credits_max', 'support_shop', 'score_runner', 'per_page']);
         $stations = $this->stationService->list($params);
         $systems = $this->stationService->getActiveSystems();
         $systemStats = $this->stationService->getSystemStats();
 
+        $allStations = $this->stationService->allForDropdown();
+
         return view('admin.station.index', [
             'stations'    => $stations,
+            'allStations' => $allStations,
             'systems'     => $systems,
             'filters'     => $params,
             'systemStats' => $systemStats,
@@ -216,6 +230,97 @@ class StationController extends Controller
             Log::error('系統更新失敗', ['error' => $e->getMessage(), 'system_id' => $system->id]);
 
             return response()->json(['message' => trans('station.msg.update_failed')], 500);
+        }
+    }
+
+    // ---------------------------------------------------------------
+    //  補點/扣點
+    // ---------------------------------------------------------------
+
+    /**
+     * Ajax 補點紀錄列表
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection
+     */
+    public function ajaxTopupList(Request $request)
+    {
+        $params = $request->only(['station_id', 'status']);
+        $topups = $this->topupService->list($params);
+
+        return CreditTopupResource::collection($topups);
+    }
+
+    /**
+     * Ajax 申請補點/扣點
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxTopupStore(Request $request)
+    {
+        $params = $request->validate([
+            'station_id'    => 'required|integer|exists:station,id',
+            'action_type'   => 'required|integer|in:1,2',
+            'credit_type'   => 'required|string|in:credit,shop_credit',
+            'usdt_amount'   => 'required|numeric|min:0.0001',
+            'exchange_rate' => 'required|numeric|min:0.0001',
+            'credit_amount' => 'required|numeric|min:0.01',
+            'note'          => 'nullable|string|max:500',
+        ]);
+
+        try {
+            $this->topupService->request($params, Auth::id());
+
+            return response()->json(['message' => trans('station.topup_submitted')]);
+        } catch (\Exception $e) {
+            Log::error('補點申請失敗', ['error' => $e->getMessage()]);
+
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * Ajax 審核通過
+     *
+     * @param CreditTopup $topup
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxTopupApprove(CreditTopup $topup)
+    {
+        try {
+            $result = $this->topupService->approve($topup, Auth::id());
+            $msg = (int) $result->status === CreditTopup::STATUS_COMPLETED
+                ? trans('station.topup_approved')
+                : trans('station.topup_api_failed');
+
+            return response()->json([
+                'message' => $msg,
+                'status'  => $result->status,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('補點審核失敗', ['error' => $e->getMessage(), 'topup_id' => $topup->id]);
+
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * Ajax 審核拒絕
+     *
+     * @param CreditTopup $topup
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxTopupReject(CreditTopup $topup)
+    {
+        try {
+            $this->topupService->reject($topup, Auth::id());
+
+            return response()->json(['message' => trans('station.topup_rejected')]);
+        } catch (\Exception $e) {
+            Log::error('補點拒絕失敗', ['error' => $e->getMessage(), 'topup_id' => $topup->id]);
+
+            return response()->json(['message' => $e->getMessage()], 422);
         }
     }
 }

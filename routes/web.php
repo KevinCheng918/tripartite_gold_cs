@@ -103,7 +103,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
 
     // 站台管理
     Route::prefix('stations')->name('stations.')->group(function () {
-        Route::get('/', [StationController::class, 'index'])->middleware('can:station.view')->name('index');
+        Route::get('/', [StationController::class, 'index'])->name('index');
         Route::get('/ajax-list', [StationController::class, 'ajaxList'])->middleware('can:station.view')->name('ajax-list');
         Route::post('/ajax-store', [StationController::class, 'ajaxStore'])->middleware('can:station.create')->name('ajax-store');
         Route::put('/ajax-update/{station}', [StationController::class, 'ajaxUpdate'])->middleware('can:station.update')->name('ajax-update');
@@ -112,6 +112,10 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::post('/ajax-store-system', [StationController::class, 'ajaxStoreSystem'])->middleware('can:station.create')->name('ajax-store-system');
         Route::get('/ajax-bot-groups', [StationController::class, 'ajaxBotGroups'])->middleware('can:station.update')->name('ajax-bot-groups');
         Route::put('/ajax-update-system/{system}', [StationController::class, 'ajaxUpdateSystem'])->middleware('can:station.create')->name('ajax-update-system');
+        Route::get('/ajax-topup-list', [StationController::class, 'ajaxTopupList'])->middleware('can:station.topup_view')->name('ajax-topup-list');
+        Route::post('/ajax-topup-store', [StationController::class, 'ajaxTopupStore'])->middleware('can:station.topup_apply')->name('ajax-topup-store');
+        Route::put('/ajax-topup-approve/{topup}', [StationController::class, 'ajaxTopupApprove'])->middleware('can:station.topup_approve')->name('ajax-topup-approve');
+        Route::put('/ajax-topup-reject/{topup}', [StationController::class, 'ajaxTopupReject'])->middleware('can:station.topup_approve')->name('ajax-topup-reject');
     });
 
     // Telegram 群發公告

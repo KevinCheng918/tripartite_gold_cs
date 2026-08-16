@@ -62,7 +62,10 @@ return [
         'keywords' => [
             'station.view'   => 'permission.station.view',
             'station.create' => 'permission.station.create',
-            'station.update' => 'permission.station.update',
+            'station.update'       => 'permission.station.update',
+            'station.topup_view'   => 'permission.station.topup_view',
+            'station.topup_apply'  => 'permission.station.topup_apply',
+            'station.topup_approve' => 'permission.station.topup_approve',
         ],
     ],
 
@@ -90,6 +93,7 @@ return [
         'label' => 'permission.group.telegram_chat',
         'keywords' => [
             'telegram_chat.reply'     => 'permission.telegram_chat.reply',
+            'telegram_chat.assign'    => 'permission.telegram_chat.assign',
             'telegram_chat.broadcast' => 'permission.telegram_chat.broadcast',
         ],
     ],
