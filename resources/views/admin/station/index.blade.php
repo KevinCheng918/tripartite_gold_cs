@@ -220,7 +220,13 @@
                         @forelse($stations as $station)
                             @php
                                 $settings = $station->settings ?? [];
-                                $depositRate = isset($settings['system_rate']) ? number_format($settings['system_rate'] * 100, 2) . '%' : '-';
+                                if (empty($settings['withholding_system'])) {
+                                    $depositRate = '不收費';
+                                } elseif (isset($settings['system_rate'])) {
+                                    $depositRate = number_format($settings['system_rate'] * 100, 2) . '%';
+                                } else {
+                                    $depositRate = '-';
+                                }
                                 if (empty($settings['withdraw'])) {
                                     $withdrawRate = '未開啟';
                                 } elseif (empty($settings['withdraw_withholding_system'])) {
@@ -298,7 +304,13 @@
         @forelse($stations as $station)
             @php
                 $settings = $station->settings ?? [];
-                $depositRate = isset($settings['system_rate']) ? number_format($settings['system_rate'] * 100, 2) . '%' : '-';
+                if (empty($settings['withholding_system'])) {
+                    $depositRate = '不收費';
+                } elseif (isset($settings['system_rate'])) {
+                    $depositRate = number_format($settings['system_rate'] * 100, 2) . '%';
+                } else {
+                    $depositRate = '-';
+                }
                 if (empty($settings['withdraw'])) {
                     $withdrawRate = '未開啟';
                 } elseif (empty($settings['withdraw_withholding_system'])) {
@@ -908,7 +920,13 @@ $(function () {
                 html += '<tr><th>域名</th><td>' + (station.domain || '-') + '</td></tr>';
                 html += '<tr><th>系統</th><td>' + (station.system ? station.system.name : '-') + '</td></tr>';
                 html += '<tr><th>點數</th><td><strong>' + station.credits + '</strong></td></tr>';
-                html += '<tr><th>代收費率</th><td>' + (s.system_rate ? (s.system_rate * 100).toFixed(2) + '%' : '-') + '</td></tr>';
+                var depositRateText = '-';
+                if (!s.withholding_system) {
+                    depositRateText = '不收費';
+                } else if (s.system_rate) {
+                    depositRateText = (s.system_rate * 100).toFixed(2) + '%';
+                }
+                html += '<tr><th>代收費率</th><td>' + depositRateText + '</td></tr>';
                 var withdrawRateText = '-';
                 if (!s.withdraw) {
                     withdrawRateText = '未開啟';
@@ -918,7 +936,15 @@ $(function () {
                     withdrawRateText = (s.system_rate_withdraw * 100).toFixed(2) + '%';
                 }
                 html += '<tr><th>代付費率</th><td>' + withdrawRateText + '</td></tr>';
-                html += '<tr><th>同系統轉單代收費率</th><td>' + (s.self_system_rate ? (s.self_system_rate * 100).toFixed(2) + '%' : '0%') + '</td></tr>';
+                var selfDepositText = '-';
+                if (!s.withholding_system) {
+                    selfDepositText = '不收費';
+                } else if (s.self_system_rate) {
+                    selfDepositText = (s.self_system_rate * 100).toFixed(2) + '%';
+                } else {
+                    selfDepositText = '0%';
+                }
+                html += '<tr><th>同系統轉單代收費率</th><td>' + selfDepositText + '</td></tr>';
                 var selfWithdrawText = '-';
                 if (!s.withdraw) {
                     selfWithdrawText = '未開啟';
