@@ -374,12 +374,18 @@ $(function () {
             var due = new Date(task.due_date + 'T00:00:00');
             var isMiddle = task.status >= 2 && task.status <= 4;
             var isToday = due.getTime() === today.getTime();
+            var tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            var isTomorrow = due.getTime() === tomorrow.getTime();
             var isOverdue = due < today && task.status !== 5;
             var dueStyle = 'color:#6c757d';
             var dueText = task.due_date;
             if (isToday && isMiddle) {
                 dueStyle = 'color:#dc3545;font-weight:bold';
                 dueText = '今日到期';
+            } else if (isTomorrow && isMiddle) {
+                dueStyle = 'color:#b8860b;font-weight:bold';
+                dueText = '<i class="fas fa-exclamation-triangle me-1"></i>' + task.due_date + ' 明日到期';
             } else if (isOverdue) {
                 dueStyle = 'color:#dc3545';
                 dueText = task.due_date + ' <i class="fas fa-exclamation-triangle"></i>';
