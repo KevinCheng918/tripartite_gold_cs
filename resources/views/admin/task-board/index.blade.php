@@ -40,9 +40,14 @@
         /* 側邊面板 */
         #task-side-panel.open { transform: translateX(0) !important; }
         #side-panel-resize:hover { background: rgba(0,123,255,0.3); }
+        #side-panel-inner { background: #fff; }
         [data-theme="dark"] #side-panel-inner { background: #1e1e1e; color: #e0e0e0; }
         [data-theme="dark"] #side-panel-inner .form-control,
         [data-theme="dark"] #side-panel-inner .form-select { background: #2d2d2d; color: #e0e0e0; border-color: #444; }
+        [data-theme="dark"] #side-panel-inner .btn-outline-secondary { color: #ccc; border-color: #555; }
+        [data-theme="dark"] #side-panel-inner .btn-outline-secondary:hover { background: #333; }
+        [data-theme="dark"] #side-panel-inner .table { color: #e0e0e0; }
+        [data-theme="dark"] #task-side-overlay { background: rgba(0,0,0,0.5); }
         .side-field { padding: 0.5rem 0; border-bottom: 1px solid #eee; }
         .side-field label { font-size: 0.8125rem; color: #6c757d; margin-bottom: 0.25rem; display: block; }
         .side-field .field-value { cursor: pointer; padding: 0.25rem 0.5rem; border-radius: 0.25rem; min-height: 1.75rem; }
@@ -203,7 +208,7 @@
     {{-- 側邊面板 --}}
     <div id="task-side-panel" style="display:none;position:fixed;top:60px;right:0;max-width:90%;height:calc(100vh - 60px);z-index:1050;overflow-y:auto;box-shadow:-4px 0 20px rgba(0,0,0,0.15);transition:transform 0.3s ease;transform:translateX(100%)">
         <div id="side-panel-resize" style="position:absolute;left:0;top:0;width:5px;height:100%;cursor:col-resize;z-index:2"></div>
-        <div style="background:#fff;min-height:100%;padding:1.5rem" id="side-panel-inner">
+        <div style="min-height:100%;padding:1.5rem" id="side-panel-inner">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-0" id="side-panel-project-badge"></h5>
                 <button type="button" class="btn-close" id="btn-close-panel"></button>
