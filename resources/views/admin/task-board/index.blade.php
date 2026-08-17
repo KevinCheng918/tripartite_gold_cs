@@ -866,6 +866,9 @@ $(function () {
                 group: 'tasks',
                 animation: 150,
                 ghostClass: 'sortable-ghost',
+                delay: 500,
+                delayOnTouchOnly: true,
+                touchStartThreshold: 5,
                 onEnd: function (evt) {
                     var taskId = $(evt.item).data('task-id');
                     var newStatus = parseInt($(evt.to).closest('.kanban-column').data('status'), 10);
