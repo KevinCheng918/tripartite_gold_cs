@@ -372,11 +372,12 @@ $(function () {
             var today = new Date();
             today.setHours(0, 0, 0, 0);
             var due = new Date(task.due_date + 'T00:00:00');
+            var isMiddle = task.status >= 2 && task.status <= 4;
             var isToday = due.getTime() === today.getTime();
             var isOverdue = due < today && task.status !== 5;
             var dueStyle = 'color:#6c757d';
             var dueText = task.due_date;
-            if (isToday) {
+            if (isToday && isMiddle) {
                 dueStyle = 'color:#dc3545;font-weight:bold';
                 dueText = '今日到期';
             } else if (isOverdue) {
