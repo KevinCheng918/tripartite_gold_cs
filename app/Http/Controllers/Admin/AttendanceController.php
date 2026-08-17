@@ -240,20 +240,22 @@ class AttendanceController extends Controller
      */
     public function ajaxAmendments()
     {
-        $amendments = $this->amendmentService->getAll();
+        $amendments = $this->amendmentService->getAllWithOriginalRecord();
 
         return response()->json($amendments->map(function ($a) {
             return [
-                'id'          => $a->id,
-                'user'        => $a->user ? $a->user->nickname : '-',
-                'date'        => $a->date->format('Y-m-d'),
-                'type'        => $a->type,
-                'clock_time'  => $a->clock_time,
-                'reason'      => $a->reason,
-                'status'      => $a->status,
-                'reviewer'    => $a->reviewer ? $a->reviewer->nickname : null,
-                'reviewed_at' => $a->reviewed_at ? $a->reviewed_at->format('Y-m-d H:i') : null,
-                'created_at'  => $a->created_at->format('Y-m-d H:i'),
+                'id'                 => $a->id,
+                'user'               => $a->user ? $a->user->nickname : '-',
+                'date'               => $a->date->format('Y-m-d'),
+                'type'               => $a->type,
+                'clock_time'         => $a->clock_time,
+                'reason'             => $a->reason,
+                'status'             => $a->status,
+                'original_clock_in'  => $a->original_clock_in,
+                'original_clock_out' => $a->original_clock_out,
+                'reviewer'           => $a->reviewer ? $a->reviewer->nickname : null,
+                'reviewed_at'        => $a->reviewed_at ? $a->reviewed_at->format('Y-m-d H:i') : null,
+                'created_at'         => $a->created_at->format('Y-m-d H:i'),
             ];
         }));
     }

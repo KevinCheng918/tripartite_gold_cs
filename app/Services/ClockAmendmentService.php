@@ -292,6 +292,34 @@ class ClockAmendmentService
     }
 
     /**
+     * 取得所有補打卡申請（含原始打卡紀錄）
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getAllWithOriginalRecord()
+    {
+        $amendments = $this->amendmentRepository->getAll();
+
+        // 批次查詢原始打卡紀錄避免 N+1
+        $records = [];
+        $amendments->each(function ($a) use (&$records) {
+            $key = "{$a->user_id}_{$a->date->format('Y-m-d')}";
+            if (!isset($records[$key])) {
+                $records[$key] = $this->attendanceRepository->findByUserAndDate($a->user_id, $a->date->format('Y-m-d'));
+            }
+        });
+
+        return $amendments->map(function ($a) use ($records) {
+            $key = "{$a->user_id}_{$a->date->format('Y-m-d')}";
+            $record = $records[$key] ?? null;
+            $a->original_clock_in = $record && $record->clock_in ? $record->clock_in->format('H:i') : null;
+            $a->original_clock_out = $record && $record->clock_out ? $record->clock_out->format('H:i') : null;
+
+            return $a;
+        });
+    }
+
+    /**
      * 取得個人申請紀錄
      *
      * @param int $userId

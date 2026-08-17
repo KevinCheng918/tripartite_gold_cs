@@ -655,7 +655,8 @@
                 }
 
                 var dataAttrs = function (a) {
-                    return ' data-id="' + a.id + '" data-user="' + a.user + '" data-date="' + a.date + '" data-type="' + a.type + '" data-time="' + a.clock_time + '"';
+                    return ' data-id="' + a.id + '" data-user="' + a.user + '" data-date="' + a.date + '" data-type="' + a.type + '" data-time="' + a.clock_time + '"' +
+                        ' data-orig-in="' + (a.original_clock_in || '') + '" data-orig-out="' + (a.original_clock_out || '') + '"';
                 };
 
                 // 桌面版表格
@@ -663,6 +664,7 @@
                     '<th>員工</th>' +
                     '<th>' + i18n.amend_field_date + '</th>' +
                     '<th>' + i18n.amend_field_type + '</th>' +
+                    '<th>原始時間</th>' +
                     '<th>' + i18n.amend_field_time + '</th>' +
                     '<th>' + i18n.amend_field_reason + '</th>' +
                     '<th>' + i18n.amend_field_status + '</th>' +
@@ -687,6 +689,7 @@
                         '<td><strong>' + a.user + '</strong></td>' +
                         '<td>' + a.date + '</td>' +
                         '<td>' + typeName + '</td>' +
+                        '<td>' + (a.type === 1 ? (a.original_clock_in || '<span class="text-danger">未打卡</span>') : (a.original_clock_out || '<span class="text-danger">未打卡</span>')) + '</td>' +
                         '<td>' + a.clock_time + '</td>' +
                         '<td>' + (a.reason || '-') + '</td>' +
                         '<td><span class="badge ' + st.css + '">' + st.text + '</span></td>' +
@@ -699,7 +702,8 @@
                         '<div class="text-muted" style="font-size:0.8125rem">' + a.date + '</div></div>' +
                         '<span class="badge ' + st.css + '">' + st.text + '</span></div>' +
                         '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">類型</span><span>' + typeName + '</span></div>' +
-                        '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">時間</span><span>' + a.clock_time + '</span></div>' +
+                        '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">原始時間</span><span>' + (a.type === 1 ? (a.original_clock_in || '<span class="text-danger">未打卡</span>') : (a.original_clock_out || '<span class="text-danger">未打卡</span>')) + '</span></div>' +
+                        '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">申請時間</span><span>' + a.clock_time + '</span></div>' +
                         (a.reason ? '<div class="d-flex justify-content-between mb-2" style="font-size:0.875rem"><span class="text-muted">原因</span><span>' + a.reason + '</span></div>' : '') +
                         '<div class="d-flex gap-1">' + actions + '</div>' +
                         '</div></div>';
@@ -721,13 +725,17 @@
                         var type = amendTypeMap[parseInt(btn.dataset.type, 10)] || '-';
                         var time = btn.dataset.time;
 
+                        var amendType = parseInt(btn.dataset.type, 10);
+                        var origTime = amendType === 1 ? (btn.dataset.origIn || null) : (btn.dataset.origOut || null);
+
                         var confirmHtml = '<div class="text-center">' +
                             '<p><strong>確定要' + actionWord + '此補打卡申請？</strong></p>' +
                             '<table class="table table-sm mt-2 text-center"><tbody>' +
-                            '<tr><th style="width:80px">員工</th><td>' + user + '</td></tr>' +
+                            '<tr><th style="width:100px">員工</th><td>' + user + '</td></tr>' +
                             '<tr><th>日期</th><td>' + date + '</td></tr>' +
                             '<tr><th>類型</th><td>' + type + '</td></tr>' +
-                            '<tr><th>時間</th><td>' + time + '</td></tr>' +
+                            '<tr><th>原始時間</th><td>' + (origTime || '<span class="text-danger">未打卡</span>') + '</td></tr>' +
+                            '<tr><th>申請時間</th><td>' + time + '</td></tr>' +
                             '</tbody></table></div>';
 
                         var confirmBody = document.getElementById('modal-attendance-confirm-body');
