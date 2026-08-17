@@ -180,6 +180,13 @@ class VmRepository
                   ->whereDate('due_date', '<', now()->subDays(3)->toDateString());
         }
 
+        // 關機篩選：VM power_status = 0
+        if (filled($criteria['shutdown'] ?? null) && $criteria['shutdown'] === 'true') {
+            $query->whereHas('vmServer', function ($q) {
+                $q->where('power_status', config('constants.VM.POWER.OFF'));
+            });
+        }
+
         if (filled($criteria['vm_server_id'] ?? null)) {
             $query->where('vm_server_id', $criteria['vm_server_id']);
         }

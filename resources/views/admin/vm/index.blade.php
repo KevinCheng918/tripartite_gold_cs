@@ -131,6 +131,7 @@
                                 <option value="2">{{ trans('vm.filter_pending') }}</option>
                                 <option value="1">{{ trans('vm.filter_paid') }}</option>
                                 <option value="overdue">{{ trans('vm.filter_overdue') }}</option>
+                                <option value="shutdown">{{ trans('vm.power_off') }}</option>
                             </select>
                         </div>
                         <div class="col-auto">
@@ -667,6 +668,8 @@ $(function () {
         if (month) { params += '&billing_month=' + month; }
         if (filter === 'overdue') {
             params += '&overdue=true';
+        } else if (filter === 'shutdown') {
+            params += '&shutdown=true';
         } else if (filter !== '') {
             params += '&paid=' + filter;
         }

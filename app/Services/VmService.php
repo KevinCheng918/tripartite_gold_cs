@@ -103,6 +103,7 @@ class VmService
             'billing_month' => $params['billing_month'] ?? null,
             'paid'          => $params['paid'] ?? null,
             'overdue'       => $params['overdue'] ?? null,
+            'shutdown'      => $params['shutdown'] ?? null,
             'vm_server_id'  => $params['vm_server_id'] ?? null,
             'system_id'     => $params['system_id'] ?? null,
         ];
