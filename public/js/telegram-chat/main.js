@@ -27,6 +27,20 @@
             });
 
             channel.bind('telegram.alert', function (data) { T.showAlert(data); });
+
+            // 正在輸入
+            var typingTimeout = null;
+            channel.bind('telegram.typing', function (data) {
+                if (data.groupId !== T.selectedGroupId) { return; }
+                var $indicator = document.getElementById('tg-typing-indicator');
+                if (!$indicator) { return; }
+                $indicator.textContent = data.nickname + ' 正在輸入...';
+                $indicator.style.display = 'block';
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(function () {
+                    $indicator.style.display = 'none';
+                }, 4000);
+            });
         } catch (e) {
             console.warn('Pusher 初始化失敗', e);
         }

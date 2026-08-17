@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Events\TelegramTyping;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\TelegramChat\ReplyRequest;
 use App\Http\Resources\TelegramMessageResource;
@@ -167,5 +168,21 @@ class TelegramChatController extends Controller
         }
     }
 
-    // 值班客服自動從排班系統指派，不需要手動操作
+    /**
+     * Ajax 廣播正在輸入
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxTyping(Request $request)
+    {
+        $params = $request->only(['group_id']);
+
+        event(new TelegramTyping(
+            (int) $params['group_id'],
+            Auth::user()->nickname
+        ));
+
+        return response()->json(['ok' => true]);
+    }
 }

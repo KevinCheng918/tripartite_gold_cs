@@ -37,10 +37,20 @@
             }
         });
 
-        // 自動高度
+        // 自動高度 + typing 通知
+        var typingTimer = null;
         textarea.addEventListener('input', function () {
             textarea.style.height = 'auto';
             textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+
+            // 節流：3 秒內只發一次 typing
+            if (!typingTimer && T.selectedGroupId) {
+                T.apiFetch('/admin/telegram-chat/ajax-typing', {
+                    method: 'POST',
+                    body: JSON.stringify({ group_id: T.selectedGroupId }),
+                }).catch(function () {});
+                typingTimer = setTimeout(function () { typingTimer = null; }, 3000);
+            }
         });
 
         // Enter 送出（IME 安全）

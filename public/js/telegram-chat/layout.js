@@ -29,6 +29,7 @@
             '<div class="chat-wrapper p-3" id="tg-messages" style="flex:1;overflow-y:auto">' +
             '<div class="text-center text-muted py-5">' + T.i18n.select_group + '</div>' +
             '</div>' +
+            '<div id="tg-typing-indicator" style="display:none;padding:0.25rem 1rem;font-size:0.8125rem;color:#6c757d;font-style:italic"></div>' +
             '<div class="app-inner-layout__bottom-pane border-top" id="tg-input" style="display:none"></div>' +
             '</div>' +
 
