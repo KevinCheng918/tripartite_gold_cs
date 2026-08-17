@@ -7,9 +7,9 @@
 @section('content')
 
     <style>
-        .app-main__outer { overflow-x: auto !important; }
-        .app-main__inner { min-width: 1500px; }
-        .kanban-board { display: flex; gap: 0.75rem; min-height: 65vh; }
+        .app-main__outer, .app-main__inner { overflow-x: hidden !important; }
+        .kanban-board-wrapper { overflow-x: auto; width: 100%; }
+        .kanban-board { display: inline-flex; gap: 0.75rem; min-height: 65vh; min-width: 1500px; }
         .kanban-column { flex: 1; min-width: 0; display: flex; flex-direction: column; border-radius: 0.5rem; overflow: hidden; }
         .kanban-column .card-list { flex: 1; }
         .kanban-column .column-header { padding: 0.75rem 1rem; border-radius: 0.5rem 0.5rem 0 0; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
@@ -126,6 +126,7 @@
     </div>
 
     {{-- 看板 --}}
+    <div class="kanban-board-wrapper">
     <div class="kanban-board">
         <div class="kanban-column col-pending" data-status="1">
             <div class="column-header">
@@ -162,7 +163,8 @@
             </div>
             <div class="card-list" id="list-resolved"></div>
         </div>
-    </div>{{-- end kanban-board --}}
+    </div>
+    </div>{{-- end kanban-board-wrapper --}}
 
     {{-- 新增/編輯任務 Modal --}}
     <div class="modal fade" id="modal-task" tabindex="-1">
