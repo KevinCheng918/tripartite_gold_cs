@@ -19,8 +19,10 @@ class StoreTaskRequest extends FormRequest
             'title'       => 'required|string|max:200',
             'description' => 'nullable|string',
             'priority'    => 'nullable|integer|in:1,2,3,4',
-            'assignee_id' => 'nullable|integer|exists:user,id',
+            'assignee_id' => 'nullable|integer',
             'due_date'    => 'nullable|date',
+            'images'      => 'nullable|array',
+            'images.*'    => 'image|max:5120',
         ];
     }
 }

@@ -20,7 +20,7 @@ class TaskRepository
 
     /** @var array 詳細欄位 */
     private const DETAIL_COLUMNS = [
-        'id', 'project_id', 'station_id', 'title', 'description', 'status', 'priority',
+        'id', 'project_id', 'station_id', 'title', 'description', 'images', 'status', 'priority',
         'assignee_id', 'creator_id', 'due_date', 'sort_order', 'created_at', 'updated_at',
     ];
 
@@ -147,7 +147,7 @@ class TaskRepository
     public function getComments($taskId)
     {
         return TaskComment::query()
-            ->select(['id', 'task_id', 'user_id', 'content', 'created_at'])
+            ->select(['id', 'task_id', 'user_id', 'content', 'images', 'created_at'])
             ->with(['user'])
             ->where('task_id', $taskId)
             ->orderByDesc('created_at')

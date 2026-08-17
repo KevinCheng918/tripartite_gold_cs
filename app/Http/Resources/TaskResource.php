@@ -26,6 +26,9 @@ class TaskResource extends JsonResource
             'system'      => $this->station && $this->station->system ? $this->station->system->name : null,
             'title'       => $this->title,
             'description' => $this->description,
+            'images'      => array_map(function ($path) {
+                return asset("storage/{$path}");
+            }, $this->images ?? []),
             'status'      => $this->status,
             'priority'    => $this->priority,
             'assignee_id' => $this->assignee_id,

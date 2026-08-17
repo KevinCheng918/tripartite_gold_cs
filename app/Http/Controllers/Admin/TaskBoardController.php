@@ -12,6 +12,7 @@ use App\Http\Requests\TaskBoard\UpdateTaskRequest;
 use App\Http\Resources\TaskCommentResource;
 use App\Http\Resources\TaskResource;
 use App\Models\Task;
+use App\Services\ImageUploadService;
 use App\Services\TaskBoardService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -23,10 +24,12 @@ use Illuminate\Support\Facades\Log;
 class TaskBoardController extends Controller
 {
     private $taskBoardService;
+    private $imageUploadService;
 
-    public function __construct(TaskBoardService $taskBoardService)
+    public function __construct(TaskBoardService $taskBoardService, ImageUploadService $imageUploadService)
     {
         $this->taskBoardService = $taskBoardService;
+        $this->imageUploadService = $imageUploadService;
     }
 
     /**
@@ -89,6 +92,9 @@ class TaskBoardController extends Controller
     public function ajaxStoreTask(StoreTaskRequest $request)
     {
         $params = $request->validated();
+        $params['images'] = $request->hasFile('images')
+            ? $this->imageUploadService->uploadMultiple($request->file('images'), 'task')
+            : [];
 
         try {
             $task = $this->taskBoardService->storeTask($params, Auth::id());
@@ -114,6 +120,11 @@ class TaskBoardController extends Controller
     public function ajaxUpdateTask(UpdateTaskRequest $request, Task $task)
     {
         $params = $request->validated();
+        if ($request->hasFile('images')) {
+            $existing = $task->images ?? [];
+            $newImages = $this->imageUploadService->uploadMultiple($request->file('images'), 'task');
+            $params['images'] = array_merge($existing, $newImages);
+        }
 
         try {
             $task = $this->taskBoardService->updateTask($task, $params);
@@ -243,8 +254,11 @@ class TaskBoardController extends Controller
     public function ajaxStoreComment(StoreCommentRequest $request, Task $task)
     {
         $params = $request->validated();
+        $images = $request->hasFile('images')
+            ? $this->imageUploadService->uploadMultiple($request->file('images'), 'task-comment')
+            : [];
 
-        $comment = $this->taskBoardService->addComment($task->id, Auth::id(), $params['content']);
+        $comment = $this->taskBoardService->addComment($task->id, Auth::id(), $params['content'], $images);
 
         return new TaskCommentResource($comment->load('user'));
     }

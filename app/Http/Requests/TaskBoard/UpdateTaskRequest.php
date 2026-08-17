@@ -20,8 +20,10 @@ class UpdateTaskRequest extends FormRequest
             'description' => 'nullable|string',
             'status'      => 'sometimes|integer|in:1,2,3,4,5',
             'priority'    => 'sometimes|integer|in:1,2,3,4',
-            'assignee_id' => 'nullable|integer|exists:user,id',
+            'assignee_id' => 'nullable|integer',
             'due_date'    => 'nullable|date',
+            'images'      => 'nullable|array',
+            'images.*'    => 'image|max:5120',
         ];
     }
 }

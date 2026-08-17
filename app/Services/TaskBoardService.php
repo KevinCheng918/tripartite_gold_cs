@@ -86,6 +86,7 @@ class TaskBoardService
             'assignee_id' => $params['assignee_id'] ?? null,
             'creator_id'  => $creatorId,
             'due_date'    => $params['due_date'] ?? null,
+            'images'      => $params['images'] ?? [],
             'sort_order'  => $maxSort + 1,
         ]);
     }
@@ -204,14 +205,16 @@ class TaskBoardService
      * @param int    $taskId
      * @param int    $userId
      * @param string $content
+     * @param array  $images
      * @return \App\Models\TaskComment
      */
-    public function addComment($taskId, $userId, $content)
+    public function addComment($taskId, $userId, $content, $images = [])
     {
         return $this->taskRepository->createComment([
             'task_id' => $taskId,
             'user_id' => $userId,
             'content' => $content,
+            'images'  => $images,
         ]);
     }
 }

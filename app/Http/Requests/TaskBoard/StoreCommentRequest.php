@@ -14,7 +14,9 @@ class StoreCommentRequest extends FormRequest
     public function rules()
     {
         return [
-            'content' => 'required|string|max:2000',
+            'content'  => 'required|string|max:2000',
+            'images'   => 'nullable|array',
+            'images.*' => 'image|max:5120',
         ];
     }
 }

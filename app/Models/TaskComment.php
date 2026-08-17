@@ -19,6 +19,10 @@ class TaskComment extends Model
 
     protected $guarded = ['id'];
 
+    protected $casts = [
+        'images' => 'array',
+    ];
+
     /**
      * @return BelongsTo
      */

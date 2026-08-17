@@ -31,6 +31,7 @@ class Task extends Model
         'priority'   => 'integer',
         'due_date'   => 'date',
         'sort_order' => 'integer',
+        'images'     => 'array',
     ];
 
     /**

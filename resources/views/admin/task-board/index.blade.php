@@ -217,6 +217,11 @@
                             <label class="form-label">{{ trans('task_board.field_due_date') }}</label>
                             <input type="date" id="task-due-date" class="form-control">
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label">上傳圖片</label>
+                            <input type="file" class="form-control" id="task-images" accept="image/*" multiple>
+                            <div id="task-image-previews" class="d-flex flex-wrap gap-2 mt-2"></div>
+                        </div>
                         <div class="text-end">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                             <button type="submit" class="btn btn-primary">確認</button>
@@ -333,12 +338,11 @@ $(function () {
 
     function renderCard(task) {
         var pColor = getProjectColor(task.project);
-        var initials = task.project.substring(0, 2);
 
         var html = '<div class="kanban-card ' + (priorityClass[task.priority] || '') + '" data-task-id="' + task.id + '">';
         // 頂部：專案 badge + 優先順序
         html += '<div class="d-flex justify-content-between align-items-center mb-2">';
-        html += '<span class="badge" style="background:' + pColor + ';color:#fff;border-radius:9999px;padding:0.25em 0.6em;font-size:0.75rem">' + initials + '</span>';
+        html += '<span class="badge" style="background:' + pColor + ';color:#fff;border-radius:9999px;padding:0.25em 0.6em;font-size:0.75rem">' + task.project + '</span>';
         html += (priorityLabel[task.priority] || '');
         html += '</div>';
         // 標題
@@ -501,6 +505,20 @@ $(function () {
                 // 描述
                 html += '<div class="side-field" data-field="description" data-type="textarea"><label>{{ trans("task_board.field_description") }}</label><div class="field-value" style="white-space:pre-wrap;min-height:60px">' + (t.description || '<span class="text-muted">點擊新增描述...</span>') + '</div></div>';
 
+                // 圖片
+                html += '<div class="side-field"><label>圖片</label>';
+                if (t.images && t.images.length > 0) {
+                    html += '<div class="d-flex flex-wrap gap-2 mb-2">';
+                    t.images.forEach(function (url) {
+                        html += '<a href="' + url + '" target="_blank"><img src="' + url + '" style="width:100px;height:100px;object-fit:cover;border-radius:0.375rem;border:1px solid #dee2e6"></a>';
+                    });
+                    html += '</div>';
+                }
+                if (canUpdate) {
+                    html += '<input type="file" class="form-control form-control-sm" id="panel-upload-images" accept="image/*" multiple>';
+                }
+                html += '</div>';
+
                 // 操作按鈕
                 if (canDelete) {
                     html += '<div class="mt-3"><button class="btn btn-sm btn-outline-secondary" id="btn-panel-delete" data-id="' + t.id + '"><i class="fas fa-trash text-danger me-1"></i>{{ trans("task_board.action_delete") }}</button></div>';
@@ -510,7 +528,12 @@ $(function () {
                 html += '<hr><h6><i class="fas fa-comments me-1"></i>留言</h6>';
                 html += '<div id="panel-comments"><p class="text-muted" style="font-size:0.8125rem">Loading...</p></div>';
                 html += '<div class="mt-2"><textarea id="panel-comment-input" class="form-control" rows="2" placeholder="輸入留言..."></textarea>';
-                html += '<button class="btn btn-sm btn-primary mt-1" id="btn-send-comment">送出</button></div>';
+                html += '<div class="d-flex gap-2 align-items-center mt-1">';
+                html += '<label class="btn btn-sm btn-outline-secondary mb-0" for="panel-comment-images"><i class="fas fa-image me-1"></i>附圖</label>';
+                html += '<input type="file" class="d-none" id="panel-comment-images" accept="image/*" multiple>';
+                html += '<div id="panel-comment-image-previews" class="d-flex gap-1 flex-wrap"></div>';
+                html += '<button class="btn btn-sm btn-primary ms-auto" id="btn-send-comment">送出</button>';
+                html += '</div></div>';
 
                 $('#side-panel-body').html(html);
 
@@ -524,6 +547,28 @@ $(function () {
                     var deleteId = $(this).data('id');
                     $('#delete-confirm-id').val(deleteId);
                     showBsModal('modal-delete-confirm');
+                });
+
+                commentImageFiles = [];
+
+                // 側邊面板圖片上傳
+                $('#panel-upload-images').on('change', function () {
+                    if (!this.files.length) return;
+                    var formData = new FormData();
+                    formData.append('_method', 'PUT');
+                    for (var i = 0; i < this.files.length; i++) {
+                        formData.append('images[]', this.files[i]);
+                    }
+                    $.ajax({
+                        url: '/admin/task-board/ajax-update-task/' + taskId,
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': csrfToken },
+                        processData: false,
+                        contentType: false,
+                        data: formData,
+                        success: function () { loadPanel(taskId); loadBoard(); },
+                        error: function (xhr) { showMsg((xhr.responseJSON && xhr.responseJSON.message) || '上傳失敗'); }
+                    });
                 });
 
                 $('#btn-send-comment').on('click', function () { sendComment(taskId); });
@@ -662,6 +707,13 @@ $(function () {
                     html += '<div class="comment-item">';
                     html += '<div class="d-flex justify-content-between"><strong style="font-size:0.875rem">' + c.user + '</strong><small class="text-muted">' + c.created_at + '</small></div>';
                     html += '<div style="font-size:0.875rem;white-space:pre-wrap;margin-top:0.25rem">' + c.content + '</div>';
+                    if (c.images && c.images.length > 0) {
+                        html += '<div class="d-flex flex-wrap gap-1 mt-1">';
+                        c.images.forEach(function (url) {
+                            html += '<a href="' + url + '" target="_blank"><img src="' + url + '" style="width:60px;height:60px;object-fit:cover;border-radius:0.25rem"></a>';
+                        });
+                        html += '</div>';
+                    }
                     html += '</div>';
                 });
                 $('#panel-comments').html(html);
@@ -669,18 +721,52 @@ $(function () {
         });
     }
 
+    var commentImageFiles = [];
+
+    $(document).on('change', '#panel-comment-images', function () {
+        for (var i = 0; i < this.files.length; i++) {
+            commentImageFiles.push(this.files[i]);
+        }
+        this.value = '';
+        renderCommentImagePreviews();
+    });
+
+    function renderCommentImagePreviews() {
+        var $container = $('#panel-comment-image-previews');
+        $container.empty();
+        commentImageFiles.forEach(function (file, idx) {
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                $container.append('<div class="position-relative" style="width:40px;height:40px"><img src="' + e.target.result + '" style="width:40px;height:40px;object-fit:cover;border-radius:0.25rem"><button type="button" class="btn-close position-absolute top-0 end-0" style="font-size:0.4rem;padding:0.15rem;background:#fff;border-radius:50%" data-rm-comment-img="' + idx + '"></button></div>');
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    $(document).on('click', '[data-rm-comment-img]', function () {
+        commentImageFiles.splice(parseInt($(this).data('rm-comment-img'), 10), 1);
+        renderCommentImagePreviews();
+    });
+
     function sendComment(taskId) {
         var content = $('#panel-comment-input').val().trim();
-        if (!content) return;
+        if (!content && commentImageFiles.length === 0) return;
+
+        var formData = new FormData();
+        formData.append('content', content || '(圖片)');
+        commentImageFiles.forEach(function (file) { formData.append('images[]', file); });
 
         $.ajax({
             url: '/admin/task-board/ajax-store-comment/' + taskId,
             method: 'POST',
             headers: { 'X-CSRF-TOKEN': csrfToken },
-            contentType: 'application/json',
-            data: JSON.stringify({ content: content }),
+            processData: false,
+            contentType: false,
+            data: formData,
             success: function () {
                 $('#panel-comment-input').val('');
+                commentImageFiles = [];
+                $('#panel-comment-image-previews').empty();
                 loadComments(taskId);
             },
             error: function (xhr) {
@@ -767,11 +853,45 @@ $(function () {
     });
 
     // 新增任務
+    // 圖片上傳（新增 Modal）
+    var taskImageFiles = [];
+
+    function renderTaskImagePreviews() {
+        var $container = $('#task-image-previews');
+        $container.empty();
+        taskImageFiles.forEach(function (file, idx) {
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                var html = '<div class="position-relative" style="width:80px;height:80px">';
+                html += '<img src="' + e.target.result + '" style="width:80px;height:80px;object-fit:cover;border-radius:0.375rem;border:1px solid #dee2e6">';
+                html += '<button type="button" class="btn-close position-absolute top-0 end-0 bg-white rounded-circle" style="font-size:0.5rem;padding:0.25rem" data-remove="' + idx + '"></button>';
+                html += '</div>';
+                $container.append(html);
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    $('#task-images').on('change', function () {
+        for (var i = 0; i < this.files.length; i++) {
+            taskImageFiles.push(this.files[i]);
+        }
+        this.value = '';
+        renderTaskImagePreviews();
+    });
+
+    $(document).on('click', '#task-image-previews .btn-close', function () {
+        taskImageFiles.splice(parseInt($(this).data('remove'), 10), 1);
+        renderTaskImagePreviews();
+    });
+
     $('#btn-open-create-task').on('click', function () {
         $('#task-id').val('');
         $('#form-task')[0].reset();
         $('#pri-medium').prop('checked', true);
         $('#modal-task-title').text('{{ trans("task_board.action_create_task") }}');
+        taskImageFiles = [];
+        $('#task-image-previews').empty();
         showBsModal('modal-task');
     });
 
@@ -781,21 +901,23 @@ $(function () {
         var url = id ? '/admin/task-board/ajax-update-task/' + id : '/admin/task-board/ajax-store-task';
         var method = id ? 'PUT' : 'POST';
 
-        var payload = {
-            project_id: parseInt($('#task-project').val(), 10),
-            station_id: $('#task-station').val() || null,
-            title: $('#task-title').val(),
-            description: $('#task-description').val() || null,
-            priority: parseInt($('input[name="task_priority"]:checked').val(), 10),
-            assignee_id: $('#task-assignee').val() || null,
-            due_date: $('#task-due-date').val() || null
-        };
+        var formData = new FormData();
+        formData.append('project_id', $('#task-project').val());
+        if ($('#task-station').val()) formData.append('station_id', $('#task-station').val());
+        formData.append('title', $('#task-title').val());
+        if ($('#task-description').val()) formData.append('description', $('#task-description').val());
+        formData.append('priority', $('input[name="task_priority"]:checked').val());
+        if ($('#task-assignee').val()) formData.append('assignee_id', $('#task-assignee').val());
+        if ($('#task-due-date').val()) formData.append('due_date', $('#task-due-date').val());
+        taskImageFiles.forEach(function (file) { formData.append('images[]', file); });
+        if (id) formData.append('_method', 'PUT');
 
         $.ajax({
-            url: url, method: method,
+            url: url, method: 'POST',
             headers: { 'X-CSRF-TOKEN': csrfToken },
-            contentType: 'application/json',
-            data: JSON.stringify(payload),
+            processData: false,
+            contentType: false,
+            data: formData,
             success: function (body) {
                 hideBsModal(document.getElementById('modal-task'));
                 setTimeout(function () { showMsg(body.message); loadBoard(); }, 400);
