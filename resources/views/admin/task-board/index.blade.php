@@ -108,6 +108,13 @@
                                 <option value="{{ $u->id }}">{{ $u->nickname }}</option>
                             @endforeach
                         </select>
+                        <select id="filter-priority" class="form-select form-select-sm" style="width:auto">
+                            <option value="">全部優先</option>
+                            <option value="1">{{ trans('task_board.priority_low') }}</option>
+                            <option value="2">{{ trans('task_board.priority_medium') }}</option>
+                            <option value="3">{{ trans('task_board.priority_high') }}</option>
+                            <option value="4">{{ trans('task_board.priority_urgent') }}</option>
+                        </select>
                         <input type="text" id="filter-keyword" class="form-control form-control-sm" style="width:140px" placeholder="搜尋標題...">
                         <button class="btn btn-sm btn-outline-secondary" id="btn-filter">
                             <i class="fas fa-search"></i>
@@ -384,9 +391,11 @@ $(function () {
         var params = {};
         var projectId = $('#filter-project').val();
         var assigneeId = $('#filter-assignee').val();
+        var priority = $('#filter-priority').val();
         var keyword = $('#filter-keyword').val();
         if (projectId) params.project_id = projectId;
         if (assigneeId) params.assignee_id = assigneeId;
+        if (priority) params.priority = priority;
         if (keyword) params.keyword = keyword;
 
         $.ajax({

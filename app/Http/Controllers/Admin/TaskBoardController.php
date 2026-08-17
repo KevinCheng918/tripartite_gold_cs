@@ -58,7 +58,7 @@ class TaskBoardController extends Controller
      */
     public function ajaxBoard(Request $request)
     {
-        $params = $request->only(['project_id', 'assignee_id', 'keyword']);
+        $params = $request->only(['project_id', 'assignee_id', 'priority', 'keyword']);
         $board = $this->taskBoardService->getBoard($params);
 
         return response()->json([

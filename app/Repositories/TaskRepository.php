@@ -45,6 +45,10 @@ class TaskRepository
             $query->where('assignee_id', (int) $criteria['assignee_id']);
         }
 
+        if (filled($criteria['priority'] ?? null)) {
+            $query->where('priority', (int) $criteria['priority']);
+        }
+
         if (filled($criteria['keyword'] ?? null)) {
             $query->where('title', 'like', "%{$criteria['keyword']}%");
         }
