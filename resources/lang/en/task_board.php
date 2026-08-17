@@ -8,6 +8,7 @@ return [
 
     'status_pending'     => 'To Do',
     'status_in_progress' => 'In Progress',
+    'status_testing'     => 'Testing',
     'status_in_review'   => 'In Review',
     'status_resolved'    => 'Done',
 

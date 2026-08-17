@@ -7,8 +7,11 @@
 @section('content')
 
     <style>
-        .kanban-board { display: flex; gap: 1rem; overflow-x: auto; min-height: 70vh; padding-bottom: 1rem; }
-        .kanban-column { flex: 1; min-width: 280px; max-width: 350px; display: flex; flex-direction: column; }
+        .app-main__outer { overflow-x: auto !important; }
+        .app-main__inner { min-width: 1500px; }
+        .kanban-board { display: flex; gap: 0.75rem; min-height: 65vh; }
+        .kanban-column { flex: 1; min-width: 0; display: flex; flex-direction: column; border-radius: 0.5rem; overflow: hidden; }
+        .kanban-column .card-list { flex: 1; }
         .kanban-column .column-header { padding: 0.75rem 1rem; border-radius: 0.5rem 0.5rem 0 0; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
         .kanban-column .card-list { flex: 1; padding: 0.5rem; border-radius: 0 0 0.5rem 0.5rem; min-height: 100px; background: #f1f3f5; }
         .kanban-card { background: #fff; border-radius: 0.5rem; padding: 0.75rem; margin-bottom: 0.5rem; cursor: grab; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: box-shadow 0.2s; border-left: 3px solid transparent; }
@@ -23,10 +26,12 @@
         .priority-urgent { border-left-color: #dc3545 !important; }
         .col-pending .column-header     { background: #e9ecef; color: #495057; }
         .col-in-progress .column-header { background: #cfe2ff; color: #084298; }
+        .col-testing .column-header     { background: #e8daef; color: #6c3483; }
         .col-in-review .column-header   { background: #fff3cd; color: #664d03; }
         .col-resolved .column-header    { background: #d1e7dd; color: #0f5132; }
         .col-pending .card-list     { background: #f8f9fa; }
         .col-in-progress .card-list { background: #f0f6ff; }
+        .col-testing .card-list     { background: #f5f0fa; }
         .col-in-review .card-list   { background: #fffcf0; }
         .col-resolved .card-list    { background: #f0faf4; }
         /* dark mode */
@@ -35,6 +40,7 @@
         [data-theme="dark"] .card-list { background: #1e1e1e !important; }
         [data-theme="dark"] .col-pending .column-header     { background: #333; color: #ccc; }
         [data-theme="dark"] .col-in-progress .column-header { background: #1a3a5c; color: #8ec5fc; }
+        [data-theme="dark"] .col-testing .column-header     { background: #2d1f3d; color: #bb86fc; }
         [data-theme="dark"] .col-in-review .column-header   { background: #4a3f1f; color: #ffd966; }
         [data-theme="dark"] .col-resolved .column-header    { background: #1a3a2a; color: #81c784; }
         /* 側邊面板 */
@@ -61,8 +67,8 @@
             #task-side-panel { width: 100% !important; }
         }
         @media (max-width: 767px) {
-            .kanban-board { flex-direction: column; }
-            .kanban-column { max-width: 100%; min-width: 100%; }
+            .kanban-board { display: flex !important; flex-direction: column; min-width: 100% !important; }
+            .kanban-column { flex: 0 0 auto !important; width: 100% !important; }
         }
     </style>
 
@@ -125,21 +131,28 @@
             </div>
             <div class="card-list" id="list-in-progress"></div>
         </div>
-        <div class="kanban-column col-in-review" data-status="3">
+        <div class="kanban-column col-testing" data-status="3">
+            <div class="column-header">
+                <span><i class="fas fa-vial me-2"></i>{{ trans('task_board.status_testing') }}</span>
+                <span class="badge" style="background:#6f42c1" id="count-testing">0</span>
+            </div>
+            <div class="card-list" id="list-testing"></div>
+        </div>
+        <div class="kanban-column col-in-review" data-status="4">
             <div class="column-header">
                 <span><i class="fas fa-search me-2"></i>{{ trans('task_board.status_in_review') }}</span>
                 <span class="badge bg-warning text-dark" id="count-in-review">0</span>
             </div>
             <div class="card-list" id="list-in-review"></div>
         </div>
-        <div class="kanban-column col-resolved" data-status="4">
+        <div class="kanban-column col-resolved" data-status="5">
             <div class="column-header">
                 <span><i class="fas fa-check-circle me-2"></i>{{ trans('task_board.status_resolved') }}</span>
                 <span class="badge bg-success" id="count-resolved">0</span>
             </div>
             <div class="card-list" id="list-resolved"></div>
         </div>
-    </div>
+    </div>{{-- end kanban-board --}}
 
     {{-- 新增/編輯任務 Modal --}}
     <div class="modal fade" id="modal-task" tabindex="-1">
@@ -303,8 +316,8 @@ $(function () {
         4: '<span class="badge" style="background:rgba(220,53,69,0.15);color:#dc3545;border-radius:9999px;padding:0.2em 0.6em">{{ trans("task_board.priority_urgent") }}</span>'
     };
 
-    var statusListMap = { 1: 'list-pending', 2: 'list-in-progress', 3: 'list-in-review', 4: 'list-resolved' };
-    var statusCountMap = { 1: 'count-pending', 2: 'count-in-progress', 3: 'count-in-review', 4: 'count-resolved' };
+    var statusListMap = { 1: 'list-pending', 2: 'list-in-progress', 3: 'list-testing', 4: 'list-in-review', 5: 'list-resolved' };
+    var statusCountMap = { 1: 'count-pending', 2: 'count-in-progress', 3: 'count-testing', 4: 'count-in-review', 5: 'count-resolved' };
 
     // 專案名稱取前兩字做縮寫
     var projectColors = ['#6f42c1', '#0d9488', '#2563eb', '#e85d04', '#d63384', '#0ea5e9'];
@@ -344,7 +357,7 @@ $(function () {
             today.setHours(0, 0, 0, 0);
             var due = new Date(task.due_date + 'T00:00:00');
             var isToday = due.getTime() === today.getTime();
-            var isOverdue = due < today && task.status !== 4;
+            var isOverdue = due < today && task.status !== 5;
             var dueStyle = 'color:#6c757d';
             var dueText = task.due_date;
             if (isToday) {
@@ -377,11 +390,12 @@ $(function () {
                 var columns = {
                     pending: data.pending || [],
                     in_progress: data.in_progress || [],
+                    testing: data.testing || [],
                     in_review: data.in_review || [],
                     resolved: data.resolved || []
                 };
 
-                var statusKeys = { pending: 1, in_progress: 2, in_review: 3, resolved: 4 };
+                var statusKeys = { pending: 1, in_progress: 2, testing: 3, in_review: 4, resolved: 5 };
 
                 Object.keys(columns).forEach(function (key) {
                     var tasks = columns[key];
@@ -432,7 +446,7 @@ $(function () {
     })();
 
     var currentTaskId = null;
-    var statusLabels = { 1: '{{ trans("task_board.status_pending") }}', 2: '{{ trans("task_board.status_in_progress") }}', 3: '{{ trans("task_board.status_in_review") }}', 4: '{{ trans("task_board.status_resolved") }}' };
+    var statusLabels = { 1: '{{ trans("task_board.status_pending") }}', 2: '{{ trans("task_board.status_in_progress") }}', 3: '{{ trans("task_board.status_testing") }}', 4: '{{ trans("task_board.status_in_review") }}', 5: '{{ trans("task_board.status_resolved") }}' };
 
     function openPanel() {
         $('#task-side-panel').show();
@@ -547,7 +561,7 @@ $(function () {
                     inputEl = '<input type="date" class="form-control" value="' + val + '">';
                 } else if (fieldType === 'select' && fieldName === 'status') {
                     inputEl = '<select class="form-select">';
-                    [1,2,3,4].forEach(function (s) { inputEl += '<option value="' + s + '"' + (t.status === s ? ' selected' : '') + '>' + statusLabels[s] + '</option>'; });
+                    [1,2,3,4,5].forEach(function (s) { inputEl += '<option value="' + s + '"' + (t.status === s ? ' selected' : '') + '>' + statusLabels[s] + '</option>'; });
                     inputEl += '</select>';
                 } else if (fieldType === 'select' && fieldName === 'priority') {
                     var priorityNames = { 1: '{{ trans("task_board.priority_low") }}', 2: '{{ trans("task_board.priority_medium") }}', 3: '{{ trans("task_board.priority_high") }}', 4: '{{ trans("task_board.priority_urgent") }}' };

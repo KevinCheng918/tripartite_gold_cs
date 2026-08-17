@@ -66,8 +66,9 @@ return [
         'STATUS' => [
             'PENDING'     => 1,
             'IN_PROGRESS' => 2,
-            'IN_REVIEW'   => 3,
-            'RESOLVED'    => 4,
+            'TESTING'     => 3,
+            'IN_REVIEW'   => 4,
+            'RESOLVED'    => 5,
         ],
         'PRIORITY' => [
             'LOW'    => 1,

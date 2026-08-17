@@ -8,6 +8,7 @@ return [
 
     'status_pending'     => '待處理',
     'status_in_progress' => '進行中',
+    'status_testing'     => '測試中',
     'status_in_review'   => '審核中',
     'status_resolved'    => '已解決',
 

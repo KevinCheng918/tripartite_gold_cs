@@ -18,7 +18,7 @@ class UpdateTaskRequest extends FormRequest
             'station_id'  => 'nullable|integer|exists:station,id',
             'title'       => 'sometimes|string|max:200',
             'description' => 'nullable|string',
-            'status'      => 'sometimes|integer|in:1,2,3,4',
+            'status'      => 'sometimes|integer|in:1,2,3,4,5',
             'priority'    => 'sometimes|integer|in:1,2,3,4',
             'assignee_id' => 'nullable|integer|exists:user,id',
             'due_date'    => 'nullable|date',

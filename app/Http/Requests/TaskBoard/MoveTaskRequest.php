@@ -14,7 +14,7 @@ class MoveTaskRequest extends FormRequest
     public function rules()
     {
         return [
-            'status'     => 'required|integer|in:1,2,3,4',
+            'status'     => 'required|integer|in:1,2,3,4,5',
             'sort_order' => 'required|integer|min:0',
         ];
     }

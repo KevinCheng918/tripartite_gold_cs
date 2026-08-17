@@ -46,6 +46,7 @@ class TaskBoardService
         return [
             'pending'     => $tasks->where('status', $statusMap['PENDING'])->values(),
             'in_progress' => $tasks->where('status', $statusMap['IN_PROGRESS'])->values(),
+            'testing'     => $tasks->where('status', $statusMap['TESTING'])->values(),
             'in_review'   => $tasks->where('status', $statusMap['IN_REVIEW'])->values(),
             'resolved'    => $tasks->where('status', $statusMap['RESOLVED'])->values(),
         ];

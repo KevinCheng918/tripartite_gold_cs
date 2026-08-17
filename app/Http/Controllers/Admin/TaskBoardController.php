@@ -61,6 +61,7 @@ class TaskBoardController extends Controller
         return response()->json([
             'pending'     => TaskResource::collection($board['pending']),
             'in_progress' => TaskResource::collection($board['in_progress']),
+            'testing'     => TaskResource::collection($board['testing']),
             'in_review'   => TaskResource::collection($board['in_review']),
             'resolved'    => TaskResource::collection($board['resolved']),
         ]);
