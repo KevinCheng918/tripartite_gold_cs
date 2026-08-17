@@ -64,10 +64,10 @@
         .comment-item:last-child { border-bottom: none; }
         [data-theme="dark"] .comment-item { border-bottom-color: #333; }
         /* dark mode 優先順序按鈕 */
-        [data-theme="dark"] .btn-check:checked + .btn-outline-secondary { background: #555; color: #fff; border-color: #555; }
-        [data-theme="dark"] .btn-check:checked + .btn-outline-info { background: #0aa2c0; color: #fff; border-color: #0aa2c0; }
-        [data-theme="dark"] .btn-check:checked + .btn-outline-warning { background: #b8860b; color: #fff; border-color: #b8860b; }
-        [data-theme="dark"] .btn-check:checked + .btn-outline-danger { background: #c62828; color: #fff; border-color: #c62828; }
+        [data-theme="dark"] .btn-check:checked + .btn-outline-secondary { background: #888 !important; color: #fff !important; border-color: #888 !important; box-shadow: 0 0 0 3px rgba(136,136,136,0.4) !important; }
+        [data-theme="dark"] .btn-check:checked + .btn-outline-info { background: #0aa2c0 !important; color: #fff !important; border-color: #0aa2c0 !important; box-shadow: 0 0 0 3px rgba(10,162,192,0.4) !important; }
+        [data-theme="dark"] .btn-check:checked + .btn-outline-warning { background: #b8860b !important; color: #fff !important; border-color: #b8860b !important; box-shadow: 0 0 0 3px rgba(184,134,11,0.4) !important; }
+        [data-theme="dark"] .btn-check:checked + .btn-outline-danger { background: #c62828 !important; color: #fff !important; border-color: #c62828 !important; box-shadow: 0 0 0 3px rgba(198,40,40,0.4) !important; }
         /* 描述 HTML 顯示 */
         .side-field .field-value img { max-width: 100%; height: auto; }
         @media (max-width: 767px) {
