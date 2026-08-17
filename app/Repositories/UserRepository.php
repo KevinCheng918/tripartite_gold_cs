@@ -214,6 +214,20 @@ class UserRepository
     }
 
     /**
+     * 取得所有正常狀態帳號（下拉選單用）
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getActiveForDropdown()
+    {
+        return User::query()
+            ->select(['id', 'nickname'])
+            ->where('status', config('constants.USER.STATUS.NORMAL'))
+            ->orderBy('nickname')
+            ->get();
+    }
+
+    /**
      * 取得帳號的權限 keyword 清單
      *
      * @param User $user

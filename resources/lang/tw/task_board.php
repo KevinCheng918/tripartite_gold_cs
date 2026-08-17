@@ -1,0 +1,44 @@
+<?php
+
+return [
+    'nav_label'     => '任務看板',
+    'page_title'    => '任務看板',
+    'subtitle'      => '管理工作任務',
+    'section_label' => '任務管理',
+
+    'status_pending'     => '待處理',
+    'status_in_progress' => '進行中',
+    'status_in_review'   => '審核中',
+    'status_resolved'    => '已解決',
+
+    'priority_low'    => '低',
+    'priority_medium' => '中',
+    'priority_high'   => '高',
+    'priority_urgent' => '緊急',
+
+    'field_project'     => '專案',
+    'field_title'       => '任務標題',
+    'field_description' => '任務描述',
+    'field_status'      => '狀態',
+    'field_priority'    => '優先順序',
+    'field_assignee'    => '指派人員',
+    'field_creator'     => '建立者',
+    'field_due_date'    => '預期完成日',
+
+    'action_create_task'    => '新增任務',
+    'action_create_project' => '新增專案',
+    'action_edit'           => '編輯',
+    'action_delete'         => '刪除',
+    'action_filter'         => '篩選',
+
+    'msg' => [
+        'task_created'        => '任務已新增',
+        'task_create_failed'  => '任務新增失敗',
+        'task_updated'        => '任務已更新',
+        'task_update_failed'  => '任務更新失敗',
+        'task_deleted'        => '任務已刪除',
+        'task_delete_failed'  => '任務刪除失敗',
+        'project_create_failed' => '專案新增失敗',
+        'confirm_delete'      => '確定刪除此任務？',
+    ],
+];

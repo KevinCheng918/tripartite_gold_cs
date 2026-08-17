@@ -10,6 +10,7 @@ return [
         'vm' => '虛擬機管理',
         'payment_config' => '繳款設定',
         'telegram_chat' => 'Telegram 客服',
+        'task_board' => '任務看板',
     ],
     'dashboard' => [
         'usdt_rate' => '查看 USDT 匯率',
@@ -61,5 +62,12 @@ return [
         'reply'     => '回覆訊息',
         'broadcast' => '群發公告',
         'assign'    => '指派值班',
+    ],
+    'task_board' => [
+        'view'           => '檢視任務看板',
+        'create'         => '新增任務',
+        'update'         => '編輯/移動任務',
+        'delete'         => '刪除任務',
+        'manage_project' => '管理專案',
     ],
 ];

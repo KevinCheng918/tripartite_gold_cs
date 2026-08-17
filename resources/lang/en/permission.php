@@ -10,6 +10,7 @@ return [
         'vm' => 'VM Management',
         'payment_config' => 'Payment Config',
         'telegram_chat' => 'Telegram Chat',
+        'task_board' => 'Task Board',
     ],
     'dashboard' => [
         'usdt_rate' => 'View USDT rate',
@@ -61,5 +62,12 @@ return [
         'reply'     => 'Reply messages',
         'assign'    => 'Assign duty staff',
         'broadcast' => 'Broadcast announcement',
+    ],
+    'task_board' => [
+        'view'           => 'View task board',
+        'create'         => 'Create task',
+        'update'         => 'Update/move task',
+        'delete'         => 'Delete task',
+        'manage_project' => 'Manage projects',
     ],
 ];

@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\ShiftCoverController;
 use App\Http\Controllers\Admin\PushController;
 use App\Http\Controllers\Admin\VmController;
 use App\Http\Controllers\Admin\PaymentConfigController;
+use App\Http\Controllers\Admin\TaskBoardController;
 use App\Http\Controllers\Auth\LoginController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -150,6 +151,23 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::delete('/ajax-delete/{config}', [PaymentConfigController::class, 'ajaxDelete'])->middleware('can:payment_config.manage')->name('ajax-delete');
         Route::get('/ajax-by-system', [PaymentConfigController::class, 'ajaxBySystem'])->middleware('can:payment_config.view')->name('ajax-by-system');
         Route::post('/ajax-render-template', [PaymentConfigController::class, 'ajaxRenderTemplate'])->middleware('can:payment_config.view')->name('ajax-render-template');
+    });
+
+    // 任務看板
+    Route::prefix('task-board')->name('task-board.')->group(function () {
+        Route::get('/', [TaskBoardController::class, 'index'])->middleware('can:task_board.view')->name('index');
+        Route::get('/ajax-board', [TaskBoardController::class, 'ajaxBoard'])->middleware('can:task_board.view')->name('ajax-board');
+        Route::get('/ajax-task/{task}', [TaskBoardController::class, 'ajaxTaskDetail'])->middleware('can:task_board.view')->name('ajax-task-detail');
+        Route::post('/ajax-store-task', [TaskBoardController::class, 'ajaxStoreTask'])->middleware('can:task_board.create')->name('ajax-store-task');
+        Route::put('/ajax-update-task/{task}', [TaskBoardController::class, 'ajaxUpdateTask'])->middleware('can:task_board.update')->name('ajax-update-task');
+        Route::delete('/ajax-delete-task/{task}', [TaskBoardController::class, 'ajaxDeleteTask'])->middleware('can:task_board.delete')->name('ajax-delete-task');
+        Route::put('/ajax-move-task/{task}', [TaskBoardController::class, 'ajaxMoveTask'])->middleware('can:task_board.update')->name('ajax-move-task');
+        Route::post('/ajax-reorder', [TaskBoardController::class, 'ajaxReorder'])->middleware('can:task_board.update')->name('ajax-reorder');
+        Route::get('/ajax-projects', [TaskBoardController::class, 'ajaxProjects'])->middleware('can:task_board.view')->name('ajax-projects');
+        Route::post('/ajax-store-project', [TaskBoardController::class, 'ajaxStoreProject'])->middleware('can:task_board.manage_project')->name('ajax-store-project');
+        Route::get('/ajax-assignees', [TaskBoardController::class, 'ajaxAssignees'])->middleware('can:task_board.view')->name('ajax-assignees');
+        Route::get('/ajax-comments/{task}', [TaskBoardController::class, 'ajaxComments'])->middleware('can:task_board.view')->name('ajax-comments');
+        Route::post('/ajax-store-comment/{task}', [TaskBoardController::class, 'ajaxStoreComment'])->middleware('can:task_board.view')->name('ajax-store-comment');
     });
 
     // Web Push 訂閱

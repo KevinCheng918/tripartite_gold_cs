@@ -200,6 +200,14 @@
                                     {{ trans('telegram_chat.nav_label') }}
                                 </a>
                             </li>
+                            @if(Auth::user()->hasPermission('task_board.view'))
+                            <li>
+                                <a href="{{ route('admin.task-board.index') }}" class="{{ request()->routeIs('admin.task-board.*') ? 'mm-active' : '' }}">
+                                    <i class="metismenu-icon fas fa-columns"></i>
+                                    {{ trans('task_board.nav_label') }}
+                                </a>
+                            </li>
+                            @endif
                             @if(Auth::user()->hasPermission('station.view') || Auth::user()->hasPermission('station.topup_view') || Auth::user()->hasPermission('telegram_chat.broadcast') || Auth::user()->hasPermission('vm.view') || Auth::user()->hasPermission('vm.billing_view') || Auth::user()->hasPermission('payment_config.view'))
                             <li class="app-sidebar__heading">{{ trans('station.section_label') }}</li>
                             @if(Auth::user()->hasPermission('station.view') || Auth::user()->hasPermission('station.topup_view'))

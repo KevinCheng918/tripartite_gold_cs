@@ -62,6 +62,28 @@ return [
         ],
     ],
 
+    'TASK' => [
+        'STATUS' => [
+            'PENDING'     => 1,
+            'IN_PROGRESS' => 2,
+            'IN_REVIEW'   => 3,
+            'RESOLVED'    => 4,
+        ],
+        'PRIORITY' => [
+            'LOW'    => 1,
+            'MEDIUM' => 2,
+            'HIGH'   => 3,
+            'URGENT' => 4,
+        ],
+    ],
+
+    'PROJECT' => [
+        'STATUS' => [
+            'ACTIVE'   => 1,
+            'DISABLED' => 0,
+        ],
+    ],
+
     'PAGINATION' => [
         'DEFAULT' => 10,
         'USER' => 10,
