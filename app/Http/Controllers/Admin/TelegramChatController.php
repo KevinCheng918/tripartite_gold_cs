@@ -60,6 +60,9 @@ class TelegramChatController extends Controller
 
         $messages = $this->chatService->getMessages($groupId, $perPage);
 
+        // 點進對話自動標為已讀
+        $this->chatService->markAsRead($groupId);
+
         return TelegramMessageResource::collection($messages);
     }
 

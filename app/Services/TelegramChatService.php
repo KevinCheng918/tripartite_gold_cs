@@ -90,6 +90,17 @@ class TelegramChatService
         return $this->telegramRepository->getMessagesByGroup($groupId, $perPage);
     }
 
+    /**
+     * 標記群組訊息為已讀
+     *
+     * @param int $groupId
+     * @return void
+     */
+    public function markAsRead($groupId)
+    {
+        $this->telegramRepository->markMessagesReplied($groupId);
+    }
+
     // ---------------------------------------------------------------
     //  收訊（Webhook）
     // ---------------------------------------------------------------
