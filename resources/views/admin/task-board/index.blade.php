@@ -384,7 +384,7 @@ $(function () {
                 dueText = task.due_date + ' <i class="fas fa-exclamation-triangle"></i>';
             }
             html += '<div style="font-size:0.75rem;' + dueStyle + '"><i class="fas fa-calendar me-1"></i>' + dueText + '</div>';
-        } else if (task.status === 2) {
+        } else if (task.status >= 2 && task.status <= 4) {
             html += '<div style="font-size:0.75rem;color:#dc3545"><i class="fas fa-exclamation-circle me-1"></i>未設定到期日</div>';
         }
         html += '</div>';
@@ -849,6 +849,7 @@ $(function () {
                         headers: { 'X-CSRF-TOKEN': csrfToken },
                         contentType: 'application/json',
                         data: JSON.stringify({ status: newStatus, sort_order: newIndex }),
+                        success: function () { loadBoard(); },
                         error: function () { loadBoard(); }
                     });
 
