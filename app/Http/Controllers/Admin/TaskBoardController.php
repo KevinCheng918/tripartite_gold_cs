@@ -61,6 +61,16 @@ class TaskBoardController extends Controller
         $params = $request->only(['project_id', 'assignee_id', 'priority', 'keyword']);
         $board = $this->taskBoardService->getBoard($params);
 
+        // 預載所有 assignee 使用者（避免 N+1）
+        $allIds = [];
+        foreach ($board as $tasks) {
+            foreach ($tasks as $task) {
+                $ids = $task->assignee_ids ?? [];
+                foreach ($ids as $id) { $allIds[] = (int) $id; }
+            }
+        }
+        TaskResource::preloadUsers(array_unique($allIds));
+
         return response()->json([
             'pending'     => TaskResource::collection($board['pending']),
             'in_progress' => TaskResource::collection($board['in_progress']),
@@ -79,6 +89,7 @@ class TaskBoardController extends Controller
     public function ajaxTaskDetail(Task $task)
     {
         $task = $this->taskBoardService->getTask($task->id);
+        TaskResource::preloadUsers($task->assignee_ids ?? []);
 
         return new TaskResource($task);
     }

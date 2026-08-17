@@ -30,8 +30,9 @@ class Task extends Model
         'status'     => 'integer',
         'priority'   => 'integer',
         'due_date'   => 'date',
-        'sort_order' => 'integer',
-        'images'     => 'array',
+        'sort_order'   => 'integer',
+        'images'       => 'array',
+        'assignee_ids' => 'array',
     ];
 
     /**

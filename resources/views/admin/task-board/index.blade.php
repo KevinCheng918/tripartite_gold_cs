@@ -218,12 +218,14 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('task_board.field_assignee') }}</label>
-                            <select id="task-assignee" class="form-select">
-                                <option value="">未指派</option>
+                            <div id="task-assignee-list" style="max-height:150px;overflow-y:auto;border:1px solid #dee2e6;border-radius:0.25rem;padding:0.5rem">
                                 @foreach($assignees as $u)
-                                    <option value="{{ $u->id }}">{{ $u->nickname }}</option>
+                                    <div class="form-check">
+                                        <input class="form-check-input js-assignee-check" type="checkbox" value="{{ $u->id }}" id="assignee-{{ $u->id }}">
+                                        <label class="form-check-label" for="assignee-{{ $u->id }}">{{ $u->nickname }}</label>
+                                    </div>
                                 @endforeach
-                            </select>
+                            </div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('task_board.field_due_date') }}</label>
@@ -365,7 +367,14 @@ $(function () {
         }
         // 指派人員
         html += '<div style="font-size:0.8125rem;margin-bottom:0.25rem">';
-        html += task.assignee ? '<i class="fas fa-user me-1" style="color:#6c757d"></i>' + task.assignee : '<span class="text-muted">未指派</span>';
+        if (task.assignees && task.assignees.length > 0) {
+            html += '<i class="fas fa-users me-1" style="color:#6c757d"></i>';
+            var names = [];
+            task.assignees.forEach(function (a) { names.push(a.nickname); });
+            html += names.join(', ');
+        } else {
+            html += '<span class="text-muted">未指派</span>';
+        }
         html += '</div>';
         // 到期日
         if (task.due_date) {
@@ -520,7 +529,13 @@ $(function () {
                 // 優先順序
                 html += '<div class="side-field" data-field="priority" data-type="select"><label>{{ trans("task_board.field_priority") }}</label><div class="field-value">' + (priorityLabel[t.priority] || '-') + '</div></div>';
                 // 指派人員
-                html += '<div class="side-field" data-field="assignee_id" data-type="select"><label>{{ trans("task_board.field_assignee") }}</label><div class="field-value">' + (t.assignee || '<span class="text-muted">未指派</span>') + '</div></div>';
+                var assigneeDisplay = '<span class="text-muted">未指派</span>';
+                if (t.assignees && t.assignees.length > 0) {
+                    var aNames = [];
+                    t.assignees.forEach(function (a) { aNames.push(a.nickname); });
+                    assigneeDisplay = aNames.join(', ');
+                }
+                html += '<div class="side-field" data-field="assignee_ids" data-type="multiselect"><label>{{ trans("task_board.field_assignee") }}</label><div class="field-value">' + assigneeDisplay + '</div></div>';
                 // 到期日
                 html += '<div class="side-field" data-field="due_date" data-type="date"><label>{{ trans("task_board.field_due_date") }}</label><div class="field-value">' + (t.due_date || '<span class="text-muted">未設定</span>') + '</div></div>';
                 // 建立者 + 時間（不可編輯）
@@ -661,12 +676,26 @@ $(function () {
                 inputEl += '<option value="{{ $st->id }}"' + (t.station_id === {{ $st->id }} ? ' selected' : '') + '>{{ $st->name }}</option>';
                 @endforeach
                 inputEl += '</select>';
-            } else if (fieldType === 'select' && fieldName === 'assignee_id') {
-                    inputEl = '<select class="form-select"><option value="">未指派</option>';
+            } else if (fieldType === 'multiselect' && fieldName === 'assignee_ids') {
+                    var currentIds = t.assignee_ids || [];
+                    var checkHtml = '<div style="max-height:150px;overflow-y:auto;border:1px solid #dee2e6;border-radius:0.25rem;padding:0.5rem">';
                     @foreach($assignees as $u)
-                    inputEl += '<option value="{{ $u->id }}"' + (t.assignee_id === {{ $u->id }} ? ' selected' : '') + '>{{ $u->nickname }}</option>';
+                    checkHtml += '<div class="form-check"><input class="form-check-input js-panel-assignee" type="checkbox" value="{{ $u->id }}"' + (currentIds.indexOf({{ $u->id }}) !== -1 ? ' checked' : '') + '><label class="form-check-label">{{ $u->nickname }}</label></div>';
                     @endforeach
-                    inputEl += '</select>';
+                    checkHtml += '</div>';
+                    $valueDiv.html(checkHtml + '<div class="d-flex gap-2 mt-1">' + editConfirmBtn + editCancelBtn + '</div>');
+
+                    $valueDiv.find('.js-edit-confirm').on('click', function (e) {
+                        e.stopPropagation();
+                        var selected = [];
+                        $valueDiv.find('.js-panel-assignee:checked').each(function () { selected.push(parseInt($(this).val(), 10)); });
+                        saveField('assignee_ids', selected);
+                    });
+                    $valueDiv.find('.js-edit-cancel').on('click', function (e) {
+                        e.stopPropagation();
+                        $valueDiv.html(originalHtml);
+                    });
+                    return;
                 } else {
                     var val = t[fieldName] || '';
                     inputEl = '<input type="text" class="form-control" value="' + val.replace(/"/g, '&quot;') + '">';
@@ -684,7 +713,7 @@ $(function () {
                 } else if (fieldType === 'select') {
                     newVal = $valueDiv.find('select').val();
                     if (fieldName === 'status' || fieldName === 'priority') newVal = parseInt(newVal, 10);
-                    if (fieldName === 'assignee_id' && !newVal) newVal = null;
+                    if (!newVal) newVal = null;
                 } else if (fieldType === 'date') {
                     newVal = $valueDiv.find('input').val();
                 } else {
@@ -951,7 +980,7 @@ $(function () {
         var descContent = tinymce.get('task-description') ? tinymce.get('task-description').getContent() : $('#task-description').val();
         if (descContent) formData.append('description', descContent);
         formData.append('priority', $('input[name="task_priority"]:checked').val());
-        if ($('#task-assignee').val()) formData.append('assignee_id', $('#task-assignee').val());
+        $('.js-assignee-check:checked').each(function () { formData.append('assignee_ids[]', $(this).val()); });
         if ($('#task-due-date').val()) formData.append('due_date', $('#task-due-date').val());
         taskImageFiles.forEach(function (file) { formData.append('images[]', file); });
         if (id) formData.append('_method', 'PUT');

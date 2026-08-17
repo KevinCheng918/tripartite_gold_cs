@@ -223,6 +223,7 @@ class UserRepository
         return User::query()
             ->select(['id', 'nickname'])
             ->where('status', config('constants.USER.STATUS.NORMAL'))
+            ->where('level', '!=', config('constants.USER.LEVEL.ADMIN'))
             ->orderBy('nickname')
             ->get();
     }

@@ -15,13 +15,13 @@ class TaskRepository
     /** @var array 列表欄位 */
     private const LIST_COLUMNS = [
         'id', 'project_id', 'station_id', 'title', 'status', 'priority',
-        'assignee_id', 'creator_id', 'due_date', 'sort_order', 'created_at',
+        'assignee_id', 'assignee_ids', 'creator_id', 'due_date', 'sort_order', 'created_at',
     ];
 
     /** @var array 詳細欄位 */
     private const DETAIL_COLUMNS = [
         'id', 'project_id', 'station_id', 'title', 'description', 'images', 'status', 'priority',
-        'assignee_id', 'creator_id', 'due_date', 'sort_order', 'created_at', 'updated_at',
+        'assignee_id', 'assignee_ids', 'creator_id', 'due_date', 'sort_order', 'created_at', 'updated_at',
     ];
 
     /**
@@ -42,7 +42,11 @@ class TaskRepository
         }
 
         if (filled($criteria['assignee_id'] ?? null)) {
-            $query->where('assignee_id', (int) $criteria['assignee_id']);
+            $id = (int) $criteria['assignee_id'];
+            $query->where(function ($q) use ($id) {
+                $q->where('assignee_id', $id)
+                  ->orWhereJsonContains('assignee_ids', $id);
+            });
         }
 
         if (filled($criteria['priority'] ?? null)) {

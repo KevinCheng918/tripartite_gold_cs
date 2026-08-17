@@ -83,7 +83,7 @@ class TaskBoardService
             'description' => $params['description'] ?? null,
             'status'      => (int) ($params['status'] ?? config('constants.TASK.STATUS.PENDING')),
             'priority'    => (int) ($params['priority'] ?? config('constants.TASK.PRIORITY.MEDIUM')),
-            'assignee_id' => $params['assignee_id'] ?? null,
+            'assignee_ids' => $params['assignee_ids'] ?? [],
             'creator_id'  => $creatorId,
             'due_date'    => $params['due_date'] ?? null,
             'images'      => $params['images'] ?? [],
