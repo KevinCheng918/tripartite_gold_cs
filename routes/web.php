@@ -168,6 +168,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-assignees', [TaskBoardController::class, 'ajaxAssignees'])->middleware('can:task_board.view')->name('ajax-assignees');
         Route::get('/ajax-comments/{task}', [TaskBoardController::class, 'ajaxComments'])->middleware('can:task_board.view')->name('ajax-comments');
         Route::post('/ajax-store-comment/{task}', [TaskBoardController::class, 'ajaxStoreComment'])->middleware('can:task_board.view')->name('ajax-store-comment');
+        Route::post('/ajax-upload-editor-image', [TaskBoardController::class, 'ajaxUploadEditorImage'])->middleware('can:task_board.create')->name('ajax-upload-editor-image');
     });
 
     // Web Push 訂閱

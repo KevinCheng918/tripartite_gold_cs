@@ -232,6 +232,21 @@ class TaskBoardController extends Controller
     }
 
     /**
+     * Ajax 編輯器圖片上傳（TinyMCE）
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxUploadEditorImage(Request $request)
+    {
+        $request->validate(['file' => 'required|image|max:5120']);
+
+        $path = $this->imageUploadService->upload($request->file('file'), 'task-editor');
+
+        return response()->json(['location' => asset("storage/{$path}")]);
+    }
+
+    /**
      * Ajax 取得任務留言
      *
      * @param Task $task

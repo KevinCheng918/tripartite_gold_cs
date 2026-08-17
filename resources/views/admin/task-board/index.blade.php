@@ -63,12 +63,16 @@
         .comment-item { padding: 0.5rem 0; border-bottom: 1px solid #f0f0f0; }
         .comment-item:last-child { border-bottom: none; }
         [data-theme="dark"] .comment-item { border-bottom-color: #333; }
+        /* dark mode 優先順序按鈕 */
+        [data-theme="dark"] .btn-check:checked + .btn-outline-secondary { background: #555; color: #fff; border-color: #555; }
+        [data-theme="dark"] .btn-check:checked + .btn-outline-info { background: #0aa2c0; color: #fff; border-color: #0aa2c0; }
+        [data-theme="dark"] .btn-check:checked + .btn-outline-warning { background: #b8860b; color: #fff; border-color: #b8860b; }
+        [data-theme="dark"] .btn-check:checked + .btn-outline-danger { background: #c62828; color: #fff; border-color: #c62828; }
+        /* 描述 HTML 顯示 */
+        .side-field .field-value img { max-width: 100%; height: auto; }
         @media (max-width: 767px) {
             #task-side-panel { width: 100% !important; }
-        }
-        @media (max-width: 767px) {
-            .kanban-board { display: flex !important; flex-direction: column; min-width: 100% !important; }
-            .kanban-column { flex: 0 0 auto !important; width: 100% !important; }
+            .app-main__inner { min-width: auto !important; }
         }
     </style>
 
@@ -189,7 +193,7 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('task_board.field_description') }}</label>
-                            <textarea id="task-description" class="form-control" rows="4"></textarea>
+                            <textarea id="task-description" class="tinymce-editor"></textarea>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('task_board.field_priority') }}</label>
@@ -503,7 +507,7 @@ $(function () {
                 // 建立者 + 時間（不可編輯）
                 html += '<div class="side-field"><label>{{ trans("task_board.field_creator") }}</label><div>' + t.creator + ' · ' + t.created_at + '</div></div>';
                 // 描述
-                html += '<div class="side-field" data-field="description" data-type="textarea"><label>{{ trans("task_board.field_description") }}</label><div class="field-value" style="white-space:pre-wrap;min-height:60px">' + (t.description || '<span class="text-muted">點擊新增描述...</span>') + '</div></div>';
+                html += '<div class="side-field" data-field="description" data-type="richtext"><label>{{ trans("task_board.field_description") }}</label><div class="field-value" style="min-height:60px">' + (t.description || '<span class="text-muted">點擊新增描述...</span>') + '</div></div>';
 
                 // 圖片
                 html += '<div class="side-field"><label>圖片</label>';
@@ -596,7 +600,26 @@ $(function () {
             var originalHtml = $valueDiv.html();
 
             var inputEl = '';
-            if (fieldType === 'textarea') {
+            if (fieldType === 'richtext') {
+                var val = t[fieldName] || '';
+                var editorId = 'panel-editor-' + Date.now();
+                $valueDiv.html('<textarea id="' + editorId + '">' + val + '</textarea><div class="d-flex gap-2 mt-1">' + editConfirmBtn + editCancelBtn + '</div>');
+                tinymce.init(getTinyConfig({ selector: '#' + editorId, height: 250 }));
+
+                $valueDiv.find('.js-edit-confirm').on('click', function (e) {
+                    e.stopPropagation();
+                    var editor = tinymce.get(editorId);
+                    saveField(fieldName, editor ? editor.getContent() : '');
+                    if (editor) editor.remove();
+                });
+                $valueDiv.find('.js-edit-cancel').on('click', function (e) {
+                    e.stopPropagation();
+                    var editor = tinymce.get(editorId);
+                    if (editor) editor.remove();
+                    $valueDiv.html(originalHtml);
+                });
+                return;
+            } else if (fieldType === 'textarea') {
                 var val = t[fieldName] || '';
                 inputEl = '<textarea class="form-control" rows="4">' + val + '</textarea>';
                 $valueDiv.html(inputEl + '<div class="d-flex gap-2 mt-1">' + editConfirmBtn + editCancelBtn + '</div>');
@@ -905,7 +928,8 @@ $(function () {
         formData.append('project_id', $('#task-project').val());
         if ($('#task-station').val()) formData.append('station_id', $('#task-station').val());
         formData.append('title', $('#task-title').val());
-        if ($('#task-description').val()) formData.append('description', $('#task-description').val());
+        var descContent = tinymce.get('task-description') ? tinymce.get('task-description').getContent() : $('#task-description').val();
+        if (descContent) formData.append('description', descContent);
         formData.append('priority', $('input[name="task_priority"]:checked').val());
         if ($('#task-assignee').val()) formData.append('assignee_id', $('#task-assignee').val());
         if ($('#task-due-date').val()) formData.append('due_date', $('#task-due-date').val());
@@ -965,6 +989,78 @@ $(function () {
 
     // 初始載入
     loadBoard();
+});
+</script>
+
+@php
+    $tinyBase = asset('js/tinymce/js/tinymce');
+    $uploadUrl = route('admin.task-board.ajax-upload-editor-image');
+    $csrf = csrf_token();
+@endphp
+<script src="{{ $tinyBase }}/tinymce.min.js" referrerpolicy="origin"></script>
+<script>
+function getTinyConfig(overrides) {
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    var config = {
+        base_url: '{{ $tinyBase }}',
+        suffix: '.min',
+        license_key: 'gpl',
+        skin: dark ? 'oxide-dark' : 'oxide',
+        content_css: dark ? 'dark' : 'default',
+        height: 300,
+        menubar: false,
+        plugins: ['autolink', 'link', 'lists', 'image', 'table', 'code'],
+        toolbar: 'undo redo | fontfamily fontsize | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright | bullist numlist | link image table | code',
+        font_family_formats:
+            '系統預設=inherit;' +
+            '微軟正黑體=Microsoft JhengHei,PingFang TC,Heiti TC,sans-serif;' +
+            '思源黑體=Noto Sans TC,Noto Sans CJK TC,Microsoft JhengHei,PingFang TC,sans-serif;' +
+            'Arial=Arial,Helvetica,sans-serif;' +
+            'Times New Roman=Times New Roman,Times,serif;',
+        font_size_formats: '12px 14px 16px 18px 20px 24px 28px 32px 36px 48px',
+        toolbar_mode: 'sliding',
+        images_upload_url: '{{ $uploadUrl }}',
+        images_upload_credentials: true,
+        automatic_uploads: true,
+        images_upload_handler: function (blobInfo, progress) {
+            return new Promise(function (resolve, reject) {
+                var xhr = new XMLHttpRequest();
+                xhr.withCredentials = true;
+                xhr.open('POST', '{{ $uploadUrl }}');
+                xhr.setRequestHeader('X-CSRF-TOKEN', '{{ $csrf }}');
+                xhr.upload.onprogress = function (e) { progress(e.loaded / e.total * 100); };
+                xhr.onload = function () {
+                    if (xhr.status < 200 || xhr.status >= 300) { reject({ message: 'HTTP Error: ' + xhr.status, remove: true }); return; }
+                    try { var json = JSON.parse(xhr.responseText); resolve(json.location); } catch (e) { reject('Invalid JSON'); }
+                };
+                xhr.onerror = function () { reject('Upload failed'); };
+                var fd = new FormData();
+                fd.append('file', blobInfo.blob(), blobInfo.filename());
+                xhr.send(fd);
+            });
+        },
+        paste_data_images: true,
+        relative_urls: false,
+        convert_urls: false,
+        branding: false,
+        promotion: false,
+        content_style: 'body { font-family: "PingFang TC", "Microsoft JhengHei", Arial, sans-serif; font-size: 14px; line-height: 1.6; ' + (dark ? 'background: #2d2d2d; color: #e0e0e0;' : '') + ' }'
+    };
+    if (overrides) {
+        for (var key in overrides) { config[key] = overrides[key]; }
+    }
+    return config;
+}
+
+// Modal 打開時初始化 TinyMCE
+$('#modal-task').on('shown.bs.modal', function () {
+    if (!tinymce.get('task-description')) {
+        tinymce.init(getTinyConfig({ selector: '#task-description' }));
+    }
+});
+$('#modal-task').on('hidden.bs.modal', function () {
+    var editor = tinymce.get('task-description');
+    if (editor) editor.remove();
 });
 </script>
 @endsection
