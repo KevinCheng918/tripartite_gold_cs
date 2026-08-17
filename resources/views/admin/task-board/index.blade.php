@@ -72,7 +72,6 @@
         .side-field .field-value img { max-width: 100%; height: auto; }
         @media (max-width: 767px) {
             #task-side-panel { width: 100% !important; }
-            .app-main__inner { min-width: auto !important; }
         }
     </style>
 
@@ -160,7 +159,7 @@
 
     {{-- 新增/編輯任務 Modal --}}
     <div class="modal fade" id="modal-task" tabindex="-1">
-        <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="modal-task-title">{{ trans('task_board.action_create_task') }}</h5>
