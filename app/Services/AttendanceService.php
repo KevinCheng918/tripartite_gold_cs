@@ -257,16 +257,13 @@ class AttendanceService
      */
     private function calcLateMinutes($workStart)
     {
-        $gracePeriod = 5; // 緩衝時間（分鐘）
-
         $parts = explode(':', $workStart);
         $startMinutes = (int) $parts[0] * 60 + (int) $parts[1];
         $nowMinutes = now()->hour * 60 + now()->minute;
 
         $diff = $nowMinutes - $startMinutes;
 
-        // 緩衝時間內不算遲到
-        return $diff > $gracePeriod ? $diff : 0;
+        return $diff > 0 ? $diff : 0;
     }
 
     /**
