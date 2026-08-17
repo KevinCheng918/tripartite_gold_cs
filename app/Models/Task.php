@@ -36,6 +36,14 @@ class Task extends Model
     /**
      * @return BelongsTo
      */
+    public function station(): BelongsTo
+    {
+        return $this->belongsTo(Station::class)->select(['id', 'system_id', 'name']);
+    }
+
+    /**
+     * @return BelongsTo
+     */
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class)->select(['id', 'name']);

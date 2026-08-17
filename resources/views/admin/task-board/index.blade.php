@@ -162,6 +162,15 @@
                             </select>
                         </div>
                         <div class="mb-3">
+                            <label class="form-label">站台</label>
+                            <select id="task-station" class="form-select">
+                                <option value="">未選擇</option>
+                                @foreach($stations as $st)
+                                    <option value="{{ $st->id }}">{{ $st->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="mb-3">
                             <label class="form-label">{{ trans('task_board.field_title') }} <span class="text-danger">*</span></label>
                             <input type="text" id="task-title" class="form-control" required maxlength="200">
                         </div>
@@ -321,6 +330,10 @@ $(function () {
         html += '</div>';
         // 標題
         html += '<div class="card-title-text">' + task.title + '</div>';
+        // 站台/系統
+        if (task.station) {
+            html += '<div style="font-size:0.75rem;color:#6c757d;margin-bottom:0.25rem"><i class="fas fa-server me-1"></i>' + (task.system ? task.system + ' / ' : '') + task.station + '</div>';
+        }
         // 指派人員
         html += '<div style="font-size:0.8125rem;margin-bottom:0.25rem">';
         html += task.assignee ? '<i class="fas fa-user me-1" style="color:#6c757d"></i>' + task.assignee : '<span class="text-muted">未指派</span>';
@@ -458,6 +471,9 @@ $(function () {
                 var html = '';
                 // 標題（可編輯）
                 html += '<div class="side-field" data-field="title" data-type="text"><label>{{ trans("task_board.field_title") }}</label><div class="field-value" style="font-size:1.25rem;font-weight:bold">' + t.title + '</div></div>';
+                // 站台
+                var stationDisplay = t.station ? (t.system ? t.system + ' / ' : '') + t.station : '<span class="text-muted">未選擇</span>';
+                html += '<div class="side-field" data-field="station_id" data-type="select"><label>站台</label><div class="field-value">' + stationDisplay + '</div></div>';
                 // 狀態
                 html += '<div class="side-field" data-field="status" data-type="select"><label>{{ trans("task_board.field_status") }}</label><div class="field-value">' + (statusLabels[t.status] || '-') + '</div></div>';
                 // 優先順序
@@ -538,7 +554,13 @@ $(function () {
                     inputEl = '<select class="form-select">';
                     [1,2,3,4].forEach(function (p) { inputEl += '<option value="' + p + '"' + (t.priority === p ? ' selected' : '') + '>' + priorityNames[p] + '</option>'; });
                     inputEl += '</select>';
-                } else if (fieldType === 'select' && fieldName === 'assignee_id') {
+                } else if (fieldType === 'select' && fieldName === 'station_id') {
+                inputEl = '<select class="form-select"><option value="">未選擇</option>';
+                @foreach($stations as $st)
+                inputEl += '<option value="{{ $st->id }}"' + (t.station_id === {{ $st->id }} ? ' selected' : '') + '>{{ $st->name }}</option>';
+                @endforeach
+                inputEl += '</select>';
+            } else if (fieldType === 'select' && fieldName === 'assignee_id') {
                     inputEl = '<select class="form-select"><option value="">未指派</option>';
                     @foreach($assignees as $u)
                     inputEl += '<option value="{{ $u->id }}"' + (t.assignee_id === {{ $u->id }} ? ' selected' : '') + '>{{ $u->nickname }}</option>';
@@ -747,6 +769,7 @@ $(function () {
 
         var payload = {
             project_id: parseInt($('#task-project').val(), 10),
+            station_id: $('#task-station').val() || null,
             title: $('#task-title').val(),
             description: $('#task-description').val() || null,
             priority: parseInt($('input[name="task_priority"]:checked').val(), 10),

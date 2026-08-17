@@ -17,7 +17,7 @@ class CreateTaskTable extends Migration
                 $table->tinyInteger('status')->default(1)->comment('1=待處理, 2=進行中, 3=審核中, 4=已解決');
                 $table->tinyInteger('priority')->default(2)->comment('1=低, 2=中, 3=高, 4=緊急');
                 $table->unsignedBigInteger('assignee_id')->nullable();
-                $table->unsignedBigInteger('creator_id');
+                $table->unsignedBigInteger('creator_id')->nullable();
                 $table->date('due_date')->nullable();
                 $table->unsignedInteger('sort_order')->default(0);
                 $table->timestamps();

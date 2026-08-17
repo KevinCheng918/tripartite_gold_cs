@@ -14,13 +14,13 @@ class TaskRepository
 {
     /** @var array 列表欄位 */
     private const LIST_COLUMNS = [
-        'id', 'project_id', 'title', 'status', 'priority',
+        'id', 'project_id', 'station_id', 'title', 'status', 'priority',
         'assignee_id', 'creator_id', 'due_date', 'sort_order', 'created_at',
     ];
 
     /** @var array 詳細欄位 */
     private const DETAIL_COLUMNS = [
-        'id', 'project_id', 'title', 'description', 'status', 'priority',
+        'id', 'project_id', 'station_id', 'title', 'description', 'status', 'priority',
         'assignee_id', 'creator_id', 'due_date', 'sort_order', 'created_at', 'updated_at',
     ];
 
@@ -34,7 +34,7 @@ class TaskRepository
     {
         $query = Task::query()
             ->select(self::LIST_COLUMNS)
-            ->with(['project', 'assignee', 'creator'])
+            ->with(['project', 'station.system', 'assignee', 'creator'])
             ->orderBy('sort_order');
 
         if (filled($criteria['project_id'] ?? null)) {
@@ -68,7 +68,7 @@ class TaskRepository
     {
         return Task::query()
             ->select(self::DETAIL_COLUMNS)
-            ->with(['project', 'assignee', 'creator'])
+            ->with(['project', 'station.system', 'assignee', 'creator'])
             ->find($id);
     }
 

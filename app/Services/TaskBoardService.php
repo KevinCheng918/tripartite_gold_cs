@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Task;
 use App\Repositories\ProjectRepository;
+use App\Repositories\StationRepository;
 use App\Repositories\TaskRepository;
 use App\Repositories\UserRepository;
 use Illuminate\Support\Facades\DB;
@@ -16,15 +17,18 @@ class TaskBoardService
     private $taskRepository;
     private $projectRepository;
     private $userRepository;
+    private $stationRepository;
 
     public function __construct(
         TaskRepository $taskRepository,
         ProjectRepository $projectRepository,
-        UserRepository $userRepository
+        UserRepository $userRepository,
+        StationRepository $stationRepository
     ) {
         $this->taskRepository = $taskRepository;
         $this->projectRepository = $projectRepository;
         $this->userRepository = $userRepository;
+        $this->stationRepository = $stationRepository;
     }
 
     /**
@@ -73,6 +77,7 @@ class TaskBoardService
 
         return $this->taskRepository->create([
             'project_id'  => $params['project_id'],
+            'station_id'  => $params['station_id'] ?? null,
             'title'       => $params['title'],
             'description' => $params['description'] ?? null,
             'status'      => (int) ($params['status'] ?? config('constants.TASK.STATUS.PENDING')),
@@ -169,6 +174,16 @@ class TaskBoardService
     public function getAssignees()
     {
         return $this->userRepository->getActiveForDropdown();
+    }
+
+    /**
+     * 取得所有站台（下拉選單用）
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getStations()
+    {
+        return $this->stationRepository->allForDropdown();
     }
 
     /**

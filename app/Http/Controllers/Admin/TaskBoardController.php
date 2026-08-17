@@ -3,6 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\TaskBoard\MoveTaskRequest;
+use App\Http\Requests\TaskBoard\ReorderTaskRequest;
+use App\Http\Requests\TaskBoard\StoreCommentRequest;
+use App\Http\Requests\TaskBoard\StoreProjectRequest;
+use App\Http\Requests\TaskBoard\StoreTaskRequest;
+use App\Http\Requests\TaskBoard\UpdateTaskRequest;
 use App\Http\Resources\TaskCommentResource;
 use App\Http\Resources\TaskResource;
 use App\Models\Task;
@@ -32,10 +38,12 @@ class TaskBoardController extends Controller
     {
         $projects = $this->taskBoardService->getProjects();
         $assignees = $this->taskBoardService->getAssignees();
+        $stations = $this->taskBoardService->getStations();
 
         return view('admin.task-board.index', [
             'projects'  => $projects,
             'assignees' => $assignees,
+            'stations'  => $stations,
         ]);
     }
 
@@ -77,16 +85,9 @@ class TaskBoardController extends Controller
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function ajaxStoreTask(Request $request)
+    public function ajaxStoreTask(StoreTaskRequest $request)
     {
-        $params = $request->validate([
-            'project_id'  => 'required|integer|exists:project,id',
-            'title'       => 'required|string|max:200',
-            'description' => 'nullable|string',
-            'priority'    => 'nullable|integer|in:1,2,3,4',
-            'assignee_id' => 'nullable|integer|exists:user,id',
-            'due_date'    => 'nullable|date',
-        ]);
+        $params = $request->validated();
 
         try {
             $task = $this->taskBoardService->storeTask($params, Auth::id());
@@ -109,17 +110,9 @@ class TaskBoardController extends Controller
      * @param Task    $task
      * @return \Illuminate\Http\JsonResponse
      */
-    public function ajaxUpdateTask(Request $request, Task $task)
+    public function ajaxUpdateTask(UpdateTaskRequest $request, Task $task)
     {
-        $params = $request->validate([
-            'project_id'  => 'sometimes|integer|exists:project,id',
-            'title'       => 'sometimes|string|max:200',
-            'description' => 'nullable|string',
-            'status'      => 'sometimes|integer|in:1,2,3,4',
-            'priority'    => 'sometimes|integer|in:1,2,3,4',
-            'assignee_id' => 'nullable|integer|exists:user,id',
-            'due_date'    => 'nullable|date',
-        ]);
+        $params = $request->validated();
 
         try {
             $task = $this->taskBoardService->updateTask($task, $params);
@@ -157,16 +150,13 @@ class TaskBoardController extends Controller
     /**
      * Ajax 拖曳移動任務（換狀態）
      *
-     * @param Request $request
-     * @param Task    $task
+     * @param MoveTaskRequest $request
+     * @param Task            $task
      * @return TaskResource
      */
-    public function ajaxMoveTask(Request $request, Task $task)
+    public function ajaxMoveTask(MoveTaskRequest $request, Task $task)
     {
-        $params = $request->validate([
-            'status'     => 'required|integer|in:1,2,3,4',
-            'sort_order' => 'required|integer|min:0',
-        ]);
+        $params = $request->validated();
 
         $task = $this->taskBoardService->moveTask($task, $params);
 
@@ -179,13 +169,9 @@ class TaskBoardController extends Controller
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function ajaxReorder(Request $request)
+    public function ajaxReorder(ReorderTaskRequest $request)
     {
-        $params = $request->validate([
-            'orders'              => 'required|array',
-            'orders.*.id'         => 'required|integer|exists:task,id',
-            'orders.*.sort_order' => 'required|integer|min:0',
-        ]);
+        $params = $request->validated();
 
         $this->taskBoardService->reorder($params['orders']);
 
@@ -208,12 +194,9 @@ class TaskBoardController extends Controller
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function ajaxStoreProject(Request $request)
+    public function ajaxStoreProject(StoreProjectRequest $request)
     {
-        $params = $request->validate([
-            'name'        => 'required|string|max:100|unique:project,name',
-            'description' => 'nullable|string|max:500',
-        ]);
+        $params = $request->validated();
 
         try {
             $project = $this->taskBoardService->storeProject($params, Auth::id());
@@ -256,11 +239,9 @@ class TaskBoardController extends Controller
      * @param Task    $task
      * @return \Illuminate\Http\JsonResponse
      */
-    public function ajaxStoreComment(Request $request, Task $task)
+    public function ajaxStoreComment(StoreCommentRequest $request, Task $task)
     {
-        $params = $request->validate([
-            'content' => 'required|string|max:2000',
-        ]);
+        $params = $request->validated();
 
         $comment = $this->taskBoardService->addComment($task->id, Auth::id(), $params['content']);
 
