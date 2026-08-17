@@ -201,9 +201,9 @@
     </div>
 
     {{-- 側邊面板 --}}
-    <div id="task-side-panel" style="display:none;position:fixed;top:0;right:0;max-width:90%;height:100vh;z-index:1050;overflow-y:auto;box-shadow:-4px 0 20px rgba(0,0,0,0.15);transition:transform 0.3s ease;transform:translateX(100%)">
+    <div id="task-side-panel" style="display:none;position:fixed;top:60px;right:0;max-width:90%;height:calc(100vh - 60px);z-index:1050;overflow-y:auto;box-shadow:-4px 0 20px rgba(0,0,0,0.15);transition:transform 0.3s ease;transform:translateX(100%)">
         <div id="side-panel-resize" style="position:absolute;left:0;top:0;width:5px;height:100%;cursor:col-resize;z-index:2"></div>
-        <div style="background:#fff;min-height:100vh;padding:1.5rem;padding-top:1rem" id="side-panel-inner">
+        <div style="background:#fff;min-height:100%;padding:1.5rem" id="side-panel-inner">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-0" id="side-panel-project-badge"></h5>
                 <button type="button" class="btn-close" id="btn-close-panel"></button>
@@ -232,6 +232,22 @@
                             <button type="submit" class="btn btn-primary">新增</button>
                         </div>
                     </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- 刪除確認 Modal --}}
+    <div class="modal fade" id="modal-delete-confirm" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-body text-center py-4">
+                    <p class="mb-3">{{ trans('task_board.msg.confirm_delete') }}</p>
+                    <input type="hidden" id="delete-confirm-id">
+                    <div class="d-flex justify-content-center gap-2">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="button" class="btn btn-danger" id="btn-delete-confirm-ok">確定刪除</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -470,14 +486,9 @@ $(function () {
                 loadComments(taskId);
 
                 $('#btn-panel-delete').on('click', function () {
-                    if (!confirm('{{ trans("task_board.msg.confirm_delete") }}')) return;
-                    $.ajax({
-                        url: '/admin/task-board/ajax-delete-task/' + $(this).data('id'),
-                        method: 'DELETE',
-                        headers: { 'X-CSRF-TOKEN': csrfToken },
-                        success: function (body) { closePanel(); showMsg(body.message); loadBoard(); },
-                        error: function (xhr) { showMsg((xhr.responseJSON && xhr.responseJSON.message) || '刪除失敗'); }
-                    });
+                    var deleteId = $(this).data('id');
+                    $('#delete-confirm-id').val(deleteId);
+                    showBsModal('modal-delete-confirm');
                 });
 
                 $('#btn-send-comment').on('click', function () { sendComment(taskId); });
@@ -488,6 +499,9 @@ $(function () {
         });
     }
 
+    var editConfirmBtn = '<button class="btn btn-outline-secondary js-edit-confirm" type="button" title="確認"><i class="fas fa-check text-success"></i></button>';
+    var editCancelBtn = '<button class="btn btn-outline-secondary js-edit-cancel" type="button" title="取消" style="margin-left:2px"><i class="fas fa-times text-danger"></i></button>';
+
     function bindInlineEdit() {
         if (!canUpdate) return;
 
@@ -495,51 +509,78 @@ $(function () {
 
         $('#side-panel-body').find('.side-field[data-field]').off('click').on('click', function () {
             var $field = $(this);
-            if ($field.find('input, select, textarea').length) return; // 已在編輯
+            if ($field.find('input, select, textarea').length) return;
             var fieldName = $field.data('field');
             var fieldType = $field.data('type');
             var $valueDiv = $field.find('.field-value');
+            var originalHtml = $valueDiv.html();
 
+            var inputEl = '';
             if (fieldType === 'textarea') {
                 var val = t[fieldName] || '';
-                $valueDiv.html('<textarea class="form-control" rows="4">' + val + '</textarea><button class="btn btn-sm btn-primary mt-1 js-save-field">儲存</button>');
-                $valueDiv.find('textarea').focus();
-            } else if (fieldType === 'date') {
-                var val = t[fieldName] || '';
-                $valueDiv.html('<input type="date" class="form-control" value="' + val + '">');
-                $valueDiv.find('input').focus().on('change', function () { saveField(fieldName, $(this).val()); });
-            } else if (fieldType === 'select' && fieldName === 'status') {
-                var sel = '<select class="form-select">';
-                [1,2,3,4].forEach(function (s) { sel += '<option value="' + s + '"' + (t.status === s ? ' selected' : '') + '>' + statusLabels[s] + '</option>'; });
-                sel += '</select>';
-                $valueDiv.html(sel);
-                $valueDiv.find('select').focus().on('change', function () { saveField('status', parseInt($(this).val(), 10)); });
-            } else if (fieldType === 'select' && fieldName === 'priority') {
-                var priorityNames = { 1: '{{ trans("task_board.priority_low") }}', 2: '{{ trans("task_board.priority_medium") }}', 3: '{{ trans("task_board.priority_high") }}', 4: '{{ trans("task_board.priority_urgent") }}' };
-                var sel = '<select class="form-select">';
-                [1,2,3,4].forEach(function (p) { sel += '<option value="' + p + '"' + (t.priority === p ? ' selected' : '') + '>' + priorityNames[p] + '</option>'; });
-                sel += '</select>';
-                $valueDiv.html(sel);
-                $valueDiv.find('select').focus().on('change', function () { saveField('priority', parseInt($(this).val(), 10)); });
-            } else if (fieldType === 'select' && fieldName === 'assignee_id') {
-                var sel = '<select class="form-select"><option value="">未指派</option>';
-                @foreach($assignees as $u)
-                sel += '<option value="{{ $u->id }}"' + (t.assignee_id === {{ $u->id }} ? ' selected' : '') + '>{{ $u->nickname }}</option>';
-                @endforeach
-                sel += '</select>';
-                $valueDiv.html(sel);
-                $valueDiv.find('select').focus().on('change', function () { saveField('assignee_id', $(this).val() || null); });
+                inputEl = '<textarea class="form-control" rows="4">' + val + '</textarea>';
+                $valueDiv.html(inputEl + '<div class="d-flex gap-2 mt-1">' + editConfirmBtn + editCancelBtn + '</div>');
             } else {
-                var val = t[fieldName] || '';
-                $valueDiv.html('<input type="text" class="form-control" value="' + val.replace(/"/g, '&quot;') + '">');
-                $valueDiv.find('input').focus().on('keypress', function (e) {
-                    if (e.which === 13) saveField(fieldName, $(this).val());
+                if (fieldType === 'date') {
+                    var val = t[fieldName] || '';
+                    inputEl = '<input type="date" class="form-control" value="' + val + '">';
+                } else if (fieldType === 'select' && fieldName === 'status') {
+                    inputEl = '<select class="form-select">';
+                    [1,2,3,4].forEach(function (s) { inputEl += '<option value="' + s + '"' + (t.status === s ? ' selected' : '') + '>' + statusLabels[s] + '</option>'; });
+                    inputEl += '</select>';
+                } else if (fieldType === 'select' && fieldName === 'priority') {
+                    var priorityNames = { 1: '{{ trans("task_board.priority_low") }}', 2: '{{ trans("task_board.priority_medium") }}', 3: '{{ trans("task_board.priority_high") }}', 4: '{{ trans("task_board.priority_urgent") }}' };
+                    inputEl = '<select class="form-select">';
+                    [1,2,3,4].forEach(function (p) { inputEl += '<option value="' + p + '"' + (t.priority === p ? ' selected' : '') + '>' + priorityNames[p] + '</option>'; });
+                    inputEl += '</select>';
+                } else if (fieldType === 'select' && fieldName === 'assignee_id') {
+                    inputEl = '<select class="form-select"><option value="">未指派</option>';
+                    @foreach($assignees as $u)
+                    inputEl += '<option value="{{ $u->id }}"' + (t.assignee_id === {{ $u->id }} ? ' selected' : '') + '>{{ $u->nickname }}</option>';
+                    @endforeach
+                    inputEl += '</select>';
+                } else {
+                    var val = t[fieldName] || '';
+                    inputEl = '<input type="text" class="form-control" value="' + val.replace(/"/g, '&quot;') + '">';
+                }
+                $valueDiv.html('<div class="input-group">' + inputEl + editConfirmBtn + editCancelBtn + '</div>');
+            }
+            $valueDiv.find('input, textarea, select').first().focus();
+
+            // 確認
+            $valueDiv.find('.js-edit-confirm').on('click', function (e) {
+                e.stopPropagation();
+                var newVal;
+                if (fieldType === 'textarea') {
+                    newVal = $valueDiv.find('textarea').val();
+                } else if (fieldType === 'select') {
+                    newVal = $valueDiv.find('select').val();
+                    if (fieldName === 'status' || fieldName === 'priority') newVal = parseInt(newVal, 10);
+                    if (fieldName === 'assignee_id' && !newVal) newVal = null;
+                } else if (fieldType === 'date') {
+                    newVal = $valueDiv.find('input').val();
+                } else {
+                    newVal = $valueDiv.find('input').val();
+                }
+                saveField(fieldName, newVal);
+            });
+
+            // 取消
+            $valueDiv.find('.js-edit-cancel').on('click', function (e) {
+                e.stopPropagation();
+                $valueDiv.html(originalHtml);
+            });
+
+            // Enter 確認（非 textarea）
+            if (fieldType !== 'textarea') {
+                $valueDiv.find('input, select').on('keypress', function (e) {
+                    if (e.which === 13) $valueDiv.find('.js-edit-confirm').trigger('click');
                 });
             }
 
-            // textarea 的儲存按鈕
-            $valueDiv.find('.js-save-field').on('click', function () {
-                saveField(fieldName, $valueDiv.find('textarea').val());
+            // Esc 取消
+            $valueDiv.find('input, select, textarea').on('keydown', function (e) {
+                if (e.which === 27) $valueDiv.find('.js-edit-cancel').trigger('click');
             });
         });
     }
@@ -660,6 +701,29 @@ $(function () {
             sortableInstances.push(s);
         });
     }
+
+    // 刪除確認
+    $('#btn-delete-confirm-ok').on('click', function () {
+        var id = $('#delete-confirm-id').val();
+        var $btn = $(this);
+        $btn.prop('disabled', true);
+        $.ajax({
+            url: '/admin/task-board/ajax-delete-task/' + id,
+            method: 'DELETE',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            success: function (body) {
+                hideBsModal(document.getElementById('modal-delete-confirm'));
+                closePanel();
+                setTimeout(function () { showMsg(body.message); loadBoard(); }, 400);
+                $btn.prop('disabled', false);
+            },
+            error: function (xhr) {
+                hideBsModal(document.getElementById('modal-delete-confirm'));
+                setTimeout(function () { showMsg((xhr.responseJSON && xhr.responseJSON.message) || '刪除失敗'); }, 400);
+                $btn.prop('disabled', false);
+            }
+        });
+    });
 
     // 新增任務
     $('#btn-open-create-task').on('click', function () {
