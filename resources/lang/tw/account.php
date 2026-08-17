@@ -3,6 +3,7 @@
 return [
     'nav_label' => '帳號管理',
     'page_title' => '帳號管理',
+    'subtitle'   => '管理系統帳號與權限',
     'deleted' => '帳號已刪除',
     'created' => '帳號已建立',
     'updated' => '帳號已更新',

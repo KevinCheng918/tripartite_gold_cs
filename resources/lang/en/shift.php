@@ -3,6 +3,7 @@
 return [
     'nav_label' => 'Shifts',
     'page_title' => 'Shift Management',
+    'subtitle'   => 'Shift settings and scheduling',
     'tab_shifts' => 'Shift Settings',
     'tab_assignments' => 'Assignments',
     'tab_swaps' => 'Swap Requests',

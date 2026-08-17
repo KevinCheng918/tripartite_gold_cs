@@ -3,6 +3,7 @@
 return [
     'nav_label' => '账号管理',
     'page_title' => '账号管理',
+    'subtitle'   => '管理系统账号与权限',
     'deleted' => '账号已删除',
     'created' => '账号已创建',
     'updated' => '账号已更新',

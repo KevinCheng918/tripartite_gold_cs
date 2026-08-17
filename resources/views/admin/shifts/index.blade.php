@@ -2,6 +2,7 @@
 
 @section('title', trans('shift.page_title'))
 @section('icon', 'calendar-alt')
+@section('subtitle', trans('shift.subtitle'))
 
 @section('content')
     <div id="shift-app"

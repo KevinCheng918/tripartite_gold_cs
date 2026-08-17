@@ -3,6 +3,7 @@
 return [
     'nav_label' => 'Accounts',
     'page_title' => 'Accounts',
+    'subtitle'   => 'Manage accounts and permissions',
     'deleted' => 'Account deleted',
     'created' => 'Account created',
     'updated' => 'Account updated',

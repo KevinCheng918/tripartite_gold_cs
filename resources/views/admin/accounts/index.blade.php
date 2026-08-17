@@ -2,6 +2,7 @@
 
 @section('title', trans('account.page_title'))
 @section('icon', 'users')
+@section('subtitle', trans('account.subtitle'))
 
 @section('content')
 

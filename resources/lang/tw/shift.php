@@ -3,6 +3,7 @@
 return [
     'nav_label' => '排班管理',
     'page_title' => '排班管理',
+    'subtitle'   => '班別設定與排班指派',
     'tab_shifts' => '班別設定',
     'tab_assignments' => '排班紀錄',
     'tab_swaps' => '換班請求',
