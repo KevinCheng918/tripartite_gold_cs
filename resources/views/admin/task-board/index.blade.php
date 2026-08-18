@@ -68,6 +68,10 @@
         [data-theme="dark"] .btn-check:checked + .btn-outline-info { background: #0aa2c0 !important; color: #fff !important; border-color: #0aa2c0 !important; box-shadow: 0 0 0 3px rgba(10,162,192,0.4) !important; }
         [data-theme="dark"] .btn-check:checked + .btn-outline-warning { background: #b8860b !important; color: #fff !important; border-color: #b8860b !important; box-shadow: 0 0 0 3px rgba(184,134,11,0.4) !important; }
         [data-theme="dark"] .btn-check:checked + .btn-outline-danger { background: #c62828 !important; color: #fff !important; border-color: #c62828 !important; box-shadow: 0 0 0 3px rgba(198,40,40,0.4) !important; }
+        /* emoji picker */
+        .js-emoji-item:hover { background: rgba(0,0,0,0.08); }
+        [data-theme="dark"] #comment-emoji-picker { background: #2d2d2d !important; border-color: #444 !important; }
+        [data-theme="dark"] .js-emoji-item:hover { background: rgba(255,255,255,0.1); }
         /* 描述 HTML 顯示 */
         .side-field .field-value img { max-width: 100%; height: auto; }
         @media (max-width: 767px) {
@@ -577,6 +581,9 @@ $(function () {
                 html += '<div id="panel-comments"><p class="text-muted" style="font-size:0.8125rem">Loading...</p></div>';
                 html += '<div class="mt-2"><textarea id="panel-comment-input" class="form-control" rows="2" placeholder="輸入留言..."></textarea>';
                 html += '<div class="d-flex gap-2 align-items-center mt-1">';
+                html += '<div class="position-relative"><button class="btn btn-sm btn-outline-secondary" id="btn-comment-emoji" type="button"><i class="fas fa-smile"></i></button>';
+                html += '<div id="comment-emoji-picker" style="display:none;position:absolute;bottom:100%;left:0;z-index:1060;background:#fff;border:1px solid #dee2e6;border-radius:0.5rem;padding:0.5rem;width:280px;box-shadow:0 4px 12px rgba(0,0,0,0.15);margin-bottom:0.25rem">';
+                html += '<div style="display:flex;flex-wrap:wrap;gap:4px;max-height:200px;overflow-y:auto" id="emoji-grid"></div></div></div>';
                 html += '<label class="btn btn-sm btn-outline-secondary mb-0" for="panel-comment-images"><i class="fas fa-image me-1"></i>附圖</label>';
                 html += '<input type="file" class="d-none" id="panel-comment-images" accept="image/*" multiple>';
                 html += '<div id="panel-comment-image-previews" class="d-flex gap-1 flex-wrap"></div>';
@@ -617,6 +624,35 @@ $(function () {
                         success: function () { loadPanel(taskId); loadBoard(); },
                         error: function (xhr) { showMsg((xhr.responseJSON && xhr.responseJSON.message) || '上傳失敗'); }
                     });
+                });
+
+                // Emoji picker
+                var emojis = ['👍','❤️','😂','😮','😢','🙏','❤️‍🔥','👌','😁','🤗','🔥','🤔','👎','🥰','👏','🤯','🎉','🤩','🤮','💩','🕊️','🤡','🫣','😌','😍','🐳','🌚','🌭','💯','🤣','⚡','🍌','🏆','💔','🤨','🙂','🍓','🍾','💋','🖕','😈','😴','😭','🤓','👻','🤷','👀','🎃','🙈','😇','😱','🤝','✍️','🫡','🎅','🎄','☃️','🎆','🤪','🗿','🆒','💘','🙉','🦄','🥴','🙊','👾','🤷‍♂️'];
+                var emojiHtml = '';
+                emojis.forEach(function (e) {
+                    emojiHtml += '<span class="js-emoji-item" style="cursor:pointer;font-size:1.25rem;padding:2px 4px;border-radius:4px;display:inline-block" data-emoji="' + e + '">' + e + '</span>';
+                });
+                $('#emoji-grid').html(emojiHtml);
+
+                $('#btn-comment-emoji').on('click', function (e) {
+                    e.stopPropagation();
+                    $('#comment-emoji-picker').toggle();
+                });
+
+                $(document).on('click', '.js-emoji-item', function () {
+                    var emoji = $(this).data('emoji');
+                    var $input = $('#panel-comment-input');
+                    var pos = $input[0].selectionStart || $input.val().length;
+                    var val = $input.val();
+                    $input.val(val.substring(0, pos) + emoji + val.substring(pos));
+                    $input.focus();
+                    $('#comment-emoji-picker').hide();
+                });
+
+                $(document).on('click', function (e) {
+                    if (!$(e.target).closest('#comment-emoji-picker, #btn-comment-emoji').length) {
+                        $('#comment-emoji-picker').hide();
+                    }
                 });
 
                 $('#btn-send-comment').on('click', function () { sendComment(taskId); });
