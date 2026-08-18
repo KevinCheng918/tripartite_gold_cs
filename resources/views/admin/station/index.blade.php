@@ -73,14 +73,6 @@
             <form method="GET">
                 <div class="row g-3 mb-3">
                     <div class="col-md-3 col-6">
-                        <label class="form-label fw-bold">{{ trans('station.field_name') }}：</label>
-                        <input type="text" class="form-control" name="keyword" value="{{ $filters['keyword'] ?? '' }}" placeholder="{{ trans('station.field_name') }}">
-                    </div>
-                    <div class="col-md-3 col-6">
-                        <label class="form-label fw-bold">域名：</label>
-                        <input type="text" class="form-control" name="domain" value="{{ $filters['domain'] ?? '' }}" placeholder="域名">
-                    </div>
-                    <div class="col-md-3 col-6">
                         <label class="form-label fw-bold">系統：</label>
                         <select name="system_id" class="form-select">
                             <option value="">全部</option>
@@ -88,6 +80,14 @@
                                 <option value="{{ $sys->id }}" {{ ($filters['system_id'] ?? '') == $sys->id ? 'selected' : '' }}>{{ $sys->name }}</option>
                             @endforeach
                         </select>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label fw-bold">{{ trans('station.field_name') }}：</label>
+                        <input type="text" class="form-control" name="keyword" value="{{ $filters['keyword'] ?? '' }}" placeholder="{{ trans('station.field_name') }}">
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label fw-bold">域名：</label>
+                        <input type="text" class="form-control" name="domain" value="{{ $filters['domain'] ?? '' }}" placeholder="域名">
                     </div>
                     <div class="col-md-3 col-6">
                         <label class="form-label fw-bold">{{ trans('station.field_status') }}：</label>
