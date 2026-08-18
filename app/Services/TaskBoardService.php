@@ -83,7 +83,7 @@ class TaskBoardService
             'description' => $params['description'] ?? null,
             'status'      => (int) ($params['status'] ?? config('constants.TASK.STATUS.PENDING')),
             'priority'    => (int) ($params['priority'] ?? config('constants.TASK.PRIORITY.MEDIUM')),
-            'assignee_ids' => $params['assignee_ids'] ?? [],
+            'assignee_ids' => array_map('intval', $params['assignee_ids'] ?? []),
             'creator_id'  => $creatorId,
             'due_date'    => $params['due_date'] ?? null,
             'images'      => $params['images'] ?? [],
@@ -100,6 +100,10 @@ class TaskBoardService
      */
     public function updateTask(Task $task, $params)
     {
+        if (isset($params['assignee_ids'])) {
+            $params['assignee_ids'] = array_map('intval', $params['assignee_ids']);
+        }
+
         return $this->taskRepository->update($task, $params);
     }
 
