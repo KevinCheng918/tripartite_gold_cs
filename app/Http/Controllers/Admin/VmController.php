@@ -50,8 +50,9 @@ class VmController extends Controller
         }
 
         $systems = $this->stationService->getActiveSystems();
+        $stations = $this->stationService->allForDropdown();
 
-        return view('admin.vm.index', ['systems' => $systems]);
+        return view('admin.vm.index', ['systems' => $systems, 'stations' => $stations]);
     }
 
     /**

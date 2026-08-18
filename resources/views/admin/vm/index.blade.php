@@ -6,6 +6,13 @@
 
 @section('content')
 
+    <style>
+        .searchable-dropdown .dropdown-item:hover { background: #f0f0f0; cursor: pointer; }
+        [data-theme="dark"] .searchable-dropdown { background: #2d2d2d !important; border-color: #444 !important; }
+        [data-theme="dark"] .searchable-dropdown .dropdown-item { color: #e0e0e0; }
+        [data-theme="dark"] .searchable-dropdown .dropdown-item:hover { background: #3a3a3a; }
+    </style>
+
     {{-- Tab 切換 --}}
     <ul class="nav nav-tabs mb-3">
         @if(Auth::user()->hasPermission('vm.view'))
@@ -55,6 +62,20 @@
                                 </select>
                             </div>
                             <div class="col-md-3 col-6">
+                                <label class="form-label fw-bold">站台：</label>
+                                <div class="searchable-select" style="position:relative">
+                                    <input type="text" class="form-control" id="vm-search-station-text" placeholder="搜尋站台..." autocomplete="off">
+                                    <input type="hidden" id="vm-search-station" value="">
+                                    <div class="searchable-dropdown" id="vm-search-station-dropdown" style="display:none;position:absolute;z-index:1050;background:#fff;border:1px solid #dee2e6;border-radius:0.25rem;max-height:200px;overflow-y:auto;width:100%;box-shadow:0 2px 8px rgba(0,0,0,0.15)">
+                                        <a href="javascript:void(0)" class="dropdown-item js-vm-station-opt" data-id="" style="display:block;padding:0.35rem 0.75rem;font-size:0.875rem">全部站台</a>
+                                        @foreach($stations as $st)
+                                            <a href="javascript:void(0)" class="dropdown-item js-vm-station-opt" data-id="{{ $st->id }}" data-name="{{ $st->name }}" style="display:block;padding:0.35rem 0.75rem;font-size:0.875rem">{{ $st->name }}</a>
+                                        @endforeach
+
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-6">
                                 <label class="form-label fw-bold">{{ trans('vm.field_hostname') }}：</label>
                                 <input type="text" class="form-control" id="vm-search-hostname" placeholder="{{ trans('vm.field_hostname') }}">
                             </div>
@@ -62,12 +83,12 @@
                                 <label class="form-label fw-bold">{{ trans('vm.field_internal_ip') }}：</label>
                                 <input type="text" class="form-control" id="vm-search-internal-ip" placeholder="{{ trans('vm.field_internal_ip') }}">
                             </div>
+                        </div>
+                        <div class="row g-3 mb-3">
                             <div class="col-md-3 col-6">
                                 <label class="form-label fw-bold">{{ trans('vm.field_external_ip') }}：</label>
                                 <input type="text" class="form-control" id="vm-search-external-ip" placeholder="{{ trans('vm.field_external_ip') }}">
                             </div>
-                        </div>
-                        <div class="row g-3 mb-3">
                             <div class="col-md-3 col-6">
                                 <label class="form-label fw-bold">{{ trans('vm.field_power') }}：</label>
                                 <select id="vm-search-power" class="form-select">
@@ -330,12 +351,14 @@ $(function () {
     function loadServers() {
         var params = 'per_page=100';
         var systemId = $('#vm-search-system').val();
+        var stationId = $('#vm-search-station').val();
         var hostname = $('#vm-search-hostname').val();
         var internalIp = $('#vm-search-internal-ip').val();
         var externalIp = $('#vm-search-external-ip').val();
         var power = $('#vm-search-power').val();
         var status = $('#vm-search-status').val();
         if (systemId) { params += '&system_id=' + systemId; }
+        if (stationId) { params += '&station_id=' + stationId; }
         if (hostname) { params += '&hostname=' + encodeURIComponent(hostname); }
         if (internalIp) { params += '&internal_ip=' + encodeURIComponent(internalIp); }
         if (externalIp) { params += '&external_ip=' + encodeURIComponent(externalIp); }
@@ -1130,8 +1153,38 @@ $(function () {
 
     // 搜尋 / 重置
     $('#btn-vm-search').on('click', function () { loadServers(); });
+    // 站台搜尋下拉
+    (function () {
+        var $input = $('#vm-search-station-text');
+        var $hidden = $('#vm-search-station');
+        var $dropdown = $('#vm-search-station-dropdown');
+
+        $input.on('focus', function () { $dropdown.show(); });
+        $input.on('input', function () {
+            var keyword = $(this).val().toLowerCase();
+            $dropdown.find('.js-vm-station-opt').each(function () {
+                var name = ($(this).data('name') || $(this).text()).toString().toLowerCase();
+                $(this).toggle(name.indexOf(keyword) !== -1 || !keyword);
+            });
+            $dropdown.show();
+            $hidden.val('');
+        });
+        $dropdown.on('click', '.js-vm-station-opt', function () {
+            var id = $(this).data('id');
+            var name = $(this).data('name') || $(this).text();
+            $hidden.val(id || '');
+            $input.val(id ? name : '');
+            $dropdown.hide();
+        });
+        $(document).on('mousedown', function (e) {
+            if (!$(e.target).closest($input.parent()).length) { $dropdown.hide(); }
+        });
+    })();
+
     $('#btn-vm-reset').on('click', function () {
         $('#vm-search-system').val('');
+        $('#vm-search-station').val('');
+        $('#vm-search-station-text').val('');
         $('#vm-search-hostname').val('');
         $('#vm-search-internal-ip').val('');
         $('#vm-search-external-ip').val('');
