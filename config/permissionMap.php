@@ -105,6 +105,7 @@ return [
             'task_board.create'         => 'permission.task_board.create',
             'task_board.update'         => 'permission.task_board.update',
             'task_board.delete'         => 'permission.task_board.delete',
+            'task_board.delete_comment'  => 'permission.task_board.delete_comment',
             'task_board.manage_project' => 'permission.task_board.manage_project',
         ],
     ],

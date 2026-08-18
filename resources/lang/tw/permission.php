@@ -68,6 +68,7 @@ return [
         'create'         => '新增任務',
         'update'         => '編輯/移動任務',
         'delete'         => '刪除任務',
+        'delete_comment' => '刪除留言',
         'manage_project' => '管理專案',
     ],
 ];

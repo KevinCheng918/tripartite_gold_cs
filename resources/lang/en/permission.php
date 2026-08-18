@@ -68,6 +68,7 @@ return [
         'create'         => 'Create task',
         'update'         => 'Update/move task',
         'delete'         => 'Delete task',
+        'delete_comment' => 'Delete comment',
         'manage_project' => 'Manage projects',
     ],
 ];

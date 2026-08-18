@@ -177,6 +177,20 @@ class TaskBoardService
      *
      * @return \Illuminate\Database\Eloquent\Collection
      */
+    /**
+     * 刪除留言
+     *
+     * @param int $commentId
+     * @return void
+     */
+    public function deleteComment($commentId)
+    {
+        $comment = $this->taskRepository->findComment($commentId);
+        if ($comment) {
+            $this->taskRepository->deleteComment($comment);
+        }
+    }
+
     public function getAssignees()
     {
         return $this->userRepository->getActiveForDropdown();

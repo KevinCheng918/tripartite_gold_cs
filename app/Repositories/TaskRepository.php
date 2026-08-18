@@ -184,6 +184,28 @@ class TaskRepository
      * @param array $attributes
      * @return TaskComment
      */
+    /**
+     * 查詢留言
+     *
+     * @param int $commentId
+     * @return TaskComment|null
+     */
+    public function findComment($commentId)
+    {
+        return TaskComment::query()->find($commentId);
+    }
+
+    /**
+     * 刪除留言
+     *
+     * @param TaskComment $comment
+     * @return void
+     */
+    public function deleteComment(TaskComment $comment)
+    {
+        $comment->delete();
+    }
+
     public function createComment($attributes)
     {
         return TaskComment::query()->create($attributes);

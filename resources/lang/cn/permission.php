@@ -68,6 +68,7 @@ return [
         'create'         => '新增任务',
         'update'         => '编辑/移动任务',
         'delete'         => '删除任务',
+        'delete_comment' => '删除留言',
         'manage_project' => '管理项目',
     ],
 ];

@@ -311,6 +311,23 @@
         </div>
     </div>
 
+    {{-- 刪除留言確認 Modal --}}
+    <div class="modal fade" id="modal-delete-comment-confirm" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-body text-center py-4">
+                    <p class="mb-3">確定刪除此留言？</p>
+                    <input type="hidden" id="delete-comment-confirm-id">
+                    <input type="hidden" id="delete-comment-confirm-task-id">
+                    <div class="d-flex justify-content-center gap-2">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="button" class="btn btn-danger" id="btn-delete-comment-confirm-ok">確定刪除</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- 訊息 Modal --}}
     <div class="modal fade" id="modal-task-msg" tabindex="-1">
         <div class="modal-dialog modal-sm">
@@ -333,6 +350,7 @@ $(function () {
     var canCreate = {{ Auth::user()->hasPermission('task_board.create') ? 'true' : 'false' }};
     var canUpdate = {{ Auth::user()->hasPermission('task_board.update') ? 'true' : 'false' }};
     var canDelete = {{ Auth::user()->hasPermission('task_board.delete') ? 'true' : 'false' }};
+    var canDeleteComment = {{ Auth::user()->hasPermission('task_board.delete_comment') ? 'true' : 'false' }};
 
     function showMsg(msg) {
         $('#modal-task-msg-text').text(msg);
@@ -822,7 +840,12 @@ $(function () {
                 var html = '';
                 list.forEach(function (c) {
                     html += '<div class="comment-item">';
-                    html += '<div class="d-flex justify-content-between"><strong style="font-size:0.875rem">' + c.user + '</strong><small class="text-muted">' + c.created_at + '</small></div>';
+                    html += '<div class="d-flex justify-content-between align-items-center"><strong style="font-size:0.875rem">' + c.user + '</strong><div>';
+                    html += '<small class="text-muted me-2">' + c.created_at + '</small>';
+                    if (canDeleteComment) {
+                        html += '<button class="btn btn-sm btn-outline-secondary js-delete-comment" data-id="' + c.id + '" title="刪除留言"><i class="fas fa-trash text-danger"></i></button>';
+                    }
+                    html += '</div></div>';
                     html += '<div style="font-size:0.875rem;white-space:pre-wrap;margin-top:0.25rem">' + c.content + '</div>';
                     if (c.images && c.images.length > 0) {
                         html += '<div class="d-flex flex-wrap gap-1 mt-1">';
@@ -834,6 +857,13 @@ $(function () {
                     html += '</div>';
                 });
                 $('#panel-comments').html(html);
+
+                // 綁定刪除留言
+                $('.js-delete-comment').off('click').on('click', function () {
+                    $('#delete-comment-confirm-id').val($(this).data('id'));
+                    $('#delete-comment-confirm-task-id').val(taskId);
+                    showBsModal('modal-delete-comment-confirm');
+                });
             }
         });
     }
@@ -951,6 +981,30 @@ $(function () {
     }
 
     // 刪除確認
+    // 刪除留言確認
+    $('#btn-delete-comment-confirm-ok').on('click', function () {
+        var commentId = $('#delete-comment-confirm-id').val();
+        var taskId = $('#delete-comment-confirm-task-id').val();
+        var $btn = $(this);
+        $btn.prop('disabled', true);
+        $.ajax({
+            url: '/admin/task-board/ajax-delete-comment/' + commentId,
+            method: 'DELETE',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            success: function () {
+                hideBsModal(document.getElementById('modal-delete-comment-confirm'));
+                setTimeout(function () { loadComments(parseInt(taskId, 10)); }, 400);
+                $btn.prop('disabled', false);
+            },
+            error: function (xhr) {
+                hideBsModal(document.getElementById('modal-delete-comment-confirm'));
+                setTimeout(function () { showMsg((xhr.responseJSON && xhr.responseJSON.message) || '刪除失敗'); }, 400);
+                $btn.prop('disabled', false);
+            }
+        });
+    });
+
+    // 刪除任務確認
     $('#btn-delete-confirm-ok').on('click', function () {
         var id = $('#delete-confirm-id').val();
         var $btn = $(this);

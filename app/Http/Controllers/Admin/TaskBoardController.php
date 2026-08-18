@@ -12,6 +12,7 @@ use App\Http\Requests\TaskBoard\UpdateTaskRequest;
 use App\Http\Resources\TaskCommentResource;
 use App\Http\Resources\TaskResource;
 use App\Models\Task;
+use App\Models\TaskComment;
 use App\Services\ImageUploadService;
 use App\Services\TaskBoardService;
 use Illuminate\Http\Request;
@@ -287,5 +288,18 @@ class TaskBoardController extends Controller
         $comment = $this->taskBoardService->addComment($task->id, Auth::id(), $params['content'], $images);
 
         return new TaskCommentResource($comment->load('user'));
+    }
+
+    /**
+     * Ajax 刪除留言
+     *
+     * @param TaskComment $comment
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxDeleteComment(TaskComment $comment)
+    {
+        $this->taskBoardService->deleteComment($comment->id);
+
+        return response()->json(['message' => '留言已刪除']);
     }
 }
