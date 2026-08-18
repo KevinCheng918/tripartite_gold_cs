@@ -115,6 +115,14 @@
                             <option value="3">{{ trans('task_board.priority_high') }}</option>
                             <option value="4">{{ trans('task_board.priority_urgent') }}</option>
                         </select>
+                        <select id="filter-sort" class="form-select form-select-sm" style="width:auto">
+                            <option value="created_desc">建立時間 新→舊</option>
+                            <option value="created_asc">建立時間 舊→新</option>
+                            <option value="updated_desc">更新時間 新→舊</option>
+                            <option value="updated_asc">更新時間 舊→新</option>
+                            <option value="priority_desc">優先順序 高→低</option>
+                            <option value="priority_asc">優先順序 低→高</option>
+                        </select>
                         <input type="text" id="filter-keyword" class="form-control form-control-sm" style="width:140px" placeholder="搜尋標題...">
                         <button class="btn btn-sm btn-outline-secondary" id="btn-filter">
                             <i class="fas fa-search"></i>
@@ -412,10 +420,12 @@ $(function () {
         var projectId = $('#filter-project').val();
         var assigneeId = $('#filter-assignee').val();
         var priority = $('#filter-priority').val();
+        var sortBy = $('#filter-sort').val();
         var keyword = $('#filter-keyword').val();
         if (projectId) params.project_id = projectId;
         if (assigneeId) params.assignee_id = assigneeId;
         if (priority) params.priority = priority;
+        if (sortBy && sortBy !== 'sort_order') params.sort = sortBy;
         if (keyword) params.keyword = keyword;
 
         $.ajax({
@@ -1033,6 +1043,16 @@ $(function () {
                 showMsg((xhr.responseJSON && xhr.responseJSON.message) || '新增失敗');
             }
         });
+    });
+
+    // 排序 localStorage 記憶
+    var savedSort = localStorage.getItem('taskBoardSort');
+    if (savedSort && $('#filter-sort option[value="' + savedSort + '"]').length) {
+        $('#filter-sort').val(savedSort);
+    }
+    $('#filter-sort').on('change', function () {
+        localStorage.setItem('taskBoardSort', $(this).val());
+        loadBoard();
     });
 
     // 篩選

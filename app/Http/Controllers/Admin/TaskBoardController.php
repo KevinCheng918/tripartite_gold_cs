@@ -58,7 +58,7 @@ class TaskBoardController extends Controller
      */
     public function ajaxBoard(Request $request)
     {
-        $params = $request->only(['project_id', 'assignee_id', 'priority', 'keyword']);
+        $params = $request->only(['project_id', 'assignee_id', 'priority', 'keyword', 'sort']);
         $board = $this->taskBoardService->getBoard($params);
 
         // 預載所有 assignee 使用者（避免 N+1）

@@ -34,8 +34,24 @@ class TaskRepository
     {
         $query = Task::query()
             ->select(self::LIST_COLUMNS)
-            ->with(['project', 'station.system', 'assignee', 'creator'])
-            ->orderBy('sort_order');
+            ->with(['project', 'station.system', 'assignee', 'creator']);
+
+        // 排序
+        $sort = $criteria['sort'] ?? 'created_desc';
+        $sortMap = [
+            'priority_desc' => ['priority', 'desc'],
+            'priority_asc'  => ['priority', 'asc'],
+            'created_desc'  => ['created_at', 'desc'],
+            'created_asc'   => ['created_at', 'asc'],
+            'updated_desc'  => ['updated_at', 'desc'],
+            'updated_asc'   => ['updated_at', 'asc'],
+            'sort_order'    => ['sort_order', 'asc'],
+        ];
+        if (isset($sortMap[$sort])) {
+            $query->orderBy($sortMap[$sort][0], $sortMap[$sort][1]);
+        } else {
+            $query->orderBy('created_at', 'desc');
+        }
 
         if (filled($criteria['project_id'] ?? null)) {
             $query->where('project_id', (int) $criteria['project_id']);
