@@ -111,7 +111,7 @@
         </div>
     </div>
 
-    {{-- 本週概況 --}}
+    {{-- 本週概況（管理者：每位客服排了多少班） --}}
     <div class="main-card mb-3 card">
         <div class="card-header">
             <i class="header-icon fas fa-chart-bar me-2 text-muted"></i>
