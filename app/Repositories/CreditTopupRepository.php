@@ -31,6 +31,12 @@ class CreditTopupRepository
             ->with(['station.system', 'requester', 'reviewer'])
             ->orderByDesc('created_at');
 
+        if (filled($filters['system_id'] ?? null)) {
+            $query->whereHas('station', function ($q) use ($filters) {
+                $q->where('system_id', (int) $filters['system_id']);
+            });
+        }
+
         if (filled($filters['station_id'] ?? null)) {
             $query->where('station_id', (int) $filters['station_id']);
         }
@@ -38,6 +44,18 @@ class CreditTopupRepository
         // status 為 0 時 filled() 會回 false，需用 isset + !== ''
         if (isset($filters['status']) && $filters['status'] !== '') {
             $query->where('status', (int) $filters['status']);
+        }
+
+        if (filled($filters['requested_by'] ?? null)) {
+            $query->where('requested_by', (int) $filters['requested_by']);
+        }
+
+        if (filled($filters['date_from'] ?? null)) {
+            $query->where('created_at', '>=', $filters['date_from'] . ' 00:00:00');
+        }
+
+        if (filled($filters['date_to'] ?? null)) {
+            $query->where('created_at', '<=', $filters['date_to'] . ' 23:59:59');
         }
 
         return $query->get();

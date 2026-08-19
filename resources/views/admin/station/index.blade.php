@@ -54,10 +54,10 @@
         <div class="card-header d-flex align-items-center justify-content-between">
             <div class="d-flex gap-2">
                 @if(Auth::user()->hasPermission('station.create'))
-                    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modal-station">
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-station">
                         <i class="fas fa-plus me-1"></i>{{ trans('station.action_create') }}
                     </button>
-                    <button type="button" class="btn btn-outline-secondary" id="btn-open-system-mgmt">
+                    <button type="button" class="btn btn-primary" id="btn-open-system-mgmt">
                         <i class="fas fa-cogs me-1"></i>系統管理
                     </button>
                 @endif
@@ -393,20 +393,34 @@
     @if($canTopupView)
     <div class="tab-pane fade {{ $firstTab === 'topup' ? 'show active' : '' }}" id="tab-topup">
         <div class="main-card mb-3 card">
-            <div class="card-header">
-                <div class="row g-2 align-items-center">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <div class="d-flex gap-2">
                     @if(Auth::user()->hasPermission('station.topup_apply'))
-                    <div class="col-auto">
                         <button type="button" class="btn btn-primary" id="btn-open-topup-apply">
                             <i class="fas fa-plus me-1"></i>{{ trans('station.topup_title') }}
                         </button>
-                    </div>
                     @endif
-                    <div class="col"></div>
-                    <div class="col-12 col-md-auto">
-                        <div class="d-flex gap-2 align-items-center flex-wrap">
-                            <div class="searchable-select flex-grow-1" style="min-width:140px;position:relative">
-                                <input type="text" class="form-control form-control-sm" id="topup-filter-station-search" placeholder="搜尋站台..." autocomplete="off">
+                </div>
+                <a href="javascript:void(0)" class="text-muted text-decoration-none" data-bs-toggle="collapse" data-bs-target="#topup-search-collapse" aria-expanded="true">
+                    — 折疊 —
+                </a>
+            </div>
+            <div class="collapse show" id="topup-search-collapse">
+                <div class="card-body pt-3">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3 col-6">
+                            <label class="form-label fw-bold">系統：</label>
+                            <select id="topup-filter-system" class="form-select">
+                                <option value="">全部</option>
+                                @foreach($systems as $sys)
+                                    <option value="{{ $sys->id }}">{{ $sys->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <label class="form-label fw-bold">站台：</label>
+                            <div class="searchable-select" style="position:relative">
+                                <input type="text" class="form-control" id="topup-filter-station-search" placeholder="搜尋站台..." autocomplete="off">
                                 <input type="hidden" id="topup-filter-station" value="">
                                 <div class="searchable-dropdown" id="topup-filter-station-dropdown" style="display:none;position:absolute;z-index:1050;background:#fff;border:1px solid #dee2e6;border-radius:0.25rem;max-height:200px;overflow-y:auto;width:100%;box-shadow:0 2px 8px rgba(0,0,0,0.15)">
                                     <a href="javascript:void(0)" class="dropdown-item js-station-opt" data-id="" style="display:block;padding:0.35rem 0.75rem;font-size:0.875rem">全部站台</a>
@@ -415,19 +429,54 @@
                                     @endforeach
                                 </div>
                             </div>
-                            <select id="topup-filter-status" class="form-select form-select-sm" style="width:auto">
-                                <option value="">全部狀態</option>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <label class="form-label fw-bold">狀態：</label>
+                            <select id="topup-filter-status" class="form-select">
+                                <option value="">全部</option>
                                 <option value="0">{{ trans('station.topup_status_pending') }}</option>
                                 <option value="1">{{ trans('station.topup_status_completed') }}</option>
                                 <option value="2">{{ trans('station.topup_status_rejected') }}</option>
                                 <option value="3">{{ trans('station.topup_status_failed') }}</option>
                             </select>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-topup-search">
-                                <i class="fas fa-search"></i>
-                            </button>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <label class="form-label fw-bold">申請人：</label>
+                            <select id="topup-filter-requester" class="form-select">
+                                <option value="">全部</option>
+                                @foreach($csUsers as $u)
+                                    <option value="{{ $u->id }}">{{ $u->nickname }}</option>
+                                @endforeach
+                            </select>
                         </div>
                     </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3 col-6">
+                            <label class="form-label fw-bold">開始日期：</label>
+                            <input type="date" class="form-control" id="topup-filter-date-from">
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <label class="form-label fw-bold">結束日期：</label>
+                            <input type="date" class="form-control" id="topup-filter-date-to">
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-outline-secondary" id="btn-topup-reset">重置</button>
+                        <button type="button" class="btn btn-primary" id="btn-topup-search">
+                            <i class="fas fa-search me-1"></i>搜尋
+                        </button>
+                    </div>
                 </div>
+            </div>
+        </div>
+
+        {{-- 統計總覽 --}}
+        <div class="main-card mb-3 card" id="topup-stats-card">
+            <div class="card-header py-2">
+                <strong><i class="fas fa-chart-bar me-2 text-muted"></i>補點統計總覽</strong>
+            </div>
+            <div class="card-body py-3">
+                <div class="row g-3" id="topup-stats-body"></div>
             </div>
         </div>
 
@@ -1089,6 +1138,7 @@ $(function () {
     var hasTopupView = {{ Auth::user()->hasPermission('station.topup_view') ? 'true' : 'false' }};
     var hasTopupApply = {{ Auth::user()->hasPermission('station.topup_apply') ? 'true' : 'false' }};
     var hasTopupApprove = {{ Auth::user()->hasPermission('station.topup_approve') ? 'true' : 'false' }};
+    var allSystems = @json($systems->map(function ($s) { return ['id' => $s->id, 'name' => $s->name]; }));
 
     function topupStatusBadge(status) {
         var map = {
@@ -1115,13 +1165,32 @@ $(function () {
         return fixed.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
     }
 
+    // 預設本月日期
+    function initTopupDateDefaults() {
+        var now = new Date();
+        var y = now.getFullYear();
+        var m = ('0' + (now.getMonth() + 1)).slice(-2);
+        var lastDay = new Date(y, now.getMonth() + 1, 0).getDate();
+        $('#topup-filter-date-from').val(y + '-' + m + '-01');
+        $('#topup-filter-date-to').val(y + '-' + m + '-' + ('0' + lastDay).slice(-2));
+    }
+    initTopupDateDefaults();
+
     function loadTopupList() {
         if (!hasTopupView) return;
         var params = {};
+        var systemId = $('#topup-filter-system').val();
         var stationId = $('#topup-filter-station').val();
         var status = $('#topup-filter-status').val();
+        var requestedBy = $('#topup-filter-requester').val();
+        var dateFrom = $('#topup-filter-date-from').val();
+        var dateTo = $('#topup-filter-date-to').val();
+        if (systemId) params.system_id = systemId;
         if (stationId) params.station_id = stationId;
         if (status !== '') params.status = status;
+        if (requestedBy) params.requested_by = requestedBy;
+        if (dateFrom) params.date_from = dateFrom;
+        if (dateTo) params.date_to = dateTo;
 
         $.ajax({
             url: '/admin/stations/ajax-topup-list',
@@ -1129,10 +1198,87 @@ $(function () {
             headers: { 'X-CSRF-TOKEN': csrfToken },
             success: function (body) {
                 var list = body.data || body;
+                renderTopupStats(list);
                 renderTopupTable(list);
                 renderTopupCards(list);
             }
         });
+    }
+
+    function renderTopupStats(list) {
+        var $body = $('#topup-stats-body');
+        if (!list) list = [];
+
+        var cardColors = ['#6f42c1', '#0d9488', '#2563eb', '#e85d04', '#d63384', '#0ea5e9'];
+
+        // 用固定系統列表初始化
+        var bySystem = {};
+        allSystems.forEach(function (s) {
+            bySystem[s.name] = { name: s.name, count: 0, usdt: 0, amount: 0, rateSum: 0 };
+        });
+
+        var totalUsdt = 0;
+        var totalAmount = 0;
+        var totalCount = 0;
+        var totalRateSum = 0;
+
+        list.forEach(function (t) {
+            // 只有已完成（status=1）的才計入統計
+            if (parseInt(t.status, 10) !== 1) return;
+            var sysName = t.system || '-';
+            if (!bySystem[sysName]) {
+                bySystem[sysName] = { name: sysName, count: 0, usdt: 0, amount: 0, rateSum: 0 };
+            }
+            bySystem[sysName].count++;
+            bySystem[sysName].usdt += parseFloat(t.usdt_amount) || 0;
+            bySystem[sysName].amount += parseFloat(t.credit_amount) || 0;
+            bySystem[sysName].rateSum += parseFloat(t.exchange_rate) || 0;
+            totalCount++;
+            totalUsdt += parseFloat(t.usdt_amount) || 0;
+            totalAmount += parseFloat(t.credit_amount) || 0;
+            totalRateSum += parseFloat(t.exchange_rate) || 0;
+        });
+
+        var systems = allSystems.map(function (s) { return bySystem[s.name]; });
+        var html = '';
+
+        function statLine(stat) {
+            var avgRate = stat.count > 0 ? (stat.rateSum / stat.count).toFixed(4) : '0';
+            var s = '<div class="d-flex flex-column gap-1 mt-1" style="font-size:0.8125rem">';
+            s += '<div><span class="text-muted">均匯率：</span><strong>' + avgRate + '</strong></div>';
+            s += '<div><span class="text-muted">USDT：</span><strong>' + stat.usdt.toFixed(4) + '</strong></div>';
+            s += '<div><span class="text-muted">總點數：</span><strong>' + stat.amount.toFixed(2) + '</strong></div>';
+            s += '</div>';
+            return s;
+        }
+
+        systems.forEach(function (stat, idx) {
+            var color = cardColors[idx % cardColors.length];
+            var initials = stat.name.substring(0, 2);
+            html += '<div class="col">';
+            html += '<div class="border rounded-3 p-3 d-flex align-items-center gap-3" style="border-left:4px solid ' + color + ' !important;transition:box-shadow .2s" onmouseover="this.style.boxShadow=\'0 2px 8px rgba(0,0,0,0.1)\'" onmouseout="this.style.boxShadow=\'none\'">';
+            html += '<div class="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white" style="width:40px;height:40px;min-width:40px;background:' + color + ';font-size:0.8125rem">' + initials + '</div>';
+            html += '<div>';
+            html += '<div class="fw-bold" style="color:#212529">' + stat.name + ' <span class="text-muted fw-normal" style="font-size:0.8125rem">' + stat.count + ' 筆</span></div>';
+            html += statLine(stat);
+            html += '</div>';
+            html += '</div>';
+            html += '</div>';
+        });
+
+        // 總計
+        var totalStat = { count: totalCount, usdt: totalUsdt, amount: totalAmount, rateSum: totalRateSum };
+        html += '<div class="col">';
+        html += '<div class="border rounded-3 p-3 d-flex align-items-center gap-3" style="border-left:4px solid #0d9488 !important;background:#f8f9fa">';
+        html += '<div class="rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width:40px;height:40px;min-width:40px;background:#e9ecef;color:#495057;font-size:0.875rem"><i class="fas fa-clipboard-list"></i></div>';
+        html += '<div>';
+        html += '<div class="fw-bold">總計 <span class="text-muted fw-normal" style="font-size:0.8125rem">' + totalCount + ' 筆</span></div>';
+        html += statLine(totalStat);
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+
+        $body.html(html);
     }
 
     function renderTopupTable(list) {
@@ -1286,8 +1432,25 @@ $(function () {
         });
     });
 
+    // 補點搜尋區折疊文字切換
+    var $topupCollapse = $('#topup-search-collapse');
+    var $topupToggle = $('[data-bs-target="#topup-search-collapse"]');
+    $topupCollapse.on('show.bs.collapse', function () { $topupToggle.text('— 折疊 —'); });
+    $topupCollapse.on('hide.bs.collapse', function () { $topupToggle.text('— 展開 —'); });
+
     // 搜尋
     $('#btn-topup-search').on('click', function () { loadTopupList(); });
+
+    // 重置
+    $('#btn-topup-reset').on('click', function () {
+        $('#topup-filter-system').val('');
+        $('#topup-filter-station').val('');
+        $('#topup-filter-station-search').val('');
+        $('#topup-filter-status').val('');
+        $('#topup-filter-requester').val('');
+        initTopupDateDefaults();
+        loadTopupList();
+    });
 
     // 圖片上傳
     var topupImageFiles = [];

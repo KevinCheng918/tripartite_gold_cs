@@ -7,6 +7,7 @@ use App\Http\Resources\CreditTopupResource;
 use App\Http\Resources\StationResource;
 use App\Models\CreditTopup;
 use App\Models\Station;
+use App\Repositories\UserRepository;
 use App\Services\CreditTopupService;
 use App\Services\ImageUploadService;
 use App\Services\StationService;
@@ -22,15 +23,18 @@ class StationController extends Controller
     private $stationService;
     private $topupService;
     private $imageUploadService;
+    private $userRepository;
 
     public function __construct(
         StationService $stationService,
         CreditTopupService $topupService,
-        ImageUploadService $imageUploadService
+        ImageUploadService $imageUploadService,
+        UserRepository $userRepository
     ) {
         $this->stationService = $stationService;
         $this->topupService = $topupService;
         $this->imageUploadService = $imageUploadService;
+        $this->userRepository = $userRepository;
     }
 
     /**
@@ -52,12 +56,15 @@ class StationController extends Controller
 
         $allStations = $this->stationService->allForDropdown();
 
+        $csUsers = $this->userRepository->getActiveForDropdown();
+
         return view('admin.station.index', [
             'stations'    => $stations,
             'allStations' => $allStations,
             'systems'     => $systems,
             'filters'     => $params,
             'systemStats' => $systemStats,
+            'csUsers'     => $csUsers,
         ]);
     }
 
@@ -251,7 +258,7 @@ class StationController extends Controller
      */
     public function ajaxTopupList(Request $request)
     {
-        $params = $request->only(['station_id', 'status']);
+        $params = $request->only(['system_id', 'station_id', 'status', 'requested_by', 'date_from', 'date_to']);
         $topups = $this->topupService->list($params);
 
         return CreditTopupResource::collection($topups);
