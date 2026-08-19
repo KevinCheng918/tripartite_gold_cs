@@ -59,9 +59,6 @@
     </div>
     @endif
 
-    @if(Auth::user()->isAdmin())
-    {{-- ===== Admin Dashboard ===== --}}
-
     @if(Auth::user()->hasPermission('shift.view'))
     {{-- 今日排班 --}}
     <div class="main-card mb-3 card">
@@ -256,7 +253,6 @@
         </div>
     </div>
     @endif {{-- end shift.view --}}
-    @endif {{-- end isAdmin --}}
 
 @endsection
 
