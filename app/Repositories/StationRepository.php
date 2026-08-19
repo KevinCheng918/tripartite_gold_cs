@@ -187,7 +187,7 @@ class StationRepository
                     'disabled' => $disabled,
                     'total'    => $active + $frozen + $disabled,
                 ];
-            })->values();
+            })->sortBy('system_id')->values();
 
         // 按狀態
         $activeCount = $all->where('status', config('constants.STATION.STATUS.ACTIVE'))->sum('count');
@@ -209,7 +209,7 @@ class StationRepository
         return System::query()
             ->select(['id', 'name', 'bot_token'])
             ->where('status', 1)
-            ->orderBy('name')
+            ->orderBy('id')
             ->get();
     }
 

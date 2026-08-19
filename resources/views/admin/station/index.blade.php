@@ -476,7 +476,7 @@
                 <strong><i class="fas fa-chart-bar me-2 text-muted"></i>補點統計總覽</strong>
             </div>
             <div class="card-body py-3">
-                <div class="row g-3" id="topup-stats-body"></div>
+                <div class="d-flex flex-wrap gap-3" id="topup-stats-body"></div>
             </div>
         </div>
 
@@ -487,21 +487,22 @@
                     <table class="table table-hover table-striped align-middle mb-0" style="white-space:nowrap">
                         <thead class="table-light">
                             <tr>
-                                <th>#</th>
-                                <th>系統</th>
-                                <th>{{ trans('station.topup_field_station') }}</th>
-                                <th>{{ trans('station.topup_field_action') }}</th>
-                                <th>{{ trans('station.topup_field_usdt') }}</th>
-                                <th>{{ trans('station.topup_field_rate') }}</th>
-                                <th>{{ trans('station.topup_field_amount') }}</th>
-                                <th>{{ trans('station.topup_field_status') }}</th>
-                                <th>{{ trans('station.topup_field_requester') }}</th>
-                                <th>時間</th>
-                                <th>操作</th>
+                                <th class="text-center">#</th>
+                                <th class="text-center">系統</th>
+                                <th class="text-center">{{ trans('station.topup_field_station') }}</th>
+                                <th class="text-center">{{ trans('station.topup_field_action') }}</th>
+                                <th class="text-center">USDT / 匯率</th>
+                                <th class="text-center">{{ trans('station.topup_field_amount') }}</th>
+                                <th class="text-center">{{ trans('station.topup_field_status') }}</th>
+                                <th class="text-center">申請/審核人</th>
+                                <th class="text-center">申請/審核時間</th>
+                                <th class="text-center">圖片</th>
+                                <th class="text-center">備註</th>
+                                <th class="text-center">操作</th>
                             </tr>
                         </thead>
                         <tbody id="topup-table-body">
-                            <tr><td colspan="11" class="text-center text-muted py-4">Loading...</td></tr>
+                            <tr><td colspan="12" class="text-center text-muted py-4">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -1255,7 +1256,7 @@ $(function () {
         systems.forEach(function (stat, idx) {
             var color = cardColors[idx % cardColors.length];
             var initials = stat.name.substring(0, 2);
-            html += '<div class="col">';
+            html += '<div style="flex:1;min-width:200px">';
             html += '<div class="border rounded-3 p-3 d-flex align-items-center gap-3" style="border-left:4px solid ' + color + ' !important;transition:box-shadow .2s" onmouseover="this.style.boxShadow=\'0 2px 8px rgba(0,0,0,0.1)\'" onmouseout="this.style.boxShadow=\'none\'">';
             html += '<div class="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white" style="width:40px;height:40px;min-width:40px;background:' + color + ';font-size:0.8125rem">' + initials + '</div>';
             html += '<div>';
@@ -1268,7 +1269,7 @@ $(function () {
 
         // 總計
         var totalStat = { count: totalCount, usdt: totalUsdt, amount: totalAmount, rateSum: totalRateSum };
-        html += '<div class="col">';
+        html += '<div style="flex:1;min-width:200px">';
         html += '<div class="border rounded-3 p-3 d-flex align-items-center gap-3" style="border-left:4px solid #0d9488 !important;background:#f8f9fa">';
         html += '<div class="rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width:40px;height:40px;min-width:40px;background:#e9ecef;color:#495057;font-size:0.875rem"><i class="fas fa-clipboard-list"></i></div>';
         html += '<div>';
@@ -1284,7 +1285,7 @@ $(function () {
     function renderTopupTable(list) {
         var $tbody = $('#topup-table-body');
         if (!list || list.length === 0) {
-            $tbody.html('<tr><td colspan="11" class="text-center text-muted py-4">暫無資料</td></tr>');
+            $tbody.html('<tr><td colspan="12" class="text-center text-muted py-4">暫無資料</td></tr>');
             return;
         }
         var html = '';
@@ -1294,32 +1295,33 @@ $(function () {
             html += '<td>' + (t.system || '-') + '</td>';
             html += '<td>' + t.station + '</td>';
             html += '<td>' + topupActionLabel(t.action_type, t.credit_type) + '</td>';
-            html += '<td>' + t.usdt_amount + '</td>';
-            html += '<td>' + t.exchange_rate + '</td>';
+            html += '<td>' + t.usdt_amount + ' U<br><span class="text-muted">' + t.exchange_rate + '</span></td>';
             html += '<td><strong>' + t.credit_amount + '</strong></td>';
             html += '<td>' + topupStatusBadge(t.status) + '</td>';
-            html += '<td>' + t.requester + '</td>';
-            html += '<td><small class="text-muted">' + t.created_at + '</small></td>';
+            html += '<td>' + t.requester + (t.reviewer ? '<br><small class="text-muted">審核：' + t.reviewer + '</small>' : '') + '</td>';
+            html += '<td><small class="text-muted">' + t.created_at + '</small>' + (t.reviewed_at ? '<br><small class="text-muted">' + t.reviewed_at + '</small>' : '') + '</td>';
+            // 圖片
+            html += '<td>';
+            if (t.images && t.images.length > 0) {
+                html += '<button class="btn btn-sm btn-outline-secondary js-topup-images" data-images=\'' + JSON.stringify(t.images) + '\'><i class="fas fa-image me-1"></i>' + t.images.length + '張</button>';
+            } else { html += '-'; }
+            html += '</td>';
+            // 備註
+            html += '<td>';
+            if (t.note) {
+                html += '<button class="btn btn-sm btn-outline-secondary js-topup-note" data-note="' + t.note.replace(/"/g, '&quot;') + '"><i class="fas fa-sticky-note me-1"></i>備註</button>';
+            } else { html += '-'; }
+            html += '</td>';
+            // 操作按鈕
             html += '<td>';
             if (parseInt(t.status, 10) === 0 && hasTopupApprove) {
-                html += '<button class="btn btn-sm btn-outline-secondary js-topup-approve" data-id="' + t.id + '" data-station="' + t.station + '" data-amount="' + t.credit_amount + '" data-action="' + t.action_type + '">';
-                html += '<i class="fas fa-check text-success me-1"></i>通過</button> ';
-                html += '<button class="btn btn-sm btn-outline-secondary js-topup-reject" data-id="' + t.id + '">';
-                html += '<i class="fas fa-times text-danger me-1"></i>拒絕</button>';
-            }
-            if (parseInt(t.status, 10) === 3 && hasTopupApprove) {
-                html += '<button class="btn btn-sm btn-outline-secondary js-topup-approve" data-id="' + t.id + '" data-station="' + t.station + '" data-amount="' + t.credit_amount + '" data-action="' + t.action_type + '">';
-                html += '<i class="fas fa-redo text-warning me-1"></i>重試</button>';
-            }
-            if (t.reviewer) {
-                html += ' <small class="text-muted">審核：' + t.reviewer + '</small>';
-            }
-            if (t.images && t.images.length > 0) {
-                html += ' <button class="btn btn-sm btn-outline-secondary js-topup-images" data-images=\'' + JSON.stringify(t.images) + '\'><i class="fas fa-image me-1"></i>' + t.images.length + '張</button>';
-            }
-            if (t.note) {
-                html += ' <button class="btn btn-sm btn-outline-secondary js-topup-note" data-note="' + t.note.replace(/"/g, '&quot;') + '"><i class="fas fa-sticky-note me-1"></i>備註</button>';
-            }
+                html += '<div class="d-flex gap-1">';
+                html += '<button class="btn btn-sm btn-outline-secondary js-topup-approve" data-id="' + t.id + '" data-station="' + t.station + '" data-amount="' + t.credit_amount + '" data-action="' + t.action_type + '"><i class="fas fa-check text-success me-1"></i>通過</button>';
+                html += '<button class="btn btn-sm btn-outline-secondary js-topup-reject" data-id="' + t.id + '"><i class="fas fa-times text-danger me-1"></i>拒絕</button>';
+                html += '</div>';
+            } else if (parseInt(t.status, 10) === 3 && hasTopupApprove) {
+                html += '<button class="btn btn-sm btn-outline-secondary js-topup-approve" data-id="' + t.id + '" data-station="' + t.station + '" data-amount="' + t.credit_amount + '" data-action="' + t.action_type + '"><i class="fas fa-redo text-warning me-1"></i>重試</button>';
+            } else { html += '-'; }
             html += '</td>';
             html += '</tr>';
         });
