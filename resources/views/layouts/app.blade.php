@@ -194,12 +194,14 @@
                                 </a>
                             </li>
                             @endif
+                            @if(Auth::user()->hasPermission('telegram_chat.reply') || Auth::user()->hasPermission('telegram_chat.assign') || Auth::user()->hasPermission('telegram_chat.broadcast'))
                             <li>
                                 <a href="{{ route('admin.telegram-chat.index') }}" class="{{ request()->routeIs('admin.telegram-chat.*') ? 'mm-active' : '' }}">
                                     <i class="metismenu-icon fas fa-comments"></i>
                                     {{ trans('telegram_chat.nav_label') }}
                                 </a>
                             </li>
+                            @endif
                             @if(Auth::user()->hasPermission('task_board.view'))
                             <li>
                                 <a href="{{ route('admin.task-board.index') }}" class="{{ request()->routeIs('admin.task-board.*') ? 'mm-active' : '' }}">

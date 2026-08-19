@@ -33,6 +33,13 @@ class TelegramChatController extends Controller
      */
     public function index()
     {
+        $user = Auth::user();
+        if (!$user->hasPermission('telegram_chat.reply')
+            && !$user->hasPermission('telegram_chat.assign')
+            && !$user->hasPermission('telegram_chat.broadcast')) {
+            abort(403);
+        }
+
         return view('admin.telegram-chat.index');
     }
 
