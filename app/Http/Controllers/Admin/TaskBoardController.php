@@ -40,11 +40,13 @@ class TaskBoardController extends Controller
      */
     public function index()
     {
-        $userProjectIds = Auth::user()->project_ids ?? [];
+        $user = Auth::user();
+        $isAdmin = (int) $user->level === config('constants.USER.LEVEL.ADMIN');
+        $userProjectIds = $user->project_ids ?? [];
         $allProjects = $this->taskBoardService->getProjects();
-        $projects = !empty($userProjectIds)
-            ? $allProjects->filter(function ($p) use ($userProjectIds) { return in_array($p->id, $userProjectIds); })->values()
-            : $allProjects;
+        $projects = ($isAdmin || empty($userProjectIds))
+            ? ($isAdmin ? $allProjects : collect([]))
+            : $allProjects->filter(function ($p) use ($userProjectIds) { return in_array($p->id, $userProjectIds); })->values();
         $assignees = $this->taskBoardService->getAssignees();
         $stations = $this->taskBoardService->getStations();
 
@@ -64,7 +66,9 @@ class TaskBoardController extends Controller
     public function ajaxBoard(Request $request)
     {
         $params = $request->only(['project_id', 'assignee_id', 'priority', 'keyword', 'sort']);
-        $params['user_project_ids'] = Auth::user()->project_ids ?? [];
+        $user = Auth::user();
+        $isAdmin = (int) $user->level === config('constants.USER.LEVEL.ADMIN');
+        $params['user_project_ids'] = $isAdmin ? [] : ($user->project_ids ?? [-1]);
         $board = $this->taskBoardService->getBoard($params);
 
         // 預載所有 assignee 使用者（避免 N+1）
