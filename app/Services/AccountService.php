@@ -93,6 +93,10 @@ class AccountService
             $attributes['password'] = $params['password'];
         }
 
+        if (array_key_exists('project_ids', $params)) {
+            $attributes['project_ids'] = array_map('intval', $params['project_ids'] ?? []);
+        }
+
         return DB::transaction(function () use ($user, $attributes) {
             return $this->userRepository->update($user, $attributes);
         });

@@ -40,7 +40,11 @@ class TaskBoardController extends Controller
      */
     public function index()
     {
-        $projects = $this->taskBoardService->getProjects();
+        $userProjectIds = Auth::user()->project_ids ?? [];
+        $allProjects = $this->taskBoardService->getProjects();
+        $projects = !empty($userProjectIds)
+            ? $allProjects->filter(function ($p) use ($userProjectIds) { return in_array($p->id, $userProjectIds); })->values()
+            : $allProjects;
         $assignees = $this->taskBoardService->getAssignees();
         $stations = $this->taskBoardService->getStations();
 
@@ -60,6 +64,7 @@ class TaskBoardController extends Controller
     public function ajaxBoard(Request $request)
     {
         $params = $request->only(['project_id', 'assignee_id', 'priority', 'keyword', 'sort']);
+        $params['user_project_ids'] = Auth::user()->project_ids ?? [];
         $board = $this->taskBoardService->getBoard($params);
 
         // 預載所有 assignee 使用者（避免 N+1）

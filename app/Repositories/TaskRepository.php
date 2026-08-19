@@ -53,6 +53,11 @@ class TaskRepository
             $query->orderBy('created_at', 'desc');
         }
 
+        // 只顯示用戶參與的專案
+        if (!empty($criteria['user_project_ids'])) {
+            $query->whereIn('project_id', $criteria['user_project_ids']);
+        }
+
         if (filled($criteria['project_id'] ?? null)) {
             $query->where('project_id', (int) $criteria['project_id']);
         }

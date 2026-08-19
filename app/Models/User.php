@@ -33,8 +33,9 @@ class User extends Authenticatable
     protected $hidden = ['password', 'remember_token'];
 
     protected $casts = [
-        'status' => 'integer',
-        'level' => 'integer',
+        'status'      => 'integer',
+        'level'       => 'integer',
+        'project_ids' => 'array',
     ];
 
     /**

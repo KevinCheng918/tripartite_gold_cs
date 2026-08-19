@@ -8,6 +8,7 @@ use App\Http\Requests\Account\StoreAccountRequest;
 use App\Http\Requests\Account\UpdateAccountRequest;
 use App\Http\Resources\AccountResource;
 use App\Models\User;
+use App\Repositories\ProjectRepository;
 use App\Services\AccountService;
 use App\Services\PermissionMapService;
 use Illuminate\Http\Request;
@@ -25,13 +26,16 @@ class AccountController extends Controller
 {
     private $accountService;
     private $permissionMapService;
+    private $projectRepository;
 
     public function __construct(
         AccountService $accountService,
-        PermissionMapService $permissionMapService
+        PermissionMapService $permissionMapService,
+        ProjectRepository $projectRepository
     ) {
         $this->accountService = $accountService;
         $this->permissionMapService = $permissionMapService;
+        $this->projectRepository = $projectRepository;
     }
 
     /**
@@ -45,10 +49,13 @@ class AccountController extends Controller
         $accounts = $this->accountService->list($params);
         $accountStats = $this->accountService->getStatusStats();
 
+        $projects = $this->projectRepository->getActive();
+
         return view('admin.accounts.index', [
             'accounts'     => $accounts,
             'filters'      => $params,
             'accountStats' => $accountStats,
+            'projects'     => $projects,
         ]);
     }
 

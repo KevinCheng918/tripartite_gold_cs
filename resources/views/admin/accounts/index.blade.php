@@ -111,7 +111,8 @@
                                 <td>
                                     <button class="btn btn-sm btn-outline-secondary js-edit"
                                             data-id="{{ $account->id }}"
-                                            data-nickname="{{ $account->nickname }}">
+                                            data-nickname="{{ $account->nickname }}"
+                                            data-project-ids="{{ json_encode($account->project_ids ?? []) }}">
                                         <i class="fas fa-edit me-1"></i>{{ trans('account.action_edit') }}
                                     </button>
                                     <button class="btn btn-sm btn-outline-secondary js-change-status"
@@ -244,6 +245,17 @@
                             <label class="form-label">{{ trans('account.field_password') }}（{{ trans('account.password_hint') }}）</label>
                             <input id="edit-password" type="password" class="form-control" name="password" minlength="8">
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label">參與專案</label>
+                            <div id="edit-project-list" style="max-height:150px;overflow-y:auto;border:1px solid #dee2e6;border-radius:0.25rem;padding:0.5rem">
+                                @foreach($projects as $p)
+                                    <div class="form-check">
+                                        <input class="form-check-input js-edit-project-check" type="checkbox" value="{{ $p->id }}" id="edit-project-{{ $p->id }}">
+                                        <label class="form-check-label" for="edit-project-{{ $p->id }}">{{ $p->name }}</label>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
                         <div class="text-end">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('shift.modal_cancel') }}</button>
                             <button type="submit" class="btn btn-primary">{{ trans('shift.modal_confirm') }}</button>
@@ -343,6 +355,11 @@ $(function () {
         $('#edit-account-id').val($btn.data('id'));
         $('#edit-nickname').val($btn.data('nickname'));
         $('#edit-password').val('');
+        // 帶入參與專案
+        var projectIds = $btn.data('project-ids') || [];
+        $('.js-edit-project-check').each(function () {
+            $(this).prop('checked', projectIds.indexOf(parseInt($(this).val(), 10)) !== -1);
+        });
         showBsModal('modal-edit-account');
     });
 
@@ -378,6 +395,9 @@ $(function () {
         var data = { nickname: $('#edit-nickname').val() };
         var pw = $('#edit-password').val();
         if (pw) { data.password = pw; }
+        var projectIds = [];
+        $('.js-edit-project-check:checked').each(function () { projectIds.push(parseInt($(this).val(), 10)); });
+        data.project_ids = projectIds;
 
         $.ajax({
             url: '/admin/accounts/ajax-update/' + $('#edit-account-id').val(),

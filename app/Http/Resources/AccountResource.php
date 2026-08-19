@@ -30,6 +30,7 @@ class AccountResource extends JsonResource
             'nickname'            => $this->nickname,
             'status'              => $this->status,
             'level'               => $this->level,
+            'project_ids'         => $this->project_ids ?? [],
             'permission_keywords' => $this->whenLoaded('permissions', function () {
                 return $this->permissions->pluck('permission_keyword')->all();
             }),
