@@ -204,16 +204,14 @@
         </div>
     </div>
 
+    @if(!$weekByDate->isEmpty())
     <div class="main-card mb-3 card">
         <div class="card-header">
             <i class="header-icon fas fa-list-ol me-2 text-muted"></i>
             {{ trans('dashboard.my_week_shift') }}
-            <span class="ms-2 badge bg-secondary">{{ trans('dashboard.week_total') }} {{ $weekTotal }}</span>
+            <span class="ms-2 badge bg-secondary">{{ trans('dashboard.week_total') }} {{ $myWeekTotal ?? $weekTotal }}</span>
         </div>
         <div class="card-body p-0">
-            @if($weekByDate->isEmpty())
-                <p class="text-muted p-3 mb-0">{{ trans('dashboard.my_no_shift') }}</p>
-            @else
                 <div class="table-responsive">
                     <table class="table table-hover mb-0">
                         <thead>
@@ -251,9 +249,9 @@
                         </tbody>
                     </table>
                 </div>
-            @endif
         </div>
     </div>
+    @endif {{-- end weekByDate not empty --}}
     @endif {{-- end shift.view for cs --}}
 
 @endsection

@@ -146,7 +146,7 @@ class DashboardService
      *
      * @return array
      */
-    public function getShiftData()
+    public function getShiftData($userId = null)
     {
         $today = now()->format('Y-m-d');
         $weekStart = now()->startOfWeek()->format('Y-m-d');
@@ -181,8 +181,13 @@ class DashboardService
             return $group->count();
         })->sortDesc();
 
+        // 我的本週排班（只查自己）
+        $myWeekAssignments = filled($userId)
+            ? $this->assignmentRepository->getByUserAndDateRange($userId, $weekStart, $weekEnd)
+            : collect();
+        $myWeekTotal = $myWeekAssignments->count();
         $activeShiftCount = $allShifts->count();
-        $weekByDate = $weekAssignments->sortBy('date')->groupBy(function ($a) {
+        $weekByDate = $myWeekAssignments->sortBy('date')->groupBy(function ($a) {
             return $a->date->format('Y-m-d');
         })->map(function ($group) use ($activeShiftCount) {
             $shiftIds = $group->pluck('shift_id')->unique()->count();
@@ -195,6 +200,6 @@ class DashboardService
             ];
         });
 
-        return compact('todayByShift', 'weekTotal', 'weekUserRanking', 'weekByDate');
+        return compact('todayByShift', 'weekTotal', 'weekUserRanking', 'myWeekTotal', 'weekByDate');
     }
 }

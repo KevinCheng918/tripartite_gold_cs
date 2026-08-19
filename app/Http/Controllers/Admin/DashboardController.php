@@ -39,7 +39,7 @@ class DashboardController extends Controller
 
         // 非管理者有 shift.view 權限時，補上排班資料
         if (!$user->isAdmin() && $user->hasPermission('shift.view') && !isset($data['weekUserRanking'])) {
-            $shiftData = $this->dashboardService->getShiftData();
+            $shiftData = $this->dashboardService->getShiftData(Auth::id());
             $data = array_merge($data, $shiftData);
         }
 
