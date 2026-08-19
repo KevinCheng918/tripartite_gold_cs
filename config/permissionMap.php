@@ -98,6 +98,14 @@ return [
         ],
     ],
 
+    'leave_request' => [
+        'label' => 'permission.group.leave_request',
+        'keywords' => [
+            'leave_request.apply'  => 'permission.leave_request.apply',
+            'leave_request.review' => 'permission.leave_request.review',
+        ],
+    ],
+
     'task_board' => [
         'label' => 'permission.group.task_board',
         'keywords' => [

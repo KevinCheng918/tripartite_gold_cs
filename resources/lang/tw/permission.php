@@ -10,6 +10,7 @@ return [
         'vm' => '虛擬機管理',
         'payment_config' => '繳款設定',
         'telegram_chat' => 'Telegram 客服',
+        'leave_request' => '請假管理',
         'task_board' => '任務看板',
     ],
     'dashboard' => [
@@ -62,6 +63,10 @@ return [
         'reply'     => '回覆訊息',
         'broadcast' => '群發公告',
         'assign'    => '指派值班',
+    ],
+    'leave_request' => [
+        'apply'  => '申請請假',
+        'review' => '審核請假',
     ],
     'task_board' => [
         'view'           => '檢視任務看板',

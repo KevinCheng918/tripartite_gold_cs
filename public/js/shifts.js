@@ -6,6 +6,7 @@
 
     var i18n = JSON.parse(root.dataset.i18n);
     var coverI18n = JSON.parse(root.dataset.coverI18n || '{}');
+    var leaveI18n = JSON.parse(root.dataset.leaveI18n || '{}');
     var currentUserId = parseInt(root.dataset.userId, 10);
     var isAdmin = root.dataset.isAdmin === '1';
     var csrfToken = document.querySelector('meta[name="csrf-token"]').content;
@@ -228,6 +229,7 @@
             { key: 'shifts', label: i18n.tab_shifts, perm: 'shift.update' },
             { key: 'swaps', label: i18n.tab_swaps, perm: 'shift.swap' },
             { key: 'covers', label: coverI18n.nav_label || '代班管理', perm: 'shift.cover' },
+            { key: 'leave', label: leaveI18n.tab_title || '請假管理', perm: 'leave_request.apply' },
         ];
 
         // 只顯示有權限的 Tab
@@ -262,6 +264,8 @@
             loadSwaps();
         } else if (activeTab === 'covers') {
             loadCovers();
+        } else if (activeTab === 'leave') {
+            loadLeave();
         }
     }
 
@@ -1580,4 +1584,335 @@
         .catch(function () {
             root.innerHTML = '<p>Failed to initialize.</p>';
         });
+
+    // ---------------------------------------------------------------
+    //  請假 Tab
+    // ---------------------------------------------------------------
+
+    var leaveStatusMap = {};
+    leaveStatusMap[0] = { text: leaveI18n.status_pending || '待審核', css: 'bg-warning text-dark' };
+    leaveStatusMap[1] = { text: leaveI18n.status_approved || '已通過', css: 'bg-success' };
+    leaveStatusMap[2] = { text: leaveI18n.status_rejected || '已拒絕', css: 'bg-danger' };
+
+    function loadLeave() {
+        var container = document.getElementById('tab-content');
+        if (!container) { return; }
+
+        var html = '';
+
+        // 申請按鈕
+        if (hasPerm('leave_request.apply')) {
+            html += '<div class="mb-3"><button class="btn btn-primary" id="btn-open-leave-apply"><i class="fas fa-plus me-1"></i>' + (leaveI18n.action_apply || '申請請假') + '</button></div>';
+        }
+
+        // 我的請假（非管理者才顯示）+ 審核列表
+        if (!isAdmin) {
+            html += '<h6 class="mb-2"><i class="fas fa-user me-1"></i>' + (leaveI18n.tab_my_leave || '我的請假') + '</h6>';
+            html += '<div id="leave-my-list"><p class="text-muted">Loading...</p></div>';
+        }
+        if (hasPerm('leave_request.review')) {
+            html += '<h6 class="mt-4 mb-2"><i class="fas fa-clipboard-check me-1"></i>' + (leaveI18n.tab_review || '請假審核') + '</h6>';
+            html += '<div id="leave-review-list"><p class="text-muted">Loading...</p></div>';
+        }
+
+        container.innerHTML = html;
+
+        // 綁定申請按鈕
+        var applyBtn = document.getElementById('btn-open-leave-apply');
+        if (applyBtn) {
+            applyBtn.addEventListener('click', function () {
+                document.getElementById('form-leave-apply').reset();
+                document.getElementById('leave-time-fields').style.display = 'none';
+                var endDateInput = document.getElementById('leave-end-date');
+                var dateSeparator = document.getElementById('leave-date-separator');
+                if (endDateInput) { endDateInput.style.display = 'block'; }
+                if (dateSeparator) { dateSeparator.style.display = 'flex'; }
+                var fullDayCheck = document.getElementById('leave-full-day');
+                if (fullDayCheck) { fullDayCheck.checked = true; }
+                showBsModal('modal-leave-apply');
+            });
+        }
+
+        if (!isAdmin && hasPerm('leave_request.apply')) {
+            loadMyLeave();
+        }
+
+        if (hasPerm('leave_request.review')) {
+            loadLeaveReview();
+        }
+    }
+
+    // 整天 checkbox 切換：時段假只能選單天
+    document.addEventListener('change', function (e) {
+        if (e.target && e.target.id === 'leave-full-day') {
+            var timeFields = document.getElementById('leave-time-fields');
+            var endDateInput = document.getElementById('leave-end-date');
+            var dateSeparator = document.getElementById('leave-date-separator');
+            if (e.target.checked) {
+                if (timeFields) { timeFields.style.display = 'none'; }
+                if (endDateInput) { endDateInput.style.display = 'block'; }
+                if (dateSeparator) { dateSeparator.style.display = 'flex'; }
+            } else {
+                if (timeFields) { timeFields.style.display = 'block'; }
+                if (endDateInput) { endDateInput.value = document.getElementById('leave-start-date').value; endDateInput.style.display = 'none'; }
+                if (dateSeparator) { dateSeparator.style.display = 'none'; }
+            }
+            calcLeaveDuration();
+        }
+        // 時段假時，start_date 變動自動同步 end_date
+        if (e.target && e.target.id === 'leave-start-date') {
+            var fullDay = document.getElementById('leave-full-day');
+            if (fullDay && !fullDay.checked) {
+                document.getElementById('leave-end-date').value = e.target.value;
+            }
+        }
+    });
+
+    // 時段即時計算時長
+    function calcLeaveDuration() {
+        var hint = document.getElementById('leave-duration-hint');
+        if (!hint) { return; }
+        var fullDay = document.getElementById('leave-full-day');
+        if (fullDay && fullDay.checked) {
+            var s = document.getElementById('leave-start-date').value;
+            var e = document.getElementById('leave-end-date').value;
+            if (s && e) {
+                var days = Math.round((new Date(e) - new Date(s)) / 86400000) + 1;
+                hint.textContent = days > 0 ? '共 ' + days + ' 天' : '';
+                hint.style.color = '#a67c00';
+                hint.style.background = days > 0 ? 'rgba(212,175,55,0.15)' : '';
+            } else if (s) {
+                hint.textContent = '共 1 天';
+                hint.style.color = '#a67c00';
+                hint.style.background = 'rgba(212,175,55,0.15)';
+            } else {
+                hint.textContent = '';
+            }
+            return;
+        }
+        var st = document.getElementById('leave-start-time').value;
+        var et = document.getElementById('leave-end-time').value;
+        if (!st || !et) { hint.textContent = ''; return; }
+        var sp = st.split(':');
+        var ep = et.split(':');
+        var mins = (parseInt(ep[0], 10) * 60 + parseInt(ep[1], 10)) - (parseInt(sp[0], 10) * 60 + parseInt(sp[1], 10));
+        if (mins <= 0) { hint.textContent = '結束時間需晚於開始時間'; hint.style.color = '#dc3545'; hint.style.background = 'rgba(220,53,69,0.1)'; return; }
+        hint.style.color = '#a67c00';
+        hint.style.background = 'rgba(212,175,55,0.15)';
+        var h = Math.floor(mins / 60);
+        var m = mins % 60;
+        var text = '共 ';
+        if (h > 0) { text += h + ' 小時'; }
+        if (m > 0) { text += ' ' + m + ' 分鐘'; }
+        hint.textContent = text;
+    }
+
+    ['leave-start-time', 'leave-end-time', 'leave-start-date', 'leave-end-date', 'leave-full-day'].forEach(function (id) {
+        document.addEventListener('change', function (e) {
+            if (e.target && e.target.id === id) { calcLeaveDuration(); }
+        });
+    });
+
+    // 請假送出
+    document.addEventListener('submit', function (e) {
+        if (e.target && e.target.id === 'form-leave-apply') {
+            e.preventDefault();
+            var isFullDay = document.getElementById('leave-full-day').checked ? 1 : 0;
+            var startDate = document.getElementById('leave-start-date').value;
+            var payload = {
+                start_date: startDate,
+                end_date: isFullDay ? document.getElementById('leave-end-date').value : startDate,
+                is_full_day: isFullDay
+            };
+            if (!isFullDay) {
+                payload.start_time = document.getElementById('leave-start-time').value;
+                payload.end_time = document.getElementById('leave-end-time').value;
+            }
+            var reason = document.getElementById('leave-reason').value.trim();
+            if (reason) { payload.reason = reason; }
+            var leaveUserSelect = document.getElementById('leave-user-id');
+            if (leaveUserSelect && leaveUserSelect.value) { payload.user_id = parseInt(leaveUserSelect.value, 10); }
+
+            apiFetch('/admin/leave-request/ajax-store', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            })
+                .then(function (body) {
+                    hideBsModal(document.getElementById('modal-leave-apply'));
+                    setTimeout(function () { showMessage(body.message || '已送出'); loadLeave(); }, 400);
+                })
+                .catch(function (err) {
+                    hideBsModal(document.getElementById('modal-leave-apply'));
+                    setTimeout(function () { showMessage(err.message || '申請失敗'); }, 400);
+                });
+        }
+    });
+
+    // 請假審核確認送出
+    document.addEventListener('click', function (e) {
+        if (e.target && e.target.id === 'btn-leave-confirm-ok') {
+            var id = document.getElementById('leave-confirm-id').value;
+            var status = parseInt(document.getElementById('leave-confirm-status').value, 10);
+            e.target.disabled = true;
+
+            apiFetch('/admin/leave-request/ajax-respond/' + id, {
+                method: 'PUT',
+                body: JSON.stringify({ status: status })
+            })
+                .then(function (body) {
+                    hideBsModal(document.getElementById('modal-leave-confirm'));
+                    setTimeout(function () { showMessage(body.message || '操作成功'); loadLeave(); }, 400);
+                    e.target.disabled = false;
+                })
+                .catch(function (err) {
+                    hideBsModal(document.getElementById('modal-leave-confirm'));
+                    setTimeout(function () { showMessage(err.message || '操作失敗'); }, 400);
+                    e.target.disabled = false;
+                });
+        }
+    });
+
+    function loadMyLeave() {
+        apiFetch('/admin/leave-request/ajax-my-list')
+            .then(function (body) {
+                var list = body.data || [];
+                renderLeaveList('leave-my-list', list, false);
+            });
+    }
+
+    function loadLeaveReview() {
+        apiFetch('/admin/leave-request/ajax-list')
+            .then(function (body) {
+                var list = body.data || [];
+                renderLeaveList('leave-review-list', list, true);
+            });
+    }
+
+    function renderLeaveList(containerId, list, showActions) {
+        var container = document.getElementById(containerId);
+        if (!container) { return; }
+
+        if (!list.length) {
+            container.innerHTML = '<p class="text-muted">暫無資料</p>';
+            return;
+        }
+
+        // 共用資料處理
+        var items = list.map(function (item, idx) {
+            var st = leaveStatusMap[item.status] || { text: '-', css: '' };
+            var dateText = item.start_date === item.end_date ? item.start_date : item.start_date + ' ~ ' + item.end_date;
+            var typeText = item.is_full_day === 1 ? (leaveI18n.type_full_day || '整天') : (leaveI18n.type_hours || '時段');
+            var timeText = item.is_full_day === 1 ? '-' : (item.start_time + ' ~ ' + item.end_time);
+            return { item: item, idx: idx, st: st, dateText: dateText, typeText: typeText, timeText: timeText };
+        });
+
+        // 桌面版表格
+        var html = '<div class="d-none d-md-block"><div class="table-responsive"><table class="table table-hover table-striped align-middle mb-0"><thead class="table-light"><tr>';
+        html += '<th>#</th><th>' + (leaveI18n.field_user || '申請人') + '</th>';
+        html += '<th>' + (leaveI18n.field_date || '日期') + '</th>';
+        html += '<th>' + (leaveI18n.field_type || '類型') + '</th>';
+        html += '<th>' + (leaveI18n.field_time || '時段') + '</th>';
+        html += '<th>' + (leaveI18n.field_reason || '原因') + '</th>';
+        html += '<th>' + (leaveI18n.field_status || '狀態') + '</th>';
+        if (showActions) { html += '<th>操作</th>'; }
+        html += '</tr></thead><tbody>';
+
+        items.forEach(function (d) {
+            var item = d.item;
+            html += '<tr>';
+            html += '<td>' + (d.idx + 1) + '</td>';
+            html += '<td><strong>' + item.user + '</strong></td>';
+            html += '<td>' + d.dateText + '</td>';
+            html += '<td>' + d.typeText + '</td>';
+            html += '<td>' + d.timeText + '</td>';
+            html += '<td>' + (item.reason || '-') + '</td>';
+            html += '<td><span class="badge ' + d.st.css + '">' + d.st.text + '</span></td>';
+
+            if (showActions && item.status === 0) {
+                html += '<td>';
+                html += '<button class="btn btn-sm btn-outline-secondary js-leave-respond" data-id="' + item.id + '" data-status="1"><i class="fas fa-check text-success me-1"></i>通過</button> ';
+                html += '<button class="btn btn-sm btn-outline-secondary js-leave-respond" data-id="' + item.id + '" data-status="2"><i class="fas fa-times text-danger me-1"></i>拒絕</button>';
+                html += '</td>';
+            } else if (showActions) {
+                html += '<td>';
+                if (item.reviewer) { html += '<small class="text-muted">審核：' + item.reviewer + '</small>'; }
+                html += '</td>';
+            }
+
+            html += '</tr>';
+        });
+
+        html += '</tbody></table></div></div>';
+
+        // 手機版卡片
+        html += '<div class="d-md-none">';
+        items.forEach(function (d) {
+            var item = d.item;
+            html += '<div class="card mb-2 shadow-sm"><div class="card-body py-3">';
+            html += '<div class="d-flex justify-content-between align-items-start mb-2">';
+            html += '<div><strong style="font-size:1.0625rem">' + item.user + '</strong>';
+            html += '<div class="text-muted" style="font-size:0.8125rem">' + d.dateText + '</div></div>';
+            html += '<span class="badge ' + d.st.css + '">' + d.st.text + '</span></div>';
+            html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">類型</span><span>' + d.typeText + '</span></div>';
+            if (item.is_full_day !== 1) {
+                html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">時段</span><span>' + d.timeText + '</span></div>';
+            }
+            if (item.reason) {
+                html += '<div class="d-flex justify-content-between mb-2" style="font-size:0.875rem"><span class="text-muted">原因</span><span>' + item.reason + '</span></div>';
+            }
+            if (showActions && item.status === 0) {
+                html += '<div class="d-flex gap-1">';
+                html += '<button class="btn btn-sm btn-outline-secondary js-leave-respond" data-id="' + item.id + '" data-status="1"><i class="fas fa-check text-success me-1"></i>通過</button>';
+                html += '<button class="btn btn-sm btn-outline-secondary js-leave-respond" data-id="' + item.id + '" data-status="2"><i class="fas fa-times text-danger me-1"></i>拒絕</button>';
+                html += '</div>';
+            }
+            html += '</div></div>';
+        });
+        html += '</div>';
+        container.innerHTML = html;
+
+        // 綁定審核按鈕 → 開二次確認 Modal
+        container.querySelectorAll('.js-leave-respond').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var id = btn.dataset.id;
+                var status = parseInt(btn.dataset.status, 10);
+                var item = list.filter(function (l) { return l.id === parseInt(id, 10); })[0];
+                if (!item) { return; }
+
+                var actionWord = status === 1 ? '<span class="text-success fw-bold">通過</span>' : '<span class="text-danger fw-bold">拒絕</span>';
+                var dateText = item.start_date === item.end_date ? item.start_date : item.start_date + ' ~ ' + item.end_date;
+
+                // 計算時長
+                var durationText = '';
+                if (item.is_full_day === 1) {
+                    var start = new Date(item.start_date);
+                    var end = new Date(item.end_date);
+                    var days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                    durationText = days + ' 天';
+                } else {
+                    var parts1 = item.start_time.split(':');
+                    var parts2 = item.end_time.split(':');
+                    var minutes = (parseInt(parts2[0], 10) * 60 + parseInt(parts2[1], 10)) - (parseInt(parts1[0], 10) * 60 + parseInt(parts1[1], 10));
+                    var hours = Math.floor(minutes / 60);
+                    var mins = minutes % 60;
+                    durationText = hours > 0 ? hours + ' 小時' : '';
+                    if (mins > 0) { durationText += ' ' + mins + ' 分鐘'; }
+                }
+
+                var html = '<p>確定要' + actionWord + '此請假申請？</p>';
+                html += '<table class="table table-sm text-start mt-2"><tbody>';
+                html += '<tr><th style="width:80px">申請人</th><td><strong>' + item.user + '</strong></td></tr>';
+                html += '<tr><th>日期</th><td>' + dateText + '</td></tr>';
+                html += '<tr><th>類型</th><td>' + (item.is_full_day === 1 ? (leaveI18n.type_full_day || '整天') : item.start_time + ' ~ ' + item.end_time) + '</td></tr>';
+                html += '<tr><th>時長</th><td><strong>' + durationText + '</strong></td></tr>';
+                if (item.reason) { html += '<tr><th>原因</th><td>' + item.reason + '</td></tr>'; }
+                html += '</tbody></table>';
+
+                document.getElementById('leave-confirm-body').innerHTML = html;
+                document.getElementById('leave-confirm-id').value = id;
+                document.getElementById('leave-confirm-status').value = status;
+                showBsModal('modal-leave-confirm');
+            });
+        });
+    }
 })();

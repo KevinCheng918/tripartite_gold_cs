@@ -59,8 +59,8 @@
     </div>
     @endif
 
-    @if(Auth::user()->hasPermission('shift.view'))
-    {{-- 今日排班 --}}
+    @if(Auth::user()->hasPermission('shift.view') && Auth::user()->isAdmin())
+    {{-- 今日排班（管理者版） --}}
     <div class="main-card mb-3 card">
         <div class="card-header">
             <i class="header-icon fas fa-calendar-day me-2 text-muted"></i>

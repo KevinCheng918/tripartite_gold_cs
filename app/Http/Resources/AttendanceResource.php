@@ -41,6 +41,7 @@ class AttendanceResource extends JsonResource
             'early_leave_minutes' => $this->early_leave_minutes,
             'overtime_minutes'    => $this->overtime_minutes,
             'status'              => $this->status,
+            'leave_info'          => $this->leave_info ?? null,
             'user'                => new AccountResource($this->whenLoaded('user')),
             'assignment'          => new ShiftAssignmentResource($this->whenLoaded('assignment')),
         ];

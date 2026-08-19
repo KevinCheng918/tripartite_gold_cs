@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\ShiftCoverController;
 use App\Http\Controllers\Admin\PushController;
 use App\Http\Controllers\Admin\VmController;
 use App\Http\Controllers\Admin\PaymentConfigController;
+use App\Http\Controllers\Admin\LeaveRequestController;
 use App\Http\Controllers\Admin\TaskBoardController;
 use App\Http\Controllers\Auth\LoginController;
 use Illuminate\Support\Facades\Auth;
@@ -90,6 +91,15 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-pending', [ShiftCoverController::class, 'ajaxPendingCovers'])->middleware('can:shift.cover_review')->name('ajax-pending');
         Route::get('/ajax-approved', [ShiftCoverController::class, 'ajaxApprovedCovers'])->middleware('can:shift.view')->name('ajax-approved');
         Route::get('/ajax-all', [ShiftCoverController::class, 'ajaxAllCovers'])->middleware('can:shift.cover_review')->name('ajax-all');
+    });
+
+    // 請假管理
+    Route::prefix('leave-request')->name('leave-request.')->group(function () {
+        Route::get('/ajax-my-list', [LeaveRequestController::class, 'ajaxMyList'])->middleware('can:leave_request.apply')->name('ajax-my-list');
+        Route::get('/ajax-list', [LeaveRequestController::class, 'ajaxList'])->middleware('can:leave_request.review')->name('ajax-list');
+        Route::post('/ajax-store', [LeaveRequestController::class, 'ajaxStore'])->middleware('can:leave_request.apply')->name('ajax-store');
+        Route::put('/ajax-respond/{leaveRequest}', [LeaveRequestController::class, 'ajaxRespond'])->middleware('can:leave_request.review')->name('ajax-respond');
+        Route::get('/ajax-check', [LeaveRequestController::class, 'ajaxCheck'])->middleware('can:shift.view')->name('ajax-check');
     });
 
     // Telegram 客服聊天（所有登入者可查看，回覆需權限，值班自動從排班指派）

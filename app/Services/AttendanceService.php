@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AttendanceRecord;
 use App\Repositories\AttendanceRepository;
 use App\Repositories\ClockAmendmentRepository;
+use App\Repositories\LeaveRequestRepository;
 use App\Repositories\ShiftAssignmentRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\ValidationException;
@@ -19,15 +20,18 @@ class AttendanceService
     private $attendanceRepository;
     private $assignmentRepository;
     private $amendmentRepository;
+    private $leaveRepository;
 
     public function __construct(
         AttendanceRepository $attendanceRepository,
         ShiftAssignmentRepository $assignmentRepository,
-        ClockAmendmentRepository $amendmentRepository
+        ClockAmendmentRepository $amendmentRepository,
+        LeaveRequestRepository $leaveRepository
     ) {
         $this->attendanceRepository = $attendanceRepository;
         $this->assignmentRepository = $assignmentRepository;
         $this->amendmentRepository = $amendmentRepository;
+        $this->leaveRepository = $leaveRepository;
     }
 
     /**
@@ -42,6 +46,14 @@ class AttendanceService
     public function clockIn($userId, $ip, $device)
     {
         $today = now()->format('Y-m-d');
+
+        // 檢查今日是否有整天請假
+        if ($this->leaveRepository->hasApprovedFullDayOnDate($userId, $today)) {
+            throw ValidationException::withMessages([
+                'clock_in' => [trans('leave.msg.on_leave_today')],
+            ]);
+        }
+
         $existing = $this->attendanceRepository->findByUserAndDate($userId, $today);
 
         if ($existing && filled($existing->clock_in)) {
@@ -193,7 +205,23 @@ class AttendanceService
      */
     public function getMonthlyRecords($userId, $yearMonth)
     {
-        return $this->attendanceRepository->getByUserAndMonth($userId, $yearMonth);
+        $records = $this->attendanceRepository->getByUserAndMonth($userId, $yearMonth);
+
+        // 帶入每天的請假資訊
+        $records->each(function ($record) use ($userId) {
+            $date = $record->date->format('Y-m-d');
+            $leaves = $this->leaveRepository->getApprovedOnDate($userId, $date);
+            if ($leaves->isNotEmpty()) {
+                $leave = $leaves->first();
+                $record->leave_info = [
+                    'is_full_day' => (int) $leave->is_full_day,
+                    'start_time'  => $leave->start_time,
+                    'end_time'    => $leave->end_time,
+                ];
+            }
+        });
+
+        return $records;
     }
 
     /**
@@ -206,6 +234,10 @@ class AttendanceService
     {
         $records = $this->attendanceRepository->getAllByMonth($yearMonth);
         $amendCounts = $this->amendmentRepository->getApprovedCountByMonth($yearMonth);
+        $leaveRecords = $this->leaveRepository->getApprovedByMonth($yearMonth);
+
+        $monthStart = "{$yearMonth}-01";
+        $monthEnd = date('Y-m-t', strtotime($monthStart));
 
         // 按員工分組統計
         $grouped = $records->groupBy('user_id');
@@ -213,6 +245,32 @@ class AttendanceService
 
         foreach ($grouped as $userId => $userRecords) {
             $user = $userRecords->first()->user;
+
+            // 計算請假統計
+            $userLeaves = $leaveRecords->where('user_id', $userId);
+            $leaveCount = $userLeaves->count();
+            $leaveDays = 0;
+            $leaveHours = 0;
+
+            foreach ($userLeaves as $leave) {
+                if ((int) $leave->is_full_day === 1) {
+                    // 整天假：計算在本月內的天數
+                    $start = max(strtotime($monthStart), strtotime($leave->start_date->format('Y-m-d')));
+                    $end = min(strtotime($monthEnd), strtotime($leave->end_date->format('Y-m-d')));
+                    $days = (int) round(($end - $start) / 86400) + 1;
+                    $leaveDays += $days;
+                } else {
+                    // 時段假：計算小時數（支援跨日，如 19:30 ~ 00:00）
+                    $startParts = explode(':', $leave->start_time);
+                    $endParts = explode(':', $leave->end_time);
+                    $startMin = (int) $startParts[0] * 60 + (int) $startParts[1];
+                    $endMin = (int) $endParts[0] * 60 + (int) $endParts[1];
+                    $minutes = $endMin - $startMin;
+                    if ($minutes <= 0) { $minutes += 1440; } // 跨日加 24 小時
+                    $leaveHours += $minutes / 60;
+                }
+            }
+
             $report[] = [
                 'user'                 => $user,
                 'total_days'           => $userRecords->count(),
@@ -224,6 +282,9 @@ class AttendanceService
                 'absent_count'         => $userRecords->where('status', AttendanceRecord::STATUS_ABSENT)->count(),
                 'overtime_total_minutes' => $userRecords->sum('overtime_minutes'),
                 'amend_count'          => $amendCounts->get($userId, 0),
+                'leave_count'          => $leaveCount,
+                'leave_days'           => $leaveDays,
+                'leave_hours'          => round($leaveHours, 1),
                 'records'              => $userRecords->values(),
             ];
         }

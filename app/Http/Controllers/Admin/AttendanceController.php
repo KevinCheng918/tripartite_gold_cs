@@ -7,6 +7,7 @@ use App\Http\Resources\AttendanceResource;
 use App\Models\ClockAmendment;
 use App\Services\AttendanceService;
 use App\Services\ClockAmendmentService;
+use App\Services\LeaveRequestService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -21,11 +22,16 @@ class AttendanceController extends Controller
 {
     private $attendanceService;
     private $amendmentService;
+    private $leaveService;
 
-    public function __construct(AttendanceService $attendanceService, ClockAmendmentService $amendmentService)
-    {
+    public function __construct(
+        AttendanceService $attendanceService,
+        ClockAmendmentService $amendmentService,
+        LeaveRequestService $leaveService
+    ) {
         $this->attendanceService = $attendanceService;
         $this->amendmentService = $amendmentService;
+        $this->leaveService = $leaveService;
     }
 
     /**

@@ -5,11 +5,29 @@
 @section('subtitle', trans('shift.subtitle'))
 
 @section('content')
+    <style>
+        /* dark mode: modal 表單元素 */
+        [data-theme="dark"] .modal-content .form-control,
+        [data-theme="dark"] .modal-content .form-select { background: #2d2d2d; color: #e0e0e0; border-color: #444; }
+        [data-theme="dark"] .modal-content .input-group-text { background: #333; color: #ccc; border-color: #444; }
+        [data-theme="dark"] .modal-content .form-check-label { color: #e0e0e0; }
+        /* 瀏覽器原生 date/time picker dark mode */
+        [data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
+        [data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1); }
+        /* input-group 統一白底 */
+        #leave-date-group .input-group-text { background: #fff; }
+        #leave-date-group .form-control { background: #fff; }
+        [data-theme="dark"] #leave-date-group .input-group-text { background: #2d2d2d; color: #ccc; border-color: #444; }
+        [data-theme="dark"] #leave-date-group .form-control { background: #2d2d2d; color: #e0e0e0; border-color: #444; }
+        /* 時長提示 */
+        #leave-duration-hint:empty { display: none; }
+    </style>
     <div id="shift-app"
          data-i18n='@json(trans('shift'))'
          data-user-id="{{ Auth::id() }}"
          data-is-admin="{{ Auth::user()->isAdmin() ? '1' : '0' }}"
          data-cover-i18n='@json(trans("cover"))'
+         data-leave-i18n='@json(trans("leave"))'
          data-permissions='@json(Auth::user()->isAdmin() ? ["all"] : Auth::user()->permissions()->pluck("permission_keyword")->all())'>
         <p>Loading…</p>
     </div>
@@ -95,6 +113,79 @@
             </div>
         </form>
     @endcomponent
+
+    {{-- 申請請假 Modal --}}
+    @component('components.modal', ['id' => 'modal-leave-apply', 'title' => trans('leave.action_apply')])
+        <form id="form-leave-apply">
+            @if(Auth::user()->isAdmin())
+            <div class="mb-3">
+                <label class="form-label">{{ trans('leave.field_user') }} <span class="text-danger">*</span></label>
+                <select id="leave-user-id" class="form-select" required>
+                    <option value="">請選擇</option>
+                    @foreach(\App\Models\User::where('level', '!=', config('constants.USER.LEVEL.ADMIN'))->where('status', config('constants.USER.STATUS.NORMAL'))->orderBy('nickname')->get(['id', 'nickname']) as $u)
+                        <option value="{{ $u->id }}">{{ $u->nickname }}</option>
+                    @endforeach
+                </select>
+            </div>
+            @endif
+            <div class="mb-3">
+                <label class="form-label">{{ trans('leave.field_date') }} <span class="text-danger">*</span></label>
+                <div class="input-group" id="leave-date-group">
+                    <input id="leave-start-date" type="date" class="form-control" required>
+                    <span class="input-group-text" id="leave-date-separator">~</span>
+                    <input id="leave-end-date" type="date" class="form-control" required>
+                </div>
+            </div>
+            <div class="mb-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="leave-full-day" checked>
+                    <label class="form-check-label" for="leave-full-day">{{ trans('leave.type_full_day') }}</label>
+                </div>
+            </div>
+            <div class="mb-3" id="leave-time-fields" style="display:none">
+                <label class="form-label">{{ trans('leave.field_time') }} <span class="text-danger">*</span></label>
+                <div class="row g-2">
+                    <div class="col">
+                        <input id="leave-start-time" type="time" class="form-control">
+                    </div>
+                    <div class="col-auto d-flex align-items-center">~</div>
+                    <div class="col">
+                        <input id="leave-end-time" type="time" class="form-control">
+                    </div>
+                </div>
+            </div>
+            <div id="leave-duration-hint" class="mb-3 fw-bold text-center py-2 rounded" style="font-size:1.25rem;background:rgba(212,175,55,0.15);color:#a67c00"></div>
+            <div class="mb-3">
+                <label class="form-label">{{ trans('leave.field_reason') }}</label>
+                <textarea id="leave-reason" class="form-control" rows="2" maxlength="500"></textarea>
+            </div>
+            <div class="text-end">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('shift.modal_cancel') }}</button>
+                <button type="submit" class="btn btn-primary">{{ trans('shift.modal_confirm') }}</button>
+            </div>
+        </form>
+    @endcomponent
+
+    {{-- 請假審核確認 Modal --}}
+    <div class="modal fade" id="modal-leave-confirm" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header justify-content-center">
+                    <h4 class="modal-title text-center fw-bold">請假審核確認</h4>
+                    <button type="button" class="btn-close position-absolute end-0 me-3" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="leave-confirm-body" class="text-center"></div>
+                    <input type="hidden" id="leave-confirm-id">
+                    <input type="hidden" id="leave-confirm-status">
+                    <div class="d-flex justify-content-between mt-3">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="button" class="btn btn-primary" id="btn-leave-confirm-ok">確認</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     {{-- 編輯班別 Modal (Admin) --}}
     @component('components.modal', ['id' => 'modal-edit-shift', 'title' => trans('shift.modal_edit_shift_title')])

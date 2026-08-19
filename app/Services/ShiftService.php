@@ -8,6 +8,7 @@ use App\Criteria\ShiftAssignment\AssignmentUserCriteria;
 use App\Models\Shift;
 use App\Models\ShiftAssignment;
 use App\Models\ShiftSwap;
+use App\Repositories\LeaveRequestRepository;
 use App\Repositories\ShiftAssignmentRepository;
 use App\Repositories\ShiftRepository;
 use App\Repositories\UserRepository;
@@ -28,15 +29,18 @@ class ShiftService
     private $shiftRepository;
     private $assignmentRepository;
     private $userRepository;
+    private $leaveRepository;
 
     public function __construct(
         ShiftRepository $shiftRepository,
         ShiftAssignmentRepository $assignmentRepository,
-        UserRepository $userRepository
+        UserRepository $userRepository,
+        LeaveRequestRepository $leaveRepository
     ) {
         $this->shiftRepository = $shiftRepository;
         $this->assignmentRepository = $assignmentRepository;
         $this->userRepository = $userRepository;
+        $this->leaveRepository = $leaveRepository;
     }
 
     // ---------------------------------------------------------------
@@ -154,6 +158,13 @@ class ShiftService
         if (!$byAdmin && $user && $user->isLockStatus()) {
             throw ValidationException::withMessages([
                 'user_id' => [trans('shift.locked_cannot_assign')],
+            ]);
+        }
+
+        // 檢查該日是否有已通過的整天請假
+        if ($this->leaveRepository->hasApprovedFullDayOnDate((int) $params['user_id'], $params['date'])) {
+            throw ValidationException::withMessages([
+                'user_id' => [trans('leave.msg.leave_blocked')],
             ]);
         }
 

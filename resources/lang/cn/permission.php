@@ -10,6 +10,7 @@ return [
         'vm' => '虚拟机管理',
         'payment_config' => '缴款设定',
         'telegram_chat' => 'Telegram 客服',
+        'leave_request' => '请假管理',
         'task_board' => '任务看板',
     ],
     'dashboard' => [
@@ -62,6 +63,10 @@ return [
         'reply'     => '回复消息',
         'assign'    => '指派值班',
         'broadcast' => '群发公告',
+    ],
+    'leave_request' => [
+        'apply'  => '申请请假',
+        'review' => '审核请假',
     ],
     'task_board' => [
         'view'           => '查看任务看板',

@@ -95,6 +95,7 @@
                             <th>{{ trans('attendance.field_early_leave') }}</th>
                             <th>{{ trans('attendance.field_overtime') }}</th>
                             <th>{{ trans('attendance.field_status') }}</th>
+                            <th>請假</th>
                             <th>{{ trans('attendance.field_ip') }}</th>
                         </tr>
                     </thead>
@@ -139,11 +140,22 @@
                                         @case(5) <span class="badge bg-danger">{{ trans('attendance.status_absent') }}</span> @break
                                     @endswitch
                                 </td>
+                                <td>
+                                    @if(filled($r->leave_info))
+                                        @if($r->leave_info['is_full_day'] === 1)
+                                            <span class="badge bg-info">整天請假</span>
+                                        @else
+                                            <span class="badge bg-info">{{ $r->leave_info['start_time'] }} ~ {{ $r->leave_info['end_time'] }}</span>
+                                        @endif
+                                    @else
+                                        -
+                                    @endif
+                                </td>
                                 <td><small class="text-muted">{{ $r->clock_in_ip ?? '-' }}</small></td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="text-center text-muted py-4">暫無資料</td>
+                                <td colspan="9" class="text-center text-muted py-4">暫無資料</td>
                             </tr>
                         @endforelse
                     </tbody>

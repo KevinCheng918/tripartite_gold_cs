@@ -499,6 +499,7 @@
                 '<td>' + r.early_count + '<span class="att-sub">' + r.early_total_minutes + ' ' + i18n.unit_minutes + '</span></td>' +
                 '<td>' + r.absent_count + '</td>' +
                 '<td>' + (r.amend_count || 0) + '</td>' +
+                '<td>' + (r.leave_count || 0) + '<span class="att-sub">' + (r.leave_days || 0) + ' 天 ' + (r.leave_hours || 0) + ' 小時</span></td>' +
                 '<td>' + r.overtime_total_minutes + ' ' + i18n.unit_minutes + '</td>' +
                 '</tr>'
             );
@@ -514,6 +515,7 @@
             '<th>' + i18n.field_early_count + '</th>' +
             '<th>' + i18n.field_absent_count + '</th>' +
             '<th>' + i18n.field_amend_count + '</th>' +
+            '<th>請假</th>' +
             '<th>' + i18n.field_overtime_total + '</th>' +
             '</tr></thead><tbody>' + rows + '</tbody></table>';
 
@@ -532,6 +534,7 @@
                 '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_early_count + '</span><span>' + r.early_count + '（' + r.early_total_minutes + ' ' + i18n.unit_minutes + '）</span></div>' +
                 '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_absent_count + '</span><span>' + r.absent_count + '</span></div>' +
                 '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_amend_count + '</span><span>' + (r.amend_count || 0) + '</span></div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">請假</span><span>' + (r.leave_count || 0) + '（' + (r.leave_days || 0) + ' 天 ' + (r.leave_hours || 0) + ' 小時）</span></div>' +
                 '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_overtime_total + '</span><span>' + r.overtime_total_minutes + ' ' + i18n.unit_minutes + '</span></div>' +
                 '</div>'
             );
