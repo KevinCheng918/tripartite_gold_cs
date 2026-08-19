@@ -149,7 +149,9 @@
         </div>
     </div>
 
-    @else
+    @endif {{-- end shift.view for admin --}}
+
+    @if(Auth::user()->hasPermission('shift.view') && !Auth::user()->isAdmin())
     {{-- ===== 客服 Dashboard ===== --}}
 
     <div class="main-card mb-3 card">
@@ -252,7 +254,7 @@
             @endif
         </div>
     </div>
-    @endif {{-- end shift.view --}}
+    @endif {{-- end shift.view for cs --}}
 
 @endsection
 
