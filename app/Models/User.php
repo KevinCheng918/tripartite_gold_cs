@@ -62,6 +62,16 @@ class User extends Authenticatable
     }
 
     /**
+     * 是否為主管以上（Admin / Boss / Leader）
+     *
+     * @return bool
+     */
+    public function isLeaderUp()
+    {
+        return $this->level <= config('constants.USER.LEVEL.LEADER');
+    }
+
+    /**
      * 是否為客服
      *
      * @return bool
