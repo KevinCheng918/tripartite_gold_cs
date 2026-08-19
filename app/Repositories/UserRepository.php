@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\DB;
 class UserRepository
 {
     /** @var array 列表查詢欄位 */
-    private const LIST_COLUMNS = ['id', 'account', 'nickname', 'status', 'level', 'created_at'];
+    private const LIST_COLUMNS = ['id', 'account', 'nickname', 'status', 'level', 'project_ids', 'created_at'];
 
     /**
      * 依條件分頁查詢使用者
