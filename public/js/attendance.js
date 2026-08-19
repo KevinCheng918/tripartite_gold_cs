@@ -419,6 +419,7 @@
                 '<td>' + (r.early_leave_minutes > 0 ? r.early_leave_minutes + ' ' + i18n.unit_minutes : '-') + '</td>' +
                 '<td>' + (r.overtime_minutes > 0 ? r.overtime_minutes + ' ' + i18n.unit_minutes : '-') + '</td>' +
                 '<td><span class="badge ' + st.css + '">' + st.text + '</span></td>' +
+                '<td>' + (r.leave_info ? (r.leave_info.is_full_day === 1 ? '<span class="badge bg-info">整天請假</span>' : '<span class="badge bg-info">' + r.leave_info.start_time + ' ~ ' + r.leave_info.end_time + '</span>') : '-') + '</td>' +
                 '</tr>'
             );
         }).join('');
@@ -432,6 +433,7 @@
             '<th>' + i18n.field_early_leave + '</th>' +
             '<th>' + i18n.field_overtime + '</th>' +
             '<th>' + i18n.field_status + '</th>' +
+            '<th>請假</th>' +
             '</tr></thead><tbody>' + rows + '</tbody></table>';
 
         // 手機版卡片
@@ -450,6 +452,7 @@
                 (r.late_minutes > 0 ? '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_late + '</span><span style="color:#dc2626;font-weight:600">' + r.late_minutes + ' ' + i18n.unit_minutes + '</span></div>' : '') +
                 (r.early_leave_minutes > 0 ? '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_early_leave + '</span><span style="color:#dc2626;font-weight:600">' + r.early_leave_minutes + ' ' + i18n.unit_minutes + '</span></div>' : '') +
                 (r.overtime_minutes > 0 ? '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_overtime + '</span><span style="color:#059669;font-weight:600">' + r.overtime_minutes + ' ' + i18n.unit_minutes + '</span></div>' : '') +
+                (r.leave_info ? '<div class="shift-card__row"><span class="shift-card__label">請假</span><span class="badge bg-info">' + (r.leave_info.is_full_day === 1 ? '整天請假' : r.leave_info.start_time + ' ~ ' + r.leave_info.end_time) + '</span></div>' : '') +
                 '</div>'
             );
         }).join('');
