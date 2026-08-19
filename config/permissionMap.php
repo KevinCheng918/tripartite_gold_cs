@@ -98,6 +98,14 @@ return [
         ],
     ],
 
+    'staff_manage' => [
+        'label' => 'permission.group.staff_manage',
+        'keywords' => [
+            'staff_manage.view' => 'permission.staff_manage.view',
+            'staff_manage.edit' => 'permission.staff_manage.edit',
+        ],
+    ],
+
     'leave_request' => [
         'label' => 'permission.group.leave_request',
         'keywords' => [

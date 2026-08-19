@@ -11,8 +11,11 @@ return [
 
     'USER' => [
         'LEVEL' => [
-            'ADMIN' => 0,
-            'CS'    => 1,
+            'ADMIN'    => 0,
+            'BOSS'     => 1,
+            'LEADER'   => 2,
+            'ENGINEER' => 3,
+            'CS'       => 4,
         ],
         'STATUS' => [
             'NORMAL'     => 1,  // 正常：完整功能

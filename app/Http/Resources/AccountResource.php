@@ -31,10 +31,33 @@ class AccountResource extends JsonResource
             'status'              => $this->status,
             'level'               => $this->level,
             'project_ids'         => $this->project_ids ?? [],
+            'hired_at'            => $this->hired_at ? $this->hired_at->format('Y-m-d') : null,
+            'tenure'              => $this->hired_at ? $this->calcTenure() : null,
+            'equipments'          => $this->equipments ?? [],
             'permission_keywords' => $this->whenLoaded('permissions', function () {
                 return $this->permissions->pluck('permission_keyword')->all();
             }),
             'created_at'          => \Carbon\Carbon::parse($this->created_at)->toDateTimeString(),
         ];
+    }
+
+    /**
+     * 計算年資（年/月/日）
+     *
+     * @return string
+     */
+    private function calcTenure()
+    {
+        if ($this->hired_at->isFuture()) {
+            return '尚未到職';
+        }
+
+        $diff = $this->hired_at->diff(now());
+        $parts = [];
+        if ($diff->y > 0) { $parts[] = "{$diff->y} 年"; }
+        if ($diff->m > 0) { $parts[] = "{$diff->m} 個月"; }
+        if ($diff->d > 0) { $parts[] = "{$diff->d} 天"; }
+
+        return !empty($parts) ? implode(' ', $parts) : '今天到職';
     }
 }

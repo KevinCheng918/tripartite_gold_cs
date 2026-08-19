@@ -10,6 +10,7 @@ return [
         'vm' => 'VM Management',
         'payment_config' => 'Payment Config',
         'telegram_chat' => 'Telegram Chat',
+        'staff_manage' => 'Staff Management',
         'leave_request' => 'Leave Management',
         'task_board' => 'Task Board',
     ],
@@ -63,6 +64,10 @@ return [
         'reply'     => 'Reply messages',
         'assign'    => 'Assign duty staff',
         'broadcast' => 'Broadcast announcement',
+    ],
+    'staff_manage' => [
+        'view' => 'View staff management',
+        'edit' => 'Edit staff info',
     ],
     'leave_request' => [
         'apply'  => 'Apply for leave',

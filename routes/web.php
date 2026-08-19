@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\PushController;
 use App\Http\Controllers\Admin\VmController;
 use App\Http\Controllers\Admin\PaymentConfigController;
 use App\Http\Controllers\Admin\LeaveRequestController;
+use App\Http\Controllers\Admin\StaffManageController;
 use App\Http\Controllers\Admin\TaskBoardController;
 use App\Http\Controllers\Auth\LoginController;
 use Illuminate\Support\Facades\Auth;
@@ -181,6 +182,13 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::post('/ajax-store-comment/{task}', [TaskBoardController::class, 'ajaxStoreComment'])->middleware('can:task_board.view')->name('ajax-store-comment');
         Route::delete('/ajax-delete-comment/{comment}', [TaskBoardController::class, 'ajaxDeleteComment'])->middleware('can:task_board.delete_comment')->name('ajax-delete-comment');
         Route::post('/ajax-upload-editor-image', [TaskBoardController::class, 'ajaxUploadEditorImage'])->middleware('can:task_board.create')->name('ajax-upload-editor-image');
+    });
+
+    // 內部管理
+    Route::prefix('staff-manage')->name('staff-manage.')->group(function () {
+        Route::get('/', [StaffManageController::class, 'index'])->middleware('can:staff_manage.view')->name('index');
+        Route::get('/ajax-list', [StaffManageController::class, 'ajaxList'])->middleware('can:staff_manage.view')->name('ajax-list');
+        Route::put('/ajax-update/{user}', [StaffManageController::class, 'ajaxUpdate'])->middleware('can:staff_manage.edit')->name('ajax-update');
     });
 
     // Web Push 訂閱

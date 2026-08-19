@@ -210,6 +210,15 @@
                                 </a>
                             </li>
                             @endif
+                            @if(Auth::user()->hasPermission('staff_manage.view'))
+                            <li class="app-sidebar__heading">內勤管理</li>
+                            <li>
+                                <a href="{{ route('admin.staff-manage.index') }}" class="{{ request()->routeIs('admin.staff-manage.*') ? 'mm-active' : '' }}">
+                                    <i class="metismenu-icon fas fa-id-card"></i>
+                                    內勤管理
+                                </a>
+                            </li>
+                            @endif
                             @if(Auth::user()->hasPermission('station.view') || Auth::user()->hasPermission('station.topup_view') || Auth::user()->hasPermission('telegram_chat.broadcast') || Auth::user()->hasPermission('vm.view') || Auth::user()->hasPermission('vm.billing_view') || Auth::user()->hasPermission('payment_config.view'))
                             <li class="app-sidebar__heading">{{ trans('station.section_label') }}</li>
                             @if(Auth::user()->hasPermission('station.view') || Auth::user()->hasPermission('station.topup_view'))

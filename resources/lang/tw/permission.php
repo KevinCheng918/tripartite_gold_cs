@@ -10,6 +10,7 @@ return [
         'vm' => '虛擬機管理',
         'payment_config' => '繳款設定',
         'telegram_chat' => 'Telegram 客服',
+        'staff_manage' => '內部管理',
         'leave_request' => '請假管理',
         'task_board' => '任務看板',
     ],
@@ -63,6 +64,10 @@ return [
         'reply'     => '回覆訊息',
         'broadcast' => '群發公告',
         'assign'    => '指派值班',
+    ],
+    'staff_manage' => [
+        'view' => '檢視內部管理',
+        'edit' => '編輯員工資料',
     ],
     'leave_request' => [
         'apply'  => '申請請假',

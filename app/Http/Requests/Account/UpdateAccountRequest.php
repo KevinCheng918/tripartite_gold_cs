@@ -23,9 +23,12 @@ class UpdateAccountRequest extends FormRequest
             'nickname' => 'sometimes|max:100',
             'account'  => ['sometimes', 'max:100', Rule::unique('user', 'account')->ignore($userId)],
             'password' => 'sometimes|nullable|' . config('rules.USER_PASSWORD_REGEX'),
+            'level'          => 'sometimes|integer|in:0,1,2,3,4',
             'status'         => 'sometimes|integer|in:0,1,2',
             'project_ids'    => 'nullable|array',
             'project_ids.*'  => 'integer',
+            'hired_at'       => 'nullable|date',
+            'equipments'     => 'nullable|array',
         ];
     }
 

@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\DB;
 class UserRepository
 {
     /** @var array 列表查詢欄位 */
-    private const LIST_COLUMNS = ['id', 'account', 'nickname', 'status', 'level', 'project_ids', 'created_at'];
+    private const LIST_COLUMNS = ['id', 'account', 'nickname', 'status', 'level', 'project_ids', 'hired_at', 'equipments', 'created_at'];
 
     /**
      * 依條件分頁查詢使用者
@@ -55,9 +55,9 @@ class UserRepository
      */
     public function countByStatus()
     {
-        $rows = User::query()
+        $statusRows = User::query()
             ->selectRaw('status, COUNT(*) as count')
-            ->where('level', config('constants.USER.LEVEL.CS'))
+            ->where('level', '!=', config('constants.USER.LEVEL.ADMIN'))
             ->groupBy('status')
             ->get();
 
@@ -65,7 +65,7 @@ class UserRepository
         $lock = 0;
         $deactivate = 0;
 
-        foreach ($rows as $row) {
+        foreach ($statusRows as $row) {
             if ((int) $row->status === config('constants.USER.STATUS.NORMAL')) {
                 $normal = $row->count;
             } elseif ((int) $row->status === config('constants.USER.STATUS.LOCK')) {
@@ -75,11 +75,24 @@ class UserRepository
             }
         }
 
+        // 按身份統計
+        $levelRows = User::query()
+            ->selectRaw('level, COUNT(*) as count')
+            ->where('level', '!=', config('constants.USER.LEVEL.ADMIN'))
+            ->groupBy('level')
+            ->get();
+
+        $byLevel = [];
+        foreach ($levelRows as $row) {
+            $byLevel[(int) $row->level] = $row->count;
+        }
+
         return [
             'normal'     => $normal,
             'lock'       => $lock,
             'deactivate' => $deactivate,
             'total'      => $normal + $lock + $deactivate,
+            'by_level'   => $byLevel,
         ];
     }
 
@@ -223,6 +236,20 @@ class UserRepository
         return User::query()
             ->select(['id', 'nickname'])
             ->where('status', config('constants.USER.STATUS.NORMAL'))
+            ->where('level', '!=', config('constants.USER.LEVEL.ADMIN'))
+            ->orderBy('nickname')
+            ->get();
+    }
+
+    /**
+     * 取得所有客服帳號（含到職日與設備）
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getAllCsUsersWithDetail()
+    {
+        return User::query()
+            ->select(['id', 'account', 'nickname', 'level', 'status', 'hired_at', 'resigned_at', 'equipments'])
             ->where('level', '!=', config('constants.USER.LEVEL.ADMIN'))
             ->orderBy('nickname')
             ->get();

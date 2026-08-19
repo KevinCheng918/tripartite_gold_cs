@@ -36,6 +36,9 @@ class User extends Authenticatable
         'status'      => 'integer',
         'level'       => 'integer',
         'project_ids' => 'array',
+        'hired_at'    => 'date',
+        'resigned_at' => 'date',
+        'equipments'  => 'array',
     ];
 
     /**

@@ -11,7 +11,7 @@
         <div class="card-header d-flex align-items-center justify-content-between">
             <div class="d-flex gap-2">
                 @if(Auth::user()->isAdmin())
-                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-create-account">
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-create-account">
                         <i class="fas fa-plus me-1"></i>{{ trans('account.action_create') }}
                     </button>
                 @endif
@@ -45,7 +45,11 @@
                             <label class="form-label fw-bold">{{ trans('account.field_level') }}：</label>
                             <select name="level" class="form-select">
                                 <option value="">全部</option>
-                                <option value="1" {{ ($filters['level'] ?? '') === '1' ? 'selected' : '' }}>{{ trans('account.level_cs') }}</option>
+                                @foreach(config('constants.USER.LEVEL') as $key => $val)
+                                    @if($val !== config('constants.USER.LEVEL.ADMIN'))
+                                        <option value="{{ $val }}" {{ ($filters['level'] ?? '') == $val ? 'selected' : '' }}>{{ \App\Presenters\UserPresenter::levelName($val) }}</option>
+                                    @endif
+                                @endforeach
                             </select>
                         </div>
                     </div>
@@ -61,13 +65,52 @@
     </div>
 
     {{-- 統計 --}}
-    <div class="main-card mb-3 card">
-        <div class="card-body py-2">
-            <div class="d-flex flex-wrap gap-4 align-items-center">
-                <span><span class="badge bg-success">{{ trans('account.status_normal') }}</span> <strong>{{ $accountStats['normal'] }}</strong></span>
-                <span><span class="badge bg-warning text-dark">{{ trans('account.status_lock') }}</span> <strong>{{ $accountStats['lock'] }}</strong></span>
-                <span><span class="badge bg-danger">{{ trans('account.status_deactivate') }}</span> <strong>{{ $accountStats['deactivate'] }}</strong></span>
-                <span class="ms-auto fw-bold">客服總數：{{ $accountStats['total'] }} 人</span>
+    <div class="row g-3 mb-3">
+        <div class="col">
+            <div class="card shadow-sm">
+                <div class="card-header py-2 d-flex justify-content-center" style="background:#e9ecef"><strong style="font-size:1.0625rem"><i class="fas fa-users me-2"></i>身份</strong></div>
+                <div class="card-body py-2">
+                    <div class="d-flex flex-wrap text-center">
+                        @foreach(config('constants.USER.LEVEL') as $key => $val)
+                            @if($val !== config('constants.USER.LEVEL.ADMIN'))
+                                <div class="flex-fill">
+                                    <div class="mb-1">{!! \App\Presenters\UserPresenter::levelBadge($val) !!}</div>
+                                    <div class="fw-bold" style="font-size:1.25rem">{{ $accountStats['by_level'][$val] ?? 0 }}</div>
+                                </div>
+                            @endif
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card shadow-sm">
+                <div class="card-header py-2 d-flex justify-content-center" style="background:#e9ecef"><strong style="font-size:1.0625rem"><i class="fas fa-toggle-on me-2"></i>狀態</strong></div>
+                <div class="card-body py-2">
+                    <div class="d-flex flex-wrap text-center">
+                        <div class="flex-fill">
+                            <div class="mb-1"><span class="badge bg-success">{{ trans('account.status_normal') }}</span></div>
+                            <div class="fw-bold" style="font-size:1.25rem">{{ $accountStats['normal'] }}</div>
+                        </div>
+                        <div class="flex-fill">
+                            <div class="mb-1"><span class="badge bg-warning text-dark">{{ trans('account.status_lock') }}</span></div>
+                            <div class="fw-bold" style="font-size:1.25rem">{{ $accountStats['lock'] }}</div>
+                        </div>
+                        <div class="flex-fill">
+                            <div class="mb-1"><span class="badge bg-danger">{{ trans('account.status_deactivate') }}</span></div>
+                            <div class="fw-bold" style="font-size:1.25rem">{{ $accountStats['deactivate'] }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-auto d-flex">
+            <div class="card shadow-sm d-flex justify-content-center" style="min-width:100px">
+                <div class="card-header py-2 d-flex justify-content-center" style="background:#e9ecef"><strong style="font-size:1.0625rem">總計</strong></div>
+                <div class="card-body py-2 d-flex flex-column align-items-center justify-content-center">
+                    <div class="fw-bold" style="font-size:1.25rem">{{ $accountStats['total'] }}</div>
+                    <small class="text-muted">人</small>
+                </div>
             </div>
         </div>
     </div>
@@ -107,11 +150,12 @@
                                         <span class="badge bg-danger">{{ trans('account.status_deactivate') }}</span>
                                     @endif
                                 </td>
-                                <td><span class="badge bg-secondary">{{ trans('account.level_cs') }}</span></td>
+                                <td>{!! \App\Presenters\UserPresenter::levelBadge($account->level) !!}</td>
                                 <td>
                                     <button class="btn btn-sm btn-outline-secondary js-edit"
                                             data-id="{{ $account->id }}"
                                             data-nickname="{{ $account->nickname }}"
+                                            data-level="{{ $account->level }}"
                                             data-project-ids="{{ json_encode($account->project_ids ?? []) }}">
                                         <i class="fas fa-edit me-1"></i>{{ trans('account.action_edit') }}
                                     </button>
@@ -166,6 +210,7 @@
                             @else
                                 <span class="badge bg-danger">{{ trans('account.status_deactivate') }}</span>
                             @endif
+                            {!! \App\Presenters\UserPresenter::levelBadge($account->level) !!}
                         </div>
                     </div>
                     <div class="d-grid gap-1" style="grid-template-columns: 1fr 1fr">
@@ -244,6 +289,12 @@
                         <div class="mb-3">
                             <label class="form-label">{{ trans('account.field_password') }}（{{ trans('account.password_hint') }}）</label>
                             <input id="edit-password" type="password" class="form-control" name="password" minlength="8">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{{ trans('account.field_level') }}</label>
+                            <select id="edit-level" class="form-select">
+                                {!! \App\Presenters\UserPresenter::levelOptions([0]) !!}
+                            </select>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">參與專案</label>
@@ -354,6 +405,7 @@ $(function () {
         var $btn = $(this);
         $('#edit-account-id').val($btn.data('id'));
         $('#edit-nickname').val($btn.data('nickname'));
+        $('#edit-level').val($btn.data('level'));
         $('#edit-password').val('');
         // 帶入參與專案
         var projectIds = $btn.data('project-ids') || [];
@@ -392,13 +444,12 @@ $(function () {
     // 編輯帳號
     $('#form-edit-account').on('submit', function (e) {
         e.preventDefault();
-        var data = { nickname: $('#edit-nickname').val() };
+        var data = { nickname: $('#edit-nickname').val(), level: parseInt($('#edit-level').val(), 10) };
         var pw = $('#edit-password').val();
         if (pw) { data.password = pw; }
         var projectIds = [];
         $('.js-edit-project-check:checked').each(function () { projectIds.push(parseInt($(this).val(), 10)); });
         data.project_ids = projectIds;
-
         $.ajax({
             url: '/admin/accounts/ajax-update/' + $('#edit-account-id').val(),
             method: 'PUT',

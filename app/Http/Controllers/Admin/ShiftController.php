@@ -12,6 +12,7 @@ use App\Http\Resources\ShiftAssignmentResource;
 use App\Http\Resources\ShiftSwapResource;
 use App\Models\Shift;
 use App\Models\ShiftSwap;
+use App\Repositories\UserRepository;
 use App\Services\ShiftService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -27,10 +28,12 @@ use Illuminate\Support\Facades\Log;
 class ShiftController extends Controller
 {
     private $shiftService;
+    private $userRepository;
 
-    public function __construct(ShiftService $shiftService)
+    public function __construct(ShiftService $shiftService, UserRepository $userRepository)
     {
         $this->shiftService = $shiftService;
+        $this->userRepository = $userRepository;
     }
 
     // ---------------------------------------------------------------
@@ -51,7 +54,9 @@ class ShiftController extends Controller
             abort(403);
         }
 
-        return view('admin.shifts.index');
+        $csUsers = $this->userRepository->getActiveForDropdown();
+
+        return view('admin.shifts.index', ['csUsers' => $csUsers]);
     }
 
     // ---------------------------------------------------------------

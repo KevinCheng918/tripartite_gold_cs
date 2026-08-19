@@ -122,7 +122,7 @@
                 <label class="form-label">{{ trans('leave.field_user') }} <span class="text-danger">*</span></label>
                 <select id="leave-user-id" class="form-select" required>
                     <option value="">請選擇</option>
-                    @foreach(\App\Models\User::where('level', '!=', config('constants.USER.LEVEL.ADMIN'))->where('status', config('constants.USER.STATUS.NORMAL'))->orderBy('nickname')->get(['id', 'nickname']) as $u)
+                    @foreach($csUsers as $u)
                         <option value="{{ $u->id }}">{{ $u->nickname }}</option>
                     @endforeach
                 </select>

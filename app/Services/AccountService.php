@@ -84,6 +84,7 @@ class AccountService
         $attributes = array_filter([
             'nickname' => $params['nickname'] ?? null,
             'account'  => $params['account'] ?? null,
+            'level'    => array_key_exists('level', $params) ? $params['level'] : null,
             'status'   => array_key_exists('status', $params) ? $params['status'] : null,
         ], function ($value) {
             return filled($value);
@@ -95,6 +96,18 @@ class AccountService
 
         if (array_key_exists('project_ids', $params)) {
             $attributes['project_ids'] = array_map('intval', $params['project_ids'] ?? []);
+        }
+
+        if (array_key_exists('hired_at', $params)) {
+            $attributes['hired_at'] = $params['hired_at'] ?: null;
+        }
+
+        if (array_key_exists('resigned_at', $params)) {
+            $attributes['resigned_at'] = $params['resigned_at'] ?: null;
+        }
+
+        if (array_key_exists('equipments', $params)) {
+            $attributes['equipments'] = $params['equipments'] ?? [];
         }
 
         return DB::transaction(function () use ($user, $attributes) {
