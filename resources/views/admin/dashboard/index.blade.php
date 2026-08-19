@@ -59,8 +59,9 @@
     </div>
     @endif
 
-    @if(Auth::user()->hasPermission('shift.view') && Auth::user()->isAdmin())
-    {{-- 今日排班（管理者版） --}}
+    @php $isLeaderUp = Auth::user()->level <= config('constants.USER.LEVEL.LEADER'); @endphp
+    @if(Auth::user()->hasPermission('shift.view') && $isLeaderUp)
+    {{-- 今日排班（管理者/主管版） --}}
     <div class="main-card mb-3 card">
         <div class="card-header">
             <i class="header-icon fas fa-calendar-day me-2 text-muted"></i>
@@ -151,7 +152,7 @@
 
     @endif {{-- end shift.view for admin --}}
 
-    @if(Auth::user()->hasPermission('shift.view') && !Auth::user()->isAdmin())
+    @if(Auth::user()->hasPermission('shift.view') && !$isLeaderUp)
     {{-- ===== 客服 Dashboard ===== --}}
 
     <div class="main-card mb-3 card">
