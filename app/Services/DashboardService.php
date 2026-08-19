@@ -140,4 +140,61 @@ class DashboardService
 
         return compact('todayByShift', 'weekTotal', 'weekByDate');
     }
+
+    /**
+     * 取得排班資料（非管理者有 shift.view 權限時使用）
+     *
+     * @return array
+     */
+    public function getShiftData()
+    {
+        $today = now()->format('Y-m-d');
+        $weekStart = now()->startOfWeek()->format('Y-m-d');
+        $weekEnd = now()->endOfWeek()->format('Y-m-d');
+
+        $todayAssignments = $this->assignmentRepository->getByDateRange($today, $today);
+        $allShifts = $this->shiftRepository->allActive();
+
+        $todayByShift = collect();
+        foreach ($allShifts as $shift) {
+            $users = $todayAssignments
+                ->where('shift_id', $shift->id)
+                ->map(function ($a) {
+                    return $a->user ? $a->user->nickname : '-';
+                })
+                ->unique()
+                ->values()
+                ->all();
+
+            $todayByShift->put($shift->display_name, [
+                'shift' => $shift,
+                'users' => $users,
+            ]);
+        }
+
+        $weekAssignments = $this->assignmentRepository->getByDateRange($weekStart, $weekEnd);
+        $weekTotal = $weekAssignments->count();
+
+        $weekUserRanking = $weekAssignments->groupBy(function ($a) {
+            return $a->user ? $a->user->nickname : '-';
+        })->map(function ($group) {
+            return $group->count();
+        })->sortDesc();
+
+        $activeShiftCount = $allShifts->count();
+        $weekByDate = $weekAssignments->sortBy('date')->groupBy(function ($a) {
+            return $a->date->format('Y-m-d');
+        })->map(function ($group) use ($activeShiftCount) {
+            $shiftIds = $group->pluck('shift_id')->unique()->count();
+            $isAllday = $shiftIds >= $activeShiftCount;
+
+            return [
+                'date'      => $group->first()->date,
+                'is_allday' => $isAllday,
+                'items'     => $isAllday ? collect() : $group,
+            ];
+        });
+
+        return compact('todayByShift', 'weekTotal', 'weekUserRanking', 'weekByDate');
+    }
 }

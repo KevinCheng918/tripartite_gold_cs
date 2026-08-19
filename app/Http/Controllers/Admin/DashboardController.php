@@ -32,9 +32,16 @@ class DashboardController extends Controller
      */
     public function index()
     {
-        $data = Auth::user()->isAdmin()
+        $user = Auth::user();
+        $data = $user->isAdmin()
             ? $this->dashboardService->getAdminData()
             : $this->dashboardService->getCsData(Auth::id());
+
+        // 非管理者有 shift.view 權限時，補上排班資料
+        if (!$user->isAdmin() && $user->hasPermission('shift.view') && !isset($data['weekUserRanking'])) {
+            $shiftData = $this->dashboardService->getShiftData();
+            $data = array_merge($data, $shiftData);
+        }
 
         return view('admin.dashboard.index', $data);
     }
