@@ -178,7 +178,7 @@
                                 </a>
                             </li>
                             @endif
-                            @if(Auth::user()->hasPermission('shift.view'))
+                            @if(Auth::user()->hasPermission('shift.view') || Auth::user()->hasPermission('leave_request.apply') || Auth::user()->hasPermission('leave_request.review'))
                             <li>
                                 <a href="{{ route('admin.shifts.index') }}" class="{{ request()->routeIs('admin.shifts.*') ? 'mm-active' : '' }}">
                                     <i class="metismenu-icon fas fa-calendar-alt"></i>

@@ -147,6 +147,23 @@ class AttendanceService
             $overtimeMinutes = $result['overtime'];
         }
 
+        // 時段假加班計算：打卡時間超過請假開始時間，超出部分算加班
+        $recordDate = $record->date->format('Y-m-d');
+        $leaves = $this->leaveRepository->getApprovedOnDate($userId, $recordDate);
+        foreach ($leaves as $leave) {
+            if ((int) $leave->is_full_day === 1) {
+                continue;
+            }
+            if (filled($leave->start_time)) {
+                $leaveStartParts = explode(':', $leave->start_time);
+                $leaveStartMin = (int) $leaveStartParts[0] * 60 + (int) $leaveStartParts[1];
+                $clockOutMin = now()->hour * 60 + now()->minute;
+                if ($clockOutMin > $leaveStartMin) {
+                    $overtimeMinutes += ($clockOutMin - $leaveStartMin);
+                }
+            }
+        }
+
         // 計算最終狀態
         $isLate = $record->late_minutes > 0;
         $isEarly = $earlyLeaveMinutes > 0;

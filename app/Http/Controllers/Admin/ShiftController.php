@@ -44,6 +44,13 @@ class ShiftController extends Controller
      */
     public function index()
     {
+        $user = Auth::user();
+        if (!$user->hasPermission('shift.view')
+            && !$user->hasPermission('leave_request.apply')
+            && !$user->hasPermission('leave_request.review')) {
+            abort(403);
+        }
+
         return view('admin.shifts.index');
     }
 

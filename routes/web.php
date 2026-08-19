@@ -53,7 +53,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
 
     // 排班管理
     Route::prefix('shifts')->name('shifts.')->group(function () {
-        Route::get('/', [ShiftController::class, 'index'])->middleware('can:shift.view')->name('index');
+        Route::get('/', [ShiftController::class, 'index'])->name('index');
         Route::get('/ajax-shift-list', [ShiftController::class, 'ajaxShiftList'])->middleware('can:shift.view')->name('ajax-shift-list');
         Route::get('/ajax-cs-users', [ShiftController::class, 'ajaxCsUsers'])->middleware('can:shift.view')->name('ajax-cs-users');
         Route::post('/ajax-store-shift', [ShiftController::class, 'ajaxStoreShift'])->middleware('can:shift.update')->name('ajax-store-shift');

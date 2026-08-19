@@ -229,11 +229,17 @@
             { key: 'shifts', label: i18n.tab_shifts, perm: 'shift.update' },
             { key: 'swaps', label: i18n.tab_swaps, perm: 'shift.swap' },
             { key: 'covers', label: coverI18n.nav_label || '代班管理', perm: 'shift.cover' },
-            { key: 'leave', label: leaveI18n.tab_title || '請假管理', perm: 'leave_request.apply' },
+            { key: 'leave', label: leaveI18n.tab_title || '請假管理', perm: 'leave_request.apply', altPerm: 'leave_request.review' },
         ];
 
         // 只顯示有權限的 Tab
-        var tabs = allTabs.filter(function (t) { return hasPerm(t.perm); });
+        var tabs = allTabs.filter(function (t) { return hasPerm(t.perm) || (t.altPerm && hasPerm(t.altPerm)); });
+
+        // 預設選第一個有權限的 Tab
+        var tabKeys = tabs.map(function (t) { return t.key; });
+        if (tabKeys.indexOf(activeTab) === -1 && tabs.length > 0) {
+            activeTab = tabs[0].key;
+        }
 
         var html = '<ul class="nav nav-tabs mb-3">';
         tabs.forEach(function (tab) {
@@ -1576,14 +1582,19 @@
     flatpickr('#cover-end', { enableTime: true, noCalendar: true, dateFormat: 'H:i', time_24hr: true, disableMobile: true });
 
     // 載入班別後渲染 tabs（預設顯示課表）
-    apiFetch('/admin/shifts/ajax-shift-list')
-        .then(function (body) {
-            shiftsData = body.data;
-            renderTabs();
-        })
-        .catch(function () {
-            root.innerHTML = '<p>Failed to initialize.</p>';
-        });
+    if (hasPerm('shift.view') || hasPerm('shift.update')) {
+        apiFetch('/admin/shifts/ajax-shift-list')
+            .then(function (body) {
+                shiftsData = body.data;
+                renderTabs();
+            })
+            .catch(function () {
+                root.innerHTML = '<p>Failed to initialize.</p>';
+            });
+    } else {
+        // 只有請假權限，直接渲染 tabs
+        renderTabs();
+    }
 
     // ---------------------------------------------------------------
     //  請假 Tab
