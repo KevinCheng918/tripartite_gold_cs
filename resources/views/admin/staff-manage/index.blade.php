@@ -68,6 +68,18 @@
                             </div>
                         </div>
                     </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3 col-6">
+                            <label class="form-label fw-bold">排序：</label>
+                            <select class="form-select" id="staff-sort">
+                                <option value="id">預設（ID）</option>
+                                <option value="tenure_desc">年資 長→短</option>
+                                <option value="tenure_asc">年資 短→長</option>
+                                <option value="level_asc">身份 高→低</option>
+                                <option value="level_desc">身份 低→高</option>
+                            </select>
+                        </div>
+                    </div>
                     <div class="d-flex justify-content-end gap-2">
                         <button type="button" class="btn btn-outline-secondary" id="btn-staff-reset">重置</button>
                         <button type="button" class="btn btn-primary" id="btn-staff-search">
@@ -165,6 +177,16 @@
                                 <option value="in_use">使用中</option>
                                 <option value="returned">已退還</option>
                                 <option value="not_received">未領取</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <label class="form-label fw-bold">排序：</label>
+                            <select class="form-select" id="eq-sort">
+                                <option value="id">預設（ID）</option>
+                                <option value="received_desc">領用日期 新→舊</option>
+                                <option value="received_asc">領用日期 舊→新</option>
+                                <option value="duration_desc">使用時長 長→短</option>
+                                <option value="duration_asc">使用時長 短→長</option>
                             </select>
                         </div>
                     </div>
@@ -461,7 +483,7 @@ $(function () {
         var tenureMonths = parseInt($('#staff-search-tenure-months').val(), 10) || 0;
         var tenureThreshold = tenureYears * 12 + tenureMonths;
 
-        return list.filter(function (s) {
+        var filtered = list.filter(function (s) {
             if (acct && (s.account || '').toLowerCase().indexOf(acct) === -1) return false;
             if (name && (s.nickname || '').toLowerCase().indexOf(name) === -1) return false;
             if (level && s.level !== parseInt(level, 10)) return false;
@@ -473,6 +495,19 @@ $(function () {
             }
             return true;
         });
+
+        var sort = $('#staff-sort').val();
+        if (sort === 'tenure_desc') {
+            filtered.sort(function (a, b) { return calcTenureMonths(b.hired_at) - calcTenureMonths(a.hired_at); });
+        } else if (sort === 'tenure_asc') {
+            filtered.sort(function (a, b) { return calcTenureMonths(a.hired_at) - calcTenureMonths(b.hired_at); });
+        } else if (sort === 'level_asc') {
+            filtered.sort(function (a, b) { return a.level - b.level; });
+        } else if (sort === 'level_desc') {
+            filtered.sort(function (a, b) { return b.level - a.level; });
+        }
+
+        return filtered;
     }
 
     function renderStaffTable(list) {
@@ -638,6 +673,18 @@ $(function () {
                 result.push({ user: s, eq: eq, eqIdx: eqIdx });
             });
         });
+
+        var eqSort = $('#eq-sort').val();
+        if (eqSort === 'received_desc') {
+            result.sort(function (a, b) { return (b.eq.received_at || '').localeCompare(a.eq.received_at || ''); });
+        } else if (eqSort === 'received_asc') {
+            result.sort(function (a, b) { return (a.eq.received_at || '').localeCompare(b.eq.received_at || ''); });
+        } else if (eqSort === 'duration_desc') {
+            result.sort(function (a, b) { return calcEqDurationMonths(b.eq.received_at, b.eq.returned_at) - calcEqDurationMonths(a.eq.received_at, a.eq.returned_at); });
+        } else if (eqSort === 'duration_asc') {
+            result.sort(function (a, b) { return calcEqDurationMonths(a.eq.received_at, a.eq.returned_at) - calcEqDurationMonths(b.eq.received_at, b.eq.returned_at); });
+        }
+
         return result;
     }
 
@@ -869,6 +916,7 @@ $(function () {
     $('#btn-staff-reset').on('click', function () {
         $('#staff-search-account, #staff-search-name, #staff-search-tenure-years, #staff-search-tenure-months').val('');
         $('#staff-search-level, #staff-search-tenure-op').val('');
+        $('#staff-sort').val('id');
         renderStaffTable(staffData); renderStaffCards(staffData);
     });
     var $staffCollapse = $('#staff-search-collapse');
@@ -887,6 +935,7 @@ $(function () {
     $('#btn-eq-reset').on('click', function () {
         $('#eq-search-account, #eq-search-name, #eq-search-eq, #eq-search-serial, #eq-search-duration-years, #eq-search-duration-months').val('');
         $('#eq-search-duration-op, #eq-search-status').val('');
+        $('#eq-sort').val('id');
         renderEqTable(staffData); renderEqCards(staffData);
     });
     // 切到設備 Tab 時刷新
