@@ -72,6 +72,16 @@
         .js-emoji-item:hover { background: rgba(0,0,0,0.08); }
         [data-theme="dark"] #comment-emoji-picker { background: #2d2d2d !important; border-color: #444 !important; }
         [data-theme="dark"] .js-emoji-item:hover { background: rgba(255,255,255,0.1); }
+        /* 站台選擇金黃色 */
+        .js-station-pick.active { background: linear-gradient(135deg,#d4af37,#a67c00) !important; color: #fff !important; border-color: #a67c00 !important; }
+        .js-station-pick.active .text-muted { color: rgba(255,255,255,0.7) !important; }
+        [data-theme="dark"] .js-station-pick { color: #e0e0e0; background: #2d2d2d; border-color: #444; }
+        [data-theme="dark"] .js-station-pick:hover { background: #3a3a3a; }
+        /* 屬性點擊 */
+        .side-prop { cursor: pointer; padding: 0.375rem 0.5rem; border-radius: 0.25rem; }
+        .side-prop:hover { background: rgba(0,0,0,0.04); }
+        .side-prop label { display: block; cursor: pointer; }
+        [data-theme="dark"] .side-prop:hover { background: rgba(255,255,255,0.05); }
         /* 描述 HTML 顯示 */
         .side-field .field-value img { max-width: 100%; height: auto; }
         @media (max-width: 767px) {
@@ -263,8 +273,8 @@
         <div id="side-panel-resize" style="position:absolute;left:0;top:0;width:5px;height:100%;cursor:col-resize;z-index:2"></div>
         <div style="min-height:100%;padding:1.5rem" id="side-panel-inner">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="mb-0" id="side-panel-project-badge"></h5>
-                <button type="button" class="btn-close" id="btn-close-panel"></button>
+                <div id="side-panel-project-badge"></div>
+                <div class="d-flex gap-3 align-items-center" id="side-panel-actions"></div>
             </div>
             <div id="side-panel-body"></div>
         </div>
@@ -296,6 +306,36 @@
     </div>
 
     {{-- 刪除確認 Modal --}}
+    {{-- 屬性編輯 Modal --}}
+    <div class="modal fade" id="modal-prop-edit" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="prop-edit-title">編輯</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="prop-edit-body"></div>
+                <div class="modal-footer d-flex justify-content-between">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="btn-prop-save">確認</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- 異動紀錄 Modal --}}
+    <div class="modal fade" id="modal-task-activities" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-history me-2"></i>異動紀錄</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="activity-modal-body"></div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="modal-delete-confirm" tabindex="-1">
         <div class="modal-dialog modal-sm">
             <div class="modal-content">
@@ -526,7 +566,6 @@ $(function () {
         setTimeout(function () { $('#task-side-panel').hide(); $('#task-side-overlay').hide(); }, 300);
         currentTaskId = null;
     }
-    $('#btn-close-panel').on('click', closePanel);
     $('#task-side-overlay').on('click', closePanel);
 
     function inlineField(label, value, fieldName, type) {
@@ -548,53 +587,71 @@ $(function () {
                 var t = body.data || body;
                 var pColor = getProjectColor(t.project);
 
-                $('#side-panel-project-badge').html('<span class="badge" style="background:' + pColor + ';color:#fff;border-radius:9999px;padding:0.3em 0.8em">' + t.project + '</span>');
-
-                var html = '';
-                // 標題（可編輯）
-                html += '<div class="side-field" data-field="title" data-type="text"><label>{{ trans("task_board.field_title") }}</label><div class="field-value" style="font-size:1.25rem;font-weight:bold">' + t.title + '</div></div>';
-                // 站台
-                var stationDisplay = t.station ? (t.system ? t.system + ' / ' : '') + t.station : '<span class="text-muted">未選擇</span>';
-                html += '<div class="side-field" data-field="station_id" data-type="select"><label>站台</label><div class="field-value">' + stationDisplay + '</div></div>';
-                // 狀態
-                html += '<div class="side-field" data-field="status" data-type="select"><label>{{ trans("task_board.field_status") }}</label><div class="field-value">' + (statusLabels[t.status] || '-') + '</div></div>';
-                // 優先順序
-                html += '<div class="side-field" data-field="priority" data-type="select"><label>{{ trans("task_board.field_priority") }}</label><div class="field-value">' + (priorityLabel[t.priority] || '-') + '</div></div>';
-                // 指派人員
-                var assigneeDisplay = '<span class="text-muted">未指派</span>';
+                // 頂部：狀態 + 優先順序 + 按鈕列
+                var assigneeDisplay = '';
                 if (t.assignees && t.assignees.length > 0) {
                     var aNames = [];
                     t.assignees.forEach(function (a) { aNames.push(a.nickname); });
                     assigneeDisplay = aNames.join(', ');
+                } else {
+                    assigneeDisplay = '<span class="text-muted">未指派</span>';
                 }
-                html += '<div class="side-field" data-field="assignee_ids" data-type="multiselect"><label>{{ trans("task_board.field_assignee") }}</label><div class="field-value">' + assigneeDisplay + '</div></div>';
-                // 到期日
-                html += '<div class="side-field" data-field="due_date" data-type="date"><label>{{ trans("task_board.field_due_date") }}</label><div class="field-value">' + (t.due_date || '<span class="text-muted">未設定</span>') + '</div></div>';
-                // 建立者 + 時間（不可編輯）
-                html += '<div class="side-field"><label>{{ trans("task_board.field_creator") }}</label><div>' + t.creator + ' · ' + t.created_at + '</div></div>';
-                // 描述
-                html += '<div class="side-field" data-field="description" data-type="richtext"><label>{{ trans("task_board.field_description") }}</label><div class="field-value" style="min-height:60px">' + (t.description || '<span class="text-muted">點擊新增描述...</span>') + '</div></div>';
 
-                // 圖片
-                html += '<div class="side-field"><label>圖片</label>';
-                if (t.images && t.images.length > 0) {
-                    html += '<div class="d-flex flex-wrap gap-2 mb-2">';
-                    t.images.forEach(function (url) {
-                        html += '<a href="' + url + '" target="_blank"><img src="' + url + '" style="width:100px;height:100px;object-fit:cover;border-radius:0.375rem;border:1px solid #dee2e6"></a>';
-                    });
-                    html += '</div>';
+                $('#side-panel-project-badge').html(
+                    '<span class="badge" style="background:' + pColor + ';color:#fff;border-radius:9999px;padding:0.3em 0.8em">' + t.project + '</span> ' +
+                    (statusLabels[t.status] ? '<span class="badge bg-secondary ms-1">' + statusLabels[t.status] + '</span>' : '') + ' ' +
+                    (priorityLabel[t.priority] || '')
+                );
+
+                var actionsHtml = '<button class="btn" id="btn-show-activities" style="background:linear-gradient(135deg,#d4af37,#a67c00);color:#fff;border:none"><i class="fas fa-history me-1"></i>異動紀錄</button>';
+                if (canDelete) {
+                    actionsHtml += '<button class="btn btn-outline-secondary" id="btn-panel-delete" data-id="' + t.id + '"><i class="fas fa-trash text-danger me-1"></i>{{ trans("task_board.action_delete") }}</button>';
                 }
-                if (canUpdate) {
-                    html += '<input type="file" class="form-control form-control-sm" id="panel-upload-images" accept="image/*" multiple>';
-                }
+                actionsHtml += '<button type="button" class="btn-close" id="btn-close-panel-inner"></button>';
+                $('#side-panel-actions').html(actionsHtml);
+
+                $('#btn-close-panel-inner').on('click', closePanel);
+
+                var html = '';
+
+                // 標題
+                html += '<div class="side-field" data-field="title" data-type="text"><div class="field-value" style="font-size:1.375rem;font-weight:bold;padding:0.5rem 0">' + t.title + '</div></div>';
+
+                // 屬性區（集中在上面，虛線邊框）
+                html += '<div class="border rounded p-2 mb-3" style="border-style:dashed !important;background:rgba(0,0,0,0.015);font-size:0.8125rem">';
+                var stationDisplay = t.station ? (t.system ? t.system + ' / ' : '') + t.station : '<span class="text-muted">未選擇</span>';
+
+                html += '<div class="row g-1">';
+                html += '<div class="col-md-4 col-6"><div class="side-prop js-prop-edit" data-field="project_id"><label style="font-size:0.6875rem;color:#6c757d">專案</label><div><i class="fas fa-folder me-1 text-muted"></i>' + t.project + '</div></div></div>';
+                html += '<div class="col-md-4 col-6"><div class="side-prop js-prop-edit" data-field="station_id"><label style="font-size:0.6875rem;color:#6c757d">站台</label><div><i class="fas fa-server me-1 text-muted"></i>' + stationDisplay + '</div></div></div>';
+                html += '<div class="col-md-4 col-6"><div class="side-prop js-prop-edit" data-field="assignee_ids"><label style="font-size:0.6875rem;color:#6c757d">{{ trans("task_board.field_assignee") }}</label><div><i class="fas fa-users me-1 text-muted"></i>' + assigneeDisplay + '</div></div></div>';
+                html += '<div class="col-md-4 col-6"><div class="side-field" data-field="status" data-type="select"><label style="font-size:0.6875rem;color:#6c757d">{{ trans("task_board.field_status") }}</label><div class="field-value">' + (statusLabels[t.status] || '-') + '</div></div></div>';
+                html += '<div class="col-md-4 col-6"><div class="side-field" data-field="priority" data-type="select"><label style="font-size:0.6875rem;color:#6c757d">{{ trans("task_board.field_priority") }}</label><div class="field-value">' + (priorityLabel[t.priority] || '-') + '</div></div></div>';
+                html += '<div class="col-md-4 col-6"><div class="side-field" data-field="due_date" data-type="date"><label style="font-size:0.6875rem;color:#6c757d">{{ trans("task_board.field_due_date") }}</label><div class="field-value"><i class="fas fa-calendar me-1 text-muted"></i>' + (t.due_date || '<span class="text-muted">未設定</span>') + '</div></div></div>';
+                html += '</div>';
                 html += '</div>';
 
-                // 操作按鈕
-                if (canDelete) {
-                    html += '<div class="mt-3"><button class="btn btn-sm btn-outline-secondary" id="btn-panel-delete" data-id="' + t.id + '"><i class="fas fa-trash text-danger me-1"></i>{{ trans("task_board.action_delete") }}</button></div>';
+
+                // 描述（中間主要區域）
+                html += '<div class="side-field" data-field="description" data-type="richtext"><label class="fw-bold">{{ trans("task_board.field_description") }}</label><div class="field-value" style="min-height:100px">' + (t.description || '<span class="text-muted">點擊新增描述...</span>') + '</div></div>';
+
+                // 圖片
+                if ((t.images && t.images.length > 0) || canUpdate) {
+                    html += '<div class="mb-3">';
+                    if (t.images && t.images.length > 0) {
+                        html += '<div class="d-flex flex-wrap gap-2 mb-2">';
+                        t.images.forEach(function (url) {
+                            html += '<a href="' + url + '" target="_blank"><img src="' + url + '" style="width:80px;height:80px;object-fit:cover;border-radius:0.375rem;border:1px solid #dee2e6"></a>';
+                        });
+                        html += '</div>';
+                    }
+                    if (canUpdate) {
+                        html += '<input type="file" class="form-control form-control-sm" id="panel-upload-images" accept="image/*" multiple>';
+                    }
+                    html += '</div>';
                 }
 
-                // 留言區
+                // 留言區（底部）
                 html += '<hr><h6><i class="fas fa-comments me-1"></i>留言</h6>';
                 html += '<div id="panel-comments"><p class="text-muted" style="font-size:0.8125rem">Loading...</p></div>';
                 html += '<div class="mt-2"><textarea id="panel-comment-input" class="form-control" rows="2" placeholder="輸入留言..."></textarea>';
@@ -614,7 +671,15 @@ $(function () {
                 $('#side-panel-body').data('task', t);
 
                 bindInlineEdit();
+                bindPropEdit(t);
                 loadComments(taskId);
+
+                // 異動紀錄按鈕
+                $('#btn-show-activities').on('click', function () {
+                    $('#activity-modal-body').html('<p class="text-center py-3 text-muted">Loading...</p>');
+                    showBsModal('modal-task-activities');
+                    loadActivities(taskId);
+                });
 
                 $('#btn-panel-delete').on('click', function () {
                     var deleteId = $(this).data('id');
@@ -734,6 +799,12 @@ $(function () {
                     inputEl = '<select class="form-select">';
                     [1,2,3,4].forEach(function (p) { inputEl += '<option value="' + p + '"' + (t.priority === p ? ' selected' : '') + '>' + priorityNames[p] + '</option>'; });
                     inputEl += '</select>';
+                } else if (fieldType === 'select' && fieldName === 'project_id') {
+                    inputEl = '<select class="form-select">';
+                    @foreach($projects as $p)
+                    inputEl += '<option value="{{ $p->id }}"' + (t.project_id === {{ $p->id }} ? ' selected' : '') + '>{{ $p->name }}</option>';
+                    @endforeach
+                    inputEl += '</select>';
                 } else if (fieldType === 'select' && fieldName === 'station_id') {
                 inputEl = '<select class="form-select"><option value="">未選擇</option>';
                 @foreach($stations as $st)
@@ -823,6 +894,196 @@ $(function () {
             },
             error: function (xhr) {
                 showMsg((xhr.responseJSON && xhr.responseJSON.message) || '更新失敗');
+            }
+        });
+    }
+
+    // 屬性 Modal 編輯
+    var propEditField = null;
+    var propFieldLabels = { project_id: '專案', station_id: '站台', assignee_ids: '{{ trans("task_board.field_assignee") }}', status: '{{ trans("task_board.field_status") }}', priority: '{{ trans("task_board.field_priority") }}', due_date: '{{ trans("task_board.field_due_date") }}' };
+    var priorityNames = { 1: '{{ trans("task_board.priority_low") }}', 2: '{{ trans("task_board.priority_medium") }}', 3: '{{ trans("task_board.priority_high") }}', 4: '{{ trans("task_board.priority_urgent") }}' };
+
+    function bindPropEdit(t) {
+        if (!canUpdate) return;
+        $('.js-prop-edit').off('click').on('click', function () {
+            propEditField = $(this).data('field');
+            $('#prop-edit-title').text('編輯 - ' + (propFieldLabels[propEditField] || propEditField));
+            var html = '';
+
+            if (propEditField === 'project_id') {
+                html = '<select class="form-select" id="prop-val">';
+                @foreach($projects as $p)
+                html += '<option value="{{ $p->id }}"' + (t.project_id === {{ $p->id }} ? ' selected' : '') + '>{{ $p->name }}</option>';
+                @endforeach
+                html += '</select>';
+            } else if (propEditField === 'station_id') {
+                html = '<div class="row g-2 mb-2">';
+                html += '<div class="col"><select class="form-select form-select-sm" id="prop-station-system"><option value="">全部系統</option>';
+                @foreach($systems as $sys)
+                html += '<option value="{{ $sys->id }}">{{ $sys->name }}</option>';
+                @endforeach
+                html += '</select></div>';
+                html += '<div class="col"><input type="text" class="form-control form-control-sm" id="prop-station-search" placeholder="搜尋站台..." autocomplete="off"></div>';
+                html += '</div>';
+                html += '<div id="prop-station-list" style="max-height:250px;overflow-y:auto;border:1px solid #dee2e6;border-radius:0.25rem">';
+                html += '<a href="javascript:void(0)" class="list-group-item list-group-item-action js-station-pick" data-id="" style="font-size:0.875rem">未選擇</a>';
+                @foreach($stations as $st)
+                html += '<a href="javascript:void(0)" class="list-group-item list-group-item-action js-station-pick' + (t.station_id === {{ $st->id }} ? ' active' : '') + '" data-id="{{ $st->id }}" data-system="{{ $st->system_id }}" data-name="{{ strtolower($st->name) }}" style="font-size:0.875rem"><span class="text-muted">系統：</span>{{ $st->system ? $st->system->name : '-' }} <span class="text-muted ms-2">站台：</span><strong>{{ $st->name }}</strong></a>';
+                @endforeach
+                html += '</div>';
+                html += '<input type="hidden" id="prop-val" value="' + (t.station_id || '') + '">';
+            } else if (propEditField === 'status') {
+                html = '<select class="form-select" id="prop-val">';
+                [1,2,3,4,5].forEach(function (s) { html += '<option value="' + s + '"' + (t.status === s ? ' selected' : '') + '>' + statusLabels[s] + '</option>'; });
+                html += '</select>';
+            } else if (propEditField === 'priority') {
+                html = '<select class="form-select" id="prop-val">';
+                [1,2,3,4].forEach(function (p) { html += '<option value="' + p + '"' + (t.priority === p ? ' selected' : '') + '>' + priorityNames[p] + '</option>'; });
+                html += '</select>';
+            } else if (propEditField === 'due_date') {
+                html = '<input type="date" class="form-control" id="prop-val" value="' + (t.due_date || '') + '">';
+            } else if (propEditField === 'assignee_ids') {
+                var currentIds = t.assignee_ids || [];
+                html = '<div style="max-height:200px;overflow-y:auto;border:1px solid #dee2e6;border-radius:0.25rem;padding:0.5rem">';
+                @foreach($assignees as $u)
+                html += '<div class="form-check"><input class="form-check-input js-prop-assignee" type="checkbox" value="{{ $u->id }}"' + (currentIds.indexOf({{ $u->id }}) !== -1 ? ' checked' : '') + '><label class="form-check-label">{{ $u->nickname }}</label></div>';
+                @endforeach
+                html += '</div>';
+            }
+
+            $('#prop-edit-body').html(html);
+            showBsModal('modal-prop-edit');
+
+            // 站台搜尋 + 系統篩選
+            if (propEditField === 'station_id') {
+                function filterStations() {
+                    var kw = ($('#prop-station-search').val() || '').toLowerCase();
+                    var sysId = $('#prop-station-system').val();
+                    $('.js-station-pick').each(function () {
+                        if (!$(this).data('id')) { $(this).show(); return; }
+                        var nameMatch = !kw || ($(this).data('name') || '').indexOf(kw) !== -1;
+                        var sysMatch = !sysId || $(this).data('system') == sysId;
+                        $(this).toggle(nameMatch && sysMatch);
+                    });
+                }
+                $('#prop-station-search').on('input', filterStations);
+                $('#prop-station-system').on('change', filterStations);
+
+                $('#prop-station-list').on('click', '.js-station-pick', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    $('#prop-station-list .js-station-pick').removeClass('active');
+                    $(this).addClass('active');
+                    $('#prop-val').val($(this).data('id') || '');
+                });
+            }
+        });
+    }
+
+    $('#btn-prop-save').on('click', function () {
+        if (!propEditField || !currentTaskId) return;
+        var val;
+
+        if (propEditField === 'assignee_ids') {
+            val = [];
+            $('.js-prop-assignee:checked').each(function () { val.push(parseInt($(this).val(), 10)); });
+        } else if (propEditField === 'status' || propEditField === 'priority' || propEditField === 'project_id') {
+            val = parseInt($('#prop-val').val(), 10);
+        } else if (propEditField === 'station_id') {
+            val = $('#prop-val').val() || null;
+        } else {
+            val = $('#prop-val').val();
+        }
+
+        saveField(propEditField, val);
+        hideBsModal(document.getElementById('modal-prop-edit'));
+    });
+
+    var actionLabels = { created: '建立任務', updated: '更新內容', moved: '移動狀態', deleted: '刪除任務' };
+
+    var activityPageSize = 10;
+    var activityAllData = [];
+    var activityPage = 1;
+
+    function loadActivities(taskId) {
+        $.ajax({
+            url: '/admin/task-board/ajax-activities/' + taskId,
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            success: function (body) {
+                activityAllData = body.data || body;
+                activityPage = 1;
+                renderActivities();
+            }
+        });
+    }
+
+    function renderActivities() {
+        var $container = $('#activity-modal-body');
+        var list = activityAllData;
+        if (!list || list.length === 0) {
+            $container.html('<p class="text-muted text-center py-3">暫無紀錄</p>');
+            return;
+        }
+
+        var totalPages = Math.ceil(list.length / activityPageSize);
+        var start = (activityPage - 1) * activityPageSize;
+        var pageData = list.slice(start, start + activityPageSize);
+
+        var html = '<div class="table-responsive"><table class="table table-hover table-striped align-middle mb-0" style="font-size:0.9375rem;white-space:nowrap">';
+        html += '<thead class="table-light"><tr class="text-center"><th style="width:70px">操作人</th><th style="width:80px">動作</th><th style="width:60px">欄位</th><th>修改前</th><th>修改後</th><th style="width:130px">時間</th></tr></thead><tbody class="text-center">';
+        pageData.forEach(function (a) {
+            var changeRows = [];
+            if (a.changes) {
+                Object.keys(a.changes).forEach(function (key) {
+                    var c = a.changes[key];
+                    if (typeof c === 'object' && c.from !== undefined) {
+                        var fromVal = Array.isArray(c.from) ? c.from.join(', ') : (c.from || '-');
+                        var toVal = Array.isArray(c.to) ? c.to.join(', ') : (c.to || '-');
+                        if (key === '狀態') {
+                            fromVal = statusLabels[c.from] || fromVal;
+                            toVal = statusLabels[c.to] || toVal;
+                        }
+                        changeRows.push({ field: key, from: fromVal, to: toVal });
+                    } else {
+                        changeRows.push({ field: key, from: '-', to: c });
+                    }
+                });
+            }
+            if (changeRows.length === 0) {
+                changeRows.push({ field: '-', from: '-', to: '-' });
+            }
+            changeRows.forEach(function (cr) {
+                html += '<tr>';
+                html += '<td class="text-center"><strong>' + a.user + '</strong></td>';
+                html += '<td class="text-center">' + (actionLabels[a.action] || a.action) + '</td>';
+                html += '<td class="text-center">' + cr.field + '</td>';
+                html += '<td class="text-center"><span class="text-danger">' + cr.from + '</span></td>';
+                html += '<td class="text-center"><span class="text-success">' + cr.to + '</span></td>';
+                html += '<td class="text-center"><small class="text-muted">' + a.created_at + '</small></td>';
+                html += '</tr>';
+            });
+        });
+        html += '</tbody></table></div>';
+
+        // 分頁
+        if (totalPages > 1) {
+            html += '<nav class="mt-3"><ul class="pagination justify-content-center mb-0">';
+            html += '<li class="page-item' + (activityPage <= 1 ? ' disabled' : '') + '"><a class="page-link js-act-page" href="javascript:void(0)" data-page="' + (activityPage - 1) + '">‹</a></li>';
+            for (var i = 1; i <= totalPages; i++) {
+                html += '<li class="page-item' + (i === activityPage ? ' active' : '') + '"><a class="page-link js-act-page" href="javascript:void(0)" data-page="' + i + '">' + i + '</a></li>';
+            }
+            html += '<li class="page-item' + (activityPage >= totalPages ? ' disabled' : '') + '"><a class="page-link js-act-page" href="javascript:void(0)" data-page="' + (activityPage + 1) + '">›</a></li>';
+            html += '</ul></nav>';
+            html += '<div class="text-center text-muted mt-1" style="font-size:0.8125rem">共 ' + list.length + ' 筆，第 ' + activityPage + ' / ' + totalPages + ' 頁</div>';
+        }
+
+        $container.html(html);
+
+        $('.js-act-page').on('click', function () {
+            var p = parseInt($(this).data('page'), 10);
+            if (p >= 1 && p <= totalPages) {
+                activityPage = p;
+                renderActivities();
             }
         });
     }

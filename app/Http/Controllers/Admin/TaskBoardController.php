@@ -9,6 +9,7 @@ use App\Http\Requests\TaskBoard\StoreCommentRequest;
 use App\Http\Requests\TaskBoard\StoreProjectRequest;
 use App\Http\Requests\TaskBoard\StoreTaskRequest;
 use App\Http\Requests\TaskBoard\UpdateTaskRequest;
+use App\Http\Resources\TaskActivityResource;
 use App\Http\Resources\TaskCommentResource;
 use App\Http\Resources\TaskResource;
 use App\Models\Task;
@@ -49,11 +50,13 @@ class TaskBoardController extends Controller
             : $allProjects->filter(function ($p) use ($userProjectIds) { return in_array($p->id, $userProjectIds); })->values();
         $assignees = $this->taskBoardService->getAssignees();
         $stations = $this->taskBoardService->getStations();
+        $systems = $this->taskBoardService->getSystems();
 
         return view('admin.task-board.index', [
             'projects'  => $projects,
             'assignees' => $assignees,
             'stations'  => $stations,
+            'systems'   => $systems,
         ]);
     }
 
@@ -148,7 +151,7 @@ class TaskBoardController extends Controller
         }
 
         try {
-            $task = $this->taskBoardService->updateTask($task, $params);
+            $task = $this->taskBoardService->updateTask($task, $params, Auth::id());
 
             return response()->json([
                 'message' => trans('task_board.msg.task_updated'),
@@ -170,7 +173,7 @@ class TaskBoardController extends Controller
     public function ajaxDeleteTask(Task $task)
     {
         try {
-            $this->taskBoardService->deleteTask($task);
+            $this->taskBoardService->deleteTask($task, Auth::id());
 
             return response()->json(['message' => trans('task_board.msg.task_deleted')]);
         } catch (\Exception $e) {
@@ -191,7 +194,7 @@ class TaskBoardController extends Controller
     {
         $params = $request->validated();
 
-        $task = $this->taskBoardService->moveTask($task, $params);
+        $task = $this->taskBoardService->moveTask($task, $params, Auth::id());
 
         return new TaskResource($task->load(['project', 'assignee', 'creator']));
     }
@@ -310,5 +313,18 @@ class TaskBoardController extends Controller
         $this->taskBoardService->deleteComment($comment->id);
 
         return response()->json(['message' => '留言已刪除']);
+    }
+
+    /**
+     * Ajax 取得任務活動紀錄
+     *
+     * @param Task $task
+     * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection
+     */
+    public function ajaxActivities(Task $task)
+    {
+        $activities = $this->taskBoardService->getActivities($task->id);
+
+        return TaskActivityResource::collection($activities);
     }
 }

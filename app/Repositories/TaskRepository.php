@@ -3,6 +3,7 @@
 namespace App\Repositories;
 
 use App\Models\Task;
+use App\Models\TaskActivity;
 use App\Models\TaskComment;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -214,5 +215,32 @@ class TaskRepository
     public function createComment($attributes)
     {
         return TaskComment::query()->create($attributes);
+    }
+
+    /**
+     * 新增任務活動紀錄
+     *
+     * @param array $attributes
+     * @return TaskActivity
+     */
+    public function createActivity($attributes)
+    {
+        return TaskActivity::query()->create($attributes);
+    }
+
+    /**
+     * 取得任務活動紀錄
+     *
+     * @param int $taskId
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getActivities($taskId)
+    {
+        return TaskActivity::query()
+            ->select(['id', 'task_id', 'user_id', 'action', 'changes', 'created_at'])
+            ->with(['user'])
+            ->where('task_id', $taskId)
+            ->orderByDesc('created_at')
+            ->get();
     }
 }

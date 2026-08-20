@@ -76,7 +76,7 @@ class TaskBoardService
             (int) ($params['status'] ?? config('constants.TASK.STATUS.PENDING'))
         );
 
-        return $this->taskRepository->create([
+        $task = $this->taskRepository->create([
             'project_id'  => $params['project_id'],
             'station_id'  => $params['station_id'] ?? null,
             'title'       => $params['title'],
@@ -89,6 +89,10 @@ class TaskBoardService
             'images'      => $params['images'] ?? [],
             'sort_order'  => $maxSort + 1,
         ]);
+
+        $this->logActivity($task->id, $creatorId, 'created', null);
+
+        return $task;
     }
 
     /**
@@ -98,13 +102,32 @@ class TaskBoardService
      * @param array $params
      * @return Task
      */
-    public function updateTask(Task $task, $params)
+    public function updateTask(Task $task, $params, $userId = null)
     {
         if (isset($params['assignee_ids'])) {
             $params['assignee_ids'] = array_map('intval', $params['assignee_ids']);
         }
 
-        return $this->taskRepository->update($task, $params);
+        // 記錄變更差異
+        $changes = [];
+        $labelMap = [
+            'title' => '標題', 'description' => '描述', 'priority' => '優先順序',
+            'status' => '狀態', 'assignee_ids' => '指派人員', 'station_id' => '站台',
+            'project_id' => '專案', 'due_date' => '到期日',
+        ];
+        foreach ($params as $key => $value) {
+            if (isset($labelMap[$key]) && $task->{$key} != $value) {
+                $changes[$labelMap[$key]] = ['from' => $task->{$key}, 'to' => $value];
+            }
+        }
+
+        $result = $this->taskRepository->update($task, $params);
+
+        if (!empty($changes)) {
+            $this->logActivity($task->id, $userId, 'updated', $changes);
+        }
+
+        return $result;
     }
 
     /**
@@ -114,14 +137,25 @@ class TaskBoardService
      * @param array $params ['status' => int, 'sort_order' => int]
      * @return Task
      */
-    public function moveTask(Task $task, $params)
+    public function moveTask(Task $task, $params, $userId = null)
     {
-        return DB::transaction(function () use ($task, $params) {
+        $oldStatus = $task->status;
+        $newStatus = (int) $params['status'];
+
+        $result = DB::transaction(function () use ($task, $params, $newStatus) {
             return $this->taskRepository->update($task, [
-                'status'     => (int) $params['status'],
+                'status'     => $newStatus,
                 'sort_order' => (int) $params['sort_order'],
             ]);
         });
+
+        if ($oldStatus !== $newStatus) {
+            $this->logActivity($task->id, $userId, 'moved', [
+                '狀態' => ['from' => $oldStatus, 'to' => $newStatus],
+            ]);
+        }
+
+        return $result;
     }
 
     /**
@@ -141,8 +175,9 @@ class TaskBoardService
      * @param Task $task
      * @return void
      */
-    public function deleteTask(Task $task)
+    public function deleteTask(Task $task, $userId = null)
     {
+        $this->logActivity($task->id, $userId, 'deleted', ['title' => $task->title]);
         $this->taskRepository->delete($task);
     }
 
@@ -151,6 +186,36 @@ class TaskBoardService
      *
      * @return \Illuminate\Database\Eloquent\Collection
      */
+    /**
+     * 記錄任務活動
+     *
+     * @param int         $taskId
+     * @param int|null    $userId
+     * @param string      $action
+     * @param array|null  $changes
+     * @return void
+     */
+    private function logActivity($taskId, $userId, $action, $changes = null)
+    {
+        $this->taskRepository->createActivity([
+            'task_id' => $taskId,
+            'user_id' => $userId,
+            'action'  => $action,
+            'changes' => $changes,
+        ]);
+    }
+
+    /**
+     * 取得任務活動紀錄
+     *
+     * @param int $taskId
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getActivities($taskId)
+    {
+        return $this->taskRepository->getActivities($taskId);
+    }
+
     public function getProjects()
     {
         return $this->projectRepository->getActive();
@@ -204,6 +269,16 @@ class TaskBoardService
     public function getStations()
     {
         return $this->stationRepository->allForDropdown();
+    }
+
+    /**
+     * 取得所有系統
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getSystems()
+    {
+        return $this->stationRepository->getActiveSystems();
     }
 
     /**

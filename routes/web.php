@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AccountController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\LoginLogController;
 use App\Http\Controllers\Admin\ShiftController;
 use App\Http\Controllers\Admin\StationController;
 use App\Http\Controllers\Admin\TelegramBroadcastController;
@@ -50,6 +51,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::put('/ajax-update/{user}', [AccountController::class, 'ajaxUpdate'])->middleware('can:account.update')->name('ajax-update');
         Route::post('/ajax-assign-permissions/{user}', [AccountController::class, 'ajaxAssignPermissions'])->middleware('can:account.assign_permission')->name('ajax-assign-permissions');
         Route::get('/permissions/{user}', [AccountController::class, 'permissionsPage'])->middleware('can:account.assign_permission')->name('permissions');
+        Route::get('/ajax-login-log/{user}', [AccountController::class, 'ajaxLoginLog'])->middleware('can:account.view')->name('ajax-login-log');
     });
 
     // 排班管理
@@ -182,6 +184,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::post('/ajax-store-comment/{task}', [TaskBoardController::class, 'ajaxStoreComment'])->middleware('can:task_board.view')->name('ajax-store-comment');
         Route::delete('/ajax-delete-comment/{comment}', [TaskBoardController::class, 'ajaxDeleteComment'])->middleware('can:task_board.delete_comment')->name('ajax-delete-comment');
         Route::post('/ajax-upload-editor-image', [TaskBoardController::class, 'ajaxUploadEditorImage'])->middleware('can:task_board.create')->name('ajax-upload-editor-image');
+        Route::get('/ajax-activities/{task}', [TaskBoardController::class, 'ajaxActivities'])->middleware('can:task_board.view')->name('ajax-activities');
     });
 
     // 內部管理
@@ -189,6 +192,13 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/', [StaffManageController::class, 'index'])->middleware('can:staff_manage.view')->name('index');
         Route::get('/ajax-list', [StaffManageController::class, 'ajaxList'])->middleware('can:staff_manage.view')->name('ajax-list');
         Route::put('/ajax-update/{user}', [StaffManageController::class, 'ajaxUpdate'])->middleware('can:staff_manage.edit')->name('ajax-update');
+    });
+
+    // 登入紀錄
+    Route::prefix('login-log')->name('login-log.')->group(function () {
+        Route::get('/', [LoginLogController::class, 'index'])->middleware('can:login_log.view')->name('index');
+        Route::get('/ajax-list', [LoginLogController::class, 'ajaxList'])->middleware('can:login_log.view')->name('ajax-list');
+        Route::get('/ajax-my-log', [LoginLogController::class, 'ajaxMyLog'])->name('ajax-my-log');
     });
 
     // Web Push 訂閱

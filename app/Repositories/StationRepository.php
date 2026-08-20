@@ -135,7 +135,8 @@ class StationRepository
     public function allForDropdown()
     {
         return Station::query()
-            ->select(['id', 'name'])
+            ->select(['id', 'system_id', 'name'])
+            ->with(['system:id,name'])
             ->orderBy('name')
             ->get();
     }
