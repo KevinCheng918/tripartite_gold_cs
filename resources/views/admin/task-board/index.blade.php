@@ -700,12 +700,12 @@ $(function () {
                 var stationDisplay = t.station ? (t.system ? t.system + ' / ' : '') + t.station : '<span class="text-muted">未選擇</span>';
 
                 html += '<div class="row g-1">';
-                html += '<div class="col-md-4 col-6"><div class="side-prop js-prop-edit" data-field="project_id"><label style="font-size:0.6875rem;color:#6c757d">專案</label><div><i class="fas fa-folder me-1 text-muted"></i>' + t.project + '</div></div></div>';
-                html += '<div class="col-md-4 col-6"><div class="side-prop js-prop-edit" data-field="station_id"><label style="font-size:0.6875rem;color:#6c757d">站台</label><div><i class="fas fa-server me-1 text-muted"></i>' + stationDisplay + '</div></div></div>';
-                html += '<div class="col-md-4 col-6"><div class="side-prop js-prop-edit" data-field="assignee_ids"><label style="font-size:0.6875rem;color:#6c757d">{{ trans("task_board.field_assignee") }}</label><div><i class="fas fa-users me-1 text-muted"></i>' + assigneeDisplay + '</div></div></div>';
-                html += '<div class="col-md-4 col-6"><div class="side-field" data-field="status" data-type="select"><label style="font-size:0.6875rem;color:#6c757d">{{ trans("task_board.field_status") }}</label><div class="field-value">' + (statusLabels[t.status] || '-') + '</div></div></div>';
-                html += '<div class="col-md-4 col-6"><div class="side-field" data-field="priority" data-type="select"><label style="font-size:0.6875rem;color:#6c757d">{{ trans("task_board.field_priority") }}</label><div class="field-value">' + (priorityLabel[t.priority] || '-') + '</div></div></div>';
-                html += '<div class="col-md-4 col-6"><div class="side-field" data-field="due_date" data-type="date"><label style="font-size:0.6875rem;color:#6c757d">{{ trans("task_board.field_due_date") }}</label><div class="field-value"><i class="fas fa-calendar me-1 text-muted"></i>' + (t.due_date || '<span class="text-muted">未設定</span>') + '</div></div></div>';
+                html += '<div class="col-3"><div class="side-prop js-prop-edit" data-field="project_id"><label style="font-size:0.75rem;color:#6c757d">專案</label><div style="font-size:0.9375rem"><i class="fas fa-folder me-1 text-muted"></i>' + t.project + '</div></div></div>';
+                html += '<div class="col-3"><div class="side-prop js-prop-edit" data-field="station_id"><label style="font-size:0.75rem;color:#6c757d">站台</label><div style="font-size:0.9375rem"><i class="fas fa-server me-1 text-muted"></i>' + stationDisplay + '</div></div></div>';
+                html += '<div class="col-6"><div class="side-prop js-prop-edit" data-field="assignee_ids"><label style="font-size:0.75rem;color:#6c757d">{{ trans("task_board.field_assignee") }}</label><div style="font-size:0.9375rem"><i class="fas fa-users me-1 text-muted"></i>' + assigneeDisplay + '</div></div></div>';
+                html += '<div class="col-3"><div class="side-field" data-field="status" data-type="select"><label style="font-size:0.75rem;color:#6c757d">{{ trans("task_board.field_status") }}</label><div class="field-value" style="font-size:0.9375rem">' + (statusLabels[t.status] || '-') + '</div></div></div>';
+                html += '<div class="col-3"><div class="side-field" data-field="priority" data-type="select"><label style="font-size:0.75rem;color:#6c757d">{{ trans("task_board.field_priority") }}</label><div class="field-value" style="font-size:0.9375rem">' + (priorityLabel[t.priority] || '-') + '</div></div></div>';
+                html += '<div class="col-6"><div class="side-field" data-field="due_date" data-type="date"><label style="font-size:0.75rem;color:#6c757d">{{ trans("task_board.field_due_date") }}</label><div class="field-value" style="font-size:0.9375rem"><i class="fas fa-calendar me-1 text-muted"></i>' + (t.due_date || '<span class="text-muted">未設定</span>') + '</div></div></div>';
                 html += '</div>';
                 html += '</div>';
 
@@ -867,7 +867,7 @@ $(function () {
             } else {
                 if (fieldType === 'date') {
                     var val = t[fieldName] || '';
-                    inputEl = '<input type="date" class="form-control" value="' + val + '">';
+                    inputEl = '<input type="date" class="form-control form-control-sm" style="min-width:130px" value="' + val + '">';
                 } else if (fieldType === 'select' && fieldName === 'status') {
                     inputEl = '<select class="form-select">';
                     [1,2,3,4,5].forEach(function (s) { inputEl += '<option value="' + s + '"' + (t.status === s ? ' selected' : '') + '>' + statusLabels[s] + '</option>'; });
@@ -913,7 +913,7 @@ $(function () {
                     var val = t[fieldName] || '';
                     inputEl = '<input type="text" class="form-control" value="' + val.replace(/"/g, '&quot;') + '">';
                 }
-                $valueDiv.html('<div class="input-group">' + inputEl + editConfirmBtn + editCancelBtn + '</div>');
+                $valueDiv.html(inputEl + '<div class="d-flex gap-2 mt-1">' + editConfirmBtn + editCancelBtn + '</div>');
             }
             $valueDiv.find('input, textarea, select').first().focus();
 

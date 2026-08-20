@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => 'v1.25',
+        'date'    => '2026-08-21',
+        'title'   => '任務看板側邊面板屬性排版優化',
+        'content' => implode("\n", [
+            '• 屬性網格排版調整：專案/站台縮窄（col-3），指派人員/預期完成日加寬（col-6）',
+            '• 屬性值字體放大（0.9375rem），標籤字體統一 0.75rem',
+            '• inline 編輯改為 input + 下方按鈕排列，解決 col-3 內 select 跑版問題',
+            '• 日期 input 加 form-control-sm + min-width:130px，確保日期完整顯示',
+        ]),
+    ],
+    [
         'version' => 'v1.24',
         'date'    => '2026-08-21',
         'title'   => 'USDT 匯率圖表折線記憶',
