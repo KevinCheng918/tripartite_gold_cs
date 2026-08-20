@@ -16,7 +16,7 @@ class TaskRepository
     /** @var array 列表欄位 */
     private const LIST_COLUMNS = [
         'id', 'project_id', 'station_id', 'title', 'status', 'priority',
-        'assignee_id', 'assignee_ids', 'creator_id', 'due_date', 'sort_order', 'created_at',
+        'assignee_id', 'assignee_ids', 'creator_id', 'due_date', 'sort_order', 'created_at', 'updated_at',
     ];
 
     /** @var array 詳細欄位 */
@@ -35,7 +35,8 @@ class TaskRepository
     {
         $query = Task::query()
             ->select(self::LIST_COLUMNS)
-            ->with(['project', 'station.system', 'assignee', 'creator']);
+            ->with(['project', 'station.system', 'assignee', 'creator'])
+            ->where('status', '!=', config('constants.TASK.STATUS.ARCHIVED'));
 
         // 排序
         $sort = $criteria['sort'] ?? 'created_desc';
@@ -67,7 +68,8 @@ class TaskRepository
             $id = (int) $criteria['assignee_id'];
             $query->where(function ($q) use ($id) {
                 $q->where('assignee_id', $id)
-                  ->orWhereJsonContains('assignee_ids', $id);
+                  ->orWhereJsonContains('assignee_ids', $id)
+                  ->orWhereJsonContains('assignee_ids', (string) $id);
             });
         }
 
@@ -223,6 +225,35 @@ class TaskRepository
      * @param array $attributes
      * @return TaskActivity
      */
+    /**
+     * 取得封存任務
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getArchived()
+    {
+        return Task::query()
+            ->select(self::LIST_COLUMNS)
+            ->with(['project', 'creator', 'latestArchivedActivity'])
+            ->where('status', config('constants.TASK.STATUS.ARCHIVED'))
+            ->orderByDesc('updated_at')
+            ->get();
+    }
+
+    /**
+     * 刪除超過指定天數的封存任務
+     *
+     * @param int $days
+     * @return void
+     */
+    public function deleteArchivedOlderThan($days)
+    {
+        Task::query()
+            ->where('status', config('constants.TASK.STATUS.ARCHIVED'))
+            ->where('updated_at', '<', now()->subDays($days))
+            ->delete();
+    }
+
     public function createActivity($attributes)
     {
         return TaskActivity::query()->create($attributes);

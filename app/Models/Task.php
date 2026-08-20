@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * 任務 Model
@@ -73,5 +74,18 @@ class Task extends Model
     public function comments(): HasMany
     {
         return $this->hasMany(TaskComment::class)->orderByDesc('created_at');
+    }
+
+    /**
+     * 最近一筆封存活動紀錄
+     *
+     * @return HasOne
+     */
+    public function latestArchivedActivity(): HasOne
+    {
+        return $this->hasOne(TaskActivity::class)
+            ->select(['id', 'task_id', 'changes'])
+            ->where('action', 'archived')
+            ->orderByDesc('id');
     }
 }

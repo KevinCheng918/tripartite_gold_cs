@@ -71,6 +71,10 @@ class TaskResource extends JsonResource
             'sort_order'   => $this->sort_order,
             'created_at'   => $this->created_at->format('Y-m-d H:i'),
             'updated_at'   => $this->updated_at ? $this->updated_at->format('Y-m-d H:i') : null,
+            'previous_status' => $this->whenLoaded('latestArchivedActivity', function () {
+                $changes = $this->latestArchivedActivity->changes ?? [];
+                return isset($changes['狀態']['from']) ? (int) $changes['狀態']['from'] : null;
+            }),
         ];
     }
 }

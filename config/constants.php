@@ -72,6 +72,7 @@ return [
             'TESTING'     => 3,
             'IN_REVIEW'   => 4,
             'RESOLVED'    => 5,
+            'ARCHIVED'    => 6,
         ],
         'PRIORITY' => [
             'LOW'    => 1,

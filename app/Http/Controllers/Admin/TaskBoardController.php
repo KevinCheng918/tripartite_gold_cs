@@ -165,21 +165,58 @@ class TaskBoardController extends Controller
     }
 
     /**
-     * Ajax 刪除任務
+     * Ajax 封存任務
      *
      * @param Task $task
      * @return \Illuminate\Http\JsonResponse
      */
-    public function ajaxDeleteTask(Task $task)
+    public function ajaxArchiveTask(Task $task)
     {
         try {
-            $this->taskBoardService->deleteTask($task, Auth::id());
+            $this->taskBoardService->archiveTask($task, Auth::id());
 
-            return response()->json(['message' => trans('task_board.msg.task_deleted')]);
+            return response()->json(['message' => '任務已封存']);
         } catch (\Exception $e) {
-            Log::error('任務刪除失敗', ['error' => $e->getMessage(), 'task_id' => $task->id]);
+            Log::error('任務封存失敗', ['error' => $e->getMessage(), 'task_id' => $task->id]);
 
-            return response()->json(['message' => trans('task_board.msg.task_delete_failed')], 500);
+            return response()->json(['message' => '封存失敗'], 500);
+        }
+    }
+
+    /**
+     * Ajax 取得封存任務列表
+     *
+     * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection
+     */
+    public function ajaxArchivedList()
+    {
+        $tasks = $this->taskBoardService->getArchivedTasks();
+        $allIds = [];
+        foreach ($tasks as $task) {
+            $ids = $task->assignee_ids ?? [];
+            foreach ($ids as $id) { $allIds[] = (int) $id; }
+        }
+        TaskResource::preloadUsers(array_unique($allIds));
+
+        return TaskResource::collection($tasks);
+    }
+
+    /**
+     * Ajax 還原封存任務
+     *
+     * @param Task $task
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxRestoreTask(Task $task)
+    {
+        try {
+            $this->taskBoardService->restoreTask($task, Auth::id());
+
+            return response()->json(['message' => '任務已還原']);
+        } catch (\Exception $e) {
+            Log::error('任務還原失敗', ['error' => $e->getMessage(), 'task_id' => $task->id]);
+
+            return response()->json(['message' => '還原失敗'], 500);
         }
     }
 

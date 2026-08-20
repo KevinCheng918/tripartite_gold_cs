@@ -174,7 +174,9 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-task/{task}', [TaskBoardController::class, 'ajaxTaskDetail'])->middleware('can:task_board.view')->name('ajax-task-detail');
         Route::post('/ajax-store-task', [TaskBoardController::class, 'ajaxStoreTask'])->middleware('can:task_board.create')->name('ajax-store-task');
         Route::put('/ajax-update-task/{task}', [TaskBoardController::class, 'ajaxUpdateTask'])->middleware('can:task_board.update')->name('ajax-update-task');
-        Route::delete('/ajax-delete-task/{task}', [TaskBoardController::class, 'ajaxDeleteTask'])->middleware('can:task_board.delete')->name('ajax-delete-task');
+        Route::put('/ajax-archive-task/{task}', [TaskBoardController::class, 'ajaxArchiveTask'])->middleware('can:task_board.delete')->name('ajax-archive-task');
+        Route::get('/ajax-archived-list', [TaskBoardController::class, 'ajaxArchivedList'])->middleware('can:task_board.view')->name('ajax-archived-list');
+        Route::put('/ajax-restore-task/{task}', [TaskBoardController::class, 'ajaxRestoreTask'])->middleware('can:task_board.delete')->name('ajax-restore-task');
         Route::put('/ajax-move-task/{task}', [TaskBoardController::class, 'ajaxMoveTask'])->middleware('can:task_board.update')->name('ajax-move-task');
         Route::post('/ajax-reorder', [TaskBoardController::class, 'ajaxReorder'])->middleware('can:task_board.update')->name('ajax-reorder');
         Route::get('/ajax-projects', [TaskBoardController::class, 'ajaxProjects'])->middleware('can:task_board.view')->name('ajax-projects');

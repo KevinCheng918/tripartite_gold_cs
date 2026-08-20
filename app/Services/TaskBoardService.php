@@ -175,10 +175,45 @@ class TaskBoardService
      * @param Task $task
      * @return void
      */
-    public function deleteTask(Task $task, $userId = null)
+    /**
+     * 取得封存任務（30 天內）
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getArchivedTasks()
     {
-        $this->logActivity($task->id, $userId, 'deleted', ['title' => $task->title]);
-        $this->taskRepository->delete($task);
+        // 自動清理超過 30 天的封存任務
+        $this->taskRepository->deleteArchivedOlderThan(30);
+
+        return $this->taskRepository->getArchived();
+    }
+
+    /**
+     * 還原封存任務
+     *
+     * @param Task     $task
+     * @param int|null $userId
+     * @return Task
+     */
+    public function restoreTask(Task $task, $userId = null)
+    {
+        $this->logActivity($task->id, $userId, 'restored', null);
+
+        return $this->taskRepository->update($task, [
+            'status' => config('constants.TASK.STATUS.PENDING'),
+        ]);
+    }
+
+    public function archiveTask(Task $task, $userId = null)
+    {
+        $this->logActivity($task->id, $userId, 'archived', [
+            'title' => $task->title,
+            '狀態' => ['from' => $task->status, 'to' => config('constants.TASK.STATUS.ARCHIVED')],
+        ]);
+
+        return $this->taskRepository->update($task, [
+            'status' => config('constants.TASK.STATUS.ARCHIVED'),
+        ]);
     }
 
     /**

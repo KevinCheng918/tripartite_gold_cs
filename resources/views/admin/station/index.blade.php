@@ -182,9 +182,9 @@
                     </div>
                 @endforeach
                 <div class="col">
-                    <div class="border rounded-3 p-3 d-flex align-items-center gap-3" style="border-left:4px solid #0d9488 !important;background:#f8f9fa">
+                    <div class="border rounded-3 p-3 d-flex align-items-center gap-3" style="border-left:4px solid #d4af37 !important;background:#fdf6e3">
                         <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold"
-                             style="width:40px;height:40px;min-width:40px;background:#e9ecef;color:#495057;font-size:0.875rem"><i class="fas fa-clipboard-list"></i></div>
+                             style="width:40px;height:40px;min-width:40px;background:#fdf6e3;color:#7a5c00;font-size:0.875rem"><i class="fas fa-clipboard-list"></i></div>
                         <div>
                             <div class="fw-bold">總計 <strong>{{ $systemStats['total'] }} 站</strong></div>
                             <div class="d-flex gap-3 mt-1">
@@ -204,7 +204,7 @@
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover table-striped align-middle mb-0">
-                    <thead class="table-light">
+                    <thead class="thead-gold">
                         <tr>
                             <th>#</th>
                             <th>系統</th>
@@ -485,7 +485,7 @@
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover table-striped align-middle mb-0" style="white-space:nowrap">
-                        <thead class="table-light">
+                        <thead class="thead-gold">
                             <tr>
                                 <th class="text-center">#</th>
                                 <th class="text-center">系統</th>
@@ -791,7 +791,7 @@
                         <div class="card-header fw-bold">現有系統</div>
                         <div class="card-body p-0">
                             <table class="table table-hover align-middle mb-0">
-                                <thead class="table-light">
+                                <thead class="thead-gold">
                                     <tr>
                                         <th>系統名稱</th>
                                         <th>Bot Token</th>
@@ -1270,8 +1270,8 @@ $(function () {
         // 總計
         var totalStat = { count: totalCount, usdt: totalUsdt, amount: totalAmount, rateSum: totalRateSum };
         html += '<div style="flex:1;min-width:200px">';
-        html += '<div class="border rounded-3 p-3 d-flex align-items-center gap-3" style="border-left:4px solid #0d9488 !important;background:#f8f9fa">';
-        html += '<div class="rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width:40px;height:40px;min-width:40px;background:#e9ecef;color:#495057;font-size:0.875rem"><i class="fas fa-clipboard-list"></i></div>';
+        html += '<div class="border rounded-3 p-3 d-flex align-items-center gap-3" style="border-left:4px solid #d4af37 !important;background:#fdf6e3">';
+        html += '<div class="rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width:40px;height:40px;min-width:40px;background:#fdf6e3;color:#7a5c00;font-size:0.875rem"><i class="fas fa-clipboard-list"></i></div>';
         html += '<div>';
         html += '<div class="fw-bold">總計 <span class="text-muted fw-normal" style="font-size:0.8125rem">' + totalCount + ' 筆</span></div>';
         html += statLine(totalStat);

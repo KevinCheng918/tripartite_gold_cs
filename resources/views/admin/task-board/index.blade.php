@@ -84,6 +84,14 @@
         [data-theme="dark"] .side-prop:hover { background: rgba(255,255,255,0.05); }
         /* 描述 HTML 顯示 */
         .side-field .field-value img { max-width: 100%; height: auto; }
+        /* 封存重置按鈕 */
+        #btn-archived-filter-reset:hover { background: #a67c00; color: #fff !important; border-color: #a67c00; }
+        #btn-archived-filter-reset:active, #btn-archived-filter-reset.active { background: #d4af37 !important; color: #fff !important; border-color: #d4af37 !important; box-shadow: none !important; }
+        /* 封存清單 */
+        [data-theme="dark"] #modal-archived-list .modal-content { background: #1e1e1e; color: #e0e0e0; }
+        [data-theme="dark"] #modal-archived-list .table { color: #e0e0e0; }
+        [data-theme="dark"] #modal-archived-list .table-hover tbody tr:hover { background: rgba(255,255,255,0.05); }
+        [data-theme="dark"] #modal-restore-confirm .modal-content { background: #1e1e1e; color: #e0e0e0; }
         @media (max-width: 767px) {
             #task-side-panel { width: 100% !important; }
         }
@@ -107,6 +115,11 @@
                     </button>
                 </div>
                 @endif
+                <div class="col-auto">
+                    <button class="btn btn-outline-secondary" id="btn-open-archived">
+                        <i class="fas fa-archive me-1"></i>查看封存
+                    </button>
+                </div>
                 <div class="col"></div>
                 <div class="col-12 col-md-auto">
                     <div class="d-flex gap-2 align-items-center flex-wrap">
@@ -336,15 +349,15 @@
         </div>
     </div>
 
-    <div class="modal fade" id="modal-delete-confirm" tabindex="-1">
+    <div class="modal fade" id="modal-archive-confirm" tabindex="-1">
         <div class="modal-dialog modal-sm">
             <div class="modal-content">
                 <div class="modal-body text-center py-4">
-                    <p class="mb-3">{{ trans('task_board.msg.confirm_delete') }}</p>
+                    <p class="mb-3">確定封存此任務？封存後可在異動紀錄中查看。</p>
                     <input type="hidden" id="delete-confirm-id">
                     <div class="d-flex justify-content-center gap-2">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                        <button type="button" class="btn btn-danger" id="btn-delete-confirm-ok">確定刪除</button>
+                        <button type="button" class="btn btn-danger" id="btn-delete-confirm-ok">確定封存</button>
                     </div>
                 </div>
             </div>
@@ -356,12 +369,77 @@
         <div class="modal-dialog modal-sm">
             <div class="modal-content">
                 <div class="modal-body text-center py-4">
-                    <p class="mb-3">確定刪除此留言？</p>
+                    <p class="mb-3">確定封存此留言？</p>
                     <input type="hidden" id="delete-comment-confirm-id">
                     <input type="hidden" id="delete-comment-confirm-task-id">
                     <div class="d-flex justify-content-center gap-2">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                        <button type="button" class="btn btn-danger" id="btn-delete-comment-confirm-ok">確定刪除</button>
+                        <button type="button" class="btn btn-danger" id="btn-delete-comment-confirm-ok">確定封存</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- 封存清單 Modal --}}
+    <div class="modal fade" id="modal-archived-list" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-archive me-2"></i>封存任務清單</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-2" style="font-size:0.875rem">封存超過 30 天的任務將自動刪除</p>
+                    <div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
+                        <select id="archived-filter-project" class="form-select form-select-sm" style="width:auto">
+                            <option value="">全部專案</option>
+                        </select>
+                        <select id="archived-filter-assignee" class="form-select form-select-sm" style="width:auto">
+                            <option value="">全部人員</option>
+                        </select>
+                        <input type="date" id="archived-filter-date-start" class="form-control form-control-sm" style="width:auto" placeholder="起始日期">
+                        <span class="text-muted">~</span>
+                        <input type="date" id="archived-filter-date-end" class="form-control form-control-sm" style="width:auto" placeholder="結束日期">
+                        <button class="btn btn-sm" id="btn-archived-filter-reset" title="重置" style="color:#a67c00;border-color:#a67c00"><i class="fas fa-undo"></i></button>
+                    </div>
+                    <div id="archived-list-loading" class="text-center py-4" style="display:none">
+                        <div class="spinner-border text-secondary" role="status"></div>
+                    </div>
+                    <div id="archived-list-empty" class="text-center py-4 text-muted" style="display:none">
+                        <i class="fas fa-inbox fa-2x mb-2 d-block"></i>目前沒有封存任務
+                    </div>
+                    <div class="table-responsive" id="archived-list-table-wrap" style="display:none">
+                        <table class="table table-hover table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width:90px;white-space:nowrap">專案</th>
+                                    <th style="white-space:nowrap">標題</th>
+                                    <th style="width:90px;white-space:nowrap">原始狀態</th>
+                                    <th>指派人員</th>
+                                    <th style="width:100px;white-space:nowrap">封存時間</th>
+                                    <th style="width:80px;white-space:nowrap">剩餘天數</th>
+                                    <th style="width:60px;white-space:nowrap">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="archived-list-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- 還原確認 Modal --}}
+    <div class="modal fade" id="modal-restore-confirm" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-body text-center py-4">
+                    <p class="mb-3">確定還原此任務？任務將回到「待處理」狀態。</p>
+                    <input type="hidden" id="restore-confirm-id">
+                    <div class="d-flex justify-content-center gap-2">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="button" class="btn btn-success" id="btn-restore-confirm-ok">確定還原</button>
                     </div>
                 </div>
             </div>
@@ -605,7 +683,7 @@ $(function () {
 
                 var actionsHtml = '<button class="btn" id="btn-show-activities" style="background:linear-gradient(135deg,#d4af37,#a67c00);color:#fff;border:none"><i class="fas fa-history me-1"></i>異動紀錄</button>';
                 if (canDelete) {
-                    actionsHtml += '<button class="btn btn-outline-secondary" id="btn-panel-delete" data-id="' + t.id + '"><i class="fas fa-trash text-danger me-1"></i>{{ trans("task_board.action_delete") }}</button>';
+                    actionsHtml += '<button class="btn btn-outline-secondary" id="btn-panel-archive" data-id="' + t.id + '"><i class="fas fa-archive me-1"></i>封存</button>';
                 }
                 actionsHtml += '<button type="button" class="btn-close" id="btn-close-panel-inner"></button>';
                 $('#side-panel-actions').html(actionsHtml);
@@ -681,10 +759,10 @@ $(function () {
                     loadActivities(taskId);
                 });
 
-                $('#btn-panel-delete').on('click', function () {
+                $('#btn-panel-archive').on('click', function () {
                     var deleteId = $(this).data('id');
                     $('#delete-confirm-id').val(deleteId);
-                    showBsModal('modal-delete-confirm');
+                    showBsModal('modal-archive-confirm');
                 });
 
                 commentImageFiles = [];
@@ -999,7 +1077,7 @@ $(function () {
         hideBsModal(document.getElementById('modal-prop-edit'));
     });
 
-    var actionLabels = { created: '建立任務', updated: '更新內容', moved: '移動狀態', deleted: '刪除任務' };
+    var actionLabels = { created: '建立任務', updated: '更新內容', moved: '移動狀態', archived: '封存任務', restored: '還原任務', deleted: '刪除任務' };
 
     var activityPageSize = 10;
     var activityAllData = [];
@@ -1271,18 +1349,157 @@ $(function () {
         var $btn = $(this);
         $btn.prop('disabled', true);
         $.ajax({
-            url: '/admin/task-board/ajax-delete-task/' + id,
-            method: 'DELETE',
+            url: '/admin/task-board/ajax-archive-task/' + id,
+            method: 'PUT',
             headers: { 'X-CSRF-TOKEN': csrfToken },
             success: function (body) {
-                hideBsModal(document.getElementById('modal-delete-confirm'));
+                hideBsModal(document.getElementById('modal-archive-confirm'));
                 closePanel();
                 setTimeout(function () { showMsg(body.message); loadBoard(); }, 400);
                 $btn.prop('disabled', false);
             },
             error: function (xhr) {
-                hideBsModal(document.getElementById('modal-delete-confirm'));
+                hideBsModal(document.getElementById('modal-archive-confirm'));
                 setTimeout(function () { showMsg((xhr.responseJSON && xhr.responseJSON.message) || '刪除失敗'); }, 400);
+                $btn.prop('disabled', false);
+            }
+        });
+    });
+
+    // 封存清單
+    var archivedAllData = [];
+
+    $('#btn-open-archived').on('click', function () {
+        loadArchivedList();
+        showBsModal('modal-archived-list');
+    });
+
+    function loadArchivedList() {
+        $('#archived-list-loading').show();
+        $('#archived-list-empty, #archived-list-table-wrap').hide();
+        $.ajax({
+            url: '/admin/task-board/ajax-archived-list',
+            method: 'GET',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            success: function (res) {
+                $('#archived-list-loading').hide();
+                archivedAllData = res.data || res;
+                buildArchivedFilterOptions(archivedAllData);
+                renderArchivedList(archivedAllData);
+            },
+            error: function () {
+                $('#archived-list-loading').hide();
+                showMsg('載入封存清單失敗');
+            }
+        });
+    }
+
+    function renderArchivedList(list) {
+        $('#archived-list-empty, #archived-list-table-wrap').hide();
+        if (!list.length) {
+            $('#archived-list-empty').show();
+            return;
+        }
+        var html = '';
+        list.forEach(function (t) {
+            var updatedAt = new Date(t.updated_at);
+            var now = new Date();
+            var diffDays = Math.ceil((now - updatedAt) / (1000 * 60 * 60 * 24));
+            var remaining = 30 - diffDays;
+            if (remaining < 0) remaining = 0;
+            var badgeClass = remaining <= 7 ? 'bg-danger' : (remaining <= 14 ? 'bg-warning text-dark' : 'bg-secondary');
+            var prevStatus = t.previous_status ? (statusLabels[t.previous_status] || '-') : '-';
+            var assigneeNames = (t.assignees && t.assignees.length)
+                ? t.assignees.map(function (a) { return $('<span>').text(a.nickname).html(); }).join(', ')
+                : '-';
+            html += '<tr>';
+            html += '<td style="white-space:nowrap"><span class="badge bg-info text-dark" style="font-size:0.75rem">' + (t.project ? $('<span>').text(t.project).html() : '-') + '</span></td>';
+            html += '<td style="white-space:nowrap">' + $('<span>').text(t.title).html() + '</td>';
+            html += '<td style="white-space:nowrap"><span class="badge bg-secondary" style="font-size:0.75rem">' + prevStatus + '</span></td>';
+            html += '<td style="font-size:0.875rem">' + assigneeNames + '</td>';
+            html += '<td style="white-space:nowrap">' + updatedAt.toLocaleDateString('zh-TW') + '</td>';
+            html += '<td style="white-space:nowrap"><span class="badge ' + badgeClass + '">' + remaining + ' 天</span></td>';
+            html += '<td style="white-space:nowrap"><button class="btn btn-sm btn-outline-success js-restore-task" data-id="' + t.id + '" title="還原"><i class="fas fa-undo"></i></button></td>';
+            html += '</tr>';
+        });
+        $('#archived-list-body').html(html);
+        $('#archived-list-table-wrap').show();
+    }
+
+    function buildArchivedFilterOptions(list) {
+        var projects = {};
+        var assignees = {};
+        list.forEach(function (t) {
+            if (t.project) projects[t.project] = true;
+            (t.assignees || []).forEach(function (a) {
+                if (a.nickname) assignees[a.nickname] = true;
+            });
+        });
+        var $proj = $('#archived-filter-project').empty().append($('<option>').val('').text('全部專案'));
+        Object.keys(projects).sort().forEach(function (name) {
+            $proj.append($('<option>').val(name).text(name));
+        });
+        var $asgn = $('#archived-filter-assignee').empty().append($('<option>').val('').text('全部人員'));
+        Object.keys(assignees).sort().forEach(function (name) {
+            $asgn.append($('<option>').val(name).text(name));
+        });
+    }
+
+    function filterArchivedList() {
+        var project = $('#archived-filter-project').val();
+        var assignee = $('#archived-filter-assignee').val();
+        var dateStart = $('#archived-filter-date-start').val();
+        var dateEnd = $('#archived-filter-date-end').val();
+        var filtered = archivedAllData.filter(function (t) {
+            if (project && t.project !== project) return false;
+            if (assignee) {
+                var match = (t.assignees || []).some(function (a) { return a.nickname === assignee; });
+                if (!match) return false;
+            }
+            if (dateStart || dateEnd) {
+                var d = t.updated_at ? t.updated_at.substring(0, 10) : '';
+                if (dateStart && d < dateStart) return false;
+                if (dateEnd && d > dateEnd) return false;
+            }
+            return true;
+        });
+        renderArchivedList(filtered);
+    }
+
+    $('#archived-filter-project, #archived-filter-assignee').on('change', filterArchivedList);
+    $('#archived-filter-date-start, #archived-filter-date-end').on('change', filterArchivedList);
+    $('#btn-archived-filter-reset').on('click', function () {
+        var $btn = $(this);
+        $btn.addClass('active');
+        $('#archived-filter-project, #archived-filter-assignee').val('');
+        $('#archived-filter-date-start, #archived-filter-date-end').val('');
+        renderArchivedList(archivedAllData);
+        setTimeout(function () { $btn.removeClass('active'); }, 200);
+    });
+
+    $(document).on('click', '.js-restore-task', function () {
+        var id = $(this).data('id');
+        $('#restore-confirm-id').val(id);
+        hideBsModal(document.getElementById('modal-archived-list'));
+        setTimeout(function () { showBsModal('modal-restore-confirm'); }, 400);
+    });
+
+    $('#btn-restore-confirm-ok').on('click', function () {
+        var id = $('#restore-confirm-id').val();
+        var $btn = $(this);
+        $btn.prop('disabled', true);
+        $.ajax({
+            url: '/admin/task-board/ajax-restore-task/' + id,
+            method: 'PUT',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            success: function (body) {
+                hideBsModal(document.getElementById('modal-restore-confirm'));
+                setTimeout(function () { showMsg(body.message); loadBoard(); }, 400);
+                $btn.prop('disabled', false);
+            },
+            error: function (xhr) {
+                hideBsModal(document.getElementById('modal-restore-confirm'));
+                setTimeout(function () { showMsg((xhr.responseJSON && xhr.responseJSON.message) || '還原失敗'); }, 400);
                 $btn.prop('disabled', false);
             }
         });
