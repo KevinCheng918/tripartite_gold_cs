@@ -85,18 +85,15 @@ class CreditTopupService
             ]);
         }
 
-        // 扣點時 amount 帶負數
-        /** @var float $amount 實際傳送至 API 的點數（扣點為負值） */
         $amount = (float) $topup->credit_amount;
-        if ((int) $topup->action_type === CreditTopup::ACTION_DEDUCT) {
-            $amount = -$amount;
-        }
+        $action = (int) $topup->action_type === CreditTopup::ACTION_DEDUCT ? 'deduct' : 'add';
 
         $result = $this->mainSystemApi->addCredit(
             $station->api_url,
             $station->api_key,
             $amount,
-            $topup->credit_type
+            $topup->credit_type,
+            $action
         );
 
         return DB::transaction(function () use ($topup, $reviewerId, $result) {

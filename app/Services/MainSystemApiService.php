@@ -104,7 +104,17 @@ class MainSystemApiService
      * @param string $column    credit 或 shop_credit
      * @return array|null API 回傳，失敗回傳 null
      */
-    public function addCredit($apiUrl, $apiKey, $amount, $column = 'credit')
+    /**
+     * 呼叫站台 API 補點/扣點
+     *
+     * @param string $apiUrl   站台 API 網址
+     * @param string $apiKey   站台 API Key
+     * @param float  $amount   點數（正數）
+     * @param string $column   credit 或 shop_credit
+     * @param string $action   add 或 deduct
+     * @return array|null
+     */
+    public function addCredit($apiUrl, $apiKey, $amount, $column = 'credit', $action = 'add')
     {
         if (blank($apiUrl) || blank($apiKey)) {
             Log::warning('MainSystemApi: api_url 或 api_key 未設定（補點）');
@@ -112,12 +122,14 @@ class MainSystemApiService
             return null;
         }
 
+        $endpoint = $action === 'deduct' ? '/api/admin/credit-deduct' : '/api/admin/credit-add';
+
         try {
             $timestamp = time();
             $signKey = config('app.api_sign_key', '');
             $sign = hash('sha256', $apiKey . $signKey . $timestamp);
 
-            $response = $this->client->post(rtrim($apiUrl, '/') . '/api/admin/credit-add', [
+            $response = $this->client->post(rtrim($apiUrl, '/') . $endpoint, [
                 'headers' => [
                     'Accept' => 'application/json',
                 ],
