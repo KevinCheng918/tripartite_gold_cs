@@ -497,12 +497,11 @@
                                 <th class="text-center">申請/審核人</th>
                                 <th class="text-center">申請/審核時間</th>
                                 <th class="text-center">圖片</th>
-                                <th class="text-center">備註</th>
                                 <th class="text-center">操作</th>
                             </tr>
                         </thead>
                         <tbody id="topup-table-body">
-                            <tr><td colspan="12" class="text-center text-muted py-4">Loading...</td></tr>
+                            <tr><td colspan="11" class="text-center text-muted py-4">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -1285,7 +1284,7 @@ $(function () {
     function renderTopupTable(list) {
         var $tbody = $('#topup-table-body');
         if (!list || list.length === 0) {
-            $tbody.html('<tr><td colspan="12" class="text-center text-muted py-4">暫無資料</td></tr>');
+            $tbody.html('<tr><td colspan="11" class="text-center text-muted py-4">暫無資料</td></tr>');
             return;
         }
         var html = '';
@@ -1306,23 +1305,19 @@ $(function () {
                 html += '<button class="btn btn-sm btn-outline-secondary js-topup-images" data-images=\'' + JSON.stringify(t.images) + '\'><i class="fas fa-image me-1"></i>' + t.images.length + '張</button>';
             } else { html += '-'; }
             html += '</td>';
-            // 備註
-            html += '<td>';
+            // 操作按鈕
+            html += '<td><div class="d-flex gap-1">';
             if (t.note) {
                 html += '<button class="btn btn-sm btn-outline-secondary js-topup-note" data-note="' + t.note.replace(/"/g, '&quot;') + '"><i class="fas fa-sticky-note me-1"></i>備註</button>';
-            } else { html += '-'; }
-            html += '</td>';
-            // 操作按鈕
-            html += '<td>';
+            }
             if (parseInt(t.status, 10) === 0 && hasTopupApprove) {
-                html += '<div class="d-flex gap-1">';
                 html += '<button class="btn btn-sm btn-outline-secondary js-topup-approve" data-id="' + t.id + '" data-station="' + t.station + '" data-amount="' + t.credit_amount + '" data-action="' + t.action_type + '"><i class="fas fa-check text-success me-1"></i>通過</button>';
                 html += '<button class="btn btn-sm btn-outline-secondary js-topup-reject" data-id="' + t.id + '"><i class="fas fa-times text-danger me-1"></i>拒絕</button>';
-                html += '</div>';
             } else if (parseInt(t.status, 10) === 3 && hasTopupApprove) {
                 html += '<button class="btn btn-sm btn-outline-secondary js-topup-approve" data-id="' + t.id + '" data-station="' + t.station + '" data-amount="' + t.credit_amount + '" data-action="' + t.action_type + '"><i class="fas fa-redo text-warning me-1"></i>重試</button>';
-            } else { html += '-'; }
-            html += '</td>';
+            }
+            if (!t.note && parseInt(t.status, 10) !== 0 && parseInt(t.status, 10) !== 3) { html += '-'; }
+            html += '</div></td>';
             html += '</tr>';
         });
         $tbody.html(html);
