@@ -53,9 +53,9 @@
                                 {!! \App\Presenters\UserPresenter::levelOptions([0]) !!}
                             </select>
                         </div>
-                        <div class="col-md-3 col-6">
+                        <div class="col-md-3 col-12">
                             <label class="form-label fw-bold">年資篩選：</label>
-                            <div class="input-group">
+                            <div class="input-group flex-nowrap">
                                 <select class="form-select" id="staff-search-tenure-op" style="max-width:90px">
                                     <option value="">不限</option>
                                     <option value="gte">≥</option>
@@ -94,7 +94,7 @@
                 <div class="card-body p-0">
                     <div class="table-responsive d-none d-md-block">
                         <table class="table table-hover table-striped align-middle mb-0">
-                            <thead class="table-light">
+                            <thead class="thead-gold">
                                 <tr>
                                     <th>#</th>
                                     <th>帳號</th>
@@ -156,9 +156,9 @@
                         </div>
                     </div>
                     <div class="row g-3 mb-3">
-                        <div class="col-md-3 col-6">
+                        <div class="col-md-3 col-12">
                             <label class="form-label fw-bold">使用年限：</label>
-                            <div class="input-group">
+                            <div class="input-group flex-nowrap">
                                 <select class="form-select" id="eq-search-duration-op" style="max-width:90px">
                                     <option value="">不限</option>
                                     <option value="gte">≥</option>
@@ -204,7 +204,7 @@
                 <div class="card-body p-0">
                     <div class="table-responsive d-none d-md-block">
                         <table class="table table-hover table-striped align-middle mb-0">
-                            <thead class="table-light">
+                            <thead class="thead-gold">
                                 <tr>
                                     <th>#</th>
                                     <th>員工</th>
@@ -415,13 +415,13 @@ $(function () {
         });
 
         var html = '<div class="col"><div class="card shadow-sm">';
-        html += '<div class="card-header py-2 d-flex justify-content-center" style="background:#e9ecef"><strong style="font-size:1.0625rem"><i class="fas fa-users me-2"></i>身份</strong></div>';
+        html += '<div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong style="font-size:1.0625rem"><i class="fas fa-users me-2" style="color:#d4af37"></i>身份</strong></div>';
         html += '<div class="card-body py-2"><div class="d-flex flex-wrap">' + levelItems + '</div></div>';
         html += '</div></div>';
 
         // 狀態卡片
         html += '<div class="col"><div class="card shadow-sm">';
-        html += '<div class="card-header py-2 d-flex justify-content-center" style="background:#e9ecef"><strong style="font-size:1.0625rem"><i class="fas fa-toggle-on me-2"></i>狀態</strong></div>';
+        html += '<div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong style="font-size:1.0625rem"><i class="fas fa-toggle-on me-2" style="color:#28a745"></i>狀態</strong></div>';
         html += '<div class="card-body py-2"><div class="d-flex flex-wrap text-center">';
         html += '<div class="flex-fill"><div class="mb-1"><span class="badge bg-success">在職</span></div><div class="fw-bold" style="font-size:1.25rem">' + onJob + '</div></div>';
         html += '<div class="flex-fill"><div class="mb-1"><span class="badge bg-secondary">離職</span></div><div class="fw-bold" style="font-size:1.25rem">' + resigned + '</div></div>';
@@ -429,7 +429,7 @@ $(function () {
 
         // 總計
         html += '<div class="col-auto d-flex"><div class="card shadow-sm d-flex justify-content-center" style="min-width:100px">';
-        html += '<div class="card-header py-2 d-flex justify-content-center" style="background:#e9ecef"><strong style="font-size:1.0625rem">總計</strong></div>';
+        html += '<div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong style="font-size:1.0625rem"><i class="fas fa-chart-bar me-2" style="color:#0284c7"></i>總計</strong></div>';
         html += '<div class="card-body py-2 text-center"><div class="fw-bold" style="font-size:1.25rem">' + total + '</div><small class="text-muted">人</small></div>';
         html += '</div></div>';
 
@@ -450,7 +450,7 @@ $(function () {
         });
 
         var html = '<div class="col"><div class="card shadow-sm">';
-        html += '<div class="card-header py-2 d-flex justify-content-center" style="background:#e9ecef"><strong style="font-size:1.0625rem"><i class="fas fa-laptop me-2"></i>設備狀態</strong></div>';
+        html += '<div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong style="font-size:1.0625rem"><i class="fas fa-laptop me-2" style="color:#17a2b8"></i>設備狀態</strong></div>';
         html += '<div class="card-body py-2"><div class="d-flex flex-wrap text-center">';
         html += '<div class="flex-fill"><div class="mb-1"><span class="badge bg-success">使用中</span></div><div class="fw-bold" style="font-size:1.25rem">' + inUse + '</div></div>';
         html += '<div class="flex-fill"><div class="mb-1"><span class="badge bg-secondary">已退還</span></div><div class="fw-bold" style="font-size:1.25rem">' + returned + '</div></div>';
@@ -458,7 +458,7 @@ $(function () {
         html += '</div></div></div></div>';
 
         html += '<div class="col-auto d-flex"><div class="card shadow-sm d-flex justify-content-center" style="min-width:100px">';
-        html += '<div class="card-header py-2 d-flex justify-content-center" style="background:#e9ecef"><strong style="font-size:1.0625rem">總計</strong></div>';
+        html += '<div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong style="font-size:1.0625rem"><i class="fas fa-chart-bar me-2" style="color:#0284c7"></i>總計</strong></div>';
         html += '<div class="card-body py-2 text-center"><div class="fw-bold" style="font-size:1.25rem">' + total + '</div><small class="text-muted">件</small></div>';
         html += '</div></div>';
 
