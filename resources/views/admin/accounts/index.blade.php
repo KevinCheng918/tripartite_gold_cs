@@ -68,7 +68,7 @@
     <div class="row g-3 mb-3">
         <div class="col">
             <div class="card shadow-sm">
-                <div class="card-header py-2 d-flex justify-content-center" style="background:#e9ecef"><strong style="font-size:1.0625rem"><i class="fas fa-users me-2"></i>身份</strong></div>
+                <div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong style="font-size:1.0625rem"><i class="fas fa-users me-2" style="color:#d4af37"></i>身份</strong></div>
                 <div class="card-body py-2">
                     <div class="d-flex flex-wrap text-center">
                         @foreach(config('constants.USER.LEVEL') as $key => $val)
@@ -85,7 +85,7 @@
         </div>
         <div class="col">
             <div class="card shadow-sm">
-                <div class="card-header py-2 d-flex justify-content-center" style="background:#e9ecef"><strong style="font-size:1.0625rem"><i class="fas fa-toggle-on me-2"></i>狀態</strong></div>
+                <div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong style="font-size:1.0625rem"><i class="fas fa-toggle-on me-2" style="color:#28a745"></i>狀態</strong></div>
                 <div class="card-body py-2">
                     <div class="d-flex flex-wrap text-center">
                         <div class="flex-fill">
@@ -106,7 +106,7 @@
         </div>
         <div class="col-auto d-flex">
             <div class="card shadow-sm d-flex justify-content-center" style="min-width:100px">
-                <div class="card-header py-2 d-flex justify-content-center" style="background:#e9ecef"><strong style="font-size:1.0625rem">總計</strong></div>
+                <div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong style="font-size:1.0625rem"><i class="fas fa-chart-bar me-2" style="color:#0284c7"></i>總計</strong></div>
                 <div class="card-body py-2 d-flex flex-column align-items-center justify-content-center">
                     <div class="fw-bold" style="font-size:1.25rem">{{ $accountStats['total'] }}</div>
                     <small class="text-muted">人</small>
@@ -120,7 +120,7 @@
         <div class="card-body p-0 d-none d-md-block">
             <div class="table-responsive">
                 <table class="table table-hover table-striped align-middle mb-0">
-                    <thead class="table-light">
+                    <thead class="thead-gold">
                         <tr>
                             <th>#</th>
                             <th>{{ trans('account.field_account') }}</th>
@@ -162,7 +162,7 @@
                                     <button class="btn btn-sm btn-outline-secondary js-change-status"
                                             data-id="{{ $account->id }}"
                                             data-status="{{ $account->status }}">
-                                        {{ trans('account.action_change_status') }}
+                                        <i class="fas fa-exchange-alt me-1"></i>{{ trans('account.action_change_status') }}
                                     </button>
                                     <a href="{{ route('admin.accounts.permissions', $account->id) }}"
                                        class="btn btn-sm btn-outline-secondary">
@@ -385,7 +385,7 @@
                 <div class="modal-body p-0">
                     <div class="table-responsive">
                         <table class="table table-hover table-striped align-middle mb-0">
-                            <thead class="table-light">
+                            <thead class="thead-gold">
                                 <tr>
                                     <th class="text-nowrap" style="width:1%;white-space:nowrap">{{ trans('login_log.field_created_at') }}</th>
                                     <th class="text-nowrap" style="width:1%;white-space:nowrap">{{ trans('login_log.field_ip') }}</th>

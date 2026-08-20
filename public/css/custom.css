@@ -294,6 +294,9 @@ h6, .h6 { font-size: 1rem; font-weight: 600; color: #212529; }
 .table-hover > tbody > tr:hover {
     background-color: rgba(0, 0, 0, 0.02);
 }
+.table-striped > tbody > tr:nth-of-type(odd) > * {
+    --bs-table-accent-bg: rgba(212, 175, 55, 0.06);
+}
 /* 移除外邊框和圓角，乾淨扁平 */
 .table {
     border: none !important;
@@ -538,6 +541,16 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .page-title-heading > div { color: #f0e6c8 !important; }
 [data-theme="dark"] .page-title-subheading { color: rgba(255,255,255,0.4) !important; }
 
+/* Stat card header (帳號管理統計卡) */
+.stat-card-header { background: #fdf6e3; color: #7a5c00; }
+[data-theme="dark"] .stat-card-header { background: rgba(212,175,55,0.1) !important; color: #f0e6c8 !important; }
+
+/* 表格 thead 金色 */
+.thead-gold { background: #fdf6e3; color: #7a5c00; }
+.thead-gold th { color: #7a5c00 !important; }
+[data-theme="dark"] .thead-gold { background: rgba(212,175,55,0.25) !important; }
+[data-theme="dark"] .table > thead.thead-gold > tr > th { color: #fff !important; }
+
 /* Card */
 [data-theme="dark"] .card, [data-theme="dark"] .main-card { background: #1a1a1a !important; border-color: rgba(255,255,255,0.06) !important; }
 [data-theme="dark"] .card-header { background: rgba(255,255,255,0.03) !important; border-color: rgba(255,255,255,0.06) !important; color: #f0e6c8 !important; }
@@ -596,6 +609,8 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .btn-outline-secondary:hover, [data-theme="dark"] .btn.btn-outline-secondary:hover { background-color: #d4af37 !important; color: #1a1200 !important; border-color: #d4af37 !important; }
 [data-theme="dark"] .btn-outline-primary, [data-theme="dark"] .btn.btn-outline-primary { color: #d4af37 !important; border-color: rgba(212,175,55,0.3) !important; background: transparent !important; }
 [data-theme="dark"] .btn-outline-primary:hover, [data-theme="dark"] .btn.btn-outline-primary:hover { background-color: #d4af37 !important; color: #1a1200 !important; border-color: #d4af37 !important; }
+[data-theme="dark"] .btn-outline-info, [data-theme="dark"] .btn.btn-outline-info { color: rgba(255,255,255,0.7) !important; border-color: rgba(212,175,55,0.3) !important; background: transparent !important; }
+[data-theme="dark"] .btn-outline-info:hover, [data-theme="dark"] .btn.btn-outline-info:hover { background-color: #d4af37 !important; color: #1a1200 !important; border-color: #d4af37 !important; }
 
 /* Widget */
 [data-theme="dark"] .widget-content { background: transparent !important; }
