@@ -34,7 +34,8 @@
                         <div class="card-body">
                             <div class="mb-3">
                                 <label class="form-label">{{ trans('broadcast.field_content') }} <span class="text-danger">*</span></label>
-                                <textarea id="bc-content" class="form-control" rows="10" required placeholder="{{ trans('broadcast.field_content') }}..."></textarea>
+                                <textarea id="bc-content" class="form-control" rows="10" required maxlength="4096" placeholder="{{ trans('broadcast.field_content') }}..."></textarea>
+                                <div class="text-end mt-1" style="font-size:0.8125rem"><span id="bc-content-count">0</span> / 4096</div>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">圖片（選填，可多選）</label>
@@ -436,6 +437,14 @@ $(function () {
         }
         var modal = new bootstrap.Modal(document.getElementById('modal-send-detail'));
         modal.show();
+    });
+
+    // 字數即時計算
+    $('#bc-content').on('input', function () {
+        var len = $(this).val().length;
+        var $counter = $('#bc-content-count');
+        $counter.text(len);
+        $counter.css('color', len >= 4000 ? '#dc3545' : '');
     });
 
     // 複製公告內容
