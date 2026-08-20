@@ -320,6 +320,12 @@ $(function () {
 
         if (rateChart) { rateChart.destroy(); }
 
+        var hiddenMap = {};
+        try {
+            var saved = localStorage.getItem('rate_chart_hidden');
+            if (saved) { hiddenMap = JSON.parse(saved); }
+        } catch (e) {}
+
         var datasets = [{
             label: '即時匯率',
             data: prices,
@@ -330,6 +336,7 @@ $(function () {
             pointRadius: 2,
             pointHoverRadius: 5,
             borderWidth: 2,
+            hidden: !!hiddenMap['即時匯率'],
         }];
 
         // 水平標記線
@@ -338,6 +345,11 @@ $(function () {
         if (rateInfo.high_day) { datasets.push(makeLine(labels, rateInfo.high_day, '24H 最高', '#e85d04', [6, 4])); }
         if (rateInfo.low_day) { datasets.push(makeLine(labels, rateInfo.low_day, '24H 最低', '#0ea5e9', [6, 4])); }
         if (rateInfo.avg_rate) { datasets.push(makeLine(labels, rateInfo.avg_rate, '4H 均價', '#6f42c1', [2, 2])); }
+
+        // 套用 localStorage 記憶的隱藏狀態
+        datasets.forEach(function (ds) {
+            if (hiddenMap[ds.label]) { ds.hidden = true; }
+        });
 
         rateChart = new Chart(ctx, {
             type: 'line',
@@ -352,7 +364,18 @@ $(function () {
                     legend: {
                         display: true,
                         position: 'bottom',
-                        labels: { boxWidth: 20, font: { size: 11 } }
+                        labels: { boxWidth: 20, font: { size: 11 } },
+                        onClick: function (e, legendItem, legend) {
+                            // 執行預設的顯示/隱藏行為
+                            Chart.defaults.plugins.legend.onClick.call(this, e, legendItem, legend);
+                            // 儲存每條線的隱藏狀態到 localStorage
+                            var map = {};
+                            legend.chart.data.datasets.forEach(function (ds, i) {
+                                var meta = legend.chart.getDatasetMeta(i);
+                                if (meta.hidden) { map[ds.label] = true; }
+                            });
+                            try { localStorage.setItem('rate_chart_hidden', JSON.stringify(map)); } catch (ex) {}
+                        }
                     },
                     tooltip: {
                         callbacks: {

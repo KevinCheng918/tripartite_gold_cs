@@ -6,6 +6,15 @@
  */
 return [
     [
+        'version' => 'v1.24',
+        'date'    => '2026-08-21',
+        'title'   => 'USDT 匯率圖表折線記憶',
+        'content' => implode("\n", [
+            '• USDT/TWD 匯率折線圖：點擊 legend 隱藏/顯示折線後，狀態記憶至 localStorage',
+            '• 重新整理或下次進入頁面自動還原上次的折線顯示設定',
+        ]),
+    ],
+    [
         'version' => 'v1.23',
         'date'    => '2026-08-21',
         'title'   => '封存清單強化 + 站台金黃色主題',
