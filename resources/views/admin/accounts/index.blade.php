@@ -168,6 +168,11 @@
                                        class="btn btn-sm btn-outline-secondary">
                                         <i class="fas fa-key me-1"></i>{{ trans('account.action_assign_permissions') }}
                                     </a>
+                                    <button class="btn btn-sm btn-outline-info js-login-log"
+                                            data-id="{{ $account->id }}"
+                                            data-account="{{ $account->account }}">
+                                        <i class="fas fa-sign-in-alt me-1"></i>{{ trans('login_log.nav_label') }}
+                                    </button>
                                 </td>
                             </tr>
                         @empty
@@ -225,9 +230,14 @@
                             <i class="fas fa-exchange-alt me-1"></i>{{ trans('account.action_change_status') }}
                         </button>
                         <a href="{{ route('admin.accounts.permissions', $account->id) }}"
-                           class="btn btn-sm btn-outline-secondary" style="grid-column: 1 / -1">
+                           class="btn btn-sm btn-outline-secondary">
                             <i class="fas fa-key me-1"></i>{{ trans('account.action_assign_permissions') }}
                         </a>
+                        <button class="btn btn-sm btn-outline-info js-login-log"
+                                data-id="{{ $account->id }}"
+                                data-account="{{ $account->account }}">
+                            <i class="fas fa-sign-in-alt me-1"></i>{{ trans('login_log.nav_label') }}
+                        </button>
                     </div>
                 </div>
             </div>
@@ -361,6 +371,42 @@
         </div>
     </div>
 
+    {{-- 登入紀錄 Modal --}}
+    <div class="modal fade" id="modal-login-log" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-sign-in-alt me-1"></i>
+                        <span id="login-log-title">{{ trans('login_log.nav_label') }}</span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="text-nowrap" style="width:1%;white-space:nowrap">{{ trans('login_log.field_created_at') }}</th>
+                                    <th class="text-nowrap" style="width:1%;white-space:nowrap">{{ trans('login_log.field_ip') }}</th>
+                                    <th class="text-nowrap text-center" style="width:1%;white-space:nowrap">{{ trans('login_log.field_is_success') }}</th>
+                                    <th>{{ trans('login_log.field_device') }}</th>
+                                    <th>{{ trans('login_log.field_fail_reason') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody id="login-log-tbody">
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">{{ trans('login_log.subtitle') }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="login-log-pagination" class="d-flex justify-content-center py-2"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- 訊息提示 Modal --}}
     <div class="modal fade" id="modal-account-message" tabindex="-1">
         <div class="modal-dialog modal-sm">
@@ -459,6 +505,110 @@ $(function () {
             success: function () { location.reload(); },
             error: function (xhr) { showMessage(getErrorMsg(xhr)); }
         });
+    });
+
+    // 登入紀錄
+    var loginLogUserId = null;
+    var loginLogPage = 1;
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function parseUA(ua) {
+        if (!ua) return '-';
+        var os = '-', browser = '-', engine = '-';
+
+        // 作業系統
+        var osMatch;
+        if ((osMatch = ua.match(/Windows NT ([\d.]+)/))) { os = 'Windows_' + osMatch[1]; }
+        else if ((osMatch = ua.match(/Mac OS X ([\d_]+)/))) { os = 'macOS_' + osMatch[1].replace(/_/g, '.'); }
+        else if ((osMatch = ua.match(/iPhone OS ([\d_]+)/))) { os = 'iOS_' + osMatch[1].replace(/_/g, '.'); }
+        else if ((osMatch = ua.match(/iPad.*OS ([\d_]+)/))) { os = 'iPadOS_' + osMatch[1].replace(/_/g, '.'); }
+        else if ((osMatch = ua.match(/Android ([\d.]+)/))) { os = 'Android_' + osMatch[1]; }
+        else if (/Linux/i.test(ua)) { os = 'Linux'; }
+
+        // 瀏覽器
+        var brMatch;
+        if ((brMatch = ua.match(/Edg\/([\d.]+)/))) { browser = 'Edge_' + brMatch[1]; }
+        else if ((brMatch = ua.match(/OPR\/([\d.]+)/))) { browser = 'Opera_' + brMatch[1]; }
+        else if ((brMatch = ua.match(/Chrome\/([\d.]+)/))) { browser = 'Chrome_' + brMatch[1]; }
+        else if ((brMatch = ua.match(/Firefox\/([\d.]+)/))) { browser = 'Firefox_' + brMatch[1]; }
+        else if ((brMatch = ua.match(/Version\/([\d.]+).*Safari/))) { browser = 'Safari_' + brMatch[1]; }
+
+        // 裝置引擎
+        if (/AppleWebKit/i.test(ua)) { engine = 'WebKit'; }
+        else if (/Gecko\//i.test(ua)) { engine = 'Gecko'; }
+        else if (/Trident/i.test(ua)) { engine = 'Trident'; }
+
+        return '<div style="line-height:1.6">'
+            + '<div><strong>作業系統：</strong>' + escapeHtml(os) + '</div>'
+            + '<div><strong>瀏覽器：</strong>' + escapeHtml(browser) + '</div>'
+            + '<div><strong>裝置：</strong>' + escapeHtml(engine) + '</div>'
+            + '</div>';
+    }
+
+    function loadLoginLog(userId, page) {
+        loginLogUserId = userId;
+        loginLogPage = page || 1;
+        var $tbody = $('#login-log-tbody');
+        $tbody.html('<tr><td colspan="5" class="text-center py-3"><i class="fas fa-spinner fa-spin"></i></td></tr>');
+
+        $.ajax({
+            url: '/admin/accounts/ajax-login-log/' + userId,
+            method: 'GET',
+            data: { page: loginLogPage, per_page: 10 },
+            success: function (res) {
+                var rows = '';
+                if (!res.data || res.data.length === 0) {
+                    rows = '<tr><td colspan="5" class="text-center text-muted py-4">暫無紀錄</td></tr>';
+                } else {
+                    for (var i = 0; i < res.data.length; i++) {
+                        var log = res.data[i];
+                        var badge = log.is_success
+                            ? '<span class="badge bg-success">{{ trans("login_log.status_success") }}</span>'
+                            : '<span class="badge bg-danger">{{ trans("login_log.status_failed") }}</span>';
+                        rows += '<tr>'
+                            + '<td class="text-nowrap">' + log.created_at + '</td>'
+                            + '<td><code>' + log.ip + '</code></td>'
+                            + '<td class="text-center">' + badge + '</td>'
+                            + '<td style="font-size:0.8125rem">' + parseUA(log.device) + '</td>'
+                            + '<td>' + escapeHtml(log.fail_reason || '-') + '</td>'
+                            + '</tr>';
+                    }
+                }
+                $tbody.html(rows);
+
+                // 分頁
+                var $pag = $('#login-log-pagination');
+                $pag.empty();
+                if (res.meta && res.meta.last_page > 1) {
+                    var html = '<nav><ul class="pagination pagination-sm mb-0">';
+                    for (var p = 1; p <= res.meta.last_page; p++) {
+                        var active = p === res.meta.current_page ? ' active' : '';
+                        html += '<li class="page-item' + active + '"><a href="javascript:void(0)" class="page-link js-login-log-page" data-page="' + p + '">' + p + '</a></li>';
+                    }
+                    html += '</ul></nav>';
+                    $pag.html(html);
+                }
+            },
+            error: function () {
+                $tbody.html('<tr><td colspan="5" class="text-center text-danger py-3">載入失敗</td></tr>');
+            }
+        });
+    }
+
+    $(document).on('click', '.js-login-log', function () {
+        var userId = $(this).data('id');
+        var account = $(this).data('account');
+        $('#login-log-title').text('{{ trans("login_log.nav_label") }} — ' + account);
+        loadLoginLog(userId, 1);
+        showBsModal('modal-login-log');
+    });
+
+    $(document).on('click', '.js-login-log-page', function () {
+        loadLoginLog(loginLogUserId, $(this).data('page'));
     });
 
     // 調整狀態

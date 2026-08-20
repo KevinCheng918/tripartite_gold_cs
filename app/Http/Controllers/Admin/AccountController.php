@@ -7,9 +7,11 @@ use App\Http\Requests\Account\AssignPermissionRequest;
 use App\Http\Requests\Account\StoreAccountRequest;
 use App\Http\Requests\Account\UpdateAccountRequest;
 use App\Http\Resources\AccountResource;
+use App\Http\Resources\LoginLogResource;
 use App\Models\User;
 use App\Repositories\ProjectRepository;
 use App\Services\AccountService;
+use App\Services\LoginLogService;
 use App\Services\PermissionMapService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -27,15 +29,18 @@ class AccountController extends Controller
     private $accountService;
     private $permissionMapService;
     private $projectRepository;
+    private $loginLogService;
 
     public function __construct(
         AccountService $accountService,
         PermissionMapService $permissionMapService,
-        ProjectRepository $projectRepository
+        ProjectRepository $projectRepository,
+        LoginLogService $loginLogService
     ) {
         $this->accountService = $accountService;
         $this->permissionMapService = $permissionMapService;
         $this->projectRepository = $projectRepository;
+        $this->loginLogService = $loginLogService;
     }
 
     /**
@@ -189,5 +194,22 @@ class AccountController extends Controller
 
             return response()->json(['message' => trans('account.msg.assign_failed')], 500);
         }
+    }
+
+    /**
+     * Ajax 取得指定帳號的登入紀錄
+     *
+     * @param Request $request
+     * @param User    $user
+     * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection
+     */
+    public function ajaxLoginLog(Request $request, User $user)
+    {
+        $params = $request->only(['per_page']);
+        $perPage = $params['per_page'] ?? 10;
+
+        $logs = $this->loginLogService->listByUser($user->id, $perPage);
+
+        return LoginLogResource::collection($logs);
     }
 }

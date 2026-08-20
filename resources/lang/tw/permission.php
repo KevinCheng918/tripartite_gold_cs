@@ -13,6 +13,7 @@ return [
         'staff_manage' => '內部管理',
         'leave_request' => '請假管理',
         'task_board' => '任務看板',
+        'login_log' => '登入紀錄',
     ],
     'dashboard' => [
         'usdt_rate' => '查看 USDT 匯率',
@@ -80,5 +81,8 @@ return [
         'delete'         => '刪除任務',
         'delete_comment' => '刪除留言',
         'manage_project' => '管理專案',
+    ],
+    'login_log' => [
+        'view' => '檢視登入紀錄',
     ],
 ];

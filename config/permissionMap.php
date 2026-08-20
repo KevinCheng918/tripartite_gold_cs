@@ -126,4 +126,11 @@ return [
         ],
     ],
 
+    'login_log' => [
+        'label' => 'permission.group.login_log',
+        'keywords' => [
+            'login_log.view' => 'permission.login_log.view',
+        ],
+    ],
+
 ];

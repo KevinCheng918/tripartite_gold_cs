@@ -13,6 +13,7 @@ return [
         'staff_manage' => '内部管理',
         'leave_request' => '请假管理',
         'task_board' => '任务看板',
+        'login_log' => '登录记录',
     ],
     'dashboard' => [
         'usdt_rate' => '查看 USDT 汇率',
@@ -80,5 +81,8 @@ return [
         'delete'         => '删除任务',
         'delete_comment' => '删除留言',
         'manage_project' => '管理项目',
+    ],
+    'login_log' => [
+        'view' => '查看登录记录',
     ],
 ];

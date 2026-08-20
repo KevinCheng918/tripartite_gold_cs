@@ -13,6 +13,7 @@ return [
         'staff_manage' => 'Staff Management',
         'leave_request' => 'Leave Management',
         'task_board' => 'Task Board',
+        'login_log' => 'Login Log',
     ],
     'dashboard' => [
         'usdt_rate' => 'View USDT rate',
@@ -80,5 +81,8 @@ return [
         'delete'         => 'Delete task',
         'delete_comment' => 'Delete comment',
         'manage_project' => 'Manage projects',
+    ],
+    'login_log' => [
+        'view' => 'View login log',
     ],
 ];

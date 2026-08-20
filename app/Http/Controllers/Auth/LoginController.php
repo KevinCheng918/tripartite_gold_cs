@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Repositories\UserRepository;
+use App\Services\LoginLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
@@ -18,10 +19,12 @@ use Illuminate\Support\Facades\Log;
 class LoginController extends Controller
 {
     private $userRepository;
+    private $loginLogService;
 
-    public function __construct(UserRepository $userRepository)
+    public function __construct(UserRepository $userRepository, LoginLogService $loginLogService)
     {
         $this->userRepository = $userRepository;
+        $this->loginLogService = $loginLogService;
     }
 
     /**
@@ -53,19 +56,47 @@ class LoginController extends Controller
 
         $user = $this->userRepository->findByAccountForLogin($params['account']);
 
+        $device = $request->userAgent();
+
         if (!$user || !$this->verifyPassword($params['password'], $user->password)) {
             Log::warning('Failed login attempt', ['account' => $params['account'], 'ip' => $request->ip()]);
+
+            $this->loginLogService->record([
+                'user_id'     => $user->id ?? null,
+                'account'     => $params['account'],
+                'ip'          => $request->ip(),
+                'is_success'  => false,
+                'device'      => $device,
+                'fail_reason' => '帳號或密碼錯誤',
+            ]);
 
             return back()->withErrors(['account' => trans('auth.failed')])->onlyInput('account');
         }
 
         // 停用帳號無法登入（鎖定帳號可以登入）
         if ((int) $user->status === config('constants.USER.STATUS.DEACTIVATE')) {
+            $this->loginLogService->record([
+                'user_id'     => $user->id,
+                'account'     => $params['account'],
+                'ip'          => $request->ip(),
+                'is_success'  => false,
+                'device'      => $device,
+                'fail_reason' => '帳號已停用',
+            ]);
+
             return back()->withErrors(['account' => trans('auth.disabled')])->onlyInput('account');
         }
 
         Auth::login($user, $request->boolean('remember'));
         $request->session()->regenerate();
+
+        $this->loginLogService->record([
+            'user_id'    => $user->id,
+            'account'    => $params['account'],
+            'ip'         => $request->ip(),
+            'is_success' => true,
+            'device'     => $device,
+        ]);
 
         return redirect()->intended(route('admin.dashboard'));
     }
