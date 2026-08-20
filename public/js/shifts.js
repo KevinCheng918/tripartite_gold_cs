@@ -102,21 +102,37 @@
         if (el) { hideBsModal(el); }
     }
 
-    function showMessage(message) {
-        // 先關閉所有已開啟的 modal，避免疊加
-        document.querySelectorAll('.modal.show').forEach(function (m) {
-            if (m.id !== 'modal-message') {
-                hideBsModal(m);
-            }
+    /**
+     * 關閉 fromId modal，等完全隱藏後再開啟 toId modal
+     */
+    function closeModalThenOpen(fromId, toId) {
+        var fromEl = document.getElementById(fromId);
+        if (!fromEl || !fromEl.classList.contains('show')) {
+            openModal(toId);
+            return;
+        }
+        fromEl.addEventListener('hidden.bs.modal', function handler() {
+            fromEl.removeEventListener('hidden.bs.modal', handler);
+            openModal(toId);
         });
+        hideBsModal(fromEl);
+    }
+
+    function showMessage(message) {
         var textEl = document.getElementById('modal-message-text');
         var headerEl = document.querySelector('#modal-message .modal-header h3');
         if (textEl) { textEl.textContent = message; }
         if (headerEl) { headerEl.textContent = ''; }
-        // 檢查是否有 backdrop 殘留或 modal 正在關閉中
-        var hasBackdrop = document.querySelectorAll('.modal-backdrop').length > 0;
-        if (hasBackdrop) {
-            setTimeout(function () { openModal('modal-message'); }, 400);
+
+        // 找到目前開啟的 modal（排除 message 本身），關閉後再開 message
+        var openModals = document.querySelectorAll('.modal.show');
+        var fromEl = null;
+        openModals.forEach(function (m) {
+            if (m.id !== 'modal-message') { fromEl = m; }
+        });
+
+        if (fromEl) {
+            closeModalThenOpen(fromEl.id, 'modal-message');
         } else {
             openModal('modal-message');
         }
@@ -1008,11 +1024,10 @@
         }
         confirmHtml += '</tbody></table>';
 
-        closeModal('modal-assign');
         var confirmBody = document.getElementById('modal-cover-confirm-body');
         if (confirmBody) { confirmBody.innerHTML = confirmHtml; }
         pendingCoverAction = function () { doSubmitAssign(dates, shiftIds, userIds, isAllday); };
-        setTimeout(function () { openModal('modal-cover-confirm'); }, 350);
+        closeModalThenOpen('modal-assign', 'modal-cover-confirm');
     }
 
     function doSubmitAssign(dates, shiftIds, userIds, isAllday) {

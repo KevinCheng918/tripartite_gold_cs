@@ -91,10 +91,11 @@
                             <th>{{ trans('attendance.field_date') }}</th>
                             <th>{{ trans('attendance.field_shift') }}</th>
                             <th>{{ trans('attendance.field_clock_in') }}</th>
-                            <th>{{ trans('attendance.field_clock_out') }}</th>
                             <th>{{ trans('attendance.field_late') }}</th>
+                            <th>{{ trans('attendance.field_early_clock_in') }}</th>
+                            <th>{{ trans('attendance.field_clock_out') }}</th>
                             <th>{{ trans('attendance.field_early_leave') }}</th>
-                            <th>{{ trans('attendance.field_overtime') }}</th>
+                            <th>{{ trans('attendance.field_late_clock_out') }}</th>
                             <th>{{ trans('attendance.field_status') }}</th>
                             <th>請假</th>
                             <th>{{ trans('attendance.field_ip') }}</th>
@@ -112,15 +113,29 @@
                                     @endif
                                 </td>
                                 <td>
+                                    @if($r->late_minutes > 0)
+                                        <span class="text-danger fw-bold">{{ $r->late_minutes }} {{ trans('attendance.unit_minutes') }}</span>
+                                    @else - @endif
+                                </td>
+                                <td>
+                                    @php
+                                        $earlyClockIn = 0;
+                                        if (filled($r->clock_in) && filled($r->assignment) && filled($r->assignment->shift)) {
+                                            $shiftStartParts = explode(':', $r->assignment->shift->start_time);
+                                            $shiftStartMin = (int) $shiftStartParts[0] * 60 + (int) $shiftStartParts[1];
+                                            $clockInMin = $r->clock_in->hour * 60 + $r->clock_in->minute;
+                                            $earlyClockIn = max($shiftStartMin - $clockInMin, 0);
+                                        }
+                                    @endphp
+                                    @if($earlyClockIn > 0)
+                                        <span class="text-success fw-bold">{{ $earlyClockIn }} {{ trans('attendance.unit_minutes') }}</span>
+                                    @else - @endif
+                                </td>
+                                <td>
                                     {{ $r->clock_out ? $r->clock_out->format('H:i:s') : '-' }}
                                     @if(in_array(2, $amendLookup[$r->date->format('Y-m-d')] ?? []))
                                         <span class="badge bg-primary" style="font-size:0.625rem">補</span>
                                     @endif
-                                </td>
-                                <td>
-                                    @if($r->late_minutes > 0)
-                                        <span class="text-danger fw-bold">{{ $r->late_minutes }} {{ trans('attendance.unit_minutes') }}</span>
-                                    @else - @endif
                                 </td>
                                 <td>
                                     @if($r->early_leave_minutes > 0)
@@ -128,8 +143,21 @@
                                     @else - @endif
                                 </td>
                                 <td>
-                                    @if($r->overtime_minutes > 0)
-                                        <span class="text-success fw-bold">{{ $r->overtime_minutes }} {{ trans('attendance.unit_minutes') }}</span>
+                                    @php
+                                        $lateClockOut = 0;
+                                        if (filled($r->clock_out) && filled($r->assignment) && filled($r->assignment->shift)) {
+                                            $shiftEndParts = explode(':', $r->assignment->shift->end_time);
+                                            $shiftEndMin = (int) $shiftEndParts[0] * 60 + (int) $shiftEndParts[1];
+                                            if ($shiftEndMin === 0) { $shiftEndMin = 1440; }
+                                            $clockOutMin = $r->clock_out->hour * 60 + $r->clock_out->minute;
+                                            if ($r->clock_out->format('Y-m-d') !== $r->date->format('Y-m-d')) {
+                                                $clockOutMin += 1440;
+                                            }
+                                            $lateClockOut = max($clockOutMin - $shiftEndMin, 0);
+                                        }
+                                    @endphp
+                                    @if($lateClockOut > 0)
+                                        <span class="text-success fw-bold">{{ $lateClockOut }} {{ trans('attendance.unit_minutes') }}</span>
                                     @else - @endif
                                 </td>
                                 <td>
@@ -157,7 +185,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="10" class="text-center text-muted py-4">暫無資料</td>
+                                <td colspan="11" class="text-center text-muted py-4">暫無資料</td>
                             </tr>
                         @endforelse
                     </tbody>

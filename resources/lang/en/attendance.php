@@ -26,6 +26,8 @@ return [
     'field_early_leave'  => 'Early Leave',
     'field_overtime'     => 'Overtime',
     'field_shift'        => 'Shift',
+    'field_early_clock_in' => 'Early In',
+    'field_late_clock_out' => 'Late Out',
     'field_status'       => 'Status',
     'field_ip'           => 'IP',
     'field_device'       => 'Device',

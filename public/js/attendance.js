@@ -58,6 +58,41 @@
     }
 
 
+    /**
+     * 計算早上班分鐘數（clock_in 早於 shift start_time）
+     * @param {object} r 出勤紀錄（含 assignment.shift.start_time, clock_in）
+     * @return {number}
+     */
+    function calcEarlyClockIn(r) {
+        if (!r.clock_in || !r.assignment || !r.assignment.shift) { return 0; }
+        var parts = r.assignment.shift.start_time.split(':');
+        var shiftStartMin = parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+        var d = new Date(r.clock_in);
+        var clockInMin = d.getHours() * 60 + d.getMinutes();
+        var diff = shiftStartMin - clockInMin;
+        return diff > 0 ? diff : 0;
+    }
+
+    /**
+     * 計算晚下班分鐘數（clock_out 晚於 shift end_time）
+     * @param {object} r 出勤紀錄（含 assignment.shift.end_time, clock_out, date）
+     * @return {number}
+     */
+    function calcLateClockOut(r) {
+        if (!r.clock_out || !r.assignment || !r.assignment.shift) { return 0; }
+        var parts = r.assignment.shift.end_time.split(':');
+        var shiftEndMin = parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+        if (shiftEndMin === 0) { shiftEndMin = 1440; }
+        var d = new Date(r.clock_out);
+        var clockOutMin = d.getHours() * 60 + d.getMinutes();
+        // 跨日：下班打卡日期與出勤日期不同
+        var recordDate = r.date ? r.date.substring(0, 10) : '';
+        var clockOutDate = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        if (clockOutDate !== recordDate) { clockOutMin += 1440; }
+        var diff = clockOutMin - shiftEndMin;
+        return diff > 0 ? diff : 0;
+    }
+
     /** 出勤狀態對應 */
     var statusMap = {};
     statusMap[0] = { text: i18n.status_incomplete, css: 'bg-warning text-dark' };
@@ -411,15 +446,18 @@
             var inAmend = types.indexOf(1) !== -1;
             var outAmend = types.indexOf(2) !== -1;
             var shiftName = (r.assignment && r.assignment.shift) ? r.assignment.shift.display_name : '-';
+            var earlyIn = calcEarlyClockIn(r);
+            var lateOut = calcLateClockOut(r);
             return (
                 '<tr>' +
                 '<td>' + r.date + '</td>' +
                 '<td>' + shiftName + '</td>' +
                 '<td>' + (r.clock_in || '-') + (inAmend ? amendBadge : '') + '</td>' +
-                '<td>' + (r.clock_out || '-') + (outAmend ? amendBadge : '') + '</td>' +
                 '<td>' + (r.late_minutes > 0 ? r.late_minutes + ' ' + i18n.unit_minutes : '-') + '</td>' +
+                '<td>' + (earlyIn > 0 ? '<span style="color:#059669;font-weight:600">' + earlyIn + ' ' + i18n.unit_minutes + '</span>' : '-') + '</td>' +
+                '<td>' + (r.clock_out || '-') + (outAmend ? amendBadge : '') + '</td>' +
                 '<td>' + (r.early_leave_minutes > 0 ? r.early_leave_minutes + ' ' + i18n.unit_minutes : '-') + '</td>' +
-                '<td>' + (r.overtime_minutes > 0 ? r.overtime_minutes + ' ' + i18n.unit_minutes : '-') + '</td>' +
+                '<td>' + (lateOut > 0 ? '<span style="color:#059669;font-weight:600">' + lateOut + ' ' + i18n.unit_minutes + '</span>' : '-') + '</td>' +
                 '<td><span class="badge ' + st.css + '">' + st.text + '</span></td>' +
                 '<td>' + (r.leave_info ? (r.leave_info.is_full_day === 1 ? '<span class="badge bg-info">整天請假</span>' : '<span class="badge bg-info">' + r.leave_info.start_time + ' ~ ' + r.leave_info.end_time + '</span>') : '-') + '</td>' +
                 '</tr>'
@@ -431,10 +469,11 @@
             '<th>' + i18n.field_date + '</th>' +
             '<th>' + (i18n.field_shift || '班別') + '</th>' +
             '<th>' + i18n.field_clock_in + '</th>' +
-            '<th>' + i18n.field_clock_out + '</th>' +
             '<th>' + i18n.field_late + '</th>' +
+            '<th>' + (i18n.field_early_clock_in || '早上班') + '</th>' +
+            '<th>' + i18n.field_clock_out + '</th>' +
             '<th>' + i18n.field_early_leave + '</th>' +
-            '<th>' + i18n.field_overtime + '</th>' +
+            '<th>' + (i18n.field_late_clock_out || '晚下班') + '</th>' +
             '<th>' + i18n.field_status + '</th>' +
             '<th>請假</th>' +
             '</tr></thead><tbody>' + rows + '</tbody></table>';
@@ -445,6 +484,8 @@
             var dk = r.date ? r.date.substring(0, 10) : '';
             var ts = amendLookup[dk] || [];
             var shiftNameCard = (r.assignment && r.assignment.shift) ? r.assignment.shift.display_name : '-';
+            var cardEarlyIn = calcEarlyClockIn(r);
+            var cardLateOut = calcLateClockOut(r);
             return (
                 '<div class="shift-card">' +
                 '<div class="shift-card__header">' +
@@ -453,10 +494,11 @@
                 '</div>' +
                 '<div class="shift-card__row"><span class="shift-card__label">' + (i18n.field_shift || '班別') + '</span><span>' + shiftNameCard + '</span></div>' +
                 '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_clock_in + '</span><span>' + (r.clock_in || '-') + (ts.indexOf(1) !== -1 ? amendBadge : '') + '</span></div>' +
-                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_clock_out + '</span><span>' + (r.clock_out || '-') + (ts.indexOf(2) !== -1 ? amendBadge : '') + '</span></div>' +
                 (r.late_minutes > 0 ? '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_late + '</span><span style="color:#dc2626;font-weight:600">' + r.late_minutes + ' ' + i18n.unit_minutes + '</span></div>' : '') +
+                (cardEarlyIn > 0 ? '<div class="shift-card__row"><span class="shift-card__label">' + (i18n.field_early_clock_in || '早上班') + '</span><span style="color:#059669;font-weight:600">' + cardEarlyIn + ' ' + i18n.unit_minutes + '</span></div>' : '') +
+                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_clock_out + '</span><span>' + (r.clock_out || '-') + (ts.indexOf(2) !== -1 ? amendBadge : '') + '</span></div>' +
                 (r.early_leave_minutes > 0 ? '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_early_leave + '</span><span style="color:#dc2626;font-weight:600">' + r.early_leave_minutes + ' ' + i18n.unit_minutes + '</span></div>' : '') +
-                (r.overtime_minutes > 0 ? '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_overtime + '</span><span style="color:#059669;font-weight:600">' + r.overtime_minutes + ' ' + i18n.unit_minutes + '</span></div>' : '') +
+                (cardLateOut > 0 ? '<div class="shift-card__row"><span class="shift-card__label">' + (i18n.field_late_clock_out || '晚下班') + '</span><span style="color:#059669;font-weight:600">' + cardLateOut + ' ' + i18n.unit_minutes + '</span></div>' : '') +
                 (r.leave_info ? '<div class="shift-card__row"><span class="shift-card__label">請假</span><span class="badge bg-info">' + (r.leave_info.is_full_day === 1 ? '整天請假' : r.leave_info.start_time + ' ~ ' + r.leave_info.end_time) + '</span></div>' : '') +
                 '</div>'
             );

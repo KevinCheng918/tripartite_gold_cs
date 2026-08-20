@@ -145,6 +145,12 @@ class AttendanceService
             $result = $this->calcEarlyLeaveAndOvertime($endTime, $isOvernight);
             $earlyLeaveMinutes = $result['early_leave'];
             $overtimeMinutes = $result['overtime'];
+
+            // 提早上班加班：上班打卡時間早於排班開始時間，差值計為加班
+            $overtimeMinutes += $this->calcEarlyClockInOvertime(
+                $assignment->shift->start_time,
+                $record->clock_in
+            );
         }
 
         // 時段假加班計算：打卡時間超過請假開始時間，超出部分算加班
@@ -340,6 +346,26 @@ class AttendanceService
         $nowMinutes = now()->hour * 60 + now()->minute;
 
         $diff = $nowMinutes - $startMinutes;
+
+        return $diff > 0 ? $diff : 0;
+    }
+
+    /**
+     * 計算提早上班的加班分鐘數
+     *
+     * @param string                $shiftStart 排班開始時間 HH:mm:ss
+     * @param \Carbon\Carbon|string $clockIn    實際上班打卡時間
+     * @return int
+     */
+    private function calcEarlyClockInOvertime($shiftStart, $clockIn)
+    {
+        $parts = explode(':', $shiftStart);
+        $startMinutes = (int) $parts[0] * 60 + (int) $parts[1];
+
+        $clockInTime = \Carbon\Carbon::parse($clockIn);
+        $clockInMinutes = $clockInTime->hour * 60 + $clockInTime->minute;
+
+        $diff = $startMinutes - $clockInMinutes;
 
         return $diff > 0 ? $diff : 0;
     }

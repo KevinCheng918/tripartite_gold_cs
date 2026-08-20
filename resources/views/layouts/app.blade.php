@@ -288,7 +288,33 @@
     </div>
 
     {{-- ==================== Modals ==================== --}}
-    {{-- 個人資訊 Modal --}}
+    {{-- 個人選單 Modal --}}
+    <div class="modal fade" id="modal-profile-menu" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title">
+                        <i class="fas fa-user-circle me-1"></i>{{ Auth::user()->nickname }}
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-2">
+                    <div class="list-group list-group-flush">
+                        <a href="javascript:void(0)" class="list-group-item list-group-item-action d-flex align-items-center py-3" id="menu-go-profile">
+                            <i class="fas fa-edit me-3 text-muted" style="width:20px;text-align:center"></i>
+                            <span>{{ trans('profile.title') }}</span>
+                        </a>
+                        <a href="javascript:void(0)" class="list-group-item list-group-item-action d-flex align-items-center py-3" id="menu-go-login-log">
+                            <i class="fas fa-sign-in-alt me-3 text-muted" style="width:20px;text-align:center"></i>
+                            <span>{{ trans('login_log.nav_label') }}</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- 個人資訊修改 Modal --}}
     <div class="modal fade" id="modal-profile" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -315,6 +341,37 @@
                             <button type="submit" class="btn btn-primary">{{ trans('shift.modal_confirm') }}</button>
                         </div>
                     </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- 我的登入紀錄 Modal --}}
+    <div class="modal fade" id="modal-my-login-log" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-sign-in-alt me-1"></i>{{ trans('login_log.nav_label') }}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="text-nowrap" style="width:1%;white-space:nowrap">{{ trans('login_log.field_created_at') }}</th>
+                                    <th class="text-nowrap" style="width:1%;white-space:nowrap">{{ trans('login_log.field_ip') }}</th>
+                                    <th class="text-nowrap text-center" style="width:1%;white-space:nowrap">{{ trans('login_log.field_is_success') }}</th>
+                                    <th>{{ trans('login_log.field_device') }}</th>
+                                    <th>{{ trans('login_log.field_fail_reason') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody id="my-login-log-tbody"></tbody>
+                        </table>
+                    </div>
+                    <div id="my-login-log-pagination" class="d-flex justify-content-center py-2"></div>
                 </div>
             </div>
         </div>
@@ -418,9 +475,22 @@
             }
         });
 
-        // 個人資訊 Modal
+        // 個人選單 Modal
         $('#btn-open-profile, #btn-open-profile-dropdown, #btn-open-profile-sidebar').on('click', function () {
-            showBsModal('modal-profile');
+            showBsModal('modal-profile-menu');
+        });
+
+        // 選單 → 資訊修改
+        $('#menu-go-profile').on('click', function () {
+            hideBsModal('modal-profile-menu');
+            setTimeout(function () { showBsModal('modal-profile'); }, 200);
+        });
+
+        // 選單 → 登入紀錄
+        $('#menu-go-login-log').on('click', function () {
+            hideBsModal('modal-profile-menu');
+            loadMyLoginLog(1);
+            setTimeout(function () { showBsModal('modal-my-login-log'); }, 200);
         });
 
         // 個人資訊提交
@@ -451,6 +521,87 @@
                     showBsModal('modal-profile-msg');
                 }
             });
+        });
+
+        // 我的登入紀錄
+        function myLoginLogEscape(str) {
+            if (!str) return '';
+            return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        function myLoginLogParseUA(ua) {
+            if (!ua) return '-';
+            var os = '-', browser = '-', engine = '-';
+            var m;
+            if ((m = ua.match(/Windows NT ([\d.]+)/))) { os = 'Windows_' + m[1]; }
+            else if ((m = ua.match(/Mac OS X ([\d_]+)/))) { os = 'macOS_' + m[1].replace(/_/g, '.'); }
+            else if ((m = ua.match(/iPhone OS ([\d_]+)/))) { os = 'iOS_' + m[1].replace(/_/g, '.'); }
+            else if ((m = ua.match(/iPad.*OS ([\d_]+)/))) { os = 'iPadOS_' + m[1].replace(/_/g, '.'); }
+            else if ((m = ua.match(/Android ([\d.]+)/))) { os = 'Android_' + m[1]; }
+            else if (/Linux/i.test(ua)) { os = 'Linux'; }
+            if ((m = ua.match(/Edg\/([\d.]+)/))) { browser = 'Edge_' + m[1]; }
+            else if ((m = ua.match(/OPR\/([\d.]+)/))) { browser = 'Opera_' + m[1]; }
+            else if ((m = ua.match(/Chrome\/([\d.]+)/))) { browser = 'Chrome_' + m[1]; }
+            else if ((m = ua.match(/Firefox\/([\d.]+)/))) { browser = 'Firefox_' + m[1]; }
+            else if ((m = ua.match(/Version\/([\d.]+).*Safari/))) { browser = 'Safari_' + m[1]; }
+            if (/AppleWebKit/i.test(ua)) { engine = 'WebKit'; }
+            else if (/Gecko\//i.test(ua)) { engine = 'Gecko'; }
+            else if (/Trident/i.test(ua)) { engine = 'Trident'; }
+            return '<div style="line-height:1.6">'
+                + '<div><strong>作業系統：</strong>' + myLoginLogEscape(os) + '</div>'
+                + '<div><strong>瀏覽器：</strong>' + myLoginLogEscape(browser) + '</div>'
+                + '<div><strong>裝置：</strong>' + myLoginLogEscape(engine) + '</div></div>';
+        }
+
+        var myLogPage = 1;
+        function loadMyLoginLog(page) {
+            myLogPage = page || 1;
+            var $tbody = $('#my-login-log-tbody');
+            $tbody.html('<tr><td colspan="5" class="text-center py-3"><i class="fas fa-spinner fa-spin"></i></td></tr>');
+            $.ajax({
+                url: '/admin/login-log/ajax-my-log',
+                method: 'GET',
+                data: { page: myLogPage, per_page: 10 },
+                success: function (res) {
+                    var rows = '';
+                    if (!res.data || res.data.length === 0) {
+                        rows = '<tr><td colspan="5" class="text-center text-muted py-4">暫無紀錄</td></tr>';
+                    } else {
+                        for (var i = 0; i < res.data.length; i++) {
+                            var log = res.data[i];
+                            var badge = log.is_success
+                                ? '<span class="badge bg-success">成功</span>'
+                                : '<span class="badge bg-danger">失敗</span>';
+                            rows += '<tr>'
+                                + '<td class="text-nowrap">' + log.created_at + '</td>'
+                                + '<td><code>' + log.ip + '</code></td>'
+                                + '<td class="text-center">' + badge + '</td>'
+                                + '<td style="font-size:0.8125rem">' + myLoginLogParseUA(log.device) + '</td>'
+                                + '<td>' + myLoginLogEscape(log.fail_reason || '-') + '</td>'
+                                + '</tr>';
+                        }
+                    }
+                    $tbody.html(rows);
+                    var $pag = $('#my-login-log-pagination');
+                    $pag.empty();
+                    if (res.meta && res.meta.last_page > 1) {
+                        var html = '<nav><ul class="pagination pagination-sm mb-0">';
+                        for (var p = 1; p <= res.meta.last_page; p++) {
+                            var active = p === res.meta.current_page ? ' active' : '';
+                            html += '<li class="page-item' + active + '"><a href="javascript:void(0)" class="page-link js-my-log-page" data-page="' + p + '">' + p + '</a></li>';
+                        }
+                        html += '</ul></nav>';
+                        $pag.html(html);
+                    }
+                },
+                error: function () {
+                    $tbody.html('<tr><td colspan="5" class="text-center text-danger py-3">載入失敗</td></tr>');
+                }
+            });
+        }
+
+        $(document).on('click', '.js-my-log-page', function () {
+            loadMyLoginLog($(this).data('page'));
         });
     });
     </script>
@@ -519,33 +670,48 @@
     window.showBsModal = function (el) {
         if (typeof el === 'string') { el = document.getElementById(el); }
         if (!el) { return; }
-        // 先清除所有殘留 backdrop
+        // 將 modal 移到 body 底下，避免 ArchitectUI 容器 stacking context 問題
+        if (el.parentElement !== document.body) {
+            document.body.appendChild(el);
+        }
+        // backdrop 完全手動管理，避免 Bootstrap 和全域 hidden 事件衝突
+        var inst = bootstrap.Modal.getInstance(el);
+        if (inst) { inst.dispose(); }
+        inst = new bootstrap.Modal(el, { backdrop: false, keyboard: true });
+        // 移除舊的 backdrop，加入新的
         document.querySelectorAll('.modal-backdrop').forEach(function (b) { b.remove(); });
-        bootstrap.Modal.getOrCreateInstance(el).show();
+        var bd = document.createElement('div');
+        bd.className = 'modal-backdrop fade show';
+        document.body.appendChild(bd);
+        document.body.classList.add('modal-open');
+        inst.show();
     };
     window.hideBsModal = function (el) {
         if (typeof el === 'string') { el = document.getElementById(el); }
         if (!el) { return; }
         var inst = bootstrap.Modal.getInstance(el);
         if (inst) { inst.hide(); }
+        // 移除手動建立的 backdrop
+        document.querySelectorAll('.modal-backdrop').forEach(function (b) { b.remove(); });
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('padding-right');
+        document.body.style.removeProperty('overflow');
     };
 
-    // Modal 關閉後清除殘留 backdrop + body class + 重設表單
+    // Modal 關閉後清理 backdrop + 重設表單
     document.addEventListener('hidden.bs.modal', function (e) {
-        var backdrops = document.querySelectorAll('.modal-backdrop');
+        // 沒有其他開啟的 modal 時，清除 backdrop
         var openModals = document.querySelectorAll('.modal.show');
         if (openModals.length === 0) {
-            backdrops.forEach(function (b) { b.remove(); });
+            document.querySelectorAll('.modal-backdrop').forEach(function (b) { b.remove(); });
             document.body.classList.remove('modal-open');
             document.body.style.removeProperty('padding-right');
             document.body.style.removeProperty('overflow');
         }
-        // 清空關閉的 modal 內的表單 + 關閉 flatpickr
         var modal = e.target;
         if (modal && modal.classList.contains('modal')) {
             var form = modal.querySelector('form');
             if (form) { form.reset(); }
-            // 關閉 modal 內所有 flatpickr
             modal.querySelectorAll('input').forEach(function (input) {
                 if (input._flatpickr) { input._flatpickr.close(); }
             });
