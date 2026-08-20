@@ -106,43 +106,58 @@
     //  打卡狀態 + 按鈕
     // ---------------------------------------------------------------
 
-    var activeTab = isAdmin ? 'report' : 'clock';
+    var defaultTab = isAdmin ? 'report' : 'clock';
+    var savedTarget = localStorage.getItem('activeTab:' + location.pathname);
+    var activeTab = (savedTarget && savedTarget.indexOf('#att-tab-') === 0)
+        ? savedTarget.replace('#att-tab-', '')
+        : defaultTab;
 
     function renderPage() {
         var allTabs = [];
 
         if (!isAdmin && hasPerm('attendance.clock')) {
-            allTabs.push({ key: 'clock', label: i18n.btn_clock_in || '打卡' });
+            allTabs.push({ key: 'clock', label: '<i class="fas fa-clock me-1"></i>' + (i18n.btn_clock_in || '打卡') });
         }
         if (!isAdmin && hasPerm('attendance.view')) {
-            allTabs.push({ key: 'my_records', label: i18n.tab_my_records });
+            allTabs.push({ key: 'my_records', label: '<i class="fas fa-calendar-alt me-1"></i>' + i18n.tab_my_records });
         }
         if (isAdmin && hasPerm('attendance.report')) {
-            allTabs.push({ key: 'report', label: i18n.tab_report });
+            allTabs.push({ key: 'report', label: '<i class="fas fa-chart-bar me-1"></i>' + i18n.tab_report });
         }
         if (hasPerm('attendance.amend_review')) {
-            allTabs.push({ key: 'amend_review', label: i18n.tab_amend || '補打卡審核' });
+            allTabs.push({ key: 'amend_review', label: '<i class="fas fa-edit me-1"></i>' + (i18n.tab_amend || '補打卡審核') });
         }
 
         var tabs = allTabs.filter(function (t) { return t; });
 
-        var html = '<ul class="nav nav-tabs mb-3">';
-        tabs.forEach(function (tab) {
-            var cls = tab.key === activeTab ? 'active' : '';
-            html += '<li class="nav-item"><button class="nav-link ' + cls + '" data-tab="' + tab.key + '">' + tab.label + '</button></li>';
+        var html = '<ul class="nav nav-tabs mb-3" role="tablist">';
+        tabs.forEach(function (tab, idx) {
+            var isActive = tab.key === activeTab;
+            html += '<li class="nav-item" role="presentation">';
+            html += '<button class="nav-link' + (isActive ? ' active' : '') + '" data-bs-toggle="tab" data-bs-target="#att-tab-' + tab.key + '" data-tab="' + tab.key + '" type="button" role="tab">' + tab.label + '</button>';
+            html += '</li>';
         });
-        html += '</ul><div id="att-content"></div>';
+        html += '</ul><div class="tab-content">';
+        tabs.forEach(function (tab) {
+            var isActive = tab.key === activeTab;
+            html += '<div class="tab-pane' + (isActive ? ' show active' : '') + '" id="att-tab-' + tab.key + '" role="tabpanel"></div>';
+        });
+        html += '</div>';
 
         root.innerHTML = html;
 
-        root.querySelectorAll('.nav-tabs .nav-link').forEach(function (btn) {
-            btn.addEventListener('click', function () {
+        root.querySelectorAll('[data-bs-toggle="tab"]').forEach(function (btn) {
+            btn.addEventListener('shown.bs.tab', function () {
                 activeTab = btn.dataset.tab;
-                renderPage();
+                loadTabContent();
             });
         });
 
         loadTabContent();
+    }
+
+    function getTabPane() {
+        return document.getElementById('att-tab-' + activeTab);
     }
 
     function loadTabContent() {
@@ -170,12 +185,12 @@
                 renderClockPanel(record);
             })
             .catch(function () {
-                document.getElementById('att-content').innerHTML = '<p>Failed to load status.</p>';
+                getTabPane().innerHTML = '<p>Failed to load status.</p>';
             });
     }
 
     function renderClockPanel(record) {
-        var content = document.getElementById('att-content');
+        var content = getTabPane();
         var hasRecord = record && record.id && record.status !== 'not_clocked';
         var clockedIn = hasRecord && record.clock_in !== null && record.clock_in !== undefined;
         var clockedOut = hasRecord && record.clock_out !== null && record.clock_out !== undefined;
@@ -401,7 +416,7 @@
                 renderMyRecords(records, month, amendLookup);
             })
             .catch(function () {
-                document.getElementById('att-content').innerHTML = '<p>Failed to load records.</p>';
+                getTabPane().innerHTML = '<p>Failed to load records.</p>';
             });
     }
 
@@ -504,7 +519,7 @@
             );
         }).join('');
 
-        document.getElementById('att-content').innerHTML = nav + summary + tableHtml +
+        getTabPane().innerHTML = nav + summary + tableHtml +
             '<div class="shift-cards">' + cards + '</div>';
 
         // 綁定月份切換
@@ -526,7 +541,7 @@
                 renderReport(body, month);
             })
             .catch(function () {
-                document.getElementById('att-content').innerHTML = '<p>Failed to load report.</p>';
+                getTabPane().innerHTML = '<p>Failed to load report.</p>';
             });
     }
 
@@ -590,7 +605,7 @@
             );
         }).join('');
 
-        document.getElementById('att-content').innerHTML = nav + tableHtml +
+        getTabPane().innerHTML = nav + tableHtml +
             '<div class="shift-cards">' + reportCards + '</div>';
 
         // 綁定 flatpickr 月份選擇器
@@ -703,7 +718,7 @@
         apiFetch('/admin/attendance/ajax-amendments')
             .then(function (data) {
                 if (!data || data.length === 0) {
-                    document.getElementById('att-content').innerHTML = '<p class="text-muted text-center py-4">暫無申請</p>';
+                    getTabPane().innerHTML = '<p class="text-muted text-center py-4">暫無申請</p>';
                     return;
                 }
 
@@ -765,7 +780,7 @@
                 tableHtml += '</tbody></table></div>';
                 cardsHtml += '</div>';
 
-                document.getElementById('att-content').innerHTML = tableHtml + cardsHtml;
+                getTabPane().innerHTML = tableHtml + cardsHtml;
 
                 // 綁定審核按鈕
                 document.querySelectorAll('.js-amend-respond').forEach(function (btn) {

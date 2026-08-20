@@ -6,6 +6,27 @@
  */
 return [
     [
+        'version' => 'v1.30',
+        'date'    => '2026-08-21',
+        'title'   => '全站 Tab 記憶 + Bootstrap Tab 統一 + Icon',
+        'content' => implode("\n", [
+            '• 全站 Tab 切換後自動記憶，換頁或重新整理後自動還原',
+            '• 出勤頁面、排班管理改為標準 Bootstrap Tab，統一全站記憶機制',
+            '• 出勤 Tab 加 icon：打卡/我的出勤/月報表/補打卡審核',
+            '• 排班 Tab 加 icon：排班課表/班別設定/換班/代班/請假管理',
+        ]),
+    ],
+    [
+        'version' => 'v1.29',
+        'date'    => '2026-08-21',
+        'title'   => '全站 Tab 狀態記憶',
+        'content' => implode("\n", [
+            '• 全站 Tab 切換後自動記憶，換頁或重新整理後自動還原上次的 Tab',
+            '• 以頁面路徑為 key 存入 localStorage，各頁面互不干擾',
+            '• 支援 Bootstrap tab 和 pill 兩種 nav 元件',
+        ]),
+    ],
+    [
         'version' => 'v1.28',
         'date'    => '2026-08-21',
         'title'   => '群發公告字數上限即時計算',

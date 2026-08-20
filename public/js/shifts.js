@@ -151,7 +151,11 @@
     //  狀態
     // ---------------------------------------------------------------
 
-    var activeTab = 'timetable';
+    var defaultShiftTab = 'timetable';
+    var savedShiftTarget = localStorage.getItem('activeTab:' + location.pathname);
+    var activeTab = (savedShiftTarget && savedShiftTarget.indexOf('#shift-tab-') === 0)
+        ? savedShiftTarget.replace('#shift-tab-', '')
+        : defaultShiftTab;
     var shiftsData = [];
     var assignmentsData = [];
 
@@ -239,13 +243,17 @@
     //  Tabs
     // ---------------------------------------------------------------
 
+    function getShiftTabPane() {
+        return document.getElementById('shift-tab-' + activeTab);
+    }
+
     function renderTabs() {
         var allTabs = [
-            { key: 'timetable', label: i18n.tab_assignments || '排班課表', perm: 'shift.view' },
-            { key: 'shifts', label: i18n.tab_shifts, perm: 'shift.update' },
-            { key: 'swaps', label: i18n.tab_swaps, perm: 'shift.swap' },
-            { key: 'covers', label: coverI18n.nav_label || '代班管理', perm: 'shift.cover' },
-            { key: 'leave', label: leaveI18n.tab_title || '請假管理', perm: 'leave_request.apply', altPerm: 'leave_request.review' },
+            { key: 'timetable', label: '<i class="fas fa-calendar-alt me-1"></i>' + (i18n.tab_assignments || '排班課表'), perm: 'shift.view' },
+            { key: 'shifts', label: '<i class="fas fa-cog me-1"></i>' + i18n.tab_shifts, perm: 'shift.update' },
+            { key: 'swaps', label: '<i class="fas fa-exchange-alt me-1"></i>' + i18n.tab_swaps, perm: 'shift.swap' },
+            { key: 'covers', label: '<i class="fas fa-user-shield me-1"></i>' + (coverI18n.nav_label || '代班管理'), perm: 'shift.cover' },
+            { key: 'leave', label: '<i class="fas fa-plane-departure me-1"></i>' + (leaveI18n.tab_title || '請假管理'), perm: 'leave_request.apply', altPerm: 'leave_request.review' },
         ];
 
         // 只顯示有權限的 Tab
@@ -257,19 +265,25 @@
             activeTab = tabs[0].key;
         }
 
-        var html = '<ul class="nav nav-tabs mb-3">';
+        var html = '<ul class="nav nav-tabs mb-3" role="tablist">';
         tabs.forEach(function (tab) {
-            var cls = tab.key === activeTab ? 'active' : '';
-            html += '<li class="nav-item"><button class="nav-link ' + cls + '" data-tab="' + tab.key + '">' + tab.label + '</button></li>';
+            var isActive = tab.key === activeTab;
+            html += '<li class="nav-item" role="presentation">';
+            html += '<button class="nav-link' + (isActive ? ' active' : '') + '" data-bs-toggle="tab" data-bs-target="#shift-tab-' + tab.key + '" data-tab="' + tab.key + '" type="button" role="tab">' + tab.label + '</button>';
+            html += '</li>';
         });
-        html += '</ul><div id="tab-content"></div>';
+        html += '</ul><div class="tab-content">';
+        tabs.forEach(function (tab) {
+            var isActive = tab.key === activeTab;
+            html += '<div class="tab-pane' + (isActive ? ' show active' : '') + '" id="shift-tab-' + tab.key + '" role="tabpanel"></div>';
+        });
+        html += '</div>';
 
         root.innerHTML = html;
 
-        root.querySelectorAll('.nav-tabs .nav-link').forEach(function (btn) {
-            btn.addEventListener('click', function () {
+        root.querySelectorAll('[data-bs-toggle="tab"]').forEach(function (btn) {
+            btn.addEventListener('shown.bs.tab', function () {
                 activeTab = btn.dataset.tab;
-                renderTabs();
                 loadTabContent();
             });
         });
@@ -314,7 +328,7 @@
                 renderTimetable(weekDays, assignmentsData);
             })
             .catch(function () {
-                document.getElementById('tab-content').innerHTML = '<p>Failed to load timetable.</p>';
+                getShiftTabPane().innerHTML = '<p>Failed to load timetable.</p>';
             });
     }
 
@@ -559,7 +573,7 @@
             '<tbody>' + bodyHtml + '</tbody></table>' +
             '</div>';
 
-        document.getElementById('tab-content').innerHTML = html;
+        getShiftTabPane().innerHTML = html;
 
         // 綁定按鈕
         var assignBtn = document.getElementById('js-open-assign');
@@ -651,7 +665,7 @@
                 renderShiftsTable(body.data);
             })
             .catch(function () {
-                document.getElementById('tab-content').innerHTML = '<p>Failed to load shifts.</p>';
+                getShiftTabPane().innerHTML = '<p>Failed to load shifts.</p>';
             });
     }
 
@@ -696,7 +710,7 @@
             '</tr></thead><tbody>' + rows + '</tbody></table>' +
             '<div class="shift-cards">' + cards + '</div>';
 
-        document.getElementById('tab-content').innerHTML = html;
+        getShiftTabPane().innerHTML = html;
 
         // 新增班別按鈕
         var createBtn = document.getElementById('js-open-create-shift');
@@ -734,7 +748,7 @@
                 renderSwapsTable(body.data);
             })
             .catch(function () {
-                document.getElementById('tab-content').innerHTML = '<p>Failed to load swaps.</p>';
+                getShiftTabPane().innerHTML = '<p>Failed to load swaps.</p>';
             });
     }
 
@@ -814,7 +828,7 @@
             '</tr></thead><tbody>' + rows + '</tbody></table>' +
             '<div class="shift-cards">' + swapCards + '</div>';
 
-        document.getElementById('tab-content').innerHTML = html;
+        getShiftTabPane().innerHTML = html;
 
         root.querySelectorAll('.js-respond-swap').forEach(function (btn) {
             btn.addEventListener('click', function () {
@@ -1225,7 +1239,7 @@
                 renderCoversTable(body.data);
             })
             .catch(function () {
-                document.getElementById('tab-content').innerHTML = '<p>Failed to load covers.</p>';
+                getShiftTabPane().innerHTML = '<p>Failed to load covers.</p>';
             });
     }
 
@@ -1333,7 +1347,7 @@
             '</tr></thead><tbody>' + rows + '</tbody></table>' +
             '<div class="shift-cards">' + coverCards + '</div>';
 
-        document.getElementById('tab-content').innerHTML = html;
+        getShiftTabPane().innerHTML = html;
 
         // 從表格行取得代班詳細資訊
         function getCoverDetailFromRow(btn) {
@@ -1622,7 +1636,7 @@
     leaveStatusMap[2] = { text: leaveI18n.status_rejected || '已拒絕', css: 'bg-danger' };
 
     function loadLeave() {
-        var container = document.getElementById('tab-content');
+        var container = getShiftTabPane();
         if (!container) { return; }
 
         var html = '';

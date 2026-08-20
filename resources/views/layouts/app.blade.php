@@ -793,6 +793,25 @@
     })();
     </script>
 
+    {{-- 全站 Tab 記憶 --}}
+    <script>
+    (function () {
+        var storageKey = 'activeTab:' + location.pathname;
+        var saved = localStorage.getItem(storageKey);
+        if (saved) {
+            var tab = document.querySelector('[data-bs-toggle="tab"][href="' + saved + '"], [data-bs-toggle="tab"][data-bs-target="' + saved + '"], [data-bs-toggle="pill"][href="' + saved + '"], [data-bs-toggle="pill"][data-bs-target="' + saved + '"]');
+            if (tab) {
+                var bsTab = new bootstrap.Tab(tab);
+                bsTab.show();
+            }
+        }
+        document.addEventListener('shown.bs.tab', function (e) {
+            var target = e.target.getAttribute('href') || e.target.getAttribute('data-bs-target') || '';
+            if (target) { localStorage.setItem(storageKey, target); }
+        });
+    })();
+    </script>
+
     @yield('scripts')
 </body>
 </html>
