@@ -19,7 +19,7 @@ class TelegramBroadcastRepository
     public function paginate($perPage = 20)
     {
         return TelegramBroadcast::query()
-            ->select(['id', 'content', 'target_type', 'total_count', 'success_count', 'fail_count', 'sender_id', 'sent_at', 'created_at'])
+            ->select(['id', 'content', 'target_type', 'target_group_ids', 'send_results', 'total_count', 'success_count', 'fail_count', 'sender_id', 'sent_at', 'created_at'])
             ->with('sender')
             ->orderByDesc('id')
             ->paginate($perPage);

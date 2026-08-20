@@ -32,6 +32,7 @@ class TelegramBroadcast extends Model
     protected $casts = [
         'target_type'      => 'integer',
         'target_group_ids' => 'array',
+        'send_results'     => 'array',
         'total_count'      => 'integer',
         'success_count'    => 'integer',
         'fail_count'       => 'integer',

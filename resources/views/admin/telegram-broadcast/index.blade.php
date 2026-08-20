@@ -140,9 +140,9 @@
                                         <td>{{ $record->sender ? $record->sender->nickname : '-' }}</td>
                                         <td>
                                             @if($record->target_type == 1)
-                                                <span class="badge bg-primary">{{ trans('broadcast.target_all') }}</span>
+                                                <a href="javascript:void(0)" class="badge bg-primary js-show-send-detail" style="cursor:pointer;text-decoration:none" data-results="{{ json_encode($record->send_results ?? []) }}">{{ trans('broadcast.target_all') }}</a>
                                             @else
-                                                <span class="badge bg-secondary">{{ trans('broadcast.target_selected') }}</span>
+                                                <a href="javascript:void(0)" class="badge bg-secondary js-show-send-detail" style="cursor:pointer;text-decoration:none" data-results="{{ json_encode($record->send_results ?? []) }}">{{ trans('broadcast.target_selected') }}</a>
                                             @endif
                                         </td>
                                         <td>{{ Str::limit($record->content, 50) }}</td>
@@ -186,9 +186,9 @@
                                     <div class="text-muted" style="font-size:0.8125rem">{{ $record->sent_at ? $record->sent_at->format('m/d H:i') : '-' }}</div>
                                 </div>
                                 @if($record->target_type == 1)
-                                    <span class="badge bg-primary">{{ trans('broadcast.target_all') }}</span>
+                                    <a href="javascript:void(0)" class="badge bg-primary js-show-send-detail" style="cursor:pointer;text-decoration:none" data-results="{{ json_encode($record->send_results ?? []) }}">{{ trans('broadcast.target_all') }}</a>
                                 @else
-                                    <span class="badge bg-secondary">{{ trans('broadcast.target_selected') }}</span>
+                                    <a href="javascript:void(0)" class="badge bg-secondary js-show-send-detail" style="cursor:pointer;text-decoration:none" data-results="{{ json_encode($record->send_results ?? []) }}">{{ trans('broadcast.target_selected') }}</a>
                                 @endif
                             </div>
                             <div class="mb-2" style="font-size:0.875rem; white-space:pre-wrap; word-break:break-all">{{ $record->content }}</div>
@@ -228,17 +228,51 @@
         </div>
     </div>
 
+    {{-- 發送明細 Modal --}}
+    <div class="modal fade" id="modal-send-detail" tabindex="-1">
+        <div class="modal-dialog modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-list-alt me-2"></i>發送明細</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="send-detail-empty" class="text-center text-muted py-4" style="display:none">
+                        <i class="fas fa-inbox fa-2x mb-2 d-block"></i>此紀錄無發送明細
+                    </div>
+                    <div id="send-detail-table-wrap" style="display:none">
+                        <div class="d-flex gap-3 mb-3" id="send-detail-summary"></div>
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>站台</th>
+                                    <th style="width:80px;text-align:center">狀態</th>
+                                </tr>
+                            </thead>
+                            <tbody id="send-detail-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 @endsection
 
 @section('scripts')
 <script>
 $(function () {
     var csrfToken = $('meta[name="csrf-token"]').attr('content');
+    var pendingReload = false;
 
     function showMessage(msg) {
         $('#modal-broadcast-msg-text').text(msg);
         showBsModal('modal-broadcast-msg');
     }
+
+    document.getElementById('modal-broadcast-msg').addEventListener('hidden.bs.modal', function () {
+        if (pendingReload) { location.reload(); }
+    });
 
     // 切換全部/指定
     $('input[name="target_type"]').on('change', function () {
@@ -361,13 +395,47 @@ $(function () {
                 $btn.prop('disabled', false).html('<i class="fas fa-paper-plane me-1"></i>{{ trans("broadcast.btn_send") }}');
                 $('#bc-content').val('');
                 showMessage(body.message || '已發送');
-                setTimeout(function () { location.reload(); }, 1500);
+                pendingReload = true;
             },
             error: function (xhr) {
                 $btn.prop('disabled', false).html('<i class="fas fa-paper-plane me-1"></i>{{ trans("broadcast.btn_send") }}');
                 showMessage((xhr.responseJSON && xhr.responseJSON.message) || '發送失敗');
             }
         });
+    });
+
+    // 發送明細
+    $(document).on('click', '.js-show-send-detail', function () {
+        var results = $(this).data('results') || [];
+        $('#send-detail-empty, #send-detail-table-wrap').hide();
+        if (!results.length) {
+            $('#send-detail-empty').show();
+        } else {
+            var successCount = 0;
+            var failCount = 0;
+            var html = '';
+            results.forEach(function (r) {
+                if (r.success) { successCount++; } else { failCount++; }
+                html += '<tr>';
+                html += '<td>' + $('<span>').text(r.name).html() + '</td>';
+                html += '<td class="text-center">';
+                if (r.success) {
+                    html += '<span class="badge bg-success">成功</span>';
+                } else {
+                    html += '<span class="badge bg-danger">失敗</span>';
+                }
+                html += '</td></tr>';
+            });
+            $('#send-detail-summary').html(
+                '<span class="text-muted" style="font-size:0.875rem">共 ' + results.length + ' 站</span>' +
+                '<span style="font-size:0.875rem"><span class="badge bg-success">' + successCount + '</span> 成功</span>' +
+                (failCount > 0 ? '<span style="font-size:0.875rem"><span class="badge bg-danger">' + failCount + '</span> 失敗</span>' : '')
+            );
+            $('#send-detail-body').html(html);
+            $('#send-detail-table-wrap').show();
+        }
+        var modal = new bootstrap.Modal(document.getElementById('modal-send-detail'));
+        modal.show();
     });
 
     // 複製公告內容

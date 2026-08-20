@@ -111,9 +111,12 @@ class TelegramBroadcastService
         // 逐一發送（根據站台系統切換 Bot Token）
         $success = 0;
         $fail = 0;
+        $sendResults = [];
 
         foreach ($stations as $station) {
             if (!$station->telegramGroup) {
+                $sendResults[] = ['station_id' => $station->id, 'name' => $station->name, 'success' => false];
+                $fail++;
                 continue;
             }
 
@@ -134,6 +137,7 @@ class TelegramBroadcastService
             }
 
             if ($result && isset($result['ok']) && $result['ok']) {
+                $sendResults[] = ['station_id' => $station->id, 'name' => $station->name, 'success' => true];
                 $success++;
 
                 // 存入 outbound 訊息到對話紀錄（多張取第一張）
@@ -158,6 +162,7 @@ class TelegramBroadcastService
                     'replied'            => true,
                 ]);
             } else {
+                $sendResults[] = ['station_id' => $station->id, 'name' => $station->name, 'success' => false];
                 $fail++;
                 Log::warning('群發公告發送失敗', ['chat_id' => $station->telegramGroup->chat_id, 'broadcast_id' => $broadcast->id]);
             }
@@ -167,6 +172,7 @@ class TelegramBroadcastService
         $this->broadcastRepository->update($broadcast, [
             'success_count' => $success,
             'fail_count'    => $fail,
+            'send_results'  => $sendResults,
         ]);
 
         return $broadcast->fresh();
