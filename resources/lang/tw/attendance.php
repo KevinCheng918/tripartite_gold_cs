@@ -28,6 +28,7 @@ return [
     'field_late'         => '遲到',
     'field_early_leave'  => '早退',
     'field_overtime'     => '加班',
+    'field_shift'        => '班別',
     'field_status'       => '狀態',
     'field_ip'           => 'IP',
     'field_device'       => '裝置',

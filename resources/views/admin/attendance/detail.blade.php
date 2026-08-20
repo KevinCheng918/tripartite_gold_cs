@@ -89,6 +89,7 @@
                     <thead class="table-light">
                         <tr>
                             <th>{{ trans('attendance.field_date') }}</th>
+                            <th>{{ trans('attendance.field_shift') }}</th>
                             <th>{{ trans('attendance.field_clock_in') }}</th>
                             <th>{{ trans('attendance.field_clock_out') }}</th>
                             <th>{{ trans('attendance.field_late') }}</th>
@@ -103,6 +104,7 @@
                         @forelse($records as $r)
                             <tr>
                                 <td>{{ $r->date->format('Y-m-d') }}</td>
+                                <td>{{ filled($r->assignment) && filled($r->assignment->shift) ? $r->assignment->shift->display_name : '-' }}</td>
                                 <td>
                                     {{ $r->clock_in ? $r->clock_in->format('H:i:s') : '-' }}
                                     @if(in_array(1, $amendLookup[$r->date->format('Y-m-d')] ?? []))
@@ -155,7 +157,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="text-center text-muted py-4">暫無資料</td>
+                                <td colspan="10" class="text-center text-muted py-4">暫無資料</td>
                             </tr>
                         @endforelse
                     </tbody>

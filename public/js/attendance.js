@@ -410,9 +410,11 @@
             var types = amendLookup[dateKey] || [];
             var inAmend = types.indexOf(1) !== -1;
             var outAmend = types.indexOf(2) !== -1;
+            var shiftName = (r.assignment && r.assignment.shift) ? r.assignment.shift.display_name : '-';
             return (
                 '<tr>' +
                 '<td>' + r.date + '</td>' +
+                '<td>' + shiftName + '</td>' +
                 '<td>' + (r.clock_in || '-') + (inAmend ? amendBadge : '') + '</td>' +
                 '<td>' + (r.clock_out || '-') + (outAmend ? amendBadge : '') + '</td>' +
                 '<td>' + (r.late_minutes > 0 ? r.late_minutes + ' ' + i18n.unit_minutes : '-') + '</td>' +
@@ -427,6 +429,7 @@
         var tableHtml =
             '<table class="att-table-desktop"><thead><tr>' +
             '<th>' + i18n.field_date + '</th>' +
+            '<th>' + (i18n.field_shift || '班別') + '</th>' +
             '<th>' + i18n.field_clock_in + '</th>' +
             '<th>' + i18n.field_clock_out + '</th>' +
             '<th>' + i18n.field_late + '</th>' +
@@ -441,12 +444,14 @@
             var st = statusMap[r.status] || { text: '-', css: '' };
             var dk = r.date ? r.date.substring(0, 10) : '';
             var ts = amendLookup[dk] || [];
+            var shiftNameCard = (r.assignment && r.assignment.shift) ? r.assignment.shift.display_name : '-';
             return (
                 '<div class="shift-card">' +
                 '<div class="shift-card__header">' +
                 '<span class="shift-card__title">' + r.date + '</span>' +
                 '<span class="badge ' + st.css + '">' + st.text + '</span>' +
                 '</div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + (i18n.field_shift || '班別') + '</span><span>' + shiftNameCard + '</span></div>' +
                 '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_clock_in + '</span><span>' + (r.clock_in || '-') + (ts.indexOf(1) !== -1 ? amendBadge : '') + '</span></div>' +
                 '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_clock_out + '</span><span>' + (r.clock_out || '-') + (ts.indexOf(2) !== -1 ? amendBadge : '') + '</span></div>' +
                 (r.late_minutes > 0 ? '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_late + '</span><span style="color:#dc2626;font-weight:600">' + r.late_minutes + ' ' + i18n.unit_minutes + '</span></div>' : '') +
