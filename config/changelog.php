@@ -104,7 +104,7 @@ return [
     ],
     [
         'version' => 'v1.12',
-        'date'    => '2026-08-15',
+        'date'    => '2026-08-17',
         'title'   => '任務看板到期提醒 + 搜尋篩選',
         'content' => implode("\n", [
             '• 明日到期卡片顯示黃色驚嘆號警告',
@@ -115,7 +115,7 @@ return [
     ],
     [
         'version' => 'v1.11',
-        'date'    => '2026-08-14',
+        'date'    => '2026-08-17',
         'title'   => '任務看板富文本 + 多圖上傳 + 站台欄位',
         'content' => implode("\n", [
             '• 任務描述改用 TinyMCE 富文本編輯器',
@@ -126,7 +126,7 @@ return [
     ],
     [
         'version' => 'v1.10',
-        'date'    => '2026-08-13',
+        'date'    => '2026-08-17',
         'title'   => '任務看板功能',
         'content' => implode("\n", [
             '• 新增任務看板功能，支援拖曳排序與狀態移動',
@@ -135,7 +135,7 @@ return [
     ],
     [
         'version' => 'v1.9',
-        'date'    => '2026-08-12',
+        'date'    => '2026-08-17',
         'title'   => '站台補點/扣點 + 補打卡功能',
         'content' => implode("\n", [
             '• 站台補點/扣點功能',
@@ -146,7 +146,7 @@ return [
     ],
     [
         'version' => 'v1.8',
-        'date'    => '2026-08-11',
+        'date'    => '2026-08-14',
         'title'   => '排班報班優化 + Flatpickr 金色主題',
         'content' => implode("\n", [
             '• 報班支援多天選擇（flatpickr multiple mode）',
@@ -158,7 +158,7 @@ return [
     ],
     [
         'version' => 'v1.7',
-        'date'    => '2026-08-10',
+        'date'    => '2026-08-14',
         'title'   => 'Telegram 聊天功能增強',
         'content' => implode("\n", [
             '• 群發公告支援多張圖片（sendMediaGroup）',
@@ -170,7 +170,7 @@ return [
     ],
     [
         'version' => 'v1.6',
-        'date'    => '2026-08-09',
+        'date'    => '2026-08-14',
         'title'   => 'Dark mode 全面修正 + RWD 優化',
         'content' => implode("\n", [
             '• 全站 badge 改為淡底色 pill 樣式 + dark mode 適配',
@@ -182,7 +182,7 @@ return [
     ],
     [
         'version' => 'v1.5',
-        'date'    => '2026-08-08',
+        'date'    => '2026-08-14',
         'title'   => '新增班別功能 + USDT 匯率 + 分頁統一',
         'content' => implode("\n", [
             '• 新增班別功能 + flatpickr 時間選擇器',
@@ -193,8 +193,8 @@ return [
     ],
     [
         'version' => 'v1.4',
-        'date'    => '2026-08-06',
-        'title'   =>'VM 管理功能 + 帳務紀錄',
+        'date'    => '2026-08-12',
+        'title'   => 'VM 管理功能 + 帳務紀錄',
         'content' => implode("\n", [
             '• 新增虛擬機管理（VM + 帳務紀錄 + 繳款證明）',
             '• 繳款設定功能 + 帳務紀錄複製文案/發送通知',
@@ -207,7 +207,7 @@ return [
     ],
     [
         'version' => 'v1.3',
-        'date'    => '2026-08-04',
+        'date'    => '2026-08-11',
         'title'   => 'Dark mode 全面修正 + 排班色塊優化',
         'content' => implode("\n", [
             '• Dark mode 全面修正：modal/table/按鈕/排班/出勤/聊天',
@@ -218,7 +218,7 @@ return [
     ],
     [
         'version' => 'v1.2',
-        'date'    => '2026-08-02',
+        'date'    => '2026-08-10',
         'title'   => '全站 Architect UI 框架重構',
         'content' => implode("\n", [
             '• 全站改用 Architect UI 框架：Layout/Sidebar/Header/Dashboard/Login 重構',
@@ -231,7 +231,7 @@ return [
     ],
     [
         'version' => 'v1.1',
-        'date'    => '2026-07-30',
+        'date'    => '2026-08-09',
         'title'   => 'PWA + Web Push + 全站視覺升級',
         'content' => implode("\n", [
             '• PWA + Web Push 推播通知：Telegram 新訊息即時通知客服',
@@ -242,7 +242,7 @@ return [
     ],
     [
         'version' => 'v1.0',
-        'date'    => '2026-07-25',
+        'date'    => '2026-08-06',
         'title'   => '系統初版上線',
         'content' => implode("\n", [
             '• 帳號管理（RBAC 角色權限）',
