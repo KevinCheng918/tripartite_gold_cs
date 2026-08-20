@@ -84,13 +84,15 @@
         [data-theme="dark"] .side-prop:hover { background: rgba(255,255,255,0.05); }
         /* 描述 HTML 顯示 */
         .side-field .field-value img { max-width: 100%; height: auto; }
-        /* 封存重置按鈕 */
-        #btn-archived-filter-reset:hover { background: #a67c00; color: #fff !important; border-color: #a67c00; }
-        #btn-archived-filter-reset:active, #btn-archived-filter-reset.active { background: #d4af37 !important; color: #fff !important; border-color: #d4af37 !important; box-shadow: none !important; }
         /* 封存清單 */
         [data-theme="dark"] #modal-archived-list .modal-content { background: #1e1e1e; color: #e0e0e0; }
+        [data-theme="dark"] #modal-archived-list .modal-header { border-bottom-color: #333; }
         [data-theme="dark"] #modal-archived-list .table { color: #e0e0e0; }
+        [data-theme="dark"] #modal-archived-list .table thead th { color: #ccc; border-bottom-color: #444; }
+        [data-theme="dark"] #modal-archived-list .table td { border-bottom-color: #333; }
         [data-theme="dark"] #modal-archived-list .table-hover tbody tr:hover { background: rgba(255,255,255,0.05); }
+        [data-theme="dark"] #modal-archived-list .form-select,
+        [data-theme="dark"] #modal-archived-list .form-control { background: #2d2d2d; color: #e0e0e0; border-color: #444; }
         [data-theme="dark"] #modal-restore-confirm .modal-content { background: #1e1e1e; color: #e0e0e0; }
         @media (max-width: 767px) {
             #task-side-panel { width: 100% !important; }
@@ -401,7 +403,7 @@
                         <input type="date" id="archived-filter-date-start" class="form-control form-control-sm" style="width:auto" placeholder="起始日期">
                         <span class="text-muted">~</span>
                         <input type="date" id="archived-filter-date-end" class="form-control form-control-sm" style="width:auto" placeholder="結束日期">
-                        <button class="btn btn-sm" id="btn-archived-filter-reset" title="重置" style="color:#a67c00;border-color:#a67c00"><i class="fas fa-undo"></i></button>
+                        <button class="btn btn-sm btn-outline-secondary" id="btn-archived-filter-reset" title="重置"><i class="fas fa-undo me-1"></i>重置</button>
                     </div>
                     <div id="archived-list-loading" class="text-center py-4" style="display:none">
                         <div class="spinner-border text-secondary" role="status"></div>
@@ -1419,7 +1421,7 @@ $(function () {
             html += '<td style="font-size:0.875rem">' + assigneeNames + '</td>';
             html += '<td style="white-space:nowrap">' + updatedAt.toLocaleDateString('zh-TW') + '</td>';
             html += '<td style="white-space:nowrap"><span class="badge ' + badgeClass + '">' + remaining + ' 天</span></td>';
-            html += '<td style="white-space:nowrap"><button class="btn btn-sm btn-outline-success js-restore-task" data-id="' + t.id + '" title="還原"><i class="fas fa-undo"></i></button></td>';
+            html += '<td style="white-space:nowrap"><button class="btn btn-sm btn-outline-secondary js-restore-task" data-id="' + t.id + '" title="還原"><i class="fas fa-undo me-1"></i>還原</button></td>';
             html += '</tr>';
         });
         $('#archived-list-body').html(html);

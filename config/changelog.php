@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => 'v1.26',
+        'date'    => '2026-08-21',
+        'title'   => 'Dark Mode 補強 + 報班驗證',
+        'content' => implode("\n", [
+            '• 封存清單 Modal Dark Mode 完整適配（表格/篩選/按鈕）',
+            '• 封存清單按鈕統一 btn-outline-secondary，還原/重置按鈕加上文字',
+            '• 全站 input[type=file] 檔案選擇按鈕 Dark Mode 適配',
+            '• 全站 input-group-text Dark Mode 適配（年資篩選等）',
+            '• 報班新增員工必填驗證，未勾選員工阻擋送出',
+        ]),
+    ],
+    [
         'version' => 'v1.25',
         'date'    => '2026-08-21',
         'title'   => '任務看板側邊面板屬性排版優化',
