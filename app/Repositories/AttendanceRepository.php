@@ -77,7 +77,7 @@ class AttendanceRepository
             ->with(['assignment.shift'])
             ->where('user_id', $userId)
             ->where('date', 'like', "{$yearMonth}%")
-            ->orderBy('date')
+            ->orderBy('date', 'desc')
             ->get();
     }
 

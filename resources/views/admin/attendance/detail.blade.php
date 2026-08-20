@@ -2,7 +2,7 @@
 
 @section('title', trans('attendance.detail_title'))
 @section('icon', 'clock')
-@section('subtitle', trans('attendance.detail_subtitle'))
+@section('subtitle', (isset($targetUser) ? $targetUser->nickname . ' — ' : '') . trans('attendance.detail_subtitle'))
 
 @section('content')
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AttendanceResource;
 use App\Models\ClockAmendment;
+use App\Repositories\UserRepository;
 use App\Services\AttendanceService;
 use App\Services\ClockAmendmentService;
 use App\Services\LeaveRequestService;
@@ -23,15 +24,18 @@ class AttendanceController extends Controller
     private $attendanceService;
     private $amendmentService;
     private $leaveService;
+    private $userRepository;
 
     public function __construct(
         AttendanceService $attendanceService,
         ClockAmendmentService $amendmentService,
-        LeaveRequestService $leaveService
+        LeaveRequestService $leaveService,
+        UserRepository $userRepository
     ) {
         $this->attendanceService = $attendanceService;
         $this->amendmentService = $amendmentService;
         $this->leaveService = $leaveService;
+        $this->userRepository = $userRepository;
     }
 
     /**
@@ -138,8 +142,11 @@ class AttendanceController extends Controller
 
         $amendments = $this->amendmentService->getApprovedByUserAndMonth((int) $userId, $yearMonth);
 
+        $targetUser = $this->userRepository->find((int) $userId);
+
         return view('admin.attendance.detail', [
             'targetUserId' => $userId,
+            'targetUser'   => $targetUser,
             'records'      => $records,
             'yearMonth'    => $yearMonth,
             'amendments'   => $amendments,
