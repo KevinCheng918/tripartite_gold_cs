@@ -541,6 +541,17 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .page-title-heading > div { color: #f0e6c8 !important; }
 [data-theme="dark"] .page-title-subheading { color: rgba(255,255,255,0.4) !important; }
 
+/* 版本紀錄 sidebar 按鈕 */
+[data-theme="dark"] .sidebar-changelog-btn { border-color: rgba(255,255,255,0.06) !important; }
+[data-theme="dark"] .sidebar-changelog-btn .btn { color: #d4af37 !important; border-color: rgba(212,175,55,0.3) !important; background: rgba(212,175,55,0.08) !important; }
+
+/* 版本紀錄 Modal */
+.changelog-latest { background: rgba(212,175,55,0.06); }
+[data-theme="dark"] #modal-changelog .modal-content { background: #1e1e1e; color: #e0e0e0; }
+[data-theme="dark"] #modal-changelog .changelog-item { border-color: rgba(255,255,255,0.06) !important; }
+[data-theme="dark"] #modal-changelog .changelog-latest { background: rgba(212,175,55,0.1); }
+[data-theme="dark"] #modal-changelog .changelog-content { color: rgba(255,255,255,0.6) !important; }
+
 /* Stat card header (帳號管理統計卡) */
 .stat-card-header { background: #fdf6e3; color: #7a5c00; }
 [data-theme="dark"] .stat-card-header { background: rgba(212,175,55,0.1) !important; color: #f0e6c8 !important; }

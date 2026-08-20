@@ -38,7 +38,8 @@
 
     <style>
         body .app-container { opacity: 1 !important; visibility: visible !important; }
-        .app-sidebar__inner, .app-main__inner { opacity: 0; transition: opacity 0.3s ease-in-out !important; }
+        .app-sidebar__inner { opacity: 0; transition: opacity 0.3s ease-in-out !important; }
+        .app-main__inner { opacity: 0; transition: opacity 0.3s ease-in-out !important; }
         .page-loaded .app-sidebar__inner, .page-loaded .app-main__inner { opacity: 1; }
         .app-sidebar { transition: all .3s cubic-bezier(0.4, 0, 0.2, 1) !important; will-change: width, flex; }
         .closed-sidebar:not(.sidebar-mobile-open) .app-sidebar__heading,
@@ -49,6 +50,13 @@
         .closed-sidebar:not(.sidebar-mobile-open) #btn-open-profile-sidebar { justify-content: center; padding: 0.75rem 0 !important; }
         .closed-sidebar:not(.sidebar-mobile-open) #btn-open-profile-sidebar .rounded-circle { margin: 0 auto !important; }
         .closed-sidebar:not(.sidebar-mobile-open) #btn-open-profile-sidebar > *:not(.rounded-circle) { display: none; }
+        .closed-sidebar:not(.sidebar-mobile-open) .sidebar-changelog-btn span,
+        .closed-sidebar:not(.sidebar-mobile-open) .sidebar-changelog-btn .badge { display: none; }
+        .closed-sidebar:not(.sidebar-mobile-open) .sidebar-changelog-btn { padding: 0.5rem 0.5rem 1rem !important; }
+        .scrollbar-sidebar { height: 100% !important; overflow: hidden !important; }
+        .sidebar-scrollable::-webkit-scrollbar { width: 4px; }
+        .sidebar-scrollable::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
+        [data-theme="dark"] .sidebar-scrollable::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); }
         .app-main__outer, .app-main__inner { overflow-x: hidden; }
         @yield('css')
     </style>
@@ -147,10 +155,10 @@
                         </button>
                     </span>
                 </div>
-                <div class="scrollbar-sidebar">
-                    <div class="app-sidebar__inner">
-                        {{-- 使用者資訊（點擊開啟個人設定） --}}
-                        <a href="javascript:void(0)" class="d-flex align-items-center px-3 py-3 border-bottom mb-2 text-decoration-none" id="btn-open-profile-sidebar" title="{{ trans('profile.title') }}">
+                <div class="scrollbar-sidebar" style="display:flex;flex-direction:column;overflow:hidden">
+                    {{-- 固定頂部：個人資訊 + 首頁 --}}
+                    <div class="app-sidebar__inner sidebar-fixed-top" style="flex-shrink:0;padding-bottom:0">
+                        <a href="javascript:void(0)" class="d-flex align-items-center px-3 py-3 border-bottom mb-0 text-decoration-none" id="btn-open-profile-sidebar" title="{{ trans('profile.title') }}">
                             <div class="rounded-circle d-flex align-items-center justify-content-center me-2" style="width:36px;height:36px;background:linear-gradient(135deg,#d4af37,#a67c00);color:#fff;font-weight:700;font-size:0.875rem;flex-shrink:0">
                                 {{ mb_substr(Auth::user()->nickname, 0, 1) }}
                             </div>
@@ -160,8 +168,7 @@
                             </div>
                             <i class="fas fa-edit ms-auto text-muted" style="font-size:0.75rem"></i>
                         </a>
-
-                        <ul class="vertical-nav-menu">
+                        <ul class="vertical-nav-menu" style="margin-bottom:0;padding-bottom:0">
                             <li class="app-sidebar__heading">{{ config('app.name') }}</li>
                             <li>
                                 <a href="{{ route('admin.dashboard') }}" class="{{ request()->routeIs('admin.dashboard') ? 'mm-active' : '' }}">
@@ -169,6 +176,12 @@
                                     {{ trans('dashboard.nav_label') }}
                                 </a>
                             </li>
+                        </ul>
+                    </div>
+
+                    {{-- 可滾動中間區域：功能選單 --}}
+                    <div class="app-sidebar__inner sidebar-scrollable" style="flex:1;overflow-y:auto;overflow-x:hidden;padding-top:0">
+                        <ul class="vertical-nav-menu" style="padding-top:0">
                             <li class="app-sidebar__heading">主要功能</li>
                             @if(Auth::user()->hasPermission('account.view'))
                             <li>
@@ -255,6 +268,15 @@
                             @endif
                             @endif
                         </ul>
+                    </div>
+
+                    {{-- 固定底部：版本紀錄按鈕 --}}
+                    <div class="sidebar-changelog-btn" style="flex-shrink:0;padding:0.5rem 1.5rem 1rem;border-top:1px solid rgba(0,0,0,0.08)">
+                        <a href="javascript:void(0)" id="btn-open-changelog" class="btn btn-sm w-100 d-flex align-items-center justify-content-center" style="font-size:0.8125rem;border-radius:6px;color:#a67c00;border:1px solid rgba(212,175,55,0.4);background:rgba(212,175,55,0.06);transition:none" onmousedown="this.style.background='rgba(212,175,55,0.25)'" onmouseup="this.style.background='rgba(212,175,55,0.06)'" onmouseleave="this.style.background='rgba(212,175,55,0.06)'">
+                            <i class="fas fa-clipboard-list me-2"></i>
+                            <span>版本紀錄</span>
+                            <span class="badge ms-2" style="background:rgba(212,175,55,0.2);color:#a67c00;font-size:0.6875rem">{{ config('changelog.0.version', '') }}</span>
+                        </a>
                     </div>
                 </div>
             </div>
@@ -377,6 +399,30 @@
         </div>
     </div>
 
+    {{-- 版本紀錄 Modal --}}
+    <div class="modal fade" id="modal-changelog" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header" style="background:linear-gradient(135deg,#d4af37,#a67c00);color:#fff">
+                    <h5 class="modal-title"><i class="fas fa-clipboard-list me-2"></i>版本紀錄</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    @foreach(config('changelog', []) as $idx => $log)
+                    <div class="changelog-item border-bottom px-4 py-3{{ $idx === 0 ? ' changelog-latest' : '' }}">
+                        <div class="d-flex align-items-center mb-1">
+                            <span class="badge me-2" style="background:#d4af37;color:#fff;font-size:0.75rem">{{ $log['version'] }}</span>
+                            <span class="fw-bold" style="font-size:1rem">{{ $log['title'] }}</span>
+                            <span class="ms-auto text-muted" style="font-size:0.8125rem">{{ $log['date'] }}</span>
+                        </div>
+                        <div class="changelog-content text-muted" style="font-size:0.875rem;white-space:pre-line;line-height:1.8">{{ $log['content'] }}</div>
+                    </div>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- 訊息 Modal --}}
     <div class="modal fade" id="modal-profile-msg" tabindex="-1">
         <div class="modal-dialog modal-sm">
@@ -473,6 +519,11 @@
                 $('.theme-icon-dark').hide();
                 $('.theme-icon-light').show();
             }
+        });
+
+        // 版本紀錄 Modal
+        $('#btn-open-changelog').on('click', function () {
+            showBsModal('modal-changelog');
         });
 
         // 個人選單 Modal
