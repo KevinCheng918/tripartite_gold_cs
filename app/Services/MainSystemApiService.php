@@ -114,7 +114,8 @@ class MainSystemApiService
 
         try {
             $timestamp = time();
-            $sign = hash('sha256', $apiKey . $timestamp);
+            $encryptKey = config('app.key', '');
+            $sign = hash('sha256', $apiKey . $encryptKey . $timestamp);
 
             $response = $this->client->post(rtrim($apiUrl, '/') . '/api/admin/credit-add', [
                 'headers' => [
