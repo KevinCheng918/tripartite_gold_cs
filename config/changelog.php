@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => 'v1.34',
+        'date'    => '2026-08-21',
+        'title'   => '專案管理獨立頁面 + 任務看板專案按鈕移除',
+        'content' => implode("\n", [
+            '• 新增專案管理獨立頁面（sidebar 內勤管理下方）',
+            '• 每個專案以 Tab 呈現，顯示名稱/狀態/說明/建立者/時間',
+            '• 支援新增、編輯、啟停用專案',
+            '• 新增 project.view / project.edit 權限',
+            '• 移除任務看板「新增專案」按鈕及 task_board.manage_project 權限',
+        ]),
+    ],
+    [
         'version' => 'v1.33',
         'date'    => '2026-08-21',
         'title'   => '換班/代班手機版 RWD 修正',

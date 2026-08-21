@@ -233,6 +233,8 @@
         </div>
     </div>
 
+    </div>{{-- end tab-content --}}
+
     {{-- 編輯人員 Modal --}}
     <div class="modal fade" id="modal-staff-edit" tabindex="-1">
         <div class="modal-dialog">

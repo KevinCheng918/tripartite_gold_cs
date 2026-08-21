@@ -11,6 +11,7 @@ return [
         'payment_config' => 'Payment Config',
         'telegram_chat' => 'Telegram Chat',
         'staff_manage' => 'Staff Management',
+        'project' => 'Project Management',
         'leave_request' => 'Leave Management',
         'task_board' => 'Task Board',
         'login_log' => 'Login Log',
@@ -70,6 +71,10 @@ return [
         'view' => 'View staff management',
         'edit' => 'Edit staff info',
     ],
+    'project' => [
+        'view' => 'View projects',
+        'edit' => 'Edit projects',
+    ],
     'leave_request' => [
         'apply'  => 'Apply for leave',
         'review' => 'Review leave requests',
@@ -80,7 +85,6 @@ return [
         'update'         => 'Update/move task',
         'delete'         => 'Delete task',
         'delete_comment' => 'Delete comment',
-        'manage_project' => 'Manage projects',
     ],
     'login_log' => [
         'view' => 'View login log',

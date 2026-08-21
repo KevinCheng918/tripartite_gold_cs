@@ -18,8 +18,13 @@ class ProjectResource extends JsonResource
     public function toArray($request)
     {
         return [
-            'id'   => $this->id,
-            'name' => $this->name,
+            'id'          => $this->id,
+            'name'        => $this->name,
+            'description' => $this->description,
+            'status'      => $this->status,
+            'creator'     => $this->creator ? $this->creator->nickname : '-',
+            'created_at'  => $this->created_at ? $this->created_at->format('Y-m-d H:i') : null,
+            'updated_at'  => $this->updated_at ? $this->updated_at->format('Y-m-d H:i') : null,
         ];
     }
 }

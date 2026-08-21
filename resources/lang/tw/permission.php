@@ -11,6 +11,7 @@ return [
         'payment_config' => '繳款設定',
         'telegram_chat' => 'Telegram 客服',
         'staff_manage' => '內部管理',
+        'project' => '專案管理',
         'leave_request' => '請假管理',
         'task_board' => '任務看板',
         'login_log' => '登入紀錄',
@@ -70,6 +71,10 @@ return [
         'view' => '檢視內部管理',
         'edit' => '編輯員工資料',
     ],
+    'project' => [
+        'view' => '檢視專案管理',
+        'edit' => '編輯專案',
+    ],
     'leave_request' => [
         'apply'  => '申請請假',
         'review' => '審核請假',
@@ -80,7 +85,6 @@ return [
         'update'         => '編輯/移動任務',
         'delete'         => '刪除任務',
         'delete_comment' => '刪除留言',
-        'manage_project' => '管理專案',
     ],
     'login_log' => [
         'view' => '檢視登入紀錄',

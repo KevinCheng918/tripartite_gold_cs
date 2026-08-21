@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\VmController;
 use App\Http\Controllers\Admin\PaymentConfigController;
 use App\Http\Controllers\Admin\LeaveRequestController;
 use App\Http\Controllers\Admin\StaffManageController;
+use App\Http\Controllers\Admin\ProjectController;
 use App\Http\Controllers\Admin\TaskBoardController;
 use App\Http\Controllers\Auth\LoginController;
 use Illuminate\Support\Facades\Auth;
@@ -180,7 +181,6 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::put('/ajax-move-task/{task}', [TaskBoardController::class, 'ajaxMoveTask'])->middleware('can:task_board.update')->name('ajax-move-task');
         Route::post('/ajax-reorder', [TaskBoardController::class, 'ajaxReorder'])->middleware('can:task_board.update')->name('ajax-reorder');
         Route::get('/ajax-projects', [TaskBoardController::class, 'ajaxProjects'])->middleware('can:task_board.view')->name('ajax-projects');
-        Route::post('/ajax-store-project', [TaskBoardController::class, 'ajaxStoreProject'])->middleware('can:task_board.manage_project')->name('ajax-store-project');
         Route::get('/ajax-assignees', [TaskBoardController::class, 'ajaxAssignees'])->middleware('can:task_board.view')->name('ajax-assignees');
         Route::get('/ajax-comments/{task}', [TaskBoardController::class, 'ajaxComments'])->middleware('can:task_board.view')->name('ajax-comments');
         Route::post('/ajax-store-comment/{task}', [TaskBoardController::class, 'ajaxStoreComment'])->middleware('can:task_board.view')->name('ajax-store-comment');
@@ -194,6 +194,14 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/', [StaffManageController::class, 'index'])->middleware('can:staff_manage.view')->name('index');
         Route::get('/ajax-list', [StaffManageController::class, 'ajaxList'])->middleware('can:staff_manage.view')->name('ajax-list');
         Route::put('/ajax-update/{user}', [StaffManageController::class, 'ajaxUpdate'])->middleware('can:staff_manage.edit')->name('ajax-update');
+    });
+
+    // 專案管理
+    Route::prefix('project')->name('project.')->group(function () {
+        Route::get('/', [ProjectController::class, 'index'])->middleware('can:project.view')->name('index');
+        Route::get('/ajax-list', [ProjectController::class, 'ajaxList'])->middleware('can:project.view')->name('ajax-list');
+        Route::post('/ajax-store', [ProjectController::class, 'ajaxStore'])->middleware('can:project.edit')->name('ajax-store');
+        Route::put('/ajax-update/{project}', [ProjectController::class, 'ajaxUpdate'])->middleware('can:project.edit')->name('ajax-update');
     });
 
     // 登入紀錄

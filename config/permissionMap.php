@@ -107,6 +107,14 @@ return [
         ],
     ],
 
+    'project' => [
+        'label' => 'permission.group.project',
+        'keywords' => [
+            'project.view' => 'permission.project.view',
+            'project.edit' => 'permission.project.edit',
+        ],
+    ],
+
     'leave_request' => [
         'label' => 'permission.group.leave_request',
         'keywords' => [
@@ -123,7 +131,6 @@ return [
             'task_board.update'         => 'permission.task_board.update',
             'task_board.delete'         => 'permission.task_board.delete',
             'task_board.delete_comment'  => 'permission.task_board.delete_comment',
-            'task_board.manage_project' => 'permission.task_board.manage_project',
         ],
     ],
 

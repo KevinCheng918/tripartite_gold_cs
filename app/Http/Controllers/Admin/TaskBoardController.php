@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\TaskBoard\MoveTaskRequest;
 use App\Http\Requests\TaskBoard\ReorderTaskRequest;
 use App\Http\Requests\TaskBoard\StoreCommentRequest;
-use App\Http\Requests\TaskBoard\StoreProjectRequest;
 use App\Http\Requests\TaskBoard\StoreTaskRequest;
 use App\Http\Requests\TaskBoard\UpdateTaskRequest;
 use App\Http\Resources\TaskActivityResource;
@@ -259,27 +258,6 @@ class TaskBoardController extends Controller
     public function ajaxProjects()
     {
         return response()->json($this->taskBoardService->getProjects());
-    }
-
-    /**
-     * Ajax 新增專案
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function ajaxStoreProject(StoreProjectRequest $request)
-    {
-        $params = $request->validated();
-
-        try {
-            $project = $this->taskBoardService->storeProject($params, Auth::id());
-
-            return response()->json($project);
-        } catch (\Exception $e) {
-            Log::error('專案新增失敗', ['error' => $e->getMessage()]);
-
-            return response()->json(['message' => trans('task_board.msg.project_create_failed')], 500);
-        }
     }
 
     /**

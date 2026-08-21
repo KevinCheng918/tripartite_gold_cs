@@ -11,6 +11,7 @@ return [
         'payment_config' => '缴款设定',
         'telegram_chat' => 'Telegram 客服',
         'staff_manage' => '内部管理',
+        'project' => '项目管理',
         'leave_request' => '请假管理',
         'task_board' => '任务看板',
         'login_log' => '登录记录',
@@ -70,6 +71,10 @@ return [
         'view' => '查看内部管理',
         'edit' => '编辑员工资料',
     ],
+    'project' => [
+        'view' => '查看项目管理',
+        'edit' => '编辑项目',
+    ],
     'leave_request' => [
         'apply'  => '申请请假',
         'review' => '审核请假',
@@ -80,7 +85,6 @@ return [
         'update'         => '编辑/移动任务',
         'delete'         => '删除任务',
         'delete_comment' => '删除留言',
-        'manage_project' => '管理项目',
     ],
     'login_log' => [
         'view' => '查看登录记录',

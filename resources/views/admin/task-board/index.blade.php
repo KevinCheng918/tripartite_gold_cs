@@ -110,13 +110,6 @@
                     </button>
                 </div>
                 @endif
-                @if(Auth::user()->hasPermission('task_board.manage_project'))
-                <div class="col-auto">
-                    <button class="btn btn-outline-secondary" id="btn-open-create-project">
-                        <i class="fas fa-folder-plus me-1"></i>{{ trans('task_board.action_create_project') }}
-                    </button>
-                </div>
-                @endif
                 <div class="col-auto">
                     <button class="btn btn-outline-secondary" id="btn-open-archived">
                         <i class="fas fa-archive me-1"></i>查看封存
@@ -297,29 +290,6 @@
     <div id="task-side-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:1049;background:rgba(0,0,0,0.3)"></div>
 
     {{-- 新增專案 Modal --}}
-    <div class="modal fade" id="modal-project" tabindex="-1">
-        <div class="modal-dialog modal-sm">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">{{ trans('task_board.action_create_project') }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="form-project">
-                        <div class="mb-3">
-                            <label class="form-label">專案名稱 <span class="text-danger">*</span></label>
-                            <input type="text" id="project-name" class="form-control" required maxlength="100">
-                        </div>
-                        <div class="text-end">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                            <button type="submit" class="btn btn-primary">新增</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
     {{-- 刪除確認 Modal --}}
     {{-- 屬性編輯 Modal --}}
     <div class="modal fade" id="modal-prop-edit" tabindex="-1">
@@ -1591,29 +1561,7 @@ $(function () {
         });
     });
 
-    // 新增專案
-    $('#btn-open-create-project').on('click', function () {
-        $('#form-project')[0].reset();
-        showBsModal('modal-project');
-    });
 
-    $('#form-project').on('submit', function (e) {
-        e.preventDefault();
-        var name = $('#project-name').val().trim();
-        if (!name) return;
-
-        $.ajax({
-            url: '/admin/task-board/ajax-store-project',
-            method: 'POST',
-            headers: { 'X-CSRF-TOKEN': csrfToken },
-            contentType: 'application/json',
-            data: JSON.stringify({ name: name }),
-            success: function () { location.reload(); },
-            error: function (xhr) {
-                showMsg((xhr.responseJSON && xhr.responseJSON.message) || '新增失敗');
-            }
-        });
-    });
 
     // 排序 localStorage 記憶
     var savedSort = localStorage.getItem('taskBoardSort');
