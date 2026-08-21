@@ -83,7 +83,7 @@ return [
         'view'           => 'View task board',
         'create'         => 'Create task',
         'update'         => 'Update/move task',
-        'delete'         => 'Delete task',
+        'delete'         => 'Archive task',
         'delete_comment' => 'Delete comment',
     ],
     'login_log' => [

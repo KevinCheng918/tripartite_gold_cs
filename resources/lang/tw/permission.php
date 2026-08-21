@@ -83,7 +83,7 @@ return [
         'view'           => '檢視任務看板',
         'create'         => '新增任務',
         'update'         => '編輯/移動任務',
-        'delete'         => '刪除任務',
+        'delete'         => '封存任務',
         'delete_comment' => '刪除留言',
     ],
     'login_log' => [

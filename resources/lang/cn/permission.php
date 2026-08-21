@@ -83,7 +83,7 @@ return [
         'view'           => '查看任务看板',
         'create'         => '新增任务',
         'update'         => '编辑/移动任务',
-        'delete'         => '删除任务',
+        'delete'         => '封存任务',
         'delete_comment' => '删除留言',
     ],
     'login_log' => [
