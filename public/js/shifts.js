@@ -821,12 +821,12 @@
         }).join('');
 
         var html =
-            '<table><thead><tr>' +
+            '<div class="d-none d-md-block"><div class="table-responsive"><table class="table table-hover table-striped align-middle mb-0"><thead class="thead-gold"><tr>' +
             '<th>' + i18n.field_user + '（發起方）</th><th>' + (i18n.field_date || '日期') + '</th><th>' + i18n.field_shift + '</th>' +
             '<th>' + i18n.field_user + '（對方）</th><th>' + (i18n.field_date || '日期') + '</th><th>' + i18n.field_shift + '</th>' +
             '<th>狀態</th><th></th>' +
-            '</tr></thead><tbody>' + rows + '</tbody></table>' +
-            '<div class="shift-cards">' + swapCards + '</div>';
+            '</tr></thead><tbody>' + rows + '</tbody></table></div></div>' +
+            '<div class="d-md-none">' + swapCards + '</div>';
 
         getShiftTabPane().innerHTML = html;
 
@@ -1334,7 +1334,7 @@
         }).join('');
 
         var html =
-            '<table><thead><tr>' +
+            '<div class="d-none d-md-block"><div class="table-responsive"><table class="table table-hover table-striped align-middle mb-0"><thead class="thead-gold"><tr>' +
             '<th>' + (coverI18n.field_date || '日期') + '</th>' +
             '<th>' + (coverI18n.field_shift || '班別') + '</th>' +
             '<th>' + (coverI18n.field_requester || '原班人') + '</th>' +
@@ -1344,8 +1344,8 @@
             '<th>' + (coverI18n.field_cover_status || '代班人') + '</th>' +
             '<th>' + (coverI18n.field_admin_status || '管理者') + '</th>' +
             '<th></th>' +
-            '</tr></thead><tbody>' + rows + '</tbody></table>' +
-            '<div class="shift-cards">' + coverCards + '</div>';
+            '</tr></thead><tbody>' + rows + '</tbody></table></div></div>' +
+            '<div class="d-md-none">' + coverCards + '</div>';
 
         getShiftTabPane().innerHTML = html;
 

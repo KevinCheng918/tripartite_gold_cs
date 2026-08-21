@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => 'v1.33',
+        'date'    => '2026-08-21',
+        'title'   => '換班/代班手機版 RWD 修正',
+        'content' => implode("\n", [
+            '• 換班請求、代班管理手機版與桌機版不再同時顯示',
+            '• 桌機表格加上 table-hover、thead-gold 統一樣式',
+            '• 手機版卡片加上間距（margin-bottom）',
+        ]),
+    ],
+    [
         'version' => 'v1.32',
         'date'    => '2026-08-21',
         'title'   => '密碼規則調整 + 報班驗證修正',
