@@ -37,7 +37,7 @@ return [
         'required'             => '此栏位为必填',
         'unique'               => '此账号已存在',
         'regex_account'        => '账号仅允许英文、数字、底线，4~20 字元',
-        'regex_password'       => '密码仅允许英文、数字、底线，4~20 字元',
+        'regex_password'       => '密码允许英文、数字、符号，最少 8 码',
         'max_string'           => '长度不可超过 :value 字元',
         'invalid_status'       => '无效的状态值',
         'permissions_required' => '请选择权限',

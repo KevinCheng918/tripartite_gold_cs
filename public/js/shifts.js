@@ -1025,7 +1025,7 @@
         var checkboxes = form.querySelectorAll('[name="user_ids[]"]:checked');
         var userIds = [];
         checkboxes.forEach(function (cb) { userIds.push(parseInt(cb.value, 10)); });
-        if (userIds.length === 0) { showMessage('請選擇員工'); return; }
+        if (isAdmin && userIds.length === 0) { showMessage('請選擇員工'); return; }
 
         var shiftName = isAllday ? (i18n.allday_shift || '全天班') : (form.querySelector('[name="shift_id"] option:checked').textContent || '-');
         var confirmHtml = '<p><strong>確定要報班？</strong></p>' +

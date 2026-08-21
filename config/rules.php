@@ -9,5 +9,5 @@
 
 return [
     'USER_ACCOUNT_REGEX'  => 'regex:/^[A-Za-z0-9\_]{4,20}$/',
-    'USER_PASSWORD_REGEX' => 'regex:/^[A-Za-z0-9\_]{4,20}$/',
+    'USER_PASSWORD_REGEX' => 'regex:/^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{}|;:,.<>?\/?]{8,}$/',
 ];

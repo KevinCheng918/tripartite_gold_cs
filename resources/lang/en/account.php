@@ -37,7 +37,7 @@ return [
         'required'             => 'This field is required',
         'unique'               => 'This account already exists',
         'regex_account'        => 'Account must be 4-20 alphanumeric or underscore characters',
-        'regex_password'       => 'Password must be 4-20 alphanumeric or underscore characters',
+        'regex_password'       => 'Password must be at least 8 characters (letters, numbers, symbols)',
         'max_string'           => 'Must not exceed :value characters',
         'invalid_status'       => 'Invalid status value',
         'permissions_required' => 'Please select permissions',
