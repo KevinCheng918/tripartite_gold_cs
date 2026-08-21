@@ -30,6 +30,7 @@ return [
             'account.create' => 'permission.account.create',
             'account.update' => 'permission.account.update',
             'account.assign_permission' => 'permission.account.assign_permission',
+            'login_log.view' => 'permission.login_log.view',
         ],
     ],
 
@@ -123,13 +124,6 @@ return [
             'task_board.delete'         => 'permission.task_board.delete',
             'task_board.delete_comment'  => 'permission.task_board.delete_comment',
             'task_board.manage_project' => 'permission.task_board.manage_project',
-        ],
-    ],
-
-    'login_log' => [
-        'label' => 'permission.group.login_log',
-        'keywords' => [
-            'login_log.view' => 'permission.login_log.view',
         ],
     ],
 
