@@ -224,7 +224,7 @@
                             </li>
                             @endif
                             @if(Auth::user()->hasPermission('staff_manage.view') || Auth::user()->hasPermission('project.view'))
-                            <li class="app-sidebar__heading">內勤管理</li>
+                            <li class="app-sidebar__heading">內務管理</li>
                             @if(Auth::user()->hasPermission('staff_manage.view'))
                             <li>
                                 <a href="{{ route('admin.staff-manage.index') }}" class="{{ request()->routeIs('admin.staff-manage.*') ? 'mm-active' : '' }}">
