@@ -12,6 +12,7 @@ return [
         'telegram_chat' => 'Telegram Chat',
         'staff_manage' => 'Staff Management',
         'project' => 'Project Management',
+        'finance' => 'Finance Management',
         'leave_request' => 'Leave Management',
         'task_board' => 'Task Board',
         'login_log' => 'Login Log',
@@ -74,6 +75,10 @@ return [
     'project' => [
         'view' => 'View projects',
         'edit' => 'Edit projects',
+    ],
+    'finance' => [
+        'view' => 'View finance',
+        'edit' => 'Edit finance records',
     ],
     'leave_request' => [
         'apply'  => 'Apply for leave',

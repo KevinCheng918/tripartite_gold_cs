@@ -12,6 +12,7 @@ return [
         'telegram_chat' => 'Telegram 客服',
         'staff_manage' => '內部管理',
         'project' => '專案管理',
+        'finance' => '財務管理',
         'leave_request' => '請假管理',
         'task_board' => '任務看板',
         'login_log' => '登入紀錄',
@@ -74,6 +75,10 @@ return [
     'project' => [
         'view' => '檢視專案管理',
         'edit' => '編輯專案',
+    ],
+    'finance' => [
+        'view' => '檢視財務管理',
+        'edit' => '編輯財務紀錄',
     ],
     'leave_request' => [
         'apply'  => '申請請假',

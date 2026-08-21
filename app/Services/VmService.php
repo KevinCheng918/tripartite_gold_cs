@@ -12,10 +12,12 @@ use Illuminate\Support\Facades\Log;
 class VmService
 {
     private $vmRepository;
+    private $usdtRateService;
 
-    public function __construct(VmRepository $vmRepository)
+    public function __construct(VmRepository $vmRepository, UsdtRateService $usdtRateService)
     {
         $this->vmRepository = $vmRepository;
+        $this->usdtRateService = $usdtRateService;
     }
 
     // ---------------------------------------------------------------
@@ -122,9 +124,14 @@ class VmService
     {
         $path = $file->store('vm-proof', 'public');
 
+        // 取得 4H 均價匯率
+        $rateData = $this->usdtRateService->getRateWithHistory();
+        $avgRate = $rateData['avg_rate'] ?? 0;
+
         return $this->vmRepository->updateBilling($billing, [
-            'proof_image' => $path,
-            'paid'        => 2, // 待審核
+            'proof_image'   => $path,
+            'paid'          => 2, // 待審核
+            'exchange_rate' => $avgRate > 0 ? $avgRate : null,
         ]);
     }
 

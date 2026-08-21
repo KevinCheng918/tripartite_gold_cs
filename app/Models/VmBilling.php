@@ -28,8 +28,9 @@ class VmBilling extends Model
     protected $guarded = ['id'];
 
     protected $casts = [
-        'amount'  => 'decimal:2',
-        'paid'    => 'integer',
+        'amount'        => 'decimal:2',
+        'exchange_rate' => 'decimal:4',
+        'paid'          => 'integer',
         'paid_at' => 'datetime',
         'due_date' => 'date',
     ];

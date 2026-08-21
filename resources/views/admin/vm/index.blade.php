@@ -759,8 +759,8 @@ $(function () {
             if (vmPowerOff) {
                 // 不顯示操作
             }
-            // 複製文案 + 發送（未收款和待審核時才顯示）
-            else if (systemId && b.paid !== 1) {
+            // 複製文案 + 發送（僅未收款時顯示）
+            else if (systemId && b.paid === 0) {
                 actions += '<button class="btn btn-sm btn-outline-secondary js-copy-billing"' +
                     ' data-system-id="' + systemId + '"' +
                     ' data-station="' + stationName + '"' +
@@ -793,11 +793,15 @@ $(function () {
                         '<i class="fas fa-check me-1"></i>{{ trans("vm.action_mark_paid") }}</button>';
                 }
             }
-            // 待審核：可查看證明，有審核權限可審核（關機不顯示）
+            // 待審核：可查看證明、重新上傳，有審核權限可審核（關機不顯示）
             if (!vmPowerOff && b.paid === 2) {
                 if (b.proof_image) {
                     actions += '<button class="btn btn-sm btn-outline-secondary js-view-proof" data-img="' + b.proof_image + '">' +
                         '<i class="fas fa-image me-1"></i>{{ trans("vm.action_view_proof") }}</button> ';
+                }
+                if (canUpload) {
+                    actions += '<button class="btn btn-sm btn-outline-secondary js-upload-proof" data-id="' + b.id + '">' +
+                        '<i class="fas fa-redo me-1"></i>重新上傳</button> ';
                 }
                 if (canApprove) {
                     actions += '<button class="btn btn-sm btn-primary js-approve-paid" data-id="' + b.id + '"' +

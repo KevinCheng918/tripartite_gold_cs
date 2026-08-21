@@ -115,6 +115,14 @@ return [
         ],
     ],
 
+    'finance' => [
+        'label' => 'permission.group.finance',
+        'keywords' => [
+            'finance.view' => 'permission.finance.view',
+            'finance.edit' => 'permission.finance.edit',
+        ],
+    ],
+
     'leave_request' => [
         'label' => 'permission.group.leave_request',
         'keywords' => [

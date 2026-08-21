@@ -12,6 +12,7 @@ return [
         'telegram_chat' => 'Telegram 客服',
         'staff_manage' => '内部管理',
         'project' => '项目管理',
+        'finance' => '财务管理',
         'leave_request' => '请假管理',
         'task_board' => '任务看板',
         'login_log' => '登录记录',
@@ -74,6 +75,10 @@ return [
     'project' => [
         'view' => '查看项目管理',
         'edit' => '编辑项目',
+    ],
+    'finance' => [
+        'view' => '查看财务管理',
+        'edit' => '编辑财务记录',
     ],
     'leave_request' => [
         'apply'  => '申请请假',

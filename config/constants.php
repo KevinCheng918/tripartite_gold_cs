@@ -94,4 +94,21 @@ return [
         'USER' => 10,
     ],
 
+    'FINANCE' => [
+        'EXPENSE_TYPE' => [
+            'MISC'   => 'misc',
+            'SERVER' => 'server',
+        ],
+        'CATEGORY' => [
+            'office'       => '辦公用品',
+            'transport'    => '交通',
+            'meal'         => '餐費',
+            'communication' => '通訊',
+            'subscription' => '軟體訂閱',
+            'other'        => '其他',
+            'server'       => '伺服器',
+        ],
+        'CURRENCY' => ['TWD', 'USD', 'USDT'],
+    ],
+
 ];

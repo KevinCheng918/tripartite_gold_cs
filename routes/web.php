@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\PaymentConfigController;
 use App\Http\Controllers\Admin\LeaveRequestController;
 use App\Http\Controllers\Admin\StaffManageController;
 use App\Http\Controllers\Admin\ProjectController;
+use App\Http\Controllers\Admin\FinanceController;
 use App\Http\Controllers\Admin\TaskBoardController;
 use App\Http\Controllers\Auth\LoginController;
 use Illuminate\Support\Facades\Auth;
@@ -202,6 +203,15 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-list', [ProjectController::class, 'ajaxList'])->middleware('can:project.view')->name('ajax-list');
         Route::post('/ajax-store', [ProjectController::class, 'ajaxStore'])->middleware('can:project.edit')->name('ajax-store');
         Route::put('/ajax-update/{project}', [ProjectController::class, 'ajaxUpdate'])->middleware('can:project.edit')->name('ajax-update');
+    });
+
+    // 財務管理
+    Route::prefix('finance')->name('finance.')->group(function () {
+        Route::get('/', [FinanceController::class, 'index'])->middleware('can:finance.view')->name('index');
+        Route::get('/ajax-detail', [FinanceController::class, 'ajaxDetail'])->middleware('can:finance.view')->name('ajax-detail');
+        Route::post('/ajax-store-expense', [FinanceController::class, 'ajaxStoreExpense'])->middleware('can:finance.edit')->name('ajax-store-expense');
+        Route::put('/ajax-update-summary/{record}', [FinanceController::class, 'ajaxUpdateSummary'])->middleware('can:finance.edit')->name('ajax-update-summary');
+        Route::delete('/ajax-delete-expense/{expense}', [FinanceController::class, 'ajaxDeleteExpense'])->middleware('can:finance.edit')->name('ajax-delete-expense');
     });
 
     // 登入紀錄
