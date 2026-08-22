@@ -613,6 +613,13 @@ class TelegramChatService
      */
     public function deleteConversation($groupId)
     {
-        return $this->telegramRepository->deleteMessagesByGroup($groupId);
+        $count = $this->telegramRepository->deleteMessagesByGroup($groupId);
+
+        $group = $this->telegramRepository->findGroup($groupId);
+        if ($group) {
+            $this->telegramRepository->deleteGroup($group);
+        }
+
+        return $count;
     }
 }

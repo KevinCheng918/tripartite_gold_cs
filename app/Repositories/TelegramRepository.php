@@ -97,6 +97,17 @@ class TelegramRepository
     }
 
     /**
+     * 刪除群組
+     *
+     * @param TelegramGroup $group
+     * @return void
+     */
+    public function deleteGroup(TelegramGroup $group)
+    {
+        $group->delete();
+    }
+
+    /**
      * 指派值班客服
      *
      * @param TelegramGroup $group
