@@ -161,10 +161,6 @@ class AttendanceController extends Controller
      */
     public function ajaxUserMonthly(Request $request)
     {
-        if (!Auth::user()->isAdmin()) {
-            return response()->json(['message' => 'Forbidden'], 403);
-        }
-
         $userId = $request->input('user_id');
         $yearMonth = $request->input('month', now()->format('Y-m'));
 
@@ -181,10 +177,6 @@ class AttendanceController extends Controller
      */
     public function ajaxMonthlyReport(Request $request)
     {
-        if (!Auth::user()->isAdmin()) {
-            return response()->json(['message' => 'Forbidden'], 403);
-        }
-
         $yearMonth = $request->input('month', now()->format('Y-m'));
 
         $report = $this->attendanceService->getMonthlyReport($yearMonth);

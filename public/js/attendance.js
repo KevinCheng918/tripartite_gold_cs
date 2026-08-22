@@ -115,13 +115,13 @@
     function renderPage() {
         var allTabs = [];
 
-        if (!isAdmin && hasPerm('attendance.clock')) {
+        if (hasPerm('attendance.clock')) {
             allTabs.push({ key: 'clock', label: '<i class="fas fa-clock me-1"></i>' + (i18n.btn_clock_in || '打卡') });
         }
-        if (!isAdmin && hasPerm('attendance.view')) {
+        if (hasPerm('attendance.view')) {
             allTabs.push({ key: 'my_records', label: '<i class="fas fa-calendar-alt me-1"></i>' + i18n.tab_my_records });
         }
-        if (isAdmin && hasPerm('attendance.report')) {
+        if (hasPerm('attendance.report')) {
             allTabs.push({ key: 'report', label: '<i class="fas fa-chart-bar me-1"></i>' + i18n.tab_report });
         }
         if (hasPerm('attendance.amend_review')) {

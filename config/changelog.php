@@ -6,6 +6,18 @@
  */
 return [
     [
+        'version' => 'v1.37',
+        'date'    => '2026-08-22',
+        'title'   => '財務支出編輯 + 出勤權限改用 middleware',
+        'content' => implode("\n", [
+            '• 財務支出紀錄新增「編輯」按鈕，可修改日期/分類/項目/金額/請款狀態',
+            '• 操作按鈕加上文字（編輯/刪除）',
+            '• 請款 checkbox 改為「已請款」（打勾=已請款）',
+            '• 出勤月報表/出勤明細移除 Controller isAdmin 硬檢查，改由路由 middleware 控制',
+            '• 出勤 Tab 全部改為純權限控制，不限 level',
+        ]),
+    ],
+    [
         'version' => 'v1.36',
         'date'    => '2026-08-22',
         'title'   => '打卡出勤 Sidebar 權限放寬',

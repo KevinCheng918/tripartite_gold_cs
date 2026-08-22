@@ -103,6 +103,20 @@ class FinanceRepository
      * @param FinanceExpense $expense
      * @return void
      */
+    /**
+     * 更新支出
+     *
+     * @param FinanceExpense $expense
+     * @param array          $attributes
+     * @return FinanceExpense
+     */
+    public function updateExpense(FinanceExpense $expense, $attributes)
+    {
+        $expense->update($attributes);
+
+        return $expense->refresh();
+    }
+
     public function deleteExpense(FinanceExpense $expense)
     {
         $expense->delete();

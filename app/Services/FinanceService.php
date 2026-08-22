@@ -106,6 +106,31 @@ class FinanceService
     }
 
     /**
+     * 更新支出
+     *
+     * @param int   $expenseId
+     * @param array $params
+     * @return \App\Models\FinanceExpense|null
+     */
+    public function updateExpense($expenseId, $params)
+    {
+        $expense = $this->financeRepository->findExpense($expenseId);
+        if (!$expense) {
+            return null;
+        }
+
+        return $this->financeRepository->updateExpense($expense, [
+            'category'     => $params['category'] ?? null,
+            'name'         => $params['name'],
+            'amount'       => (float) $params['amount'],
+            'currency'     => $params['currency'] ?? 'TWD',
+            'expense_date' => $params['expense_date'] ?? null,
+            'reimbursed'   => (int) ($params['reimbursed'] ?? 0),
+            'note'         => $params['note'] ?? null,
+        ]);
+    }
+
+    /**
      * 刪除支出
      *
      * @param int $expenseId

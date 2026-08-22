@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StaffManage\StoreExpenseRequest;
+use App\Http\Requests\StaffManage\UpdateExpenseRequest;
 use App\Models\FinanceExpense;
 use App\Models\FinanceRecord;
 use App\Services\FinanceService;
@@ -104,6 +105,28 @@ class FinanceController extends Controller
             return response()->json(['message' => '已更新']);
         } catch (\Exception $e) {
             Log::error('財務統計更新失敗', ['error' => $e->getMessage()]);
+
+            return response()->json(['message' => '更新失敗'], 500);
+        }
+    }
+
+    /**
+     * Ajax 更新支出
+     *
+     * @param UpdateExpenseRequest $request
+     * @param FinanceExpense       $expense
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxUpdateExpense(UpdateExpenseRequest $request, FinanceExpense $expense)
+    {
+        $params = $request->validated();
+
+        try {
+            $this->financeService->updateExpense($expense->id, $params);
+
+            return response()->json(['message' => '已更新']);
+        } catch (\Exception $e) {
+            Log::error('財務支出更新失敗', ['error' => $e->getMessage(), 'expense_id' => $expense->id]);
 
             return response()->json(['message' => '更新失敗'], 500);
         }

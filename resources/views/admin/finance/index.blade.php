@@ -128,7 +128,7 @@
                                         <th>項目</th>
                                         <th class="text-end">金額</th>
                                         <th class="text-center">請款</th>
-                                        <th style="width:50px">操作</th>
+                                        <th>操作</th>
                                     </tr>
                                 </thead>
                                 <tbody id="expense-table-body">
@@ -148,11 +148,12 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">新增支出</h5>
+                    <h5 class="modal-title" id="modal-expense-title">新增支出</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <form id="form-expense">
+                        <input type="hidden" id="expense-edit-id">
                         <div class="mb-3">
                             <label class="form-label">分類 <span class="text-danger">*</span></label>
                             <select id="expense-category" class="form-select">
@@ -183,7 +184,7 @@
                         <div class="mb-3">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" id="expense-reimbursed">
-                                <label class="form-check-label" for="expense-reimbursed">需要請款</label>
+                                <label class="form-check-label" for="expense-reimbursed">已請款</label>
                             </div>
                         </div>
                         <div class="mb-3">
@@ -394,7 +395,10 @@ $(function () {
                         : '<span class="badge bg-secondary">未請款</span>';
                 } else { html += '-'; }
                 html += '</td>';
-                html += '<td><button class="btn btn-sm btn-outline-secondary js-del-expense" data-id="' + e.id + '"><i class="fas fa-trash-alt text-danger"></i></button></td>';
+                html += '<td><div class="d-flex gap-1">';
+                html += '<button class="btn btn-sm btn-outline-secondary js-edit-expense" data-id="' + e.id + '" data-type="' + e.type + '" data-category="' + (e.category || '') + '" data-name="' + $('<span>').text(e.name).html() + '" data-amount="' + e.amount + '" data-currency="' + (e.currency || 'TWD') + '" data-date="' + (e.expense_date ? e.expense_date.substring(0, 10) : '') + '" data-reimbursed="' + (e.reimbursed || 0) + '" data-note="' + $('<span>').text(e.note || '').html() + '"><i class="fas fa-edit me-1"></i>編輯</button>';
+                html += '<button class="btn btn-sm btn-outline-secondary js-del-expense" data-id="' + e.id + '"><i class="fas fa-trash-alt text-danger me-1"></i>刪除</button>';
+                html += '</div></td>';
                 html += '</tr>';
             });
             $body.html(html);
@@ -403,13 +407,33 @@ $(function () {
     }
 
     // 新增支出
+    // 新增支出
     $('#btn-add-expense').on('click', function () {
+        $('#modal-expense-title').text('新增支出');
         $('#form-expense')[0].reset();
+        $('#expense-edit-id').val('');
         showBsModal('modal-expense');
     });
 
+    // 編輯支出
+    $(document).on('click', '.js-edit-expense', function () {
+        var $btn = $(this);
+        $('#modal-expense-title').text('編輯支出');
+        $('#expense-edit-id').val($btn.data('id'));
+        $('#expense-category').val($btn.data('type') === 'server' ? 'server' : ($btn.data('category') || 'office'));
+        $('#expense-name').val($btn.data('name'));
+        $('#expense-amount').val($btn.data('amount'));
+        $('#expense-currency').val($btn.data('currency') || 'TWD');
+        $('#expense-date').val($btn.data('date'));
+        $('#expense-reimbursed').prop('checked', parseInt($btn.data('reimbursed'), 10) === 1);
+        $('#expense-note').val($btn.data('note'));
+        showBsModal('modal-expense');
+    });
+
+    // 送出支出（新增/編輯）
     $('#form-expense').on('submit', function (e) {
         e.preventDefault();
+        var editId = $('#expense-edit-id').val();
         var cat = $('#expense-category').val();
         var isServer = (cat === 'server');
         var data = {
@@ -425,13 +449,13 @@ $(function () {
         };
         if (!data.name || !data.amount) return;
         $.ajax({
-            url: '/admin/finance/ajax-store-expense',
-            method: 'POST',
+            url: editId ? '/admin/finance/ajax-update-expense/' + editId : '/admin/finance/ajax-store-expense',
+            method: editId ? 'PUT' : 'POST',
             headers: { 'X-CSRF-TOKEN': csrfToken },
             contentType: 'application/json',
             data: JSON.stringify(data),
             success: function () { hideBsModal(document.getElementById('modal-expense')); setTimeout(function () { loadDetail(); }, 400); },
-            error: function (xhr) { showMsg((xhr.responseJSON && xhr.responseJSON.message) || '新增失敗'); }
+            error: function (xhr) { showMsg((xhr.responseJSON && xhr.responseJSON.message) || '操作失敗'); }
         });
     });
 
