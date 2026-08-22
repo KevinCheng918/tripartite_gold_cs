@@ -112,12 +112,17 @@
             ? T.i18n.assigned_to + '：' + group.on_duty_users.join('、')
             : T.i18n.unassigned;
 
+        var deleteBtn = T.canDelete
+            ? '<button class="btn btn-sm btn-outline-secondary ms-auto" id="btn-tg-delete-conv" data-id="' + group.id + '" title="刪除對話紀錄" style="white-space:nowrap;flex-shrink:0"><i class="fas fa-trash-alt me-1"></i>刪除對話</button>'
+            : '';
+
         header.innerHTML =
             '<div class="px-3 py-2 d-flex align-items-center">' +
             '<button class="btn btn-link text-muted p-0 me-2 d-md-none" id="btn-tg-back"><i class="fas fa-arrow-left"></i></button>' +
             '<div class="rounded-circle text-white d-flex align-items-center justify-content-center me-2" style="width:36px;height:36px;background:#6c757d;font-size:0.9rem;font-weight:700">' + initial + '</div>' +
-            '<span class="fw-bold" style="font-size:1.0625rem">' + group.title + '</span>' +
-            '<span class="text-muted ms-2" style="font-size:0.875rem">' + dutyText + '</span>' +
+            '<div class="flex-fill" style="min-width:0"><span class="fw-bold text-truncate" style="font-size:1.0625rem">' + group.title + '</span>' +
+            '<span class="text-muted ms-2" style="font-size:0.875rem">' + dutyText + '</span></div>' +
+            deleteBtn +
             '</div>';
 
         // 手機版返回按鈕
@@ -126,6 +131,21 @@
             backBtn.addEventListener('click', function () {
                 var chatLayout = document.querySelector('.chat-layout');
                 if (chatLayout) { chatLayout.classList.remove('tg-chatting'); }
+            });
+        }
+
+        // 刪除對話按鈕
+        var delBtn = document.getElementById('btn-tg-delete-conv');
+        if (delBtn) {
+            delBtn.addEventListener('click', function () {
+                var gid = parseInt(delBtn.dataset.id, 10);
+                if (!confirm('確定刪除此對話的所有紀錄？新訊息仍會繼續接收。')) { return; }
+                T.apiFetch('/admin/telegram-chat/ajax-delete-conversation/' + gid, { method: 'DELETE' })
+                    .then(function (body) {
+                        T.loadMessages(gid);
+                        T.loadGroups();
+                    })
+                    .catch(function () { alert('刪除失敗'); });
             });
         }
     };

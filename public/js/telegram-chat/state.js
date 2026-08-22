@@ -15,6 +15,7 @@ window.TgChat = (function () {
         currentUserId: parseInt(root.dataset.userId, 10),
         nickname: root.dataset.userNickname,
         canReply: root.dataset.canReply === '1',
+        canDelete: root.dataset.canDelete === '1',
         wsKey: root.dataset.wsKey,
         wsHost: root.dataset.wsHost || '127.0.0.1',
         wsPort: parseInt(root.dataset.wsPort || '6001', 10),

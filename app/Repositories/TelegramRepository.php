@@ -221,6 +221,19 @@ class TelegramRepository
     }
 
     /**
+     * 刪除群組所有訊息
+     *
+     * @param int $groupId
+     * @return int 刪除筆數
+     */
+    public function deleteMessagesByGroup($groupId)
+    {
+        return TelegramMessage::query()
+            ->where('telegram_group_id', $groupId)
+            ->delete();
+    }
+
+    /**
      * 取得超過指定分鐘未回覆的 inbound 訊息（告警用）
      *
      * @param int $minutes

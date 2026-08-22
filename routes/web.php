@@ -116,6 +116,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::post('/ajax-send-image', [TelegramChatController::class, 'ajaxSendImage'])->middleware('can:telegram_chat.reply')->name('ajax-send-image');
         Route::post('/ajax-react', [TelegramChatController::class, 'ajaxReact'])->middleware('can:telegram_chat.reply')->name('ajax-react');
         Route::post('/ajax-typing', [TelegramChatController::class, 'ajaxTyping'])->middleware('can:telegram_chat.reply')->name('ajax-typing');
+        Route::delete('/ajax-delete-conversation/{group}', [TelegramChatController::class, 'ajaxDeleteConversation'])->middleware('can:telegram_chat.delete')->name('ajax-delete-conversation');
     });
 
     // 站台管理

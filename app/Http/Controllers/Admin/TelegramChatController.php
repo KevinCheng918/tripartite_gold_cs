@@ -192,4 +192,23 @@ class TelegramChatController extends Controller
 
         return response()->json(['ok' => true]);
     }
+
+    /**
+     * Ajax 刪除對話紀錄（清除群組訊息）
+     *
+     * @param \App\Models\TelegramGroup $group
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxDeleteConversation(\App\Models\TelegramGroup $group)
+    {
+        try {
+            $count = $this->chatService->deleteConversation($group->id);
+
+            return response()->json(['message' => "已刪除 {$count} 筆對話紀錄"]);
+        } catch (\Exception $e) {
+            Log::error('對話紀錄刪除失敗', ['error' => $e->getMessage(), 'group_id' => $group->id]);
+
+            return response()->json(['message' => '刪除失敗'], 500);
+        }
+    }
 }

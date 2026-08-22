@@ -67,6 +67,7 @@ return [
         'reply'     => 'Reply messages',
         'assign'    => 'Assign duty staff',
         'broadcast' => 'Broadcast announcement',
+        'delete'    => 'Delete conversation',
     ],
     'staff_manage' => [
         'view' => 'View staff management',

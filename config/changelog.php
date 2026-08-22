@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => 'v1.39',
+        'date'    => '2026-08-23',
+        'title'   => 'Telegram 刪除對話 + 過濾私人訊息',
+        'content' => implode("\n", [
+            '• 新增刪除對話紀錄功能（需 telegram_chat.delete 權限）',
+            '• 刪除後群組保留，新訊息仍會接收顯示',
+            '• Webhook 過濾私人訊息，只接收群組對話',
+        ]),
+    ],
+    [
         'version' => 'v1.38',
         'date'    => '2026-08-22',
         'title'   => '帳號管理權限分級控制',

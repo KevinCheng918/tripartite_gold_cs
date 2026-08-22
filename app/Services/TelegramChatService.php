@@ -119,6 +119,12 @@ class TelegramChatService
             return;
         }
 
+        // 只接收群組對話，忽略私人訊息
+        $chatType = $message['chat']['type'] ?? '';
+        if ($chatType === 'private') {
+            return;
+        }
+
         $chatId = $message['chat']['id'];
         $chatTitle = $message['chat']['title'] ?? "Chat {$chatId}";
 
@@ -597,5 +603,16 @@ class TelegramChatService
         $name = trim("{$firstName} {$lastName}");
 
         return filled($name) ? $name : ($from['username'] ?? 'Unknown');
+    }
+
+    /**
+     * 刪除群組對話紀錄
+     *
+     * @param int $groupId
+     * @return int 刪除筆數
+     */
+    public function deleteConversation($groupId)
+    {
+        return $this->telegramRepository->deleteMessagesByGroup($groupId);
     }
 }

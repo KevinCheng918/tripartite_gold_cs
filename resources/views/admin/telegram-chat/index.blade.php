@@ -11,6 +11,7 @@
          data-user-id="{{ Auth::id() }}"
          data-user-nickname="{{ Auth::user()->nickname }}"
          data-can-reply="{{ Auth::user()->hasPermission('telegram_chat.reply') ? '1' : '0' }}"
+         data-can-delete="{{ Auth::user()->hasPermission('telegram_chat.delete') ? '1' : '0' }}"
          data-ws-key="{{ config('broadcasting.connections.pusher.key') }}"
          data-ws-host="{{ config('broadcasting.connections.pusher.options.host') }}"
          data-ws-port="{{ config('broadcasting.connections.pusher.options.port') }}"

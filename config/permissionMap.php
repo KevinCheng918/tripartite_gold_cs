@@ -96,6 +96,7 @@ return [
             'telegram_chat.reply'     => 'permission.telegram_chat.reply',
             'telegram_chat.assign'    => 'permission.telegram_chat.assign',
             'telegram_chat.broadcast' => 'permission.telegram_chat.broadcast',
+            'telegram_chat.delete'    => 'permission.telegram_chat.delete',
         ],
     ],
 

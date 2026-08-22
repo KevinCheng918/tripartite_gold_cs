@@ -67,6 +67,7 @@ return [
         'reply'     => '回覆訊息',
         'broadcast' => '群發公告',
         'assign'    => '指派值班',
+        'delete'    => '刪除對話紀錄',
     ],
     'staff_manage' => [
         'view' => '檢視內部管理',
