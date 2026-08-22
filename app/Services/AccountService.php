@@ -31,10 +31,12 @@ class AccountService
     public function list($params)
     {
         $filters = [
-            'account'  => $params['account'] ?? null,
-            'nickname' => $params['nickname'] ?? null,
-            'status'   => $params['status'] ?? null,
-            'level'    => $params['level'] ?? null,
+            'account'    => $params['account'] ?? null,
+            'nickname'   => $params['nickname'] ?? null,
+            'status'     => $params['status'] ?? null,
+            'level'      => $params['level'] ?? null,
+            'exclude_id' => $params['exclude_id'] ?? null,
+            'min_level'  => $params['min_level'] ?? null,
         ];
 
         return $this->userRepository->paginate(

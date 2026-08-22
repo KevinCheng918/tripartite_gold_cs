@@ -51,6 +51,11 @@ class AccountController extends Controller
     public function index(Request $request)
     {
         $params = $request->only(['account', 'nickname', 'status', 'level', 'per_page']);
+        $operator = Auth::user();
+        $params['exclude_id'] = $operator->id;
+        if (!$operator->isAdmin()) {
+            $params['min_level'] = $operator->level + 1;
+        }
         $accounts = $this->accountService->list($params);
         $accountStats = $this->accountService->getStatusStats();
 
@@ -97,6 +102,11 @@ class AccountController extends Controller
     public function ajaxList(Request $request)
     {
         $params = $request->only(['keyword', 'per_page']);
+        $params['exclude_id'] = Auth::id();
+        $operator = Auth::user();
+        if (!$operator->isAdmin()) {
+            $params['min_level'] = $operator->level + 1;
+        }
 
         $accounts = $this->accountService->list($params);
 
@@ -111,13 +121,22 @@ class AccountController extends Controller
      */
     public function permissionsPage(\App\Models\User $user)
     {
+        $operator = Auth::user();
+
+        // 不能編輯 level <= 自己的帳號（Admin 除外）
+        if (!$operator->isAdmin() && $user->level <= $operator->level) {
+            abort(403);
+        }
+
         $permissionMap = $this->permissionMapService->getGroupedKeywordsWithLabels();
         $currentKeywords = $user->permissions()->pluck('permission_keyword')->all();
+        $operatorKeywords = $operator->isAdmin() ? null : $operator->permissions()->pluck('permission_keyword')->all();
 
         return view('admin.accounts.permissions', [
-            'targetUser'      => $user,
-            'permissionMap'   => $permissionMap,
-            'currentKeywords' => $currentKeywords,
+            'targetUser'       => $user,
+            'permissionMap'    => $permissionMap,
+            'currentKeywords'  => $currentKeywords,
+            'operatorKeywords' => $operatorKeywords,
         ]);
     }
 
@@ -183,10 +202,32 @@ class AccountController extends Controller
      */
     public function ajaxAssignPermissions(AssignPermissionRequest $request, User $user)
     {
+        $operator = Auth::user();
+
+        // 不能編輯 level <= 自己的帳號（Admin 除外）
+        if (!$operator->isAdmin() && $user->level <= $operator->level) {
+            return response()->json(['message' => '無權限操作此帳號'], 403);
+        }
+
         $params = $request->validated();
+        $submitted = $params['permissions'] ?? [];
+
+        if (!$operator->isAdmin()) {
+            // 非 admin：只能操作自己有的權限，其餘保留目標用戶原值
+            $operatorKeywords = $operator->permissions()->pluck('permission_keyword')->all();
+            $targetCurrent = $user->permissions()->pluck('permission_keyword')->all();
+
+            // 保留操作者無權操作的權限原值
+            $preserved = array_filter($targetCurrent, function ($kw) use ($operatorKeywords) {
+                return !in_array($kw, $operatorKeywords);
+            });
+
+            // 合併：操作者可控範圍的新值 + 保留的舊值
+            $submitted = array_unique(array_merge($submitted, $preserved));
+        }
 
         try {
-            $this->accountService->assignPermissions($user, $params['permissions'] ?? []);
+            $this->accountService->assignPermissions($user, $submitted);
 
             return new AccountResource($user->load('permissions'));
         } catch (\Exception $e) {

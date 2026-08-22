@@ -45,6 +45,14 @@ class UserRepository
             $query->where('level', (int) $filters['level']);
         }
 
+        if (filled($filters['exclude_id'] ?? null)) {
+            $query->where('id', '!=', (int) $filters['exclude_id']);
+        }
+
+        if (filled($filters['min_level'] ?? null)) {
+            $query->where('level', '>=', (int) $filters['min_level']);
+        }
+
         return $query->orderByDesc('id')->paginate($perPage);
     }
 
