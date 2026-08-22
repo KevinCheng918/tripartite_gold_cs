@@ -73,11 +73,11 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
 
     // 打卡出勤
     Route::prefix('attendance')->name('attendance.')->group(function () {
-        Route::get('/', [AttendanceController::class, 'index'])->middleware('can:attendance.view')->name('index');
+        Route::get('/', [AttendanceController::class, 'index'])->name('index');
         Route::post('/ajax-clock-in', [AttendanceController::class, 'ajaxClockIn'])->middleware('can:attendance.clock')->name('ajax-clock-in');
         Route::post('/ajax-clock-out', [AttendanceController::class, 'ajaxClockOut'])->middleware('can:attendance.clock')->name('ajax-clock-out');
-        Route::get('/ajax-today-status', [AttendanceController::class, 'ajaxTodayStatus'])->middleware('can:attendance.view')->name('ajax-today-status');
-        Route::get('/ajax-my-monthly', [AttendanceController::class, 'ajaxMyMonthly'])->middleware('can:attendance.view')->name('ajax-my-monthly');
+        Route::get('/ajax-today-status', [AttendanceController::class, 'ajaxTodayStatus'])->name('ajax-today-status');
+        Route::get('/ajax-my-monthly', [AttendanceController::class, 'ajaxMyMonthly'])->name('ajax-my-monthly');
         Route::get('/ajax-monthly-report', [AttendanceController::class, 'ajaxMonthlyReport'])->middleware('can:attendance.report')->name('ajax-monthly-report');
         Route::get('/detail/{userId}', [AttendanceController::class, 'detail'])->middleware('can:attendance.report')->name('detail');
         Route::get('/ajax-user-monthly', [AttendanceController::class, 'ajaxUserMonthly'])->middleware('can:attendance.report')->name('ajax-user-monthly');
@@ -211,6 +211,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-detail', [FinanceController::class, 'ajaxDetail'])->middleware('can:finance.view')->name('ajax-detail');
         Route::post('/ajax-store-expense', [FinanceController::class, 'ajaxStoreExpense'])->middleware('can:finance.edit')->name('ajax-store-expense');
         Route::put('/ajax-update-summary/{record}', [FinanceController::class, 'ajaxUpdateSummary'])->middleware('can:finance.edit')->name('ajax-update-summary');
+        Route::put('/ajax-update-expense/{expense}', [FinanceController::class, 'ajaxUpdateExpense'])->middleware('can:finance.edit')->name('ajax-update-expense');
         Route::delete('/ajax-delete-expense/{expense}', [FinanceController::class, 'ajaxDeleteExpense'])->middleware('can:finance.edit')->name('ajax-delete-expense');
     });
 

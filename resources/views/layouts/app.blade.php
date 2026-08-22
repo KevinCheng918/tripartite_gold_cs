@@ -199,7 +199,7 @@
                                 </a>
                             </li>
                             @endif
-                            @if(Auth::user()->hasPermission('attendance.view'))
+                            @if(Auth::user()->hasPermission('attendance.view') || Auth::user()->hasPermission('attendance.clock') || Auth::user()->hasPermission('attendance.report') || Auth::user()->hasPermission('attendance.amend') || Auth::user()->hasPermission('attendance.amend_review'))
                             <li>
                                 <a href="{{ route('admin.attendance.index') }}" class="{{ request()->routeIs('admin.attendance.*') ? 'mm-active' : '' }}">
                                     <i class="metismenu-icon fas fa-clock"></i>
