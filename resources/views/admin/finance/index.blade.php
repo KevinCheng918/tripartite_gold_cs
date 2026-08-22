@@ -116,7 +116,13 @@
                             <button class="btn btn-sm btn-primary" id="btn-add-expense"><i class="fas fa-plus me-1"></i>新增支出</button>
                             @endif
                         </div>
-                        <span class="fw-bold" style="font-size:0.875rem">本月支出 <span id="expense-total">0</span></span>
+                        <div class="text-end" style="font-size:0.8125rem">
+                            <span class="text-success">已請款 <span id="expense-reimbursed">0</span></span>
+                            <span class="mx-1">|</span>
+                            <span class="text-danger">未請款 <span id="expense-unreimbursed">0</span></span>
+                            <span class="mx-1">|</span>
+                            <span class="fw-bold">總計 <span id="expense-total">0</span></span>
+                        </div>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
@@ -403,6 +409,19 @@ $(function () {
             });
             $body.html(html);
         }
+        var reimbursedTotal = 0;
+        var unreimbursedTotal = 0;
+        allExpenses.forEach(function (e) {
+            if ((e.currency || 'TWD') === 'TWD') {
+                if (parseInt(e.reimbursed, 10) === 1) {
+                    reimbursedTotal += parseFloat(e.amount);
+                } else {
+                    unreimbursedTotal += parseFloat(e.amount);
+                }
+            }
+        });
+        $('#expense-reimbursed').text(trimFmt(reimbursedTotal, 2));
+        $('#expense-unreimbursed').text(trimFmt(unreimbursedTotal, 2));
         $('#expense-total').text(trimFmt(totalExpenseTwd, 2));
     }
 
