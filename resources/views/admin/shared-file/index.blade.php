@@ -243,7 +243,7 @@ $(function () {
             html += '<td><i class="fas fa-file me-1 text-muted"></i>' + $('<span>').text(f.original_name).html() + '</td>';
             html += '<td>' + fmtSize(f.file_size) + '</td>';
             html += '<td>' + (f.uploader ? f.uploader.nickname : '-') + '</td>';
-            html += '<td>' + (f.created_at ? f.created_at.substring(0, 16) : '-') + '</td>';
+            html += '<td>' + (f.created_at ? f.created_at.substring(0, 16).replace('T', ' ') : '-') + '</td>';
             html += '<td><div class="d-flex gap-1">';
             html += '<a href="/storage/' + f.file_path + '" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="fas fa-download me-1"></i>下載</a>';
             if (canDel) {
