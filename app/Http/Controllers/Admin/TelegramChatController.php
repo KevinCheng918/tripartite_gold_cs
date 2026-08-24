@@ -6,6 +6,7 @@ use App\Events\TelegramTyping;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\TelegramChat\ReplyRequest;
 use App\Http\Resources\TelegramMessageResource;
+use App\Services\SharedFileService;
 use App\Services\TelegramChatService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,10 +21,12 @@ use Illuminate\Support\Facades\Storage;
 class TelegramChatController extends Controller
 {
     private $chatService;
+    private $sharedFileService;
 
-    public function __construct(TelegramChatService $chatService)
+    public function __construct(TelegramChatService $chatService, SharedFileService $sharedFileService)
     {
         $this->chatService = $chatService;
+        $this->sharedFileService = $sharedFileService;
     }
 
     /**
@@ -209,6 +212,52 @@ class TelegramChatController extends Controller
             Log::error('對話紀錄刪除失敗', ['error' => $e->getMessage(), 'group_id' => $group->id]);
 
             return response()->json(['message' => '刪除失敗'], 500);
+        }
+    }
+
+    /**
+     * Ajax 取得文件區檔案列表（Telegram 聊天選檔用）
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxSharedFiles()
+    {
+        $files = $this->sharedFileService->getFilesForTelegram(Auth::id());
+
+        return response()->json($files);
+    }
+
+    /**
+     * Ajax 從文件區傳送檔案到 Telegram 群組
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxSendDocument(Request $request)
+    {
+        $params = $request->validate([
+            'group_id' => 'required|integer',
+            'file_id'  => 'required|integer',
+            'caption'  => 'nullable|string|max:1024',
+        ]);
+
+        try {
+            $result = $this->chatService->sendDocumentFromSharedFile(
+                (int) $params['group_id'],
+                (int) $params['file_id'],
+                $params['caption'] ?? null,
+                Auth::id()
+            );
+
+            if (!$result) {
+                return response()->json(['message' => '傳送失敗'], 500);
+            }
+
+            return response()->json(['message' => '檔案已傳送']);
+        } catch (\Exception $e) {
+            Log::error('Telegram 傳送文件失敗', ['error' => $e->getMessage()]);
+
+            return response()->json(['message' => '傳送失敗'], 500);
         }
     }
 }

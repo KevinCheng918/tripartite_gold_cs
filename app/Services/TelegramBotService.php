@@ -213,6 +213,44 @@ class TelegramBotService
     }
 
     /**
+     * 發送文件到 Telegram 群組（本地檔案）
+     *
+     * @param int         $chatId   Telegram chat_id
+     * @param string      $filePath 本地檔案絕對路徑
+     * @param string|null $filename 顯示的檔名
+     * @param string|null $caption  說明文字
+     * @return array|null
+     */
+    public function sendDocument($chatId, $filePath, $filename = null, $caption = null)
+    {
+        try {
+            $multipart = [
+                ['name' => 'chat_id', 'contents' => (string) $chatId],
+                ['name' => 'document', 'contents' => fopen($filePath, 'r'), 'filename' => $filename ?: basename($filePath)],
+            ];
+
+            if (filled($caption)) {
+                $multipart[] = ['name' => 'caption', 'contents' => $this->escapeHtml($caption)];
+                $multipart[] = ['name' => 'parse_mode', 'contents' => 'HTML'];
+            }
+
+            $response = $this->client->post("{$this->getBaseUrl()}/sendDocument", [
+                'multipart' => $multipart,
+            ]);
+
+            return json_decode($response->getBody()->getContents(), true);
+        } catch (\Exception $e) {
+            Log::error('Telegram sendDocument 失敗', [
+                'chat_id' => $chatId,
+                'file'    => $filePath,
+                'error'   => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
      * 對指定訊息設定表情回應
      *
      * @param int    $chatId    Telegram chat_id

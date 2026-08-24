@@ -6,6 +6,19 @@
  */
 return [
     [
+        'version' => 'v1.40',
+        'date'    => '2026-08-24',
+        'title'   => '共用文件區 + Telegram 傳送文件',
+        'content' => implode("\n", [
+            '• 新增文件區頁面：共用文件（需權限）+ 個人文件（所有人可用）',
+            '• 資料夾分類管理，不限檔案類型，上限 20MB',
+            '• 管理者可查看所有人的個人文件',
+            '• Telegram 聊天新增「文件區」按鈕，可選檔案直接 sendDocument 傳送',
+            '• TelegramBotService 新增 sendDocument（multipart 本地檔案上傳）',
+            '• 新增 shared_file.view / upload / delete 權限',
+        ]),
+    ],
+    [
         'version' => 'v1.39',
         'date'    => '2026-08-23',
         'title'   => 'Telegram 刪除對話 + 過濾私人訊息',

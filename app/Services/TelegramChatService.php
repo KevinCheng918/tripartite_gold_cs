@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\TelegramGroup;
+use App\Repositories\SharedFileRepository;
 use App\Repositories\ShiftAssignmentRepository;
 use App\Repositories\TelegramRepository;
 use Illuminate\Database\Eloquent\Collection;
@@ -20,17 +21,20 @@ class TelegramChatService
     private $botService;
     private $assignmentRepository;
     private $webPushService;
+    private $sharedFileRepository;
 
     public function __construct(
         TelegramRepository $telegramRepository,
         TelegramBotService $botService,
         ShiftAssignmentRepository $assignmentRepository,
-        WebPushService $webPushService
+        WebPushService $webPushService,
+        SharedFileRepository $sharedFileRepository
     ) {
         $this->telegramRepository = $telegramRepository;
         $this->botService = $botService;
         $this->assignmentRepository = $assignmentRepository;
         $this->webPushService = $webPushService;
+        $this->sharedFileRepository = $sharedFileRepository;
     }
 
     /**
@@ -603,6 +607,60 @@ class TelegramChatService
         $name = trim("{$firstName} {$lastName}");
 
         return filled($name) ? $name : ($from['username'] ?? 'Unknown');
+    }
+
+    /**
+     * 從文件區傳送檔案到 Telegram 群組
+     *
+     * @param int         $groupId
+     * @param int         $fileId
+     * @param string|null $caption
+     * @param int|null    $senderId
+     * @return bool
+     */
+    public function sendDocumentFromSharedFile($groupId, $fileId, $caption = null, $senderId = null)
+    {
+        $group = $this->telegramRepository->findGroup($groupId);
+        if (!$group) {
+            return false;
+        }
+
+        $file = $this->sharedFileRepository->findFile($fileId);
+        if (!$file) {
+            return false;
+        }
+
+        $this->switchBotToken($group);
+
+        $diskPath = Storage::disk('public')->path($file->file_path);
+        if (!file_exists($diskPath)) {
+            Log::warning('sendDocument: 檔案不存在', ['path' => $diskPath]);
+
+            return false;
+        }
+
+        $result = $this->botService->sendDocument($group->chat_id, $diskPath, $file->original_name, $caption);
+
+        if ($result && isset($result['ok']) && $result['ok']) {
+            $sender = $senderId ? \App\Models\User::query()->select(['id', 'nickname'])->find($senderId) : null;
+            $msgId = $result['result']['message_id'] ?? null;
+
+            $this->telegramRepository->createMessage([
+                'telegram_group_id'   => $group->id,
+                'direction'           => config('constants.TELEGRAM.DIRECTION.OUTBOUND'),
+                'telegram_message_id' => $msgId,
+                'sender_name'         => $sender ? $sender->nickname : '系統',
+                'sender_user_id'      => $senderId,
+                'content'             => $caption ?: "[檔案] {$file->original_name}",
+                'media_type'          => 'document',
+                'media_url'           => null,
+                'replied'             => true,
+            ]);
+
+            return true;
+        }
+
+        return false;
     }
 
     /**

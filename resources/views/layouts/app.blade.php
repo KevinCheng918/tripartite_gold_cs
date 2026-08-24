@@ -223,7 +223,7 @@
                                 </a>
                             </li>
                             @endif
-                            @if(Auth::user()->hasPermission('staff_manage.view') || Auth::user()->hasPermission('project.view') || Auth::user()->hasPermission('finance.view'))
+                            @if(Auth::check())
                             <li class="app-sidebar__heading">內務管理</li>
                             @if(Auth::user()->hasPermission('staff_manage.view'))
                             <li>
@@ -241,6 +241,12 @@
                                 </a>
                             </li>
                             @endif
+                            <li>
+                                <a href="{{ route('admin.shared-file.index') }}" class="{{ request()->routeIs('admin.shared-file.*') ? 'mm-active' : '' }}">
+                                    <i class="metismenu-icon fas fa-file-alt"></i>
+                                    文件區
+                                </a>
+                            </li>
                             @if(Auth::user()->hasPermission('finance.view'))
                             <li>
                                 <a href="{{ route('admin.finance.index') }}" class="{{ request()->routeIs('admin.finance.*') ? 'mm-active' : '' }}">

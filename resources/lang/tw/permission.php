@@ -12,6 +12,7 @@ return [
         'telegram_chat' => 'Telegram 客服',
         'staff_manage' => '內部管理',
         'project' => '專案管理',
+        'shared_file' => '共用文件區',
         'finance' => '財務管理',
         'leave_request' => '請假管理',
         'task_board' => '任務看板',
@@ -76,6 +77,11 @@ return [
     'project' => [
         'view' => '檢視專案管理',
         'edit' => '編輯專案',
+    ],
+    'shared_file' => [
+        'view'   => '檢視共用文件',
+        'upload' => '上傳文件',
+        'delete' => '刪除文件',
     ],
     'finance' => [
         'view' => '檢視財務管理',

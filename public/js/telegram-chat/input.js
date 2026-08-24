@@ -19,6 +19,7 @@
             '<div class="d-flex align-items-end gap-2 px-3 py-2">' +
             '<input type="file" id="tg-image-input" accept="image/*" style="display:none">' +
             '<button class="btn btn-link text-muted p-1" id="btn-tg-image" type="button" title="' + (T.i18n.btn_image || '傳送圖片') + '" style="font-size:1.25rem"><i class="fas fa-paperclip"></i></button>' +
+            '<button class="btn btn-link text-muted p-1" id="btn-tg-shared-file" type="button" title="文件區" style="font-size:1.25rem"><i class="fas fa-file-alt"></i></button>' +
             '<textarea id="tg-reply-text" class="form-control form-control-sm" placeholder="' + T.i18n.input_placeholder + '" rows="1" style="resize:none;max-height:100px;border-radius:1rem"></textarea>' +
             '<button class="btn btn-primary btn-sm rounded-circle d-flex align-items-center justify-content-center" id="btn-tg-send" type="button" style="width:36px;height:36px;flex-shrink:0"><i class="fas fa-paper-plane" style="font-size:0.875rem"></i></button>' +
             '</div>';
@@ -36,6 +37,12 @@
                 imageInput.value = '';
             }
         });
+
+        // 文件區按鈕
+        var sfBtn = document.getElementById('btn-tg-shared-file');
+        if (sfBtn) {
+            sfBtn.addEventListener('click', function () { openSharedFileModal(); });
+        }
 
         // 自動高度 + typing 通知
         var typingTimer = null;
@@ -125,5 +132,76 @@
             .catch(function (error) {
                 alert(error.message || 'Failed');
             });
+    }
+
+    // ===== 文件區 Modal =====
+    function openSharedFileModal() {
+        // 動態建 modal（如果不存在）
+        var modalEl = document.getElementById('modal-tg-shared-files');
+        if (!modalEl) {
+            var html = '<div class="modal fade" id="modal-tg-shared-files" tabindex="-1">' +
+                '<div class="modal-dialog modal-dialog-scrollable">' +
+                '<div class="modal-content">' +
+                '<div class="modal-header"><h5 class="modal-title"><i class="fas fa-file-alt me-2"></i>文件區</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>' +
+                '<div class="modal-body">' +
+                '<ul class="nav nav-tabs mb-2"><li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#sf-modal-shared">共用</button></li><li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#sf-modal-personal">個人</button></li></ul>' +
+                '<div class="tab-content"><div class="tab-pane show active" id="sf-modal-shared"><div class="text-center text-muted py-3">載入中...</div></div><div class="tab-pane" id="sf-modal-personal"><div class="text-center text-muted py-3">載入中...</div></div></div>' +
+                '</div></div></div></div>';
+            document.body.insertAdjacentHTML('beforeend', html);
+            modalEl = document.getElementById('modal-tg-shared-files');
+        }
+
+        // 載入檔案
+        T.apiFetch('/admin/telegram-chat/ajax-shared-files')
+            .then(function (data) {
+                renderSfModalTab('sf-modal-shared', data.shared || []);
+                renderSfModalTab('sf-modal-personal', data.personal || []);
+            });
+
+        var modal = new bootstrap.Modal(modalEl);
+        modal.show();
+    }
+
+    function renderSfModalTab(tabId, folders) {
+        var container = document.getElementById(tabId);
+        if (!container) return;
+        if (!folders.length) {
+            container.innerHTML = '<div class="text-center text-muted py-3">無檔案</div>';
+            return;
+        }
+        var html = '';
+        folders.forEach(function (f) {
+            html += '<div class="fw-bold mb-1" style="font-size:0.875rem"><i class="fas fa-folder text-warning me-1"></i>' + T.escapeHtml(f.folder_name) + '</div>';
+            f.files.forEach(function (file) {
+                html += '<div class="d-flex justify-content-between align-items-center py-1 ps-3 border-bottom" style="font-size:0.875rem">';
+                html += '<span class="text-truncate" style="max-width:70%"><i class="fas fa-file me-1 text-muted"></i>' + T.escapeHtml(file.original_name) + '</span>';
+                html += '<button class="btn btn-sm btn-primary js-sf-send-file" data-file-id="' + file.id + '" style="flex-shrink:0"><i class="fas fa-paper-plane me-1"></i>傳送</button>';
+                html += '</div>';
+            });
+            html += '<div class="mb-2"></div>';
+        });
+        container.innerHTML = html;
+
+        // 綁定傳送按鈕
+        container.querySelectorAll('.js-sf-send-file').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var fileId = parseInt(btn.dataset.fileId, 10);
+                if (!T.selectedGroupId) { alert('請先選擇對話'); return; }
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                T.apiFetch('/admin/telegram-chat/ajax-send-document', {
+                    method: 'POST',
+                    body: JSON.stringify({ group_id: T.selectedGroupId, file_id: fileId }),
+                }).then(function () {
+                    var modalEl = document.getElementById('modal-tg-shared-files');
+                    if (modalEl) { bootstrap.Modal.getInstance(modalEl).hide(); }
+                    T.loadMessages(T.selectedGroupId);
+                }).catch(function (err) {
+                    alert(err.message || '傳送失敗');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>傳送';
+                });
+            });
+        });
     }
 })();

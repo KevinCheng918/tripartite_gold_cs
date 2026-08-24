@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\LeaveRequestController;
 use App\Http\Controllers\Admin\StaffManageController;
 use App\Http\Controllers\Admin\ProjectController;
 use App\Http\Controllers\Admin\FinanceController;
+use App\Http\Controllers\Admin\SharedFileController;
 use App\Http\Controllers\Admin\TaskBoardController;
 use App\Http\Controllers\Auth\LoginController;
 use Illuminate\Support\Facades\Auth;
@@ -117,6 +118,8 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::post('/ajax-react', [TelegramChatController::class, 'ajaxReact'])->middleware('can:telegram_chat.reply')->name('ajax-react');
         Route::post('/ajax-typing', [TelegramChatController::class, 'ajaxTyping'])->middleware('can:telegram_chat.reply')->name('ajax-typing');
         Route::delete('/ajax-delete-conversation/{group}', [TelegramChatController::class, 'ajaxDeleteConversation'])->middleware('can:telegram_chat.delete')->name('ajax-delete-conversation');
+        Route::get('/ajax-shared-files', [TelegramChatController::class, 'ajaxSharedFiles'])->name('ajax-shared-files');
+        Route::post('/ajax-send-document', [TelegramChatController::class, 'ajaxSendDocument'])->middleware('can:telegram_chat.reply')->name('ajax-send-document');
     });
 
     // 站台管理
@@ -204,6 +207,16 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-list', [ProjectController::class, 'ajaxList'])->middleware('can:project.view')->name('ajax-list');
         Route::post('/ajax-store', [ProjectController::class, 'ajaxStore'])->middleware('can:project.edit')->name('ajax-store');
         Route::put('/ajax-update/{project}', [ProjectController::class, 'ajaxUpdate'])->middleware('can:project.edit')->name('ajax-update');
+    });
+
+    // 共用文件區（頁面 + 列表不綁權限，Controller 內部判斷；個人文件區所有人可用）
+    Route::prefix('shared-file')->name('shared-file.')->group(function () {
+        Route::get('/', [SharedFileController::class, 'index'])->name('index');
+        Route::get('/ajax-list', [SharedFileController::class, 'ajaxList'])->name('ajax-list');
+        Route::post('/ajax-store-folder', [SharedFileController::class, 'ajaxStoreFolder'])->name('ajax-store-folder');
+        Route::post('/ajax-upload', [SharedFileController::class, 'ajaxUpload'])->name('ajax-upload');
+        Route::delete('/ajax-delete-file/{file}', [SharedFileController::class, 'ajaxDeleteFile'])->name('ajax-delete-file');
+        Route::delete('/ajax-delete-folder/{folder}', [SharedFileController::class, 'ajaxDeleteFolder'])->name('ajax-delete-folder');
     });
 
     // 財務管理

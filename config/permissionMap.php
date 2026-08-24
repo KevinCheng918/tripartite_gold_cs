@@ -116,6 +116,15 @@ return [
         ],
     ],
 
+    'shared_file' => [
+        'label' => 'permission.group.shared_file',
+        'keywords' => [
+            'shared_file.view'   => 'permission.shared_file.view',
+            'shared_file.upload' => 'permission.shared_file.upload',
+            'shared_file.delete' => 'permission.shared_file.delete',
+        ],
+    ],
+
     'finance' => [
         'label' => 'permission.group.finance',
         'keywords' => [

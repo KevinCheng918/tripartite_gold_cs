@@ -12,6 +12,7 @@ return [
         'telegram_chat' => 'Telegram Chat',
         'staff_manage' => 'Staff Management',
         'project' => 'Project Management',
+        'shared_file' => 'Shared Files',
         'finance' => 'Finance Management',
         'leave_request' => 'Leave Management',
         'task_board' => 'Task Board',
@@ -76,6 +77,11 @@ return [
     'project' => [
         'view' => 'View projects',
         'edit' => 'Edit projects',
+    ],
+    'shared_file' => [
+        'view'   => 'View shared files',
+        'upload' => 'Upload files',
+        'delete' => 'Delete files',
     ],
     'finance' => [
         'view' => 'View finance',
