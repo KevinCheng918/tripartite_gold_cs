@@ -47,13 +47,17 @@
         var date = m.created_at ? m.created_at.substring(5, 10) : '';
         var timeLabel = date + ' ' + time;
 
+        var senderLabel = '<div style="font-size:0.8125rem;font-weight:600;margin-bottom:2px">' + T.escapeHtml(m.sender_name || '') + '</div>';
+        var timeHtml = '<small class="text-muted">' + timeLabel + '</small>';
+
         if (isOutbound) {
             return (
                 '<div class="chat-box-wrapper" data-msg-id="' + m.id + '" style="display:flex;justify-content:flex-end">' +
                 '<div style="text-align:right">' +
+                senderLabel +
                 '<div class="chat-box" style="background:rgba(166,124,0,0.08);display:inline-block">' + replyHtml + mediaHtml + textHtml + reactBtn + '</div>' +
                 reactHtml +
-                '<small class="text-muted">' + timeLabel + ' | ' + m.sender_name + '</small>' +
+                timeHtml +
                 '</div>' +
                 '<div class="ms-2 flex-shrink-0">' + avatar + '</div>' +
                 '</div>'
@@ -64,9 +68,10 @@
             '<div class="chat-box-wrapper" data-msg-id="' + m.id + '">' +
             '<div class="me-2 flex-shrink-0">' + avatar + '</div>' +
             '<div>' +
+            senderLabel +
             '<div class="chat-box" style="background:rgba(166,124,0,0.08)">' + replyHtml + mediaHtml + textHtml + reactBtn + '</div>' +
             reactHtml +
-            '<small class="text-muted">' + timeLabel + ' | ' + m.sender_name + '</small>' +
+            timeHtml +
             '</div>' +
             '</div>'
         );
