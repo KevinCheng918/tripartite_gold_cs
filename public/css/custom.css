@@ -687,6 +687,10 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .app-inner-layout__content, [data-theme="dark"] .app-inner-layout__content.card { background: #141414 !important; border-color: rgba(255,255,255,0.08) !important; }
 [data-theme="dark"] .app-inner-layout__top-pane { background: #1a1a1a !important; border-color: rgba(255,255,255,0.08) !important; }
 [data-theme="dark"] .app-inner-layout__bottom-pane { background: #1a1a1a !important; border-color: rgba(255,255,255,0.08) !important; }
+/* Telegram 聊天 header 固定 */
+#tg-header { position: sticky; top: 0; z-index: 10; background: #fff; border-bottom: 1px solid #eee; }
+[data-theme="dark"] #tg-header { background: #1a1a1a; border-bottom-color: #333; }
+
 /* Telegram 表情反應膠囊 */
 .tg-react-pill {
     display: inline-flex;
