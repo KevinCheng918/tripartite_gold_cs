@@ -40,7 +40,7 @@
     max-width: 75% !important;
     flex: none !important;
     display: inline-block !important;
-    word-break: break-all;
+    word-break: break-word;
     white-space: pre-wrap;
 }
 
@@ -686,6 +686,9 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .app-inner-layout__content, [data-theme="dark"] .app-inner-layout__content.card { background: #141414 !important; border-color: rgba(255,255,255,0.08) !important; }
 [data-theme="dark"] .app-inner-layout__top-pane { background: #1a1a1a !important; border-color: rgba(255,255,255,0.08) !important; }
 [data-theme="dark"] .app-inner-layout__bottom-pane { background: #1a1a1a !important; border-color: rgba(255,255,255,0.08) !important; }
+/* Telegram 聊天泡泡顏色 */
+[data-theme="dark"] .tg-bubble-out { background: #1a3a2a !important; color: #e0e0e0 !important; }
+[data-theme="dark"] .tg-bubble-in { background: #2d2d2d !important; color: #e0e0e0 !important; }
 [data-theme="dark"] .tg-group-item { background: #1a1a1a !important; border-color: rgba(255,255,255,0.06) !important; color: #e0e0e0 !important; }
 [data-theme="dark"] .tg-group-item:hover { background: rgba(212,175,55,0.08) !important; }
 [data-theme="dark"] .tg-group-item.bg-light { background: rgba(212,175,55,0.15) !important; }

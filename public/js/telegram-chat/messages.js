@@ -47,15 +47,17 @@
         var date = m.created_at ? m.created_at.substring(5, 10) : '';
         var timeLabel = date + ' ' + time;
 
-        var senderLabel = '<div style="font-size:0.8125rem;font-weight:600;margin-bottom:2px">' + T.escapeHtml(m.sender_name || '') + '</div>';
+        var senderLabel = '<div style="font-size:0.8125rem;font-weight:600;margin-bottom:2px;color:' + (isOutbound ? '#a67c00' : '#495057') + '">' + T.escapeHtml(m.sender_name || '') + '</div>';
         var timeHtml = '<small class="text-muted">' + timeLabel + '</small>';
+        var bubbleBg = isOutbound ? 'background:#e8f5e9' : 'background:#f5f5f5';
+        var darkBubbleBg = isOutbound ? 'tg-bubble-out' : 'tg-bubble-in';
 
         if (isOutbound) {
             return (
                 '<div class="chat-box-wrapper" data-msg-id="' + m.id + '" style="display:flex;justify-content:flex-end">' +
                 '<div style="text-align:right">' +
                 senderLabel +
-                '<div class="chat-box" style="background:rgba(166,124,0,0.08);display:inline-block">' + replyHtml + mediaHtml + textHtml + reactBtn + '</div>' +
+                '<div class="chat-box ' + darkBubbleBg + '" style="' + bubbleBg + ';display:inline-block">' + replyHtml + mediaHtml + textHtml + reactBtn + '</div>' +
                 reactHtml +
                 timeHtml +
                 '</div>' +
@@ -69,7 +71,7 @@
             '<div class="me-2 flex-shrink-0">' + avatar + '</div>' +
             '<div>' +
             senderLabel +
-            '<div class="chat-box" style="background:rgba(166,124,0,0.08)">' + replyHtml + mediaHtml + textHtml + reactBtn + '</div>' +
+            '<div class="chat-box ' + darkBubbleBg + '" style="' + bubbleBg + '">' + replyHtml + mediaHtml + textHtml + reactBtn + '</div>' +
             reactHtml +
             timeHtml +
             '</div>' +
