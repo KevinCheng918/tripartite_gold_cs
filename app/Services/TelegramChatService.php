@@ -165,6 +165,20 @@ class TelegramChatService
             if (filled($fileId)) {
                 $mediaUrl = $this->downloadTelegramFile($fileId, 'sticker');
             }
+        } elseif (isset($message['document'])) {
+            $mediaType = 'document';
+            $doc = $message['document'];
+            $fileId = $doc['file_id'] ?? null;
+            $fileName = $doc['file_name'] ?? 'file';
+
+            if (filled($fileId)) {
+                $mediaUrl = $this->downloadTelegramFile($fileId, 'document');
+            }
+
+            // 檔名放到 text 前面方便顯示
+            if (!filled($text)) {
+                $text = $fileName;
+            }
         }
 
         // 無文字也無媒體則跳過
@@ -656,7 +670,7 @@ class TelegramChatService
                 'sender_user_id'      => $senderId,
                 'content'             => $caption ?: "[檔案] {$file->original_name}",
                 'media_type'          => 'document',
-                'media_url'           => null,
+                'media_url'           => asset("storage/{$file->file_path}"),
                 'replied'             => true,
             ]);
 

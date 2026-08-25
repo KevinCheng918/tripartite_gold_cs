@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => 'v1.42',
+        'date'    => '2026-08-25',
+        'title'   => 'Telegram 圖片放大 + 文件收發下載',
+        'content' => implode("\n", [
+            '• 聊天圖片點擊全螢幕 Lightbox 放大',
+            '• Webhook 新增接收 document 類型，自動下載儲存',
+            '• 文件區傳送的檔案記錄 public URL，可在對話中下載',
+            '• 對話中 document 顯示為下載連結（圖示 + 檔名）',
+        ]),
+    ],
+    [
         'version' => 'v1.41',
         'date'    => '2026-08-25',
         'title'   => '班別回訊時間 + Telegram 聊天 UI 優化',

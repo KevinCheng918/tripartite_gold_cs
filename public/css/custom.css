@@ -687,6 +687,18 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .app-inner-layout__content, [data-theme="dark"] .app-inner-layout__content.card { background: #141414 !important; border-color: rgba(255,255,255,0.08) !important; }
 [data-theme="dark"] .app-inner-layout__top-pane { background: #1a1a1a !important; border-color: rgba(255,255,255,0.08) !important; }
 [data-theme="dark"] .app-inner-layout__bottom-pane { background: #1a1a1a !important; border-color: rgba(255,255,255,0.08) !important; }
+/* Telegram 圖片 Lightbox */
+.tg-lightbox {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.85); z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    cursor: zoom-out;
+}
+.tg-lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 8px; object-fit: contain; }
+
+/* Telegram 文件下載連結 */
+[data-theme="dark"] .chat-box a[href] { color: #d4af37; }
+
 /* Telegram 聊天 header 固定 */
 #tg-header { position: sticky; top: 0; z-index: 10; background: #fff; border-bottom: 1px solid #eee; }
 [data-theme="dark"] #tg-header { background: #1a1a1a; border-bottom-color: #333; }

@@ -15,9 +15,11 @@
 
         var mediaHtml = '';
         if (m.media_type === 'photo' && m.media_url) {
-            mediaHtml = '<div class="mb-1"><img src="' + m.media_url + '" alt="photo" loading="lazy" style="max-width:100%;max-height:240px;border-radius:8px;cursor:pointer;display:block;object-fit:contain"></div>';
+            mediaHtml = '<div class="mb-1"><img src="' + m.media_url + '" alt="photo" loading="lazy" class="tg-photo-preview" style="max-width:100%;max-height:240px;border-radius:8px;cursor:pointer;display:block;object-fit:contain"></div>';
         } else if (m.media_type === 'sticker' && m.media_url) {
             mediaHtml = '<div class="mb-1"><img src="' + m.media_url + '" alt="sticker" loading="lazy" style="max-width:120px;max-height:120px;display:block"></div>';
+        } else if (m.media_type === 'document' && m.media_url) {
+            mediaHtml = '<div class="mb-1"><a href="' + m.media_url + '" target="_blank" class="d-inline-flex align-items-center gap-1 text-decoration-none" style="padding:6px 10px;border-radius:6px;background:rgba(0,0,0,0.05);font-size:0.875rem"><i class="fas fa-file-download" style="font-size:1rem"></i><span>' + T.escapeHtml(m.content || '下載檔案') + '</span></a></div>';
         }
 
         var replyHtml = '';
@@ -132,4 +134,15 @@
         container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
         T.bindReactionButtons();
     };
+
+    // 圖片 Lightbox
+    document.addEventListener('click', function (e) {
+        if (!e.target.classList.contains('tg-photo-preview')) return;
+        var src = e.target.src;
+        var overlay = document.createElement('div');
+        overlay.className = 'tg-lightbox';
+        overlay.innerHTML = '<img src="' + src + '">';
+        overlay.addEventListener('click', function () { overlay.remove(); });
+        document.body.appendChild(overlay);
+    });
 })();
