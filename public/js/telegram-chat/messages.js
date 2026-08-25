@@ -32,9 +32,12 @@
 
         var reactHtml = '';
         if (m.reactions && m.reactions.length > 0) {
-            reactHtml += '<div class="mt-1">';
+            reactHtml += '<div class="d-flex flex-wrap gap-1 mt-1">';
             m.reactions.forEach(function (r) {
-                reactHtml += '<span class="me-1" style="cursor:default;font-size:1.25rem">' + r.emoji + (r.count > 1 ? '<small class="text-muted" style="font-size:0.75rem">' + r.count + '</small>' : '') + '</span>';
+                reactHtml += '<span class="tg-react-pill">' +
+                    '<span style="font-size:1.125rem">' + r.emoji + '</span>' +
+                    (r.count > 1 ? '<span class="tg-react-count">' + r.count + '</span>' : '') +
+                    '</span>';
             });
             reactHtml += '</div>';
         }
