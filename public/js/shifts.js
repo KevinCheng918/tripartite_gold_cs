@@ -676,6 +676,7 @@
                 '<td><span class="tt-legend" style="background:' + defaultColor.bg + ';border-color:' + defaultColor.border + ';color:' + defaultColor.text + '">' + shift.display_name + '</span></td>' +
                 '<td>' + shift.start_time + '</td>' +
                 '<td>' + shift.end_time + '</td>' +
+                '<td>' + (shift.reply_start_time && shift.reply_end_time ? shift.reply_start_time + ' ~ ' + shift.reply_end_time : '-') + '</td>' +
                 '<td>' + (shift.is_active ? '<span class="badge bg-success">' + i18n.field_is_active + '</span>' : '<span class="badge bg-secondary">-</span>') + '</td>' +
                 '<td><button class="btn btn-sm btn-outline-secondary js-edit-shift">' + i18n.modal_edit_shift_title + '</button></td>' +
                 '</tr>'
@@ -691,6 +692,7 @@
                 '</div>' +
                 '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_start_time + '</span><span>' + shift.start_time + '</span></div>' +
                 '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_end_time + '</span><span>' + shift.end_time + '</span></div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">回訊時間</span><span>' + (shift.reply_start_time && shift.reply_end_time ? shift.reply_start_time + ' ~ ' + shift.reply_end_time : '-') + '</span></div>' +
                 '<div class="shift-card__actions"><button class="btn btn-sm btn-outline-secondary js-edit-shift">' + i18n.modal_edit_shift_title + '</button></div>' +
                 '</div>'
             );
@@ -705,6 +707,7 @@
             '<th>' + i18n.field_display_name + '</th>' +
             '<th>' + i18n.field_start_time + '</th>' +
             '<th>' + i18n.field_end_time + '</th>' +
+            '<th>回訊時間</th>' +
             '<th>' + i18n.field_is_active + '</th>' +
             '<th></th>' +
             '</tr></thead><tbody>' + rows + '</tbody></table>' +
@@ -735,6 +738,8 @@
         document.getElementById('edit-display-name').value = shift.display_name;
         document.getElementById('edit-start-time').value = shift.start_time.substring(0, 5);
         document.getElementById('edit-end-time').value = shift.end_time.substring(0, 5);
+        document.getElementById('edit-reply-start-time').value = shift.reply_start_time || '';
+        document.getElementById('edit-reply-end-time').value = shift.reply_end_time || '';
         openModal('modal-edit-shift');
     }
 
@@ -1144,6 +1149,8 @@
             display_name: document.getElementById('edit-display-name').value,
             start_time: document.getElementById('edit-start-time').value,
             end_time: document.getElementById('edit-end-time').value,
+            reply_start_time: document.getElementById('edit-reply-start-time').value || null,
+            reply_end_time: document.getElementById('edit-reply-end-time').value || null,
         };
 
         apiFetch('/admin/shifts/ajax-update-shift/' + id, { method: 'PUT', body: JSON.stringify(data) })
@@ -1505,6 +1512,8 @@
                 display_name: document.getElementById('create-display-name').value,
                 start_time: document.getElementById('create-start-time').value,
                 end_time: document.getElementById('create-end-time').value,
+                reply_start_time: document.getElementById('create-reply-start-time').value || null,
+                reply_end_time: document.getElementById('create-reply-end-time').value || null,
             };
 
             apiFetch('/admin/shifts/ajax-store-shift', { method: 'POST', body: JSON.stringify(data) })
@@ -1559,6 +1568,12 @@
         time_24hr: true,
         disableMobile: true
     });
+
+    var replyTimeConfig = { enableTime: true, noCalendar: true, dateFormat: 'H:i', time_24hr: true, disableMobile: true };
+    flatpickr('#create-reply-start-time', replyTimeConfig);
+    flatpickr('#create-reply-end-time', replyTimeConfig);
+    flatpickr('#edit-reply-start-time', replyTimeConfig);
+    flatpickr('#edit-reply-end-time', replyTimeConfig);
 
     // 排班操作 modal — 刪除按鈕（沒權限時按鈕不存在）
     var btnDelete = document.getElementById('btn-delete-assignment');

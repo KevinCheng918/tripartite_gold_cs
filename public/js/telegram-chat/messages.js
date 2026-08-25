@@ -34,7 +34,7 @@
         if (m.reactions && m.reactions.length > 0) {
             reactHtml += '<div class="mt-1">';
             m.reactions.forEach(function (r) {
-                reactHtml += '<span class="me-1" style="cursor:default">' + r.emoji + (r.count > 1 ? '<small class="text-muted">' + r.count + '</small>' : '') + '</span>';
+                reactHtml += '<span class="me-1" style="cursor:default;font-size:1.25rem">' + r.emoji + (r.count > 1 ? '<small class="text-muted" style="font-size:0.75rem">' + r.count + '</small>' : '') + '</span>';
             });
             reactHtml += '</div>';
         }

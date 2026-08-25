@@ -86,11 +86,13 @@ class ShiftService
         $name = 'shift_' . str_replace(':', '', $params['start_time']);
 
         return $this->shiftRepository->create([
-            'name'         => $name,
-            'display_name' => $params['display_name'],
-            'start_time'   => $params['start_time'],
-            'end_time'     => $params['end_time'],
-            'is_active'    => true,
+            'name'             => $name,
+            'display_name'     => $params['display_name'],
+            'start_time'       => $params['start_time'],
+            'end_time'         => $params['end_time'],
+            'reply_start_time' => $params['reply_start_time'] ?? null,
+            'reply_end_time'   => $params['reply_end_time'] ?? null,
+            'is_active'        => true,
         ]);
     }
 
@@ -105,6 +107,14 @@ class ShiftService
         ], function ($value) {
             return filled($value);
         });
+
+        // 回訊時間允許 null（清除），需獨立處理
+        if (array_key_exists('reply_start_time', $params)) {
+            $attributes['reply_start_time'] = $params['reply_start_time'];
+        }
+        if (array_key_exists('reply_end_time', $params)) {
+            $attributes['reply_end_time'] = $params['reply_end_time'];
+        }
 
         return DB::transaction(function () use ($shift, $attributes) {
             return $this->shiftRepository->update($shift, $attributes);

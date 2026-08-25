@@ -20,6 +20,8 @@ class UpdateShiftRequest extends FormRequest
             'display_name' => 'sometimes|string|max:100',
             'start_time'   => 'sometimes|date_format:H:i',
             'end_time'     => 'sometimes|date_format:H:i',
+            'reply_start_time' => 'sometimes|nullable|date_format:H:i',
+            'reply_end_time'   => 'sometimes|nullable|date_format:H:i',
             'is_active'    => 'sometimes|boolean',
             'sort'         => 'sometimes|integer|min:0',
         ];

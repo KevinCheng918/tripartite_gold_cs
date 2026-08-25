@@ -29,8 +29,10 @@ class ShiftResource extends JsonResource
             'id'           => $this->id,
             'name'         => $this->name,
             'display_name' => $this->display_name,
-            'start_time'   => $this->start_time,
-            'end_time'     => $this->end_time,
+            'start_time'       => $this->start_time,
+            'end_time'         => $this->end_time,
+            'reply_start_time' => $this->reply_start_time,
+            'reply_end_time'   => $this->reply_end_time,
             'is_active'    => $this->is_active,
             'sort'         => $this->sort,
         ];

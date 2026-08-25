@@ -107,6 +107,14 @@
                 <label class="form-label" for="create-end-time">{{ trans('shift.field_end_time') }}</label>
                 <input id="create-end-time" type="text" name="end_time" class="form-control" required placeholder="HH:mm" autocomplete="off">
             </div>
+            <div class="mb-3">
+                <label class="form-label">主要回訊時間</label>
+                <div class="d-flex gap-2 align-items-center">
+                    <input id="create-reply-start-time" type="text" class="form-control" placeholder="HH:mm" autocomplete="off">
+                    <span>~</span>
+                    <input id="create-reply-end-time" type="text" class="form-control" placeholder="HH:mm" autocomplete="off">
+                </div>
+            </div>
             <div class="text-end mt-3">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('shift.modal_cancel') }}</button>
                 <button type="submit" class="btn btn-primary">{{ trans('shift.modal_confirm') }}</button>
@@ -202,6 +210,14 @@
             <div class="mb-3">
                 <label class="form-label" for="edit-end-time">{{ trans('shift.field_end_time') }}</label>
                 <input id="edit-end-time" type="text" name="end_time" class="form-control" required placeholder="HH:mm" autocomplete="off">
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="edit-reply-start-time">主要回訊時間</label>
+                <div class="d-flex gap-2 align-items-center">
+                    <input id="edit-reply-start-time" type="text" class="form-control" placeholder="HH:mm" autocomplete="off">
+                    <span>~</span>
+                    <input id="edit-reply-end-time" type="text" class="form-control" placeholder="HH:mm" autocomplete="off">
+                </div>
             </div>
             <div class="text-end mt-3">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('shift.modal_cancel') }}</button>

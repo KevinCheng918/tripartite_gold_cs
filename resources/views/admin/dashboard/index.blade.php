@@ -77,8 +77,10 @@
                             $isActive = false;
                             if ($info['shift']) {
                                 $nowMinutes = now()->hour * 60 + now()->minute;
-                                $startParts = explode(':', $info['shift']->start_time);
-                                $endParts = explode(':', $info['shift']->end_time);
+                                $rStart = $info['shift']->reply_start_time ?? $info['shift']->start_time;
+                                $rEnd = $info['shift']->reply_end_time ?? $info['shift']->end_time;
+                                $startParts = explode(':', $rStart);
+                                $endParts = explode(':', $rEnd);
                                 $startMin = (int)$startParts[0] * 60 + (int)$startParts[1];
                                 $endMin = (int)$endParts[0] * 60 + (int)$endParts[1];
 
@@ -96,7 +98,7 @@
                             <div class="dash-shift-group__name">{{ $shiftName }}</div>
                             <div class="dash-shift-group__time">
                                 @if($info['shift'])
-                                    {{ $info['shift']->start_time }} - {{ $info['shift']->end_time }}
+                                    {{ $info['shift']->reply_start_time ?? $info['shift']->start_time }} - {{ $info['shift']->reply_end_time ?? $info['shift']->end_time }}
                                 @endif
                             </div>
                             <div class="dash-shift-group__users">
@@ -170,8 +172,10 @@
                             $isActive = false;
                             if ($info['shift']) {
                                 $nowMinutes = now()->hour * 60 + now()->minute;
-                                $startParts = explode(':', $info['shift']->start_time);
-                                $endParts = explode(':', $info['shift']->end_time);
+                                $rStart = $info['shift']->reply_start_time ?? $info['shift']->start_time;
+                                $rEnd = $info['shift']->reply_end_time ?? $info['shift']->end_time;
+                                $startParts = explode(':', $rStart);
+                                $endParts = explode(':', $rEnd);
                                 $startMin = (int)$startParts[0] * 60 + (int)$startParts[1];
                                 $endMin = (int)$endParts[0] * 60 + (int)$endParts[1];
 
@@ -189,7 +193,7 @@
                             <div class="dash-shift-group__name">{{ $shiftName }}</div>
                             <div class="dash-shift-group__time">
                                 @if($info['shift'])
-                                    {{ $info['shift']->start_time }} - {{ $info['shift']->end_time }}
+                                    {{ $info['shift']->reply_start_time ?? $info['shift']->start_time }} - {{ $info['shift']->reply_end_time ?? $info['shift']->end_time }}
                                 @endif
                             </div>
                             <div class="dash-shift-group__users">

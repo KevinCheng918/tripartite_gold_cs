@@ -36,12 +36,13 @@
 
 /* 修正 chat-box 泡泡寬度 */
 .chat-box-wrapper .chat-box {
-    min-width: auto !important;
-    max-width: 75% !important;
-    flex: none !important;
     display: inline-block !important;
+    max-width: 85vw;
     word-break: break-word;
     white-space: pre-wrap;
+}
+@media (min-width: 768px) {
+    .chat-box-wrapper .chat-box { max-width: 50vw; }
 }
 
 /* 聊天泡泡禁止選取（避免長按觸發選字） */

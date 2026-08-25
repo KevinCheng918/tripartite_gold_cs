@@ -65,7 +65,6 @@
             var activeCls = g.id === T.selectedGroupId ? ' bg-light' : '';
             var initial = g.title ? g.title.substring(0, 1).toUpperCase() : '?';
             var time = g.last_message_at ? g.last_message_at.substring(11, 16) : '';
-            var dutyText = g.on_duty_users && g.on_duty_users.length > 0 ? g.on_duty_users.join('、') : '';
             var unreadBadge = g.unread_count > 0
                 ? '<span class="badge bg-danger rounded-pill ms-auto">' + g.unread_count + '</span>'
                 : '';
@@ -77,7 +76,7 @@
                 '</div>' +
                 '<div class="widget-content-left flex-fill" style="min-width:0">' +
                 '<div class="fw-bold text-truncate">' + g.title + '</div>' +
-                '<small class="text-muted">' + (dutyText || time) + '</small>' +
+                '<small class="text-muted">' + time + '</small>' +
                 '</div>' +
                 unreadBadge +
                 '</div>'
@@ -108,9 +107,6 @@
         if (!group || !header) { return; }
 
         var initial = group.title ? group.title.substring(0, 1).toUpperCase() : '?';
-        var dutyText = group.on_duty_users && group.on_duty_users.length > 0
-            ? T.i18n.assigned_to + '：' + group.on_duty_users.join('、')
-            : T.i18n.unassigned;
 
         var deleteBtn = T.canDelete
             ? '<button class="btn btn-sm btn-outline-secondary ms-auto" id="btn-tg-delete-conv" data-id="' + group.id + '" title="刪除對話紀錄" style="white-space:nowrap;flex-shrink:0"><i class="fas fa-trash-alt me-1"></i>刪除對話</button>'
@@ -120,8 +116,7 @@
             '<div class="px-3 py-2 d-flex align-items-center">' +
             '<button class="btn btn-link text-muted p-0 me-2 d-md-none" id="btn-tg-back"><i class="fas fa-arrow-left"></i></button>' +
             '<div class="rounded-circle text-white d-flex align-items-center justify-content-center me-2" style="width:36px;height:36px;background:#6c757d;font-size:0.9rem;font-weight:700">' + initial + '</div>' +
-            '<div class="flex-fill" style="min-width:0"><span class="fw-bold text-truncate" style="font-size:1.0625rem">' + group.title + '</span>' +
-            '<span class="text-muted ms-2" style="font-size:0.875rem">' + dutyText + '</span></div>' +
+            '<div class="flex-fill" style="min-width:0"><span class="fw-bold text-truncate" style="font-size:1.0625rem">' + group.title + '</span></div>' +
             deleteBtn +
             '</div>';
 

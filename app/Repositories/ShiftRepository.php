@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Collection;
 class ShiftRepository
 {
     /** @var array 列表查詢欄位 */
-    private const LIST_COLUMNS = ['id', 'name', 'display_name', 'start_time', 'end_time', 'is_active', 'sort'];
+    private const LIST_COLUMNS = ['id', 'name', 'display_name', 'start_time', 'end_time', 'reply_start_time', 'reply_end_time', 'is_active', 'sort'];
 
     /**
      * 取得所有啟用中的班別（依 sort 排序）

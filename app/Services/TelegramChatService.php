@@ -480,10 +480,13 @@ class TelegramChatService
      */
     private function isTimeInShiftRange($shift, $nowMinutes)
     {
-        $parts = explode(':', $shift->start_time);
+        $start = $shift->reply_start_time ?? $shift->start_time;
+        $end = $shift->reply_end_time ?? $shift->end_time;
+
+        $parts = explode(':', $start);
         $startMin = (int) $parts[0] * 60 + (int) $parts[1];
 
-        $parts = explode(':', $shift->end_time);
+        $parts = explode(':', $end);
         $endMin = (int) $parts[0] * 60 + (int) $parts[1];
 
         if ($endMin > $startMin) {

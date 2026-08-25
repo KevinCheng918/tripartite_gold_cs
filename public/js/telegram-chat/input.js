@@ -16,12 +16,12 @@
 
         inputArea.style.display = 'block';
         inputArea.innerHTML =
-            '<div class="d-flex align-items-end gap-2 px-3 py-2">' +
+            '<div class="d-flex align-items-center gap-1 px-3 py-2">' +
             '<input type="file" id="tg-image-input" accept="image/*" style="display:none">' +
-            '<button class="btn btn-link text-muted p-1" id="btn-tg-image" type="button" title="' + (T.i18n.btn_image || '傳送圖片') + '" style="font-size:1.25rem"><i class="fas fa-paperclip"></i></button>' +
-            '<button class="btn btn-link text-muted p-1" id="btn-tg-shared-file" type="button" title="文件區" style="font-size:1.25rem"><i class="fas fa-file-alt"></i></button>' +
-            '<textarea id="tg-reply-text" class="form-control form-control-sm" placeholder="' + T.i18n.input_placeholder + '" rows="1" style="resize:none;max-height:100px;border-radius:1rem"></textarea>' +
-            '<button class="btn btn-primary btn-sm rounded-circle d-flex align-items-center justify-content-center" id="btn-tg-send" type="button" style="width:36px;height:36px;flex-shrink:0"><i class="fas fa-paper-plane" style="font-size:0.875rem"></i></button>' +
+            '<button class="btn btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center" id="btn-tg-image" type="button" title="' + (T.i18n.btn_image || '傳送圖片') + '" style="width:36px;height:36px;flex-shrink:0"><i class="fas fa-paperclip" style="font-size:0.875rem"></i></button>' +
+            '<button class="btn btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center" id="btn-tg-shared-file" type="button" title="文件區" style="width:36px;height:36px;flex-shrink:0"><i class="fas fa-file-alt" style="font-size:0.875rem"></i></button>' +
+            '<textarea id="tg-reply-text" class="form-control form-control-sm ms-1" placeholder="' + T.i18n.input_placeholder + '" rows="1" style="resize:none;max-height:100px;border-radius:1rem"></textarea>' +
+            '<button class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center ms-1" id="btn-tg-send" type="button" style="width:36px;height:36px;flex-shrink:0"><i class="fas fa-paper-plane" style="font-size:0.875rem"></i></button>' +
             '</div>';
 
         var textarea = document.getElementById('tg-reply-text');

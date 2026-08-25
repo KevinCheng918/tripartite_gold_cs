@@ -84,9 +84,11 @@ class ShiftController extends Controller
     public function ajaxStoreShift(Request $request)
     {
         $params = $request->validate([
-            'display_name' => 'required|string|max:50',
-            'start_time'   => 'required|date_format:H:i',
-            'end_time'     => 'required|date_format:H:i',
+            'display_name'     => 'required|string|max:50',
+            'start_time'       => 'required|date_format:H:i',
+            'end_time'         => 'required|date_format:H:i',
+            'reply_start_time' => 'nullable|date_format:H:i',
+            'reply_end_time'   => 'nullable|date_format:H:i',
         ]);
 
         try {
