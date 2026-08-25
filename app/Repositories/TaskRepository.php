@@ -47,6 +47,8 @@ class TaskRepository
             'created_asc'   => ['created_at', 'asc'],
             'updated_desc'  => ['updated_at', 'desc'],
             'updated_asc'   => ['updated_at', 'asc'],
+            'due_date_desc' => ['due_date', 'desc'],
+            'due_date_asc'  => ['due_date', 'asc'],
             'sort_order'    => ['sort_order', 'asc'],
         ];
         if (isset($sortMap[$sort])) {

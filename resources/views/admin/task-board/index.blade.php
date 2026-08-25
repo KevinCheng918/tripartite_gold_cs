@@ -8,6 +8,8 @@
 
     <style>
         .app-main__outer, .app-main__inner { overflow-x: hidden !important; }
+        .taskboard-toolbar { background: #fff; }
+        [data-theme="dark"] .taskboard-toolbar { background: #1a1a1a; color: #e0e0e0; }
         .kanban-board-wrapper { overflow-x: auto; width: 100%; }
         .kanban-board { display: inline-flex; gap: 0.75rem; min-height: 65vh; min-width: 1500px; }
         .kanban-column { flex: 1; min-width: 0; display: flex; flex-direction: column; border-radius: 0.5rem; overflow: hidden; }
@@ -100,57 +102,59 @@
     </style>
 
     {{-- 篩選列 --}}
-    <div class="main-card mb-3 card">
-        <div class="card-header">
-            <div class="row g-2 align-items-center">
-                @if(Auth::user()->hasPermission('task_board.create'))
-                <div class="col-auto">
-                    <button class="btn btn-primary" id="btn-open-create-task">
-                        <i class="fas fa-plus me-1"></i>{{ trans('task_board.action_create_task') }}
-                    </button>
-                </div>
-                @endif
-                <div class="col-auto">
-                    <button class="btn btn-outline-secondary" id="btn-open-archived">
-                        <i class="fas fa-archive me-1"></i>查看封存
-                    </button>
-                </div>
-                <div class="col"></div>
-                <div class="col-12 col-md-auto">
-                    <div class="d-flex gap-2 align-items-center flex-wrap">
-                        <select id="filter-project" class="form-select form-select-sm" style="width:auto">
-                            <option value="">全部專案</option>
-                            @foreach($projects as $p)
-                                <option value="{{ $p->id }}">{{ $p->name }}</option>
-                            @endforeach
-                        </select>
-                        <select id="filter-assignee" class="form-select form-select-sm" style="width:auto">
-                            <option value="">全部人員</option>
-                            @foreach($assignees as $u)
-                                <option value="{{ $u->id }}">{{ $u->nickname }}</option>
-                            @endforeach
-                        </select>
-                        <select id="filter-priority" class="form-select form-select-sm" style="width:auto">
-                            <option value="">全部優先</option>
-                            <option value="1">{{ trans('task_board.priority_low') }}</option>
-                            <option value="2">{{ trans('task_board.priority_medium') }}</option>
-                            <option value="3">{{ trans('task_board.priority_high') }}</option>
-                            <option value="4">{{ trans('task_board.priority_urgent') }}</option>
-                        </select>
-                        <select id="filter-sort" class="form-select form-select-sm" style="width:auto">
-                            <option value="created_desc">建立時間 新→舊</option>
-                            <option value="created_asc">建立時間 舊→新</option>
-                            <option value="updated_desc">更新時間 新→舊</option>
-                            <option value="updated_asc">更新時間 舊→新</option>
-                            <option value="priority_desc">優先順序 高→低</option>
-                            <option value="priority_asc">優先順序 低→高</option>
-                        </select>
-                        <input type="text" id="filter-keyword" class="form-control form-control-sm" style="width:140px" placeholder="搜尋標題...">
-                        <button class="btn btn-sm btn-outline-secondary" id="btn-filter">
-                            <i class="fas fa-search"></i>
-                        </button>
-                    </div>
-                </div>
+    <div class="mb-3 p-3 rounded shadow-sm taskboard-toolbar">
+        <div class="d-flex gap-2 align-items-center mb-2">
+            @if(Auth::user()->hasPermission('task_board.create'))
+            <button class="btn btn-primary btn-sm" id="btn-open-create-task">
+                <i class="fas fa-plus me-1"></i>{{ trans('task_board.action_create_task') }}
+            </button>
+            @endif
+            <button class="btn btn-outline-secondary btn-sm" id="btn-open-archived">
+                <i class="fas fa-archive me-1"></i>查看封存
+            </button>
+        </div>
+        <div class="d-flex align-items-center flex-wrap gap-2" style="font-size:0.8125rem">
+            <span class="text-muted">篩選</span>
+            <select id="filter-project" class="form-select form-select-sm" style="width:auto">
+                <option value="">全部專案</option>
+                @foreach($projects as $p)
+                    <option value="{{ $p->id }}">{{ $p->name }}</option>
+                @endforeach
+            </select>
+            <select id="filter-assignee" class="form-select form-select-sm" style="width:auto">
+                <option value="">全部人員</option>
+                @foreach($assignees as $u)
+                    <option value="{{ $u->id }}">{{ $u->nickname }}</option>
+                @endforeach
+            </select>
+            <select id="filter-priority" class="form-select form-select-sm" style="width:auto">
+                <option value="">全部優先</option>
+                <option value="1">{{ trans('task_board.priority_low') }}</option>
+                <option value="2">{{ trans('task_board.priority_medium') }}</option>
+                <option value="3">{{ trans('task_board.priority_high') }}</option>
+                <option value="4">{{ trans('task_board.priority_urgent') }}</option>
+            </select>
+            <span class="text-muted">|</span>
+            <span class="text-muted">排序</span>
+            <select id="filter-sort-field" class="form-select form-select-sm" style="width:auto">
+                <option value="created">建立時間</option>
+                <option value="updated">更新時間</option>
+                <option value="priority">優先順序</option>
+                <option value="due_date">到期日</option>
+            </select>
+            <select id="filter-sort-dir" class="form-select form-select-sm" style="width:auto">
+                <option value="desc">新→舊</option>
+                <option value="asc">舊→新</option>
+            </select>
+            <span class="text-muted">|</span>
+            <input type="text" id="filter-keyword" class="form-control form-control-sm" style="width:130px" placeholder="搜尋標題...">
+            <button class="btn btn-sm btn-outline-secondary" id="btn-filter">
+                <i class="fas fa-search me-1"></i>搜尋
+            </button>
+            <span class="text-muted">|</span>
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="filter-overdue">
+                <label class="form-check-label" for="filter-overdue" style="font-size:0.8125rem">僅顯示已過期</label>
             </div>
         </div>
     </div>
@@ -532,7 +536,7 @@ $(function () {
         var projectId = $('#filter-project').val();
         var assigneeId = $('#filter-assignee').val();
         var priority = $('#filter-priority').val();
-        var sortBy = $('#filter-sort').val();
+        var sortBy = $('#filter-sort-field').val() + '_' + $('#filter-sort-dir').val();
         var keyword = $('#filter-keyword').val();
         if (projectId) params.project_id = projectId;
         if (assigneeId) params.assignee_id = assigneeId;
@@ -555,8 +559,14 @@ $(function () {
 
                 var statusKeys = { pending: 1, in_progress: 2, testing: 3, in_review: 4, resolved: 5 };
 
+                var onlyOverdue = $('#filter-overdue').is(':checked');
+                var today = new Date().toISOString().substring(0, 10);
+
                 Object.keys(columns).forEach(function (key) {
                     var tasks = columns[key];
+                    if (onlyOverdue) {
+                        tasks = tasks.filter(function (t) { return t.due_date && t.due_date < today; });
+                    }
                     var listId = statusListMap[statusKeys[key]];
                     var countId = statusCountMap[statusKeys[key]];
                     var html = '';
@@ -1564,18 +1574,24 @@ $(function () {
 
 
     // 排序 localStorage 記憶
-    var savedSort = localStorage.getItem('taskBoardSort');
-    if (savedSort && $('#filter-sort option[value="' + savedSort + '"]').length) {
-        $('#filter-sort').val(savedSort);
+    var savedField = localStorage.getItem('taskBoardSortField');
+    var savedDir = localStorage.getItem('taskBoardSortDir');
+    if (savedField && $('#filter-sort-field option[value="' + savedField + '"]').length) {
+        $('#filter-sort-field').val(savedField);
     }
-    $('#filter-sort').on('change', function () {
-        localStorage.setItem('taskBoardSort', $(this).val());
+    if (savedDir && $('#filter-sort-dir option[value="' + savedDir + '"]').length) {
+        $('#filter-sort-dir').val(savedDir);
+    }
+    $('#filter-sort-field, #filter-sort-dir').on('change', function () {
+        localStorage.setItem('taskBoardSortField', $('#filter-sort-field').val());
+        localStorage.setItem('taskBoardSortDir', $('#filter-sort-dir').val());
         loadBoard();
     });
 
     // 篩選
     $('#btn-filter').on('click', function () { loadBoard(); });
     $('#filter-keyword').on('keypress', function (e) { if (e.which === 13) loadBoard(); });
+    $('#filter-overdue').on('change', function () { loadBoard(); });
 
     // 初始載入
     loadBoard();
