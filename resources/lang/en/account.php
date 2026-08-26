@@ -36,8 +36,10 @@ return [
     'msg' => [
         'required'             => 'This field is required',
         'unique'               => 'This account already exists',
-        'regex_account'        => 'Account must be 4-20 alphanumeric or underscore characters',
-        'regex_password'       => 'Password must be at least 8 characters (letters, numbers, symbols)',
+        'regex_account'        => 'Account must be 4-20 half-width alphanumeric or underscore characters',
+        'regex_password'       => 'Password must be at least 8 half-width characters (letters, numbers, symbols)',
+        'full_width_password'  => 'Password contains full-width or unsupported characters (including spaces). Use half-width letters, numbers and symbols.',
+        'full_width_account'   => 'Account contains full-width or unsupported characters. Use half-width letters, numbers and underscore.',
         'max_string'           => 'Must not exceed :value characters',
         'invalid_status'       => 'Invalid status value',
         'permissions_required' => 'Please select permissions',

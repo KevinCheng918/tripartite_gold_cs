@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Account\AssignPermissionRequest;
 use App\Http\Requests\Account\StoreAccountRequest;
 use App\Http\Requests\Account\UpdateAccountRequest;
+use App\Http\Requests\Account\UpdateProfileRequest;
 use App\Http\Resources\AccountResource;
 use App\Http\Resources\LoginLogResource;
 use App\Models\User;
@@ -72,15 +73,12 @@ class AccountController extends Controller
     /**
      * Ajax 修改個人資訊（暱稱、密碼）
      *
-     * @param Request $request
+     * @param UpdateProfileRequest $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function ajaxUpdateProfile(Request $request)
+    public function ajaxUpdateProfile(UpdateProfileRequest $request)
     {
-        $params = $request->validate([
-            'nickname' => 'sometimes|string|max:100',
-            'password' => 'sometimes|nullable|' . config('rules.USER_PASSWORD_REGEX'),
-        ]);
+        $params = $request->validated();
 
         try {
             $this->accountService->update(Auth::user(), $params);

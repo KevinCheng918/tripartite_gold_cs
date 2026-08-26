@@ -38,8 +38,10 @@ return [
     'msg' => [
         'required'             => '此欄位為必填',
         'unique'               => '此帳號已存在',
-        'regex_account'        => '帳號僅允許英文、數字、底線，4~20 字元',
-        'regex_password'       => '密碼允許英文、數字、符號，最少 8 碼',
+        'regex_account'        => '帳號僅允許半形英文、數字、底線，4~20 字元',
+        'regex_password'       => '密碼僅允許半形英文、數字、符號，最少 8 碼',
+        'full_width_password'  => '密碼含全形或不支援的字元（含空白），請改用半形英數與符號',
+        'full_width_account'   => '帳號含全形或不支援的字元，請改用半形英數與底線',
         'max_string'           => '長度不可超過 :value 字元',
         'invalid_status'       => '無效的狀態值',
         'permissions_required' => '請選擇權限',

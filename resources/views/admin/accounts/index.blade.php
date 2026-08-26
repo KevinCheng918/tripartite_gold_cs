@@ -469,18 +469,33 @@ $(function () {
         showBsModal('modal-change-status');
     });
 
+    // 帳密僅接受半形可列印字元，含全形（如＠！、全形空白）先擋下並提示
+    function hasFullWidth(str) {
+        return /[^\x21-\x7E]/.test(str);
+    }
+
     // 新增帳號
     $('#form-create-account').on('submit', function (e) {
         e.preventDefault();
+        var createAccount = $('#create-account').val();
+        var createPassword = $('#create-password').val();
+        if (hasFullWidth(createAccount)) {
+            showMessage(@json(trans('account.msg.full_width_account')));
+            return;
+        }
+        if (hasFullWidth(createPassword)) {
+            showMessage(@json(trans('account.msg.full_width_password')));
+            return;
+        }
         $.ajax({
             url: '/admin/accounts/ajax-store',
             method: 'POST',
             headers: { 'X-CSRF-TOKEN': csrfToken },
             contentType: 'application/json',
             data: JSON.stringify({
-                account: $('#create-account').val(),
+                account: createAccount,
                 nickname: $('#create-nickname').val(),
-                password: $('#create-password').val(),
+                password: createPassword,
             }),
             success: function () { location.reload(); },
             error: function (xhr) { showMessage(getErrorMsg(xhr)); }
@@ -492,6 +507,10 @@ $(function () {
         e.preventDefault();
         var data = { nickname: $('#edit-nickname').val(), level: parseInt($('#edit-level').val(), 10) };
         var pw = $('#edit-password').val();
+        if (pw && hasFullWidth(pw)) {
+            showMessage(@json(trans('account.msg.full_width_password')));
+            return;
+        }
         if (pw) { data.password = pw; }
         var projectIds = [];
         $('.js-edit-project-check:checked').each(function () { projectIds.push(parseInt($(this).val(), 10)); });

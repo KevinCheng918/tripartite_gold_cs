@@ -380,7 +380,7 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label" for="profile-password">{{ trans('profile.field_password') }}（{{ trans('profile.password_hint') }}）</label>
-                            <input id="profile-password" type="password" class="form-control" name="password" minlength="4" autocomplete="new-password">
+                            <input id="profile-password" type="password" class="form-control" name="password" minlength="8" autocomplete="new-password">
                         </div>
                         <div class="text-end">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('shift.modal_cancel') }}</button>
@@ -568,12 +568,22 @@
             setTimeout(function () { showBsModal('modal-my-login-log'); }, 200);
         });
 
+        // 密碼僅接受半形可列印字元，含全形（如＠！、全形空白）先擋下並提示
+        function hasFullWidth(str) {
+            return /[^\x21-\x7E]/.test(str);
+        }
+
         // 個人資訊提交
         $('#form-profile').on('submit', function (e) {
             e.preventDefault();
             var data = {};
             var nickname = $('#profile-nickname').val().trim();
             var password = $('#profile-password').val();
+            if (password && hasFullWidth(password)) {
+                $('#modal-profile-msg-text').text(@json(trans('profile.msg.full_width_password')));
+                showBsModal('modal-profile-msg');
+                return;
+            }
             if (nickname) { data.nickname = nickname; }
             if (password) { data.password = password; }
 
@@ -591,8 +601,16 @@
                         $('.header-user-info .widget-heading').text(nickname);
                     }
                 },
-                error: function () {
-                    $('#modal-profile-msg-text').text('更新失敗');
+                error: function (xhr) {
+                    var body = xhr.responseJSON || {};
+                    var msg = body.message || @json(trans('profile.msg.update_failed'));
+                    if (body.errors) {
+                        var first = Object.keys(body.errors)[0];
+                        if (first && body.errors[first].length) {
+                            msg = body.errors[first][0];
+                        }
+                    }
+                    $('#modal-profile-msg-text').text(msg);
                     showBsModal('modal-profile-msg');
                 }
             });

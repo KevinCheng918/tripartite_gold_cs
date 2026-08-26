@@ -333,6 +333,22 @@
         }
         .login-error p { margin: 0; }
 
+        /* 全形字元提示（僅提醒，不阻擋送出） */
+        .login-warning {
+            background: rgba(212, 175, 55, 0.1);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+            margin-bottom: 1.25rem;
+            color: #f0e6c8;
+            font-size: 0.875rem;
+        }
+        .login-warning i { margin-right: 0.5rem; color: #d4af37; }
+        .login-input-group input.has-full-width {
+            border-color: rgba(212, 175, 55, 0.7);
+            background: rgba(212, 175, 55, 0.06);
+        }
+
         /* 底部 */
         .login-footer {
             margin-top: 2.5rem;
@@ -405,6 +421,10 @@
                 </div>
             @endif
 
+            <div id="login-fw-warning" class="login-warning" style="display:none">
+                <i class="fas fa-keyboard"></i><span>{{ __('login.full_width_hint') }}</span>
+            </div>
+
             <form method="POST" action="{{ route('login') }}">
                 @csrf
                 <div class="login-input-group">
@@ -426,6 +446,8 @@
     <div class="login-footer">
         &copy; {{ date('Y') }} {{ config('app.name') }}. All rights reserved.
     </div>
+
+    <script src="{{ asset('js/login.js') }}"></script>
 
 </body>
 </html>

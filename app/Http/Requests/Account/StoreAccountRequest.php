@@ -17,9 +17,9 @@ class StoreAccountRequest extends FormRequest
     public function rules()
     {
         return [
-            'account'  => 'required|unique:user|' . config('rules.USER_ACCOUNT_REGEX'),
+            'account'  => ['required', 'unique:user', config('rules.USER_ACCOUNT_REGEX')],
             'nickname' => 'required|max:100',
-            'password' => 'required|' . config('rules.USER_PASSWORD_REGEX'),
+            'password' => ['required', config('rules.USER_PASSWORD_REGEX')],
         ];
     }
 
