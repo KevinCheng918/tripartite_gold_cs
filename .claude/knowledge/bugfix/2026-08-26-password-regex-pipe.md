@@ -50,6 +50,7 @@ pipe 形式  => BadMethodCallException: Method Validator::validate; does not exi
 | `app/Http/Requests/Account/UpdateProfileRequest.php` | **新增**。原本 `ajaxUpdateProfile()` 直接在 Controller 內 `$request->validate()`，違反 PROMPTS.md「有 Request 就補驗證檔」，抽成 FormRequest |
 | `app/Http/Controllers/Admin/AccountController.php` | `ajaxUpdateProfile()` 改注入 `UpdateProfileRequest`，以 `validated()` 取值（對齊其他方法慣例）|
 | `public/js/login.js` | **新增**。登入頁全形偵測腳本，依 PROMPTS.md「CSS/JS 分離」放 `public/js` |
+| `routes/web.php` | 個人資訊修改 route 補 `ajax-` 前綴：`PUT admin/profile`（`profile.update`）→ `PUT admin/profile/ajax-update`（`profile.ajax-update`），對齊全專案 ajax route 命名慣例 |
 | `resources/views/layouts/app.blade.php` | 個人資訊密碼欄 `minlength` 4 → 8（與後端一致）；新增 `hasFullWidth()` 提交前擋全形；ajax `error` callback 改讀 `xhr.responseJSON.errors` 顯示實際驗證訊息，而非固定「更新失敗」 |
 | `resources/views/admin/accounts/index.blade.php` | 新增/編輯帳號表單提交前用 `hasFullWidth()` 檢查帳號與密碼，含全形直接提示 |
 | `resources/views/auth/login.blade.php` | 新增全形提示條與 `.login-warning` 樣式，掛載 `public/js/login.js`（登入頁未載入 jQuery，腳本為原生 JS）|

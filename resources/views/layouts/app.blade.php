@@ -588,7 +588,7 @@
             if (password) { data.password = password; }
 
             $.ajax({
-                url: '/admin/profile',
+                url: '/admin/profile/ajax-update',
                 method: 'PUT',
                 headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
                 contentType: 'application/json',

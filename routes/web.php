@@ -43,7 +43,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::get('/dashboard/ajax-usdt-rate', [DashboardController::class, 'ajaxUsdtRate'])->name('dashboard.ajax-usdt-rate');
 
     // 個人資訊修改
-    Route::put('/profile', [AccountController::class, 'ajaxUpdateProfile'])->name('profile.update');
+    Route::put('/profile/ajax-update', [AccountController::class, 'ajaxUpdateProfile'])->name('profile.ajax-update');
 
     // 帳號管理（含權限設定）
     Route::prefix('accounts')->name('accounts.')->group(function () {
