@@ -11,6 +11,17 @@
     // 待傳送的截圖，按下發送才會真的送到客戶群組
     var pendingImages = [];
 
+    /**
+     * 手機版寬度不夠放長提示，只有桌機顯示「可直接貼上截圖」
+     *
+     * @returns {string}
+     */
+    function placeholder() {
+        if (window.innerWidth < 768) { return T.i18n.input_placeholder; }
+
+        return T.i18n.input_placeholder_wide || T.i18n.input_placeholder;
+    }
+
     T.showInput = function () {
         var inputArea = document.getElementById('tg-input');
         if (!inputArea) { return; }
@@ -32,7 +43,7 @@
             '<button class="btn btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center" id="btn-tg-image" type="button" title="' + (T.i18n.btn_image || '傳送圖片') + '" style="width:36px;height:36px;flex-shrink:0"><i class="fas fa-paperclip" style="font-size:0.875rem"></i></button>' +
             '<button class="btn btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center" id="btn-tg-shared-file" type="button" title="文件區" style="width:36px;height:36px;flex-shrink:0"><i class="fas fa-file-alt" style="font-size:0.875rem"></i></button>' +
             '<button class="btn btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center" id="btn-tg-quick-reply" type="button" title="' + (T.i18n.btn_quick_reply || '快速回覆') + '" style="width:36px;height:36px;flex-shrink:0"><i class="fas fa-bolt" style="font-size:0.875rem"></i></button>' +
-            '<textarea id="tg-reply-text" class="form-control form-control-sm ms-1" placeholder="' + T.i18n.input_placeholder + '" rows="1" style="resize:none;max-height:100px;border-radius:1rem"></textarea>' +
+            '<textarea id="tg-reply-text" class="form-control form-control-sm ms-1" placeholder="' + placeholder() + '" rows="1" style="resize:none;max-height:100px;border-radius:1rem"></textarea>' +
             '<button class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center ms-1" id="btn-tg-send" type="button" style="width:36px;height:36px;flex-shrink:0"><i class="fas fa-paper-plane" style="font-size:0.875rem"></i></button>' +
             '</div>';
 

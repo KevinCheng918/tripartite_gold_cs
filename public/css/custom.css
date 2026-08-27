@@ -162,6 +162,38 @@
     .chat-layout .app-page-title {
         display: none;
     }
+
+    /* 手機版輸入列：功能鈕縮小、間距收緊，把空間讓給輸入框
+       （按鈕尺寸是 input.js 寫在 inline style，需要 !important 覆蓋） */
+    .chat-layout #tg-input > .d-flex {
+        gap: 0.25rem !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+    .chat-layout #tg-input .btn.rounded-circle {
+        width: 32px !important;
+        height: 32px !important;
+    }
+    .chat-layout #tg-input .btn.rounded-circle i {
+        font-size: 0.8125rem !important;
+    }
+    /* 送出是主要動作，維持較大好點 */
+    .chat-layout #tg-input #btn-tg-send {
+        width: 38px !important;
+        height: 38px !important;
+        margin-left: 0.25rem !important;
+    }
+    .chat-layout #tg-input #tg-reply-text {
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        margin-left: 0.25rem !important;
+    }
+    /* 待傳送縮圖也跟著收窄邊距 */
+    .chat-layout #tg-pending-images,
+    .chat-layout #tg-input-error {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
 }
 
 /* 手機版：app sidebar 展開時必須蓋過聊天區 */
