@@ -111,6 +111,21 @@ Telegram 抓不到，會回：
 這樣**不再依賴 `APP_URL` 是否對外可達** —— 正式環境也不必為了傳圖把 storage 目錄公開。
 `sendDocument` 本來就是 multipart，所以文件一直傳得出去、只有圖片會失敗。
 
+### 超長／超寬截圖會被 Telegram 退件
+
+Telegram photo 的限制：**寬 + 高 ≤ 10000**，且**長短邊比例 ≤ 20:1**，
+超過會回 `400 PHOTO_INVALID_DIMENSIONS`。整頁長截圖、超寬的設定畫面截圖很容易踩到。
+
+`sendPhoto()` 會先用 `isValidPhotoDimensions()`（`getimagesize()`，不需要 GD）檢查，
+不符規格就**自動改用 `sendDocument`** —— 顯示成檔案，但至少送得出去，而且原圖不會被 Telegram 壓縮。
+判斷不了尺寸時照原流程送，交給 Telegram 決定。
+
+### 送失敗就不要留下「已送出」的紀錄
+
+`sendReply()` 原本不檢查 Bot API 的回傳值，Telegram 明明退件了，
+訊息還是照樣寫進 `telegram_message` 並顯示在後台，**客服會誤以為回覆成功、客戶其實沒收到**。
+現在回傳 null 就記 log 並丟 `RuntimeException`，由 Controller 轉成 500 讓前端顯示錯誤。
+
 ### 輸入區版面
 
 輸入區是**兩列**結構（`showInput()` 產生）：

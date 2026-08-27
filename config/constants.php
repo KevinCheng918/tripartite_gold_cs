@@ -37,6 +37,10 @@ return [
             'WEEKDAY_MINUTES' => 5,  // 週一至週五未回覆告警閾值
             'WEEKEND_MINUTES' => 30, // 週六日未回覆告警閾值
         ],
+        'PHOTO' => [
+            'MAX_DIMENSION_SUM' => 10000, // 寬 + 高上限，超過 Telegram 回 PHOTO_INVALID_DIMENSIONS
+            'MAX_RATIO'         => 20,    // 長短邊比例上限，同上
+        ],
         'TTL_DAYS' => 7, // 訊息保留天數
     ],
 

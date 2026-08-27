@@ -372,10 +372,19 @@ class TelegramChatService
         $this->switchBotToken($group);
 
         // 透過 Bot API 發送到 Telegram
-        if (filled($imageUrl)) {
-            $this->botService->sendPhoto($group->chat_id, $imageUrl, $content);
-        } else {
-            $this->botService->sendMessage($group->chat_id, $content);
+        $result = filled($imageUrl)
+            ? $this->botService->sendPhoto($group->chat_id, $imageUrl, $content)
+            : $this->botService->sendMessage($group->chat_id, $content);
+
+        // Telegram 沒收到就不要留下「已送出」的紀錄，否則客服會以為回覆成功
+        if (!filled($result)) {
+            Log::error('Telegram 回覆發送失敗，不寫入訊息紀錄', [
+                'group_id' => $group->id,
+                'chat_id'  => $group->chat_id,
+                'has_image' => filled($imageUrl),
+            ]);
+
+            throw new \RuntimeException(trans('telegram_chat.msg.reply_failed'));
         }
 
         // 存入 outbound 訊息

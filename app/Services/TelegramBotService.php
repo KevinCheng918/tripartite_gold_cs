@@ -151,6 +151,17 @@ class TelegramBotService
             // 本站自己的圖片直接 multipart 上傳，不要讓 Telegram 反過來抓我們的網址
             // （APP_URL 為 localhost 或內網時，Telegram 會回 wrong HTTP URL specified）
             if (filled($localPath)) {
+                // 超長／超寬的截圖 Telegram 不收（PHOTO_INVALID_DIMENSIONS），
+                // 改以檔案傳送 —— 顯示成檔案總比整則訊息送不出去好，而且原圖不會被壓縮
+                if (!$this->isValidPhotoDimensions($localPath)) {
+                    Log::info('Telegram 圖片尺寸不符 photo 規格，改以檔案傳送', [
+                        'chat_id' => $chatId,
+                        'photo'   => $photoUrl,
+                    ]);
+
+                    return $this->sendDocument($chatId, $localPath, basename($localPath), $caption);
+                }
+
                 return $this->postMultipart('sendPhoto', $chatId, [
                     ['name' => 'photo', 'contents' => fopen($localPath, 'r'), 'filename' => basename($localPath)],
                 ], $caption);
@@ -180,6 +191,36 @@ class TelegramBotService
 
             return null;
         }
+    }
+
+    /**
+     * 圖片是否符合 Telegram photo 規格
+     *
+     * Telegram 的限制：寬 + 高 ≤ 10000，且長短邊比例不得超過 20:1，
+     * 超過會回 400 PHOTO_INVALID_DIMENSIONS。長截圖與超寬截圖很容易踩到。
+     * 讀不到尺寸時回 true，讓它照原流程送、由 Telegram 自行判斷。
+     *
+     * @param string $path 本地絕對路徑
+     * @return bool
+     */
+    private function isValidPhotoDimensions($path)
+    {
+        $size = @getimagesize($path);
+        if ($size === false) {
+            return true;
+        }
+
+        $width = (int) $size[0];
+        $height = (int) $size[1];
+        if ($width < 1 || $height < 1) {
+            return true;
+        }
+
+        if ($width + $height > config('constants.TELEGRAM.PHOTO.MAX_DIMENSION_SUM')) {
+            return false;
+        }
+
+        return max($width, $height) / min($width, $height) <= config('constants.TELEGRAM.PHOTO.MAX_RATIO');
     }
 
     /**
