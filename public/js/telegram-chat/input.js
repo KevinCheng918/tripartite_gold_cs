@@ -8,8 +8,31 @@
     // 後端 ajax-send-image 限制 max:5120（KB）
     var MAX_IMAGE_BYTES = 5120 * 1024;
 
+    // 輸入框與功能鈕共用同一個字級
+    var INPUT_FONT_SIZE = '0.9375rem';
+
+    // 圖示相對文字放大：同樣 font-size 下中文字撐滿 em 方塊，
+    // Font Awesome 的圖形只佔約 0.8em，不放大看起來會比文字小一截
+    var ICON_FONT_SIZE = '1.15em';
+
     // 待傳送的截圖，按下發送才會真的送到客戶群組
     var pendingImages = [];
+
+    /**
+     * 輸入區上方的功能鈕（圖示 + 文字說明）
+     *
+     * @param {string} id
+     * @param {string} icon  Font Awesome class
+     * @param {string} label
+     * @returns {string}
+     */
+    function toolButton(id, icon, label) {
+        // 文字對齊輸入框字級，圖示再依 ICON_FONT_SIZE 放大，兩者視覺才等高
+        return '<button class="btn btn-outline-secondary d-flex align-items-center" id="' + id + '" type="button" ' +
+            'style="font-size:' + INPUT_FONT_SIZE + ';padding:0.25rem 0.625rem;line-height:1.5">' +
+            '<i class="fas ' + icon + ' me-1" style="font-size:' + ICON_FONT_SIZE + ';line-height:1"></i>' + label +
+            '</button>';
+    }
 
     /**
      * 手機版寬度不夠放長提示，只有桌機顯示「可直接貼上截圖」
@@ -38,13 +61,16 @@
         inputArea.innerHTML =
             '<div id="tg-pending-images" class="px-3 pt-2 flex-wrap gap-2 align-items-center" style="display:none"></div>' +
             '<div id="tg-input-error" class="px-3 pt-2 text-danger" style="display:none;font-size:0.8125rem"></div>' +
-            '<div class="d-flex align-items-center gap-1 px-3 py-2">' +
+            // 功能鈕獨立一列並帶文字說明，輸入框才有整列寬度
+            '<div class="d-flex align-items-center flex-wrap gap-2 px-3 pt-2" id="tg-input-tools">' +
             '<input type="file" id="tg-image-input" accept="image/*" style="display:none">' +
-            '<button class="btn btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center" id="btn-tg-image" type="button" title="' + (T.i18n.btn_image || '傳送圖片') + '" style="width:36px;height:36px;flex-shrink:0"><i class="fas fa-paperclip" style="font-size:0.875rem"></i></button>' +
-            '<button class="btn btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center" id="btn-tg-shared-file" type="button" title="文件區" style="width:36px;height:36px;flex-shrink:0"><i class="fas fa-file-alt" style="font-size:0.875rem"></i></button>' +
-            '<button class="btn btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center" id="btn-tg-quick-reply" type="button" title="' + (T.i18n.btn_quick_reply || '快速回覆') + '" style="width:36px;height:36px;flex-shrink:0"><i class="fas fa-bolt" style="font-size:0.875rem"></i></button>' +
-            '<textarea id="tg-reply-text" class="form-control form-control-sm ms-1" placeholder="' + placeholder() + '" rows="1" style="resize:none;max-height:100px;border-radius:1rem"></textarea>' +
-            '<button class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center ms-1" id="btn-tg-send" type="button" style="width:36px;height:36px;flex-shrink:0"><i class="fas fa-paper-plane" style="font-size:0.875rem"></i></button>' +
+            toolButton('btn-tg-image', 'fa-paperclip', T.i18n.btn_image || '圖片') +
+            toolButton('btn-tg-shared-file', 'fa-file-alt', T.i18n.btn_file || '文件') +
+            toolButton('btn-tg-quick-reply', 'fa-bolt', T.i18n.btn_quick_reply || '快速回覆') +
+            '</div>' +
+            '<div class="d-flex align-items-center gap-1 px-3 py-2">' +
+            '<textarea id="tg-reply-text" class="form-control form-control-sm" placeholder="' + placeholder() + '" rows="1" style="resize:none;max-height:100px;border-radius:1rem;font-size:' + INPUT_FONT_SIZE + '"></textarea>' +
+            '<button class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center ms-1" id="btn-tg-send" type="button" style="width:38px;height:38px;flex-shrink:0"><i class="fas fa-paper-plane" style="font-size:0.875rem"></i></button>' +
             '</div>';
 
         var textarea = document.getElementById('tg-reply-text');

@@ -10,6 +10,7 @@ return [
         'vm' => '虚拟机管理',
         'payment_config' => '缴款设定',
         'telegram_chat' => 'Telegram 客服',
+        'quick_reply' => '快速回复题库',
         'staff_manage' => '内部管理',
         'project' => '项目管理',
         'shared_file' => '共用文件区',
@@ -63,6 +64,10 @@ return [
     'payment_config' => [
         'view'   => '查看缴款设定',
         'manage' => '管理缴款设定',
+    ],
+    'quick_reply' => [
+        'view' => '检视快速回复题库',
+        'edit' => '编辑快速回复题库',
     ],
     'telegram_chat' => [
         'reply'     => '回复消息',

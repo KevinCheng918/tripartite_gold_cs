@@ -6,6 +6,7 @@ use App\Events\TelegramTyping;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\TelegramChat\ReplyRequest;
 use App\Http\Resources\TelegramMessageResource;
+use App\Services\QuickReplyService;
 use App\Services\SharedFileService;
 use App\Services\TelegramChatService;
 use Illuminate\Http\Request;
@@ -22,11 +23,16 @@ class TelegramChatController extends Controller
 {
     private $chatService;
     private $sharedFileService;
+    private $quickReplyService;
 
-    public function __construct(TelegramChatService $chatService, SharedFileService $sharedFileService)
-    {
+    public function __construct(
+        TelegramChatService $chatService,
+        SharedFileService $sharedFileService,
+        QuickReplyService $quickReplyService
+    ) {
         $this->chatService = $chatService;
         $this->sharedFileService = $sharedFileService;
+        $this->quickReplyService = $quickReplyService;
     }
 
     /**
@@ -234,7 +240,7 @@ class TelegramChatController extends Controller
      */
     public function ajaxQuickReplies()
     {
-        $quickReplies = $this->chatService->getQuickReplies();
+        $quickReplies = $this->quickReplyService->getForChat();
 
         return response()->json($quickReplies);
     }

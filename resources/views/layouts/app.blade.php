@@ -215,6 +215,14 @@
                                 </a>
                             </li>
                             @endif
+                            @if(Auth::user()->hasPermission('quick_reply.view'))
+                            <li>
+                                <a href="{{ route('admin.quick-reply.index') }}" class="{{ request()->routeIs('admin.quick-reply.*') ? 'mm-active' : '' }}">
+                                    <i class="metismenu-icon fas fa-bolt"></i>
+                                    {{ trans('quick_reply.nav_label') }}
+                                </a>
+                            </li>
+                            @endif
                             @if(Auth::user()->hasPermission('task_board.view'))
                             <li>
                                 <a href="{{ route('admin.task-board.index') }}" class="{{ request()->routeIs('admin.task-board.*') ? 'mm-active' : '' }}">

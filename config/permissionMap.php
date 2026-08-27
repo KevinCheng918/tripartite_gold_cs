@@ -141,6 +141,14 @@ return [
         ],
     ],
 
+    'quick_reply' => [
+        'label' => 'permission.group.quick_reply',
+        'keywords' => [
+            'quick_reply.view' => 'permission.quick_reply.view',
+            'quick_reply.edit' => 'permission.quick_reply.edit',
+        ],
+    ],
+
     'task_board' => [
         'label' => 'permission.group.task_board',
         'keywords' => [

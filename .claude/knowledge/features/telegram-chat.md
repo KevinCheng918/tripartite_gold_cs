@@ -76,12 +76,43 @@
 取代原本掛在 Telegram 上的問答機器人 —— 改由**客服在後台選好答案再送出**，
 而不是讓客戶自己點 inline_keyboard。
 
+**題庫由客服在後台自行維護（存 DB），不寫死在 config。**
+
 | 檔案 | 角色 |
 |------|------|
-| `config/quick_reply.php` | 題庫：類別 → 問題 → 答案，由原機器人的 `menus`/`answers` 轉換而來 |
-| `TelegramChatService::getQuickReplies()` | 讀 config |
+| `quick_reply_category` / `quick_reply_item` 兩張表 | 線上題庫本體，含 `sort`、`status` |
+| `config/quick_reply.php` | **只是 `QuickReplySeeder` 的初始資料來源**，改它不影響線上內容 |
+| `QuickReplyService::getForChat()` | 聊天視窗選單（只回啟用中的） |
+| `QuickReplyService::getForManage()` | 管理頁（含停用項目） |
+| `QuickReplyController` | 後台 CRUD + 上下移，`quick_reply.view` / `quick_reply.edit` |
 | `TelegramChatController::ajaxQuickReplies()` | `GET ajax-quick-replies`，需 `telegram_chat.reply` |
-| `public/js/telegram-chat/quick-reply.js` | 三層 Modal：類別 → 問題 → 答案預覽 |
+| `public/js/telegram-chat/quick-reply.js` | 聊天視窗三層 Modal：類別 → 問題 → 答案預覽 |
+| `public/js/quick-reply-admin.js` | 後台管理頁 |
+
+### 為什麼 chat 端的 key 要加前綴
+
+`getForChat()` 回傳的 key 是 `c{id}` / `i{id}` 而不是純數字 ——
+**JS 物件的純數字 key 會被引擎自動依數值排序**，會蓋掉我們排好的 `sort` 順序。
+
+### 輸入區版面
+
+輸入區是**兩列**結構（`showInput()` 產生）：
+
+```
+#tg-pending-images   ← 待傳送截圖縮圖
+#tg-input-error      ← 行內錯誤提示
+#tg-input-tools      ← 圖片／文件／快速回覆，圖示 + 文字說明
+.d-flex              ← textarea + 圓形送出鈕
+```
+
+功能鈕原本是同列的純圖示圓鈕，手機版會把輸入框擠到只剩一小截；
+改成獨立一列後輸入框可佔滿整列，文字說明在手機版也看得到（純圖示沒有 hover 可用）。
+
+### 其他注意事項
+
+- 類別底下還有問答時**不允許刪除**（`deleteCategory()` 回 `false` → 422），避免一次誤刪整批題目。
+- 上下移是與相鄰一筆交換 `sort`，兩筆寫入包在 `DB::transaction()` 內。
+- 整個類別若沒有任何啟用中的問答，聊天視窗選單就不顯示該類別，免得點進去是空的。
 
 ### 設計取捨
 

@@ -89,6 +89,13 @@ return [
         ],
     ],
 
+    'QUICK_REPLY' => [
+        'STATUS' => [
+            'ACTIVE'   => 1,
+            'DISABLED' => 0,
+        ],
+    ],
+
     'PAGINATION' => [
         'DEFAULT' => 10,
         'USER' => 10,

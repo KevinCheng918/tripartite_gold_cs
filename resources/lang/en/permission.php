@@ -10,6 +10,7 @@ return [
         'vm' => 'VM Management',
         'payment_config' => 'Payment Config',
         'telegram_chat' => 'Telegram Chat',
+        'quick_reply' => 'Quick Reply Library',
         'staff_manage' => 'Staff Management',
         'project' => 'Project Management',
         'shared_file' => 'Shared Files',
@@ -63,6 +64,10 @@ return [
     'payment_config' => [
         'view'   => 'View payment config',
         'manage' => 'Manage payment config',
+    ],
+    'quick_reply' => [
+        'view' => 'View quick reply library',
+        'edit' => 'Edit quick reply library',
     ],
     'telegram_chat' => [
         'reply'     => 'Reply messages',

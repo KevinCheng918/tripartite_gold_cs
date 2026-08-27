@@ -1,13 +1,15 @@
 <?php
 
 /**
- * Telegram 客服快速回覆選單
+ * Telegram 客服快速回覆 —— 初始題庫
+ *
+ * ⚠ 這份檔案只是 QuickReplySeeder 的匯入來源，**不是線上題庫**。
+ * 系統實際讀的是 quick_reply_category / quick_reply_item 兩張表，
+ * 由客服在後台「快速回覆題庫」頁面維護，改這裡不會影響已上線的內容。
  *
  * 兩層結構：類別 → 問題 → 答案。
- * 客服在聊天視窗選擇後，可填入輸入框微調再送出，或直接送到對話群組。
- *
  * 每個類別：label（類別名稱）、items（問題清單）
- * 每則問題：key（識別碼，沿用原問答機器人的 callback_data）、label（問題）、answer（答案）
+ * 每則問題：key（沿用原問答機器人的 callback_data，僅供對照）、label（問題）、answer（答案）
  */
 return [
     'machine' => [
