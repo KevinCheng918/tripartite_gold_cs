@@ -11,7 +11,7 @@ return [
     'btn_send'           => 'Send',
     'btn_image'          => 'Send image',
     'btn_remove_image'   => 'Remove',
-    'pending_images'     => 'Images to send',
+    'drop_hint'          => 'Drop to attach screenshot',
     'btn_assign'         => 'Assign',
     'assigned_to'        => 'On Duty',
     'unassigned'         => 'Unassigned',
@@ -29,6 +29,7 @@ return [
         'reaction_failed'  => 'Failed to send reaction',
         'image_too_large'  => 'Image exceeds 5MB and cannot be sent',
         'image_invalid'    => 'Only images can be pasted',
+        'drop_invalid'     => 'Only image files can be dropped; use the file panel for other types',
         'image_send_failed' => 'Failed to send image',
     ],
 ];

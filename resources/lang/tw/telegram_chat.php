@@ -11,7 +11,7 @@ return [
     'btn_send'           => '發送',
     'btn_image'          => '傳送圖片',
     'btn_remove_image'   => '移除',
-    'pending_images'     => '待傳送圖片',
+    'drop_hint'          => '放開以加入截圖',
     'btn_assign'         => '指派',
     'assigned_to'        => '值班客服',
     'unassigned'         => '未指派',
@@ -29,6 +29,7 @@ return [
         'reaction_failed'  => '表情回應發送失敗',
         'image_too_large'  => '圖片超過 5MB，無法傳送',
         'image_invalid'    => '只能貼上圖片',
+        'drop_invalid'     => '只能拖入圖片檔，其他檔案請用文件區傳送',
         'image_send_failed' => '圖片傳送失敗',
     ],
 ];

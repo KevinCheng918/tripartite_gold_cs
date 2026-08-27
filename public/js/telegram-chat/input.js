@@ -121,8 +121,146 @@
         images.forEach(addPendingImage);
     });
 
+    // ===== 拖曳截圖進聊天視窗 =====
+
+    // dragenter/dragleave 會在子元素之間反覆觸發，用計數避免遮罩閃爍
+    var dragDepth = 0;
+
     /**
-     * 剪貼簿的圖片常沒有檔名（或叫 blob），補一個帶副檔名的名稱，
+     * 拖的是檔案（而非選取的文字或連結）
+     *
+     * @param {DragEvent} e
+     * @returns {boolean}
+     */
+    function isFileDrag(e) {
+        var types = e.dataTransfer && e.dataTransfer.types;
+        if (!types) { return false; }
+
+        // types 在不同瀏覽器是 DOMStringList 或 Array
+        return Array.prototype.indexOf.call(types, 'Files') !== -1;
+    }
+
+    /**
+     * 落在聊天頁範圍內 —— 這層只用來阻止瀏覽器直接開啟檔案
+     *
+     * @param {DragEvent} e
+     * @returns {boolean}
+     */
+    function inChatPage(e) {
+        return !!(e.target && e.target.closest && T.root.contains(e.target));
+    }
+
+    /**
+     * 真正接受截圖的範圍：右側聊天欄，且已選對話、有回覆權限
+     *
+     * @param {DragEvent} e
+     * @returns {boolean}
+     */
+    function canDropHere(e) {
+        if (!T.canReply || !T.selectedGroupId) { return false; }
+        if (!isFileDrag(e) || !inChatPage(e)) { return false; }
+
+        return !!e.target.closest('.app-inner-layout__content');
+    }
+
+    document.addEventListener('dragenter', function (e) {
+        if (!canDropHere(e)) { return; }
+        e.preventDefault();
+        dragDepth++;
+        toggleDropOverlay(true);
+    });
+
+    document.addEventListener('dragover', function (e) {
+        // 聊天頁內一律 preventDefault，否則拖歪到左側列表會被瀏覽器當成開啟檔案而離開頁面
+        if (!isFileDrag(e) || !inChatPage(e)) { return; }
+        e.preventDefault();
+        e.dataTransfer.dropEffect = canDropHere(e) ? 'copy' : 'none';
+    });
+
+    document.addEventListener('dragleave', function (e) {
+        if (!dragDepth) { return; }
+
+        // 拖出瀏覽器視窗時 relatedTarget 為 null，直接收掉遮罩免得卡住
+        if (!e.relatedTarget) {
+            dragDepth = 0;
+            toggleDropOverlay(false);
+            return;
+        }
+
+        if (!canDropHere(e)) { return; }
+        dragDepth = Math.max(0, dragDepth - 1);
+        if (!dragDepth) { toggleDropOverlay(false); }
+    });
+
+    // 拖曳取消（例如按 Esc）也要收掉遮罩
+    document.addEventListener('dragend', function () {
+        dragDepth = 0;
+        toggleDropOverlay(false);
+    });
+
+    document.addEventListener('drop', function (e) {
+        if (!isFileDrag(e) || !inChatPage(e)) { return; }
+
+        // 落在聊天頁任何位置都吞掉，不讓瀏覽器開啟檔案
+        e.preventDefault();
+        dragDepth = 0;
+        toggleDropOverlay(false);
+
+        if (!canDropHere(e)) { return; }
+
+        var files = e.dataTransfer.files;
+        if (!files || !files.length) { return; }
+
+        var images = [];
+        var rejected = 0;
+        for (var i = 0; i < files.length; i++) {
+            if (files[i].type.indexOf('image/') === 0) {
+                images.push(namedImage(files[i]));
+            } else {
+                rejected++;
+            }
+        }
+
+        images.forEach(addPendingImage);
+
+        // 有圖片就先讓圖片進待送區，只有全部都不是圖片時才提示
+        if (rejected && !images.length) {
+            showInputError(T.i18n.msg.drop_invalid || '只能拖入圖片檔');
+        }
+    });
+
+    /**
+     * 拖曳中的提示遮罩，蓋在右側聊天欄上
+     *
+     * @param {boolean} visible
+     */
+    function toggleDropOverlay(visible) {
+        var content = document.querySelector('.app-inner-layout__content');
+        if (!content) { return; }
+
+        var overlay = document.getElementById('tg-drop-overlay');
+        if (!overlay) {
+            if (window.getComputedStyle(content).position === 'static') {
+                content.style.position = 'relative';
+            }
+
+            overlay = document.createElement('div');
+            overlay.id = 'tg-drop-overlay';
+            // pointer-events:none —— 讓 dragleave/drop 能穿透到底下元素，否則遮罩會自己吃掉事件
+            overlay.style.cssText = 'position:absolute;top:0;right:0;bottom:0;left:0;z-index:10;display:none;' +
+                'align-items:center;justify-content:center;pointer-events:none;' +
+                'background:rgba(212,175,55,0.12);border:2px dashed #d4af37;border-radius:0.5rem';
+            overlay.innerHTML = '<div class="fw-bold" style="color:#a67c00;font-size:1.0625rem">' +
+                '<i class="fas fa-image me-2"></i>' + (T.i18n.drop_hint || '放開以加入截圖') +
+                '</div>';
+            content.appendChild(overlay);
+        }
+
+        overlay.style.display = visible ? 'flex' : 'none';
+    }
+
+    /**
+     * 剪貼簿與拖曳進來的圖片常沒有檔名（或叫 blob），補一個帶副檔名的名稱，
      * 後端 putFileAs 才不會存成沒有副檔名的檔案
      */
     function namedImage(file) {
