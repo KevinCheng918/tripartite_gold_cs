@@ -966,6 +966,37 @@ $(function () {
         });
     });
 
+    // 詳細資訊 Modal 用的語系
+    var detailI18n = @json(trans('station.detail'));
+    var fieldI18n = {
+        system:  @json(trans('station.field_system')),
+        name:    @json(trans('station.field_name')),
+        domain:  @json(trans('station.field_domain')),
+        credits: @json(trans('station.field_credits')),
+    };
+
+    /**
+     * 詳細資訊的一格（card 標題 + 欄位表格），四格排成 2x2
+     *
+     * @param {string} title
+     * @param {Array}  rows  每筆為 [欄位名, 值 HTML]
+     * @returns {string}
+     */
+    function detailCard(title, rows) {
+        // 不加 h-100：讓每格依內容自適應高度，欄位少的卡片才不會被拉長留白
+        var html = '<div class="col-md-6">' +
+            '<div class="card">' +
+            '<div class="card-header py-2" style="font-size:0.9375rem">' + title + '</div>' +
+            '<div class="card-body p-0">' +
+            '<table class="table table-sm mb-0">';
+
+        rows.forEach(function (row) {
+            html += '<tr><th>' + row[0] + '</th><td>' + row[1] + '</td></tr>';
+        });
+
+        return html + '</table></div></div></div>';
+    }
+
     // 詳細資訊
     $('.js-station-detail').on('click', function () {
         var id = $(this).data('id');
@@ -978,62 +1009,75 @@ $(function () {
             success: function (body) {
                 var list = body.data || [];
                 var station = list.filter(function (s) { return s.id === id; })[0];
-                if (!station) { $('#station-detail-body').html('<p>找不到</p>'); return; }
+                if (!station) {
+                    $('#station-detail-body').html('<p class="text-center py-3">' + detailI18n.not_found + '</p>');
+
+                    return;
+                }
 
                 var s = station.settings || {};
-                var on = '<span class="badge bg-success">啟用</span>';
-                var off = '<span class="badge bg-danger">未啟用</span>';
+                var on = '<span class="badge bg-success">' + detailI18n.enabled + '</span>';
+                var off = '<span class="badge bg-danger">' + detailI18n.disabled + '</span>';
 
-                var html = '<table class="table table-sm">';
-                html += '<tr><th>名稱</th><td>' + station.name + '</td></tr>';
-                html += '<tr><th>域名</th><td>' + (station.domain || '-') + '</td></tr>';
-                html += '<tr><th>系統</th><td>' + (station.system ? station.system.name : '-') + '</td></tr>';
-                html += '<tr><th>點數</th><td><strong>' + station.credits + '</strong></td></tr>';
                 var depositRateText = '-';
                 if (!s.withholding_system) {
-                    depositRateText = '不收費';
+                    depositRateText = detailI18n.free;
                 } else if (s.system_rate) {
                     depositRateText = (s.system_rate * 100).toFixed(2) + '%';
                 }
-                html += '<tr><th>代收費率</th><td>' + depositRateText + '</td></tr>';
-                var withdrawRateText = '-';
-                if (!s.withdraw) {
-                    withdrawRateText = '未開啟';
-                } else if (!s.withdraw_withholding_system) {
-                    withdrawRateText = '不收費';
-                } else if (s.system_rate_withdraw) {
-                    withdrawRateText = (s.system_rate_withdraw * 100).toFixed(2) + '%';
-                }
-                html += '<tr><th>代付費率</th><td>' + withdrawRateText + '</td></tr>';
                 var selfDepositText = '-';
                 if (!s.withholding_system) {
-                    selfDepositText = '不收費';
+                    selfDepositText = detailI18n.free;
                 } else if (s.self_system_rate) {
                     selfDepositText = (s.self_system_rate * 100).toFixed(2) + '%';
                 } else {
                     selfDepositText = '0%';
                 }
-                html += '<tr><th>同系統轉單代收費率</th><td>' + selfDepositText + '</td></tr>';
+                var withdrawRateText = '-';
+                if (!s.withdraw) {
+                    withdrawRateText = detailI18n.not_enabled;
+                } else if (!s.withdraw_withholding_system) {
+                    withdrawRateText = detailI18n.free;
+                } else if (s.system_rate_withdraw) {
+                    withdrawRateText = (s.system_rate_withdraw * 100).toFixed(2) + '%';
+                }
                 var selfWithdrawText = '-';
                 if (!s.withdraw) {
-                    selfWithdrawText = '未開啟';
+                    selfWithdrawText = detailI18n.not_enabled;
                 } else if (!s.withdraw_withholding_system) {
-                    selfWithdrawText = '不收費';
+                    selfWithdrawText = detailI18n.free;
                 } else if (s.self_system_rate_withdraw) {
                     selfWithdrawText = (s.self_system_rate_withdraw * 100).toFixed(2) + '%';
                 } else {
                     selfWithdrawText = '0%';
                 }
-                html += '<tr><th>同系統轉單代付費率</th><td>' + selfWithdrawText + '</td></tr>';
-                html += '<tr><th>USDT 代收</th><td>' + (s.usdt_deposit ? on : off) + '</td></tr>';
-                html += '<tr><th>ATM 代收</th><td>' + (s.atm_deposit ? on : off) + '</td></tr>';
-                html += '<tr><th>超商代收</th><td>' + (s.cvs_deposit ? on : off) + '</td></tr>';
-                html += '<tr><th>信用卡</th><td>' + (s.cc_deposit ? on : off) + '</td></tr>';
-                html += '<tr><th>QR 代收</th><td>' + (s.qr_deposit ? on : off) + '</td></tr>';
-                html += '<tr><th>代付</th><td>' + (s.withdraw ? on : off) + '</td></tr>';
-                html += '<tr><th>商城</th><td>' + (s.support_shop ? on : off) + '</td></tr>';
-                html += '<tr><th>跑分員</th><td>' + (s.score_runner ? on : off) + '</td></tr>';
-                html += '</table>';
+
+                var html = '<div class="row g-3">' +
+                    detailCard(detailI18n.section_station, [
+                        [fieldI18n.system, station.system ? station.system.name : '-'],
+                        [fieldI18n.name, station.name],
+                        [fieldI18n.domain, station.domain || '-'],
+                        [fieldI18n.credits, '<strong>' + station.credits + '</strong>'],
+                    ]) +
+                    detailCard(detailI18n.section_feature, [
+                        [detailI18n.shop, s.support_shop ? on : off],
+                        [detailI18n.score_runner, s.score_runner ? on : off],
+                    ]) +
+                    detailCard(detailI18n.section_deposit, [
+                        [detailI18n.deposit_rate, depositRateText],
+                        [detailI18n.self_deposit_rate, selfDepositText],
+                        [detailI18n.usdt_deposit, s.usdt_deposit ? on : off],
+                        [detailI18n.atm_deposit, s.atm_deposit ? on : off],
+                        [detailI18n.cvs_deposit, s.cvs_deposit ? on : off],
+                        [detailI18n.cc_deposit, s.cc_deposit ? on : off],
+                        [detailI18n.qr_deposit, s.qr_deposit ? on : off],
+                    ]) +
+                    detailCard(detailI18n.section_withdraw, [
+                        [detailI18n.withdraw, s.withdraw ? on : off],
+                        [detailI18n.withdraw_rate, withdrawRateText],
+                        [detailI18n.self_withdraw_rate, selfWithdrawText],
+                    ]) +
+                    '</div>';
 
                 $('#station-detail-body').html(html);
             }

@@ -20,6 +20,31 @@ return [
     'action_edit'      => 'Edit',
     'action_detail'    => 'Detail',
 
+    // Detail modal (4 cards: station / features / deposit / withdraw)
+    'detail' => [
+        'section_station'    => 'Station Info',
+        'section_feature'    => 'Features',
+        'section_deposit'    => 'Deposit',
+        'section_withdraw'   => 'Withdraw',
+        'shop'               => 'Shop',
+        'score_runner'       => 'Score Runner',
+        'deposit_rate'       => 'Deposit rate',
+        'self_deposit_rate'  => 'Same-system deposit rate',
+        'usdt_deposit'       => 'USDT deposit',
+        'atm_deposit'        => 'ATM deposit',
+        'cvs_deposit'        => 'CVS deposit',
+        'cc_deposit'         => 'Credit card',
+        'qr_deposit'         => 'QR deposit',
+        'withdraw'           => 'Withdraw',
+        'withdraw_rate'      => 'Withdraw rate',
+        'self_withdraw_rate' => 'Same-system withdraw rate',
+        'enabled'            => 'Enabled',
+        'disabled'           => 'Disabled',
+        'free'               => 'No fee',
+        'not_enabled'        => 'Not enabled',
+        'not_found'          => 'Station not found',
+    ],
+
     'msg' => [
         'created'       => 'Station created',
         'updated'       => 'Station updated',

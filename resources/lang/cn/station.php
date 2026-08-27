@@ -20,6 +20,31 @@ return [
     'action_edit'      => '编辑',
     'action_detail'    => '详细',
 
+    // 详细信息 Modal（四格：站台信息 / 功能 / 代收 / 代付）
+    'detail' => [
+        'section_station'    => '站台信息',
+        'section_feature'    => '功能',
+        'section_deposit'    => '代收',
+        'section_withdraw'   => '代付',
+        'shop'               => '商城',
+        'score_runner'       => '跑分员',
+        'deposit_rate'       => '代收费率',
+        'self_deposit_rate'  => '同系统转单代收费率',
+        'usdt_deposit'       => 'USDT 代收',
+        'atm_deposit'        => 'ATM 代收',
+        'cvs_deposit'        => '超商代收',
+        'cc_deposit'         => '信用卡',
+        'qr_deposit'         => 'QR 代收',
+        'withdraw'           => '代付',
+        'withdraw_rate'      => '代付费率',
+        'self_withdraw_rate' => '同系统转单代付费率',
+        'enabled'            => '启用',
+        'disabled'           => '未启用',
+        'free'               => '不收费',
+        'not_enabled'        => '未开启',
+        'not_found'          => '找不到站台数据',
+    ],
+
     'msg' => [
         'created'       => '站台已新增',
         'updated'       => '站台已更新',
