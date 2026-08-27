@@ -357,7 +357,7 @@ return [
             [
                 'key'    => 'spider_api_information',
                 'label'  => 'API 網域、Token',
-                'answer' => '請與 HM系統 聯絡獲取 API 網域與 API Token。',
+                'answer' => '請與我們聯絡獲取 API 網域與 API Token。',
             ],
             [
                 'key'    => 'spider_no_bank',
@@ -443,12 +443,12 @@ return [
             [
                 'key'    => 'spider_gmail_support',
                 'label'  => 'Gmail 爬蟲',
-                'answer' => '目前僅支援 004（臺灣銀行）與 700（中華郵政）。如有其他銀行的入帳通知信件，歡迎提供給 HM 系統評估後續開發可行性。',
+                'answer' => '目前僅支援 004（臺灣銀行）與 700（中華郵政）。如有其他銀行的入帳通知信件，歡迎提供給我們評估後續開發可行性。',
             ],
             [
                 'key'    => 'spider_not_support',
                 'label'  => '銀行不在清單中',
-                'answer' => '請提供該銀行的登入資訊給ＨＭ系統評估後續開發可行性，具體開發完成時間則依據開發排程而定。',
+                'answer' => '請提供該銀行的登入資訊給我們評估後續開發可行性，具體開發完成時間則依據開發排程而定。',
             ],
         ],
     ],
@@ -573,7 +573,7 @@ return [
             [
                 'key'    => 'bot_token',
                 'label'  => '獲取機器人ID',
-                'answer' => '請洽詢ＨＭ系統',
+                'answer' => '請洽詢我們',
             ],
             [
                 'key'    => 'bot_notify_not_work',
