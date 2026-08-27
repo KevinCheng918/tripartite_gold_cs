@@ -228,6 +228,18 @@ class TelegramChatController extends Controller
     }
 
     /**
+     * Ajax 取得快速回覆選單（客服選類別 → 問題 → 答案）
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxQuickReplies()
+    {
+        $quickReplies = $this->chatService->getQuickReplies();
+
+        return response()->json($quickReplies);
+    }
+
+    /**
      * Ajax 從文件區傳送檔案到 Telegram 群組
      *
      * @param Request $request

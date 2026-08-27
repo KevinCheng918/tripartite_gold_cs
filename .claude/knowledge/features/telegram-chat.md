@@ -22,6 +22,7 @@
 | 文字收發 | Webhook 收訊 + 後台回覆 |
 | 圖片收發 | 收：下載 Telegram 圖片/貼圖到 storage；發：上傳圖片後透過 Bot API 傳送 |
 | 貼上／拖曳截圖 | 聊天視窗內 Ctrl+V 貼上，或把檔案直接拖進聊天欄（見下方「貼上／拖曳截圖」）|
+| 快速回覆選單 | 客服選類別 → 問題 → 預覽答案，可填入輸入框微調或直接送出（見下方「快速回覆選單」）|
 | 貼圖相容 | 動態/影片貼圖自動取用 thumbnail 靜態縮圖 |
 | 表情回應 | 收：處理 message_reaction webhook，合併計數存入 reactions JSON；發：透過 setMessageReaction Bot API，前端提供 6 個快速 emoji 選擇器 |
 | 值班自動指派 | 依排班自動指派當前值班客服 |
@@ -69,6 +70,37 @@
 - 前端 `MAX_IMAGE_BYTES` 必須與後端 `ajaxSendImage` 的 `max:5120`（KB）一致，改一邊要改兩邊。
 - 錯誤提示走輸入區上方的行內紅字（`#tg-input-error`），不是 `alert`。
   註：`sendReply()` 的文字送出失敗仍是既有的 `alert`，尚未一併改掉。
+
+## 快速回覆選單（2026-08-27）
+
+取代原本掛在 Telegram 上的問答機器人 —— 改由**客服在後台選好答案再送出**，
+而不是讓客戶自己點 inline_keyboard。
+
+| 檔案 | 角色 |
+|------|------|
+| `config/quick_reply.php` | 題庫：類別 → 問題 → 答案，由原機器人的 `menus`/`answers` 轉換而來 |
+| `TelegramChatService::getQuickReplies()` | 讀 config |
+| `TelegramChatController::ajaxQuickReplies()` | `GET ajax-quick-replies`，需 `telegram_chat.reply` |
+| `public/js/telegram-chat/quick-reply.js` | 三層 Modal：類別 → 問題 → 答案預覽 |
+
+### 設計取捨
+
+- **答案一定先預覽**，再由客服選「填入輸入框」（可改字）或「直接送出」。
+  訊息送到客戶群組收不回來，不做「點一下就送」。
+- 送出沿用既有 `ajax-reply`，**沒有新的送出端點**；客服本來就能自由打字送出任意內容，
+  由前端帶答案文字不構成新的風險面。
+- 選單資料前端**只載入一次**後快取在 `quick-reply.js` 的 `data` 變數，切換對話不重抓。
+- 附搜尋框，跨類別同時比對「問題」與「答案」內容 —— 題庫有 60+ 題，只靠分類翻找太慢。
+
+### 題庫轉換時的調整（原始資料來自使用者提供的機器人設定）
+
+| 項目 | 處理 |
+|------|------|
+| `keywords.not_private` | 原為 bot 拒絕私訊的自動回覆，改放進「其他」類別供客服手動送出 |
+| `back_root` 返回按鈕 | 移除，後台 Modal 自己有返回鈕 |
+| `api_block` 重複 | 原始資料中「如何開啟黑名單阻擋」與「付款人電話…必填」的 `callback_data` 都是 `api_block`，後者改 key 為 `api_block_required`，兩題目前**共用同一段答案**，待確認是否要分開 |
+| `order_distribute` | 原始資料有答案但 keyboard 漏了按鈕，已補上「派單功能設定」 |
+| `agent_balance_holiday` | 原文「系統後gi台」為筆誤，改為「系統後台」 |
 
 ## 待釐清
 

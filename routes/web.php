@@ -120,6 +120,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::delete('/ajax-delete-conversation/{group}', [TelegramChatController::class, 'ajaxDeleteConversation'])->middleware('can:telegram_chat.delete')->name('ajax-delete-conversation');
         Route::get('/ajax-shared-files', [TelegramChatController::class, 'ajaxSharedFiles'])->name('ajax-shared-files');
         Route::post('/ajax-send-document', [TelegramChatController::class, 'ajaxSendDocument'])->middleware('can:telegram_chat.reply')->name('ajax-send-document');
+        Route::get('/ajax-quick-replies', [TelegramChatController::class, 'ajaxQuickReplies'])->middleware('can:telegram_chat.reply')->name('ajax-quick-replies');
     });
 
     // 站台管理

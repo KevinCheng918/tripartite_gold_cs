@@ -697,4 +697,14 @@ class TelegramChatService
 
         return $count;
     }
+
+    /**
+     * 取得客服快速回覆選單（類別 → 問題 → 答案）
+     *
+     * @return array<string, array{label: string, items: array<int, array{key: string, label: string, answer: string}>}>
+     */
+    public function getQuickReplies()
+    {
+        return config('quick_reply', []);
+    }
 }

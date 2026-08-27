@@ -31,6 +31,7 @@
             '<input type="file" id="tg-image-input" accept="image/*" style="display:none">' +
             '<button class="btn btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center" id="btn-tg-image" type="button" title="' + (T.i18n.btn_image || '傳送圖片') + '" style="width:36px;height:36px;flex-shrink:0"><i class="fas fa-paperclip" style="font-size:0.875rem"></i></button>' +
             '<button class="btn btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center" id="btn-tg-shared-file" type="button" title="文件區" style="width:36px;height:36px;flex-shrink:0"><i class="fas fa-file-alt" style="font-size:0.875rem"></i></button>' +
+            '<button class="btn btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center" id="btn-tg-quick-reply" type="button" title="' + (T.i18n.btn_quick_reply || '快速回覆') + '" style="width:36px;height:36px;flex-shrink:0"><i class="fas fa-bolt" style="font-size:0.875rem"></i></button>' +
             '<textarea id="tg-reply-text" class="form-control form-control-sm ms-1" placeholder="' + T.i18n.input_placeholder + '" rows="1" style="resize:none;max-height:100px;border-radius:1rem"></textarea>' +
             '<button class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center ms-1" id="btn-tg-send" type="button" style="width:36px;height:36px;flex-shrink:0"><i class="fas fa-paper-plane" style="font-size:0.875rem"></i></button>' +
             '</div>';
@@ -53,6 +54,12 @@
         var sfBtn = document.getElementById('btn-tg-shared-file');
         if (sfBtn) {
             sfBtn.addEventListener('click', function () { openSharedFileModal(); });
+        }
+
+        // 快速回覆按鈕（實作在 quick-reply.js）
+        var qrBtn = document.getElementById('btn-tg-quick-reply');
+        if (qrBtn && T.openQuickReplyModal) {
+            qrBtn.addEventListener('click', function () { T.openQuickReplyModal(); });
         }
 
         // 自動高度 + typing 通知
