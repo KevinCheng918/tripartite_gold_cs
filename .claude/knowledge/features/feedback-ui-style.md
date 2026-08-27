@@ -10,6 +10,22 @@
 - 常見需要涵蓋的 type：`text`, `password`, `email`, `number`, `date`, `time`
 - 使用者不要 alert，所有操作回饋用 modal
 
+## 暗黑模式：選中狀態不要只靠 `bg-light`
+
+`bg-light` 在暗黑模式下是**白底**，整列會反白、文字看不見
+（2026-08-27 在快速回覆題庫管理頁踩到）。
+
+列表項目要標示「選中」時，除了加 `bg-light`，還要給它一個樣式用的 class
+並在 `custom.css` 補 dark 規則 —— 比照既有的 `.tg-group-item`：
+
+```css
+[data-theme="dark"] .xxx-item { border-color: rgba(255,255,255,0.06) !important; color: #e0e0e0 !important; }
+[data-theme="dark"] .xxx-item:hover { background: rgba(212,175,55,0.08) !important; }
+[data-theme="dark"] .xxx-item.bg-light { background: rgba(212,175,55,0.15) !important; }
+```
+
+> `js-` 開頭的 class 只作為 JS hook，樣式另外用語意 class（如 `qr-category-item`），不要混用。
+
 ## 刪除按鈕
 
 **不要用 `btn-outline-danger`**，在本專案會顯示成淺底淺字、幾乎看不見

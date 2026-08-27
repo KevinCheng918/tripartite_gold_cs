@@ -14,6 +14,7 @@ return [
     'btn_file'           => '文件',
     'btn_remove_image'   => '移除',
     'drop_hint'          => '放开以加入截图',
+    'download_file'      => '下载档案',
     'btn_quick_reply'    => '快速回复',
     'qr_search'          => '搜寻问题...',
     'qr_back'            => '返回',

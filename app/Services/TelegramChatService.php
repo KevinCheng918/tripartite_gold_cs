@@ -387,6 +387,13 @@ class TelegramChatService
             throw new \RuntimeException(trans('telegram_chat.msg.reply_failed'));
         }
 
+        // 超規格的截圖會被改以檔案送出，紀錄要跟著標成 document，
+        // 否則前端會當圖片渲染而顯示成破圖
+        $mediaType = null;
+        if (filled($imageUrl)) {
+            $mediaType = isset($result['result']['document']) ? 'document' : 'photo';
+        }
+
         // 存入 outbound 訊息
         $msg = $this->telegramRepository->createMessage([
             'telegram_group_id' => $group->id,
@@ -394,7 +401,7 @@ class TelegramChatService
             'sender_name'       => $nickname,
             'sender_user_id'    => $userId,
             'content'           => $content ?: '',
-            'media_type'        => filled($imageUrl) ? 'photo' : null,
+            'media_type'        => $mediaType,
             'media_url'         => $imageUrl,
             'replied'           => true,
         ]);

@@ -747,6 +747,13 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .list-group-item { background: #1a1a1a !important; border-color: rgba(255,255,255,0.08) !important; color: #e0e0e0 !important; }
 [data-theme="dark"] .list-group-item:hover, [data-theme="dark"] .list-group-item-action:hover { background: rgba(212,175,55,0.1) !important; color: #f0e6c8 !important; }
 
+/* 快速回覆題庫類別列表（選中用 bg-light，dark mode 要蓋掉否則整列反白） */
+/* 選中再加一條左側金邊，兩種模式都更好辨識 */
+.qr-category-item.bg-light { box-shadow: inset 3px 0 0 #d4af37; }
+[data-theme="dark"] .qr-category-item { border-color: rgba(255,255,255,0.06) !important; color: #e0e0e0 !important; }
+[data-theme="dark"] .qr-category-item:hover { background: rgba(212,175,55,0.08) !important; }
+[data-theme="dark"] .qr-category-item.bg-light { background: rgba(212,175,55,0.28) !important; }
+
 /* 系統狀態總覽 dark mode */
 [data-theme="dark"] .border.rounded-3 { background: #1a1a1a !important; border-color: rgba(255,255,255,0.1) !important; color: #e0e0e0 !important; }
 [data-theme="dark"] .border.rounded-3 .fw-bold { color: #f0e6c8 !important; }

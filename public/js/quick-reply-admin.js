@@ -120,7 +120,7 @@
             var disabled = category.status ? '' :
                 '<span class="badge bg-secondary me-1">' + escapeHtml(i18n.status_disabled) + '</span>';
 
-            html += '<div class="px-3 py-2 border-bottom js-qr-category' + active + '" ' +
+            html += '<div class="px-3 py-2 border-bottom qr-category-item js-qr-category' + active + '" ' +
                 'data-id="' + category.id + '" style="cursor:pointer">' +
                 '<div class="d-flex align-items-center">' +
                 '<div class="flex-fill text-truncate">' + disabled + escapeHtml(category.label) + '</div>' +

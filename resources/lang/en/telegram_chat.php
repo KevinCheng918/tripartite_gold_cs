@@ -14,6 +14,7 @@ return [
     'btn_file'           => 'Files',
     'btn_remove_image'   => 'Remove',
     'drop_hint'          => 'Drop to attach screenshot',
+    'download_file'      => 'Download file',
     'btn_quick_reply'    => 'Quick reply',
     'qr_search'          => 'Search questions...',
     'qr_back'            => 'Back',

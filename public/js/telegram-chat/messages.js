@@ -6,6 +6,22 @@
     if (!T) { return; }
 
     /**
+     * 從檔案網址取出檔名（去掉查詢字串、還原編碼）
+     *
+     * @param {string} url
+     * @returns {string}
+     */
+    function fileNameFromUrl(url) {
+        var name = String(url).split('?')[0].split('/').pop();
+
+        try {
+            return decodeURIComponent(name);
+        } catch (err) {
+            return name;
+        }
+    }
+
+    /**
      * 組合單則訊息 HTML
      */
     function buildMessageHtml(m) {
@@ -19,7 +35,9 @@
         } else if (m.media_type === 'sticker' && m.media_url) {
             mediaHtml = '<div class="mb-1"><img src="' + m.media_url + '" alt="sticker" loading="lazy" style="max-width:120px;max-height:120px;display:block"></div>';
         } else if (m.media_type === 'document' && m.media_url) {
-            mediaHtml = '<div class="mb-1"><a href="' + m.media_url + '" target="_blank" class="d-inline-flex align-items-center gap-1 text-decoration-none" style="padding:6px 10px;border-radius:6px;background:rgba(0,0,0,0.05);font-size:0.875rem"><i class="fas fa-file-download" style="font-size:1rem"></i><span>' + T.escapeHtml(m.content || '下載檔案') + '</span></a></div>';
+            // 沒有說明文字時顯示檔名，讓人看得出這是檔案而不是空白連結
+            var docLabel = m.content || fileNameFromUrl(m.media_url) || T.i18n.download_file;
+            mediaHtml = '<div class="mb-1"><a href="' + m.media_url + '" target="_blank" download class="d-inline-flex align-items-center gap-1 text-decoration-none" style="padding:6px 10px;border-radius:6px;background:rgba(0,0,0,0.05);font-size:0.875rem"><i class="fas fa-file-download" style="font-size:1rem"></i><span>' + T.escapeHtml(docLabel) + '</span></a></div>';
         }
 
         var replyHtml = '';
@@ -145,4 +163,22 @@
         overlay.addEventListener('click', function () { overlay.remove(); });
         document.body.appendChild(overlay);
     });
+
+    // 圖片載不出來就改顯示成下載連結
+    // （超規格截圖是以檔案送出的，早期紀錄卻標成 photo，會渲染成破圖）
+    // error 事件不會冒泡，必須用 capture 才收得到
+    document.addEventListener('error', function (e) {
+        var img = e.target;
+        if (!img.classList || !img.classList.contains('tg-photo-preview')) { return; }
+
+        var wrapper = img.parentElement;
+        if (!wrapper) { return; }
+
+        var name = fileNameFromUrl(img.src) || T.i18n.download_file;
+        wrapper.innerHTML = '<a href="' + img.src + '" target="_blank" download ' +
+            'class="d-inline-flex align-items-center gap-1 text-decoration-none" ' +
+            'style="padding:6px 10px;border-radius:6px;background:rgba(0,0,0,0.05);font-size:0.875rem">' +
+            '<i class="fas fa-file-download" style="font-size:1rem"></i>' +
+            '<span>' + T.escapeHtml(name) + '</span></a>';
+    }, true);
 })();
