@@ -6,6 +6,16 @@
  */
 return [
     [
+        'version' => 'v1.48',
+        'date'    => '2026-08-27',
+        'title'   => '修正 Telegram 圖片傳送失敗',
+        'content' => implode("\n", [
+            '• 圖片改為直接上傳給 Telegram，不再由 Telegram 反向抓取本站網址',
+            '• 修正圖片傳送回報 wrong HTTP URL specified 而失敗的問題',
+            '• 群發公告的多圖相簿一併改用相同方式傳送',
+        ]),
+    ],
+    [
         'version' => 'v1.47',
         'date'    => '2026-08-27',
         'title'   => '快速回覆題庫改為後台維護',

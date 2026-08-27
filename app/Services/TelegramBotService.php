@@ -4,6 +4,7 @@ namespace App\Services;
 
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Telegram Bot API Service
@@ -145,6 +146,16 @@ class TelegramBotService
     public function sendPhoto($chatId, $photoUrl, $caption = null)
     {
         try {
+            $localPath = $this->resolveLocalPath($photoUrl);
+
+            // 本站自己的圖片直接 multipart 上傳，不要讓 Telegram 反過來抓我們的網址
+            // （APP_URL 為 localhost 或內網時，Telegram 會回 wrong HTTP URL specified）
+            if (filled($localPath)) {
+                return $this->postMultipart('sendPhoto', $chatId, [
+                    ['name' => 'photo', 'contents' => fopen($localPath, 'r'), 'filename' => basename($localPath)],
+                ], $caption);
+            }
+
             $data = [
                 'chat_id' => $chatId,
                 'photo'   => $photoUrl,
@@ -163,11 +174,61 @@ class TelegramBotService
         } catch (\Exception $e) {
             Log::error('Telegram sendPhoto 失敗', [
                 'chat_id' => $chatId,
+                'photo'   => $photoUrl,
                 'error'   => $e->getMessage(),
             ]);
 
             return null;
         }
+    }
+
+    /**
+     * 把 public disk 產生的 URL 還原成本地絕對路徑
+     *
+     * 外部網址（非本站 storage）回傳 null，交由 Telegram 自行抓取。
+     *
+     * @param string $url
+     * @return string|null
+     */
+    private function resolveLocalPath($url)
+    {
+        $publicUrl = rtrim((string) config('filesystems.disks.public.url'), '/');
+        if (!filled($publicUrl) || strpos((string) $url, $publicUrl) !== 0) {
+            return null;
+        }
+
+        $relative = ltrim(substr($url, strlen($publicUrl)), '/');
+        $path = Storage::disk('public')->path($relative);
+
+        return file_exists($path) ? $path : null;
+    }
+
+    /**
+     * 以 multipart 送出（含 caption 處理），供本地檔案上傳共用
+     *
+     * @param string      $method    Telegram API method
+     * @param int         $chatId
+     * @param array       $parts     除了 chat_id / caption 以外的 multipart 欄位
+     * @param string|null $caption
+     * @return array|null
+     */
+    private function postMultipart($method, $chatId, array $parts, $caption = null)
+    {
+        $multipart = array_merge(
+            [['name' => 'chat_id', 'contents' => (string) $chatId]],
+            $parts
+        );
+
+        if (filled($caption)) {
+            $multipart[] = ['name' => 'caption', 'contents' => $this->escapeHtml($caption)];
+            $multipart[] = ['name' => 'parse_mode', 'contents' => 'HTML'];
+        }
+
+        $response = $this->client->post("{$this->getBaseUrl()}/{$method}", [
+            'multipart' => $multipart,
+        ]);
+
+        return json_decode($response->getBody()->getContents(), true);
     }
 
     /**
@@ -182,11 +243,20 @@ class TelegramBotService
     {
         try {
             $media = [];
+            $files = [];
+
             foreach ($photoUrls as $idx => $url) {
-                $item = [
-                    'type'  => 'photo',
-                    'media' => $url,
-                ];
+                $localPath = $this->resolveLocalPath($url);
+
+                if (filled($localPath)) {
+                    // 本站圖片用 attach:// 對應到同一個 multipart 的檔案欄位
+                    $field = "photo{$idx}";
+                    $files[] = ['name' => $field, 'contents' => fopen($localPath, 'r'), 'filename' => basename($localPath)];
+                    $item = ['type' => 'photo', 'media' => "attach://{$field}"];
+                } else {
+                    $item = ['type' => 'photo', 'media' => $url];
+                }
+
                 if ($idx === 0 && filled($caption)) {
                     $item['caption'] = $this->escapeHtml($caption);
                     $item['parse_mode'] = 'HTML';
@@ -194,11 +264,16 @@ class TelegramBotService
                 $media[] = $item;
             }
 
-            $response = $this->client->post("{$this->getBaseUrl()}/sendMediaGroup", [
-                'json' => [
-                    'chat_id' => $chatId,
-                    'media'   => $media,
+            $multipart = array_merge(
+                [
+                    ['name' => 'chat_id', 'contents' => (string) $chatId],
+                    ['name' => 'media', 'contents' => json_encode($media)],
                 ],
+                $files
+            );
+
+            $response = $this->client->post("{$this->getBaseUrl()}/sendMediaGroup", [
+                'multipart' => $multipart,
             ]);
 
             return json_decode($response->getBody()->getContents(), true);

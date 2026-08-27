@@ -94,6 +94,23 @@
 `getForChat()` 回傳的 key 是 `c{id}` / `i{id}` 而不是純數字 ——
 **JS 物件的純數字 key 會被引擎自動依數值排序**，會蓋掉我們排好的 `sort` 順序。
 
+### 圖片一律 multipart 上傳，不要傳 URL 給 Telegram
+
+`sendPhoto` / `sendMediaGroup` 原本是把 `Storage::disk('public')->url(...)` 產生的網址
+交給 Telegram，**由 Telegram 反過來抓我們的伺服器**。開發環境 `APP_URL=http://localhost`，
+Telegram 抓不到，會回：
+
+```
+400 Bad Request: wrong HTTP URL specified
+```
+
+現在兩支都會先用 `resolveLocalPath()` 判斷是不是本站 storage 的網址，
+是的話改用 multipart 直接把檔案上傳給 Telegram（`sendMediaGroup` 用 `attach://欄位名` 對應），
+外部網址才維持原本交給 Telegram 自行抓取的做法。
+
+這樣**不再依賴 `APP_URL` 是否對外可達** —— 正式環境也不必為了傳圖把 storage 目錄公開。
+`sendDocument` 本來就是 multipart，所以文件一直傳得出去、只有圖片會失敗。
+
 ### 輸入區版面
 
 輸入區是**兩列**結構（`showInput()` 產生）：
