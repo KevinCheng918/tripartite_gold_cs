@@ -10,6 +10,23 @@
 - 常見需要涵蓋的 type：`text`, `password`, `email`, `number`, `date`, `time`
 - 使用者不要 alert，所有操作回饋用 modal
 
+## 刪除按鈕
+
+**不要用 `btn-outline-danger`**，在本專案會顯示成淺底淺字、幾乎看不見
+（2026-08-27 在快速回覆題庫管理頁踩到；`custom.css` 只針對 `btn-outline-secondary`
+與 `btn-danger` 做了樣式，`outline-danger` 沒被涵蓋）。
+
+列表中的刪除鈕照 `task-board` 的做法：外框用 `btn-outline-secondary`（與同排其他按鈕一致），
+靠 `text-danger` 表達危險語意。
+
+```html
+<button class="btn btn-sm btn-outline-secondary js-xxx-delete">
+    <i class="fas fa-trash text-danger me-1"></i><span class="text-danger">刪除</span>
+</button>
+```
+
+確認 Modal 裡的「確定刪除」則用實心 `btn btn-danger`（`payment-config`、`finance` 等皆是）。
+
 ## 訊息／確認 Modal 的 markup
 
 **不要用 `modal-dialog-centered`。** 它帶有 `min-height: calc(100% - 1rem)`，

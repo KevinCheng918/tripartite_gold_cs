@@ -320,10 +320,13 @@
      * @returns {string}
      */
     function editButtons(type, id) {
+        // 刪除鈕沿用 task-board 的做法：外框用 outline-secondary（與其他鈕一致），
+        // 靠 text-danger 表達危險語意。btn-outline-danger 在本專案會顯示異常。
         return '<button class="btn btn-sm btn-outline-secondary js-qr-edit-' + type + '" data-id="' + id + '">' +
             '<i class="fas fa-pen me-1"></i>' + escapeHtml(i18n.action_edit) + '</button>' +
-            '<button class="btn btn-sm btn-outline-danger js-qr-del-' + type + '" data-id="' + id + '">' +
-            '<i class="fas fa-trash me-1"></i>' + escapeHtml(i18n.action_delete) + '</button>';
+            '<button class="btn btn-sm btn-outline-secondary js-qr-del-' + type + '" data-id="' + id + '">' +
+            '<i class="fas fa-trash text-danger me-1"></i>' +
+            '<span class="text-danger">' + escapeHtml(i18n.action_delete) + '</span></button>';
     }
 
     function bindMove(container, type) {
