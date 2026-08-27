@@ -116,13 +116,14 @@
         var html = '';
         categories.forEach(function (category, index) {
             var active = category.id === selectedCategoryId ? ' bg-light' : '';
+            // 狀態放名稱前面：這欄有 text-truncate，放後面遇到長名稱會被截掉
             var disabled = category.status ? '' :
-                '<span class="badge bg-secondary ms-1">' + escapeHtml(i18n.status_disabled) + '</span>';
+                '<span class="badge bg-secondary me-1">' + escapeHtml(i18n.status_disabled) + '</span>';
 
             html += '<div class="px-3 py-2 border-bottom js-qr-category' + active + '" ' +
                 'data-id="' + category.id + '" style="cursor:pointer">' +
                 '<div class="d-flex align-items-center">' +
-                '<div class="flex-fill text-truncate">' + escapeHtml(category.label) + disabled + '</div>' +
+                '<div class="flex-fill text-truncate">' + disabled + escapeHtml(category.label) + '</div>' +
                 '<small class="text-muted ms-2" style="flex-shrink:0">' +
                 escapeHtml(i18n.item_count.replace(':count', category.items.length)) + '</small>' +
                 '</div>';
@@ -220,10 +221,10 @@
         var html = '';
         category.items.forEach(function (item, index) {
             var disabled = item.status ? '' :
-                '<span class="badge bg-secondary ms-1">' + escapeHtml(i18n.status_disabled) + '</span>';
+                '<span class="badge bg-secondary me-1">' + escapeHtml(i18n.status_disabled) + '</span>';
 
             html += '<div class="px-3 py-2 border-bottom">' +
-                '<div class="fw-bold" style="font-size:0.875rem">' + escapeHtml(item.label) + disabled + '</div>' +
+                '<div class="fw-bold" style="font-size:0.875rem">' + disabled + escapeHtml(item.label) + '</div>' +
                 '<div class="text-muted mt-1" style="font-size:0.8125rem;white-space:pre-wrap">' +
                 escapeHtml(item.answer) + '</div>';
 
