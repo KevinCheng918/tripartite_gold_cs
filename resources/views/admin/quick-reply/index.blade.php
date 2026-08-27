@@ -121,12 +121,13 @@
         </div>
     </div>
 
-    {{-- 訊息 Modal --}}
+    {{-- 訊息 Modal（結構比照 payment-config：不用 modal-dialog-centered，
+         它的 min-height 會把 dialog 撐成全高，看起來像上下多一個框） --}}
     <div class="modal fade" id="modal-qr-msg" tabindex="-1">
-        <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-dialog modal-sm">
             <div class="modal-content">
-                <div class="modal-body text-center py-4" id="modal-qr-msg-text"></div>
-                <div class="modal-footer justify-content-center">
+                <div class="modal-body text-center py-4">
+                    <p id="modal-qr-msg-text" class="mb-3"></p>
                     <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
                 </div>
             </div>
@@ -135,12 +136,14 @@
 
     {{-- 刪除確認 Modal --}}
     <div class="modal fade" id="modal-qr-confirm" tabindex="-1">
-        <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-dialog modal-sm">
             <div class="modal-content">
-                <div class="modal-body text-center py-4" id="modal-qr-confirm-text"></div>
-                <div class="modal-footer justify-content-center">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('quick_reply.action_cancel') }}</button>
-                    <button type="button" class="btn btn-danger" id="btn-qr-confirm-ok">{{ trans('quick_reply.action_delete') }}</button>
+                <div class="modal-body text-center py-4">
+                    <p id="modal-qr-confirm-text" class="mb-3"></p>
+                    <div class="d-flex justify-content-center gap-2">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('quick_reply.action_cancel') }}</button>
+                        <button type="button" class="btn btn-danger" id="btn-qr-confirm-ok">{{ trans('quick_reply.action_delete') }}</button>
+                    </div>
                 </div>
             </div>
         </div>

@@ -44,8 +44,27 @@
         });
     }
 
+    /**
+     * 前一個 modal 還在淡出時直接開新的，兩層會疊在一起（backdrop 也會打架），
+     * 所以有 modal 未關完就等動畫結束再開 —— 與 payment-config / staff-manage 的做法一致。
+     *
+     * 注意不能只看 .modal-backdrop：hideBsModal() 會「立刻」移除 backdrop，
+     * 但 .modal.show 要等淡出動畫結束才拿掉，所以兩個都要檢查。
+     *
+     * @param {string} message
+     */
     function showMsg(message) {
         document.getElementById('modal-qr-msg-text').textContent = message;
+
+        var closing = document.querySelectorAll('.modal.show').length > 0
+            || document.querySelectorAll('.modal-backdrop').length > 0;
+
+        if (closing) {
+            setTimeout(function () { showBsModal('modal-qr-msg'); }, 400);
+
+            return;
+        }
+
         showBsModal('modal-qr-msg');
     }
 
