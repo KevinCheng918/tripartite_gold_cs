@@ -16,6 +16,15 @@ Kanban 風格任務看板，五欄分組：待處理、進行中、測試中、�
 - 多人指派（assignee_ids JSON 欄位）
 - 活動紀錄（欄位級 diff 追蹤，分頁顯示）
 
+### 留言編輯（2026-08-27）
+- **只有本人能編輯自己的留言**，不另設權限 keyword；管理者刪除他人留言仍走既有的 `task_board.delete_comment`
+- **只能改文字，圖片維持原樣**（編輯區會提示「圖片無法編輯」）；要改圖只能刪掉重發
+- 雙層把關：`TaskCommentResource` 的 `is_mine` 決定前端是否顯示編輯鈕，
+  `ajaxUpdateComment()` 再比對 `$comment->user_id !== Auth::id()` 回 403
+- 「已編輯」標記用 `updated_at->gt(created_at)` 判斷，**不需要額外欄位或 migration**
+  （`getComments()` 的 select 必須含 `updated_at`，否則判斷永遠是 false）
+- 留言內容渲染改為 `escapeHtml()` 後插入 —— 原本 `c.content` 直接串進 HTML，有 XSS 風險
+
 ### 封存系統
 - 任務封存（status = 6），不直接刪除
 - 封存清單 Modal（modal-xl）：顯示專案、標題、原始狀態、指派人員、封存時間、剩餘天數
@@ -49,8 +58,9 @@ Kanban 風格任務看板，五欄分組：待處理、進行中、測試中、�
 - `app/Http/Requests/TaskBoard/ReorderTaskRequest.php`
 - `app/Http/Requests/TaskBoard/StoreProjectRequest.php`
 - `app/Http/Requests/TaskBoard/StoreCommentRequest.php`
+- `app/Http/Requests/TaskBoard/UpdateCommentRequest.php` — 只驗證 content（圖片不可異動）
 - `app/Http/Resources/TaskResource.php` — 含 preloadUsers 靜態快取、previous_status（從 latestArchivedActivity 取得）
-- `app/Http/Resources/TaskCommentResource.php`
+- `app/Http/Resources/TaskCommentResource.php` — 含 `is_mine`（本人才顯示編輯鈕）、`is_edited`
 - `app/Http/Resources/TaskActivityResource.php`
 
 ### View
@@ -67,3 +77,4 @@ Kanban 風格任務看板，五欄分組：待處理、進行中、測試中、�
 - `assignee_ids` JSON 欄位可能存整數或字串，查詢時需同時用 `whereJsonContains` 比對 int 和 string
 - `LIST_COLUMNS` 需包含 `updated_at`，否則封存清單時間顯示為 1970/1/1
 - 封存時 activity changes 記錄原始狀態，供封存清單顯示「原始狀態」欄位
+- 留言編輯**不寫入活動紀錄**，與「新增留言也不記錄」的既有行為保持一致

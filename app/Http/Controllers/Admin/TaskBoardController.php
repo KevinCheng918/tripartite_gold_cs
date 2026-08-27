@@ -7,6 +7,7 @@ use App\Http\Requests\TaskBoard\MoveTaskRequest;
 use App\Http\Requests\TaskBoard\ReorderTaskRequest;
 use App\Http\Requests\TaskBoard\StoreCommentRequest;
 use App\Http\Requests\TaskBoard\StoreTaskRequest;
+use App\Http\Requests\TaskBoard\UpdateCommentRequest;
 use App\Http\Requests\TaskBoard\UpdateTaskRequest;
 use App\Http\Resources\TaskActivityResource;
 use App\Http\Resources\TaskCommentResource;
@@ -315,6 +316,32 @@ class TaskBoardController extends Controller
         $comment = $this->taskBoardService->addComment($task->id, Auth::id(), $params['content'], $images);
 
         return new TaskCommentResource($comment->load('user'));
+    }
+
+    /**
+     * Ajax 更新留言（僅本人可編輯自己的留言，圖片不受影響）
+     *
+     * @param UpdateCommentRequest $request
+     * @param TaskComment          $comment
+     * @return \Illuminate\Http\JsonResponse|TaskCommentResource
+     */
+    public function ajaxUpdateComment(UpdateCommentRequest $request, TaskComment $comment)
+    {
+        if ($comment->user_id !== Auth::id()) {
+            return response()->json(['message' => trans('task_board.msg.comment_not_owner')], 403);
+        }
+
+        $params = $request->validated();
+
+        try {
+            $comment = $this->taskBoardService->updateComment($comment, $params['content']);
+
+            return new TaskCommentResource($comment->load('user'));
+        } catch (\Exception $e) {
+            Log::error('留言更新失敗', ['error' => $e->getMessage(), 'comment_id' => $comment->id]);
+
+            return response()->json(['message' => trans('task_board.msg.comment_update_failed')], 500);
+        }
     }
 
     /**

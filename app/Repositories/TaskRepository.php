@@ -181,19 +181,13 @@ class TaskRepository
     public function getComments($taskId)
     {
         return TaskComment::query()
-            ->select(['id', 'task_id', 'user_id', 'content', 'images', 'created_at'])
+            ->select(['id', 'task_id', 'user_id', 'content', 'images', 'created_at', 'updated_at'])
             ->with(['user'])
             ->where('task_id', $taskId)
             ->orderByDesc('created_at')
             ->get();
     }
 
-    /**
-     * 新增留言
-     *
-     * @param array $attributes
-     * @return TaskComment
-     */
     /**
      * 查詢留言
      *
@@ -216,9 +210,29 @@ class TaskRepository
         $comment->delete();
     }
 
+    /**
+     * 新增留言
+     *
+     * @param array $attributes
+     * @return TaskComment
+     */
     public function createComment($attributes)
     {
         return TaskComment::query()->create($attributes);
+    }
+
+    /**
+     * 更新留言（僅內容，圖片維持原樣）
+     *
+     * @param TaskComment $comment
+     * @param string      $content
+     * @return TaskComment
+     */
+    public function updateComment(TaskComment $comment, $content)
+    {
+        $comment->update(['content' => $content]);
+
+        return $comment;
     }
 
     /**

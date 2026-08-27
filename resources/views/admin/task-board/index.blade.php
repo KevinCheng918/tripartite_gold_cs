@@ -1148,6 +1148,26 @@ $(function () {
         });
     }
 
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    /**
+     * 留言相關 ajax 的錯誤訊息：優先取後端 message，其次取驗證錯誤
+     */
+    function getCommentErrorMsg(xhr) {
+        var body = xhr.responseJSON || {};
+        if (body.errors) {
+            var first = Object.keys(body.errors)[0];
+            if (first && body.errors[first].length) {
+                return body.errors[first][0];
+            }
+        }
+
+        return body.message || @json(trans('task_board.msg.comment_update_failed'));
+    }
+
     function loadComments(taskId) {
         $.ajax({
             url: '/admin/task-board/ajax-comments/' + taskId,
@@ -1160,14 +1180,32 @@ $(function () {
                 }
                 var html = '';
                 list.forEach(function (c) {
-                    html += '<div class="comment-item">';
-                    html += '<div class="d-flex justify-content-between align-items-center"><strong style="font-size:0.875rem">' + c.user + '</strong><div>';
-                    html += '<small class="text-muted me-2">' + c.created_at + '</small>';
+                    html += '<div class="comment-item" data-comment-id="' + c.id + '">';
+                    html += '<div class="d-flex justify-content-between align-items-center"><strong style="font-size:0.875rem">' + escapeHtml(c.user) + '</strong><div>';
+                    html += '<small class="text-muted me-2">' + c.created_at;
+                    if (c.is_edited) {
+                        html += '（' + @json(trans('task_board.comment_edited')) + '）';
+                    }
+                    html += '</small>';
+                    // 只有本人能編輯自己的留言
+                    if (c.is_mine) {
+                        html += '<button class="btn btn-sm btn-outline-secondary js-edit-comment me-1" data-id="' + c.id + '" title="' + @json(trans('task_board.action_edit_comment')) + '"><i class="fas fa-pen"></i></button>';
+                    }
                     if (canDeleteComment) {
                         html += '<button class="btn btn-sm btn-outline-secondary js-delete-comment" data-id="' + c.id + '" title="刪除留言"><i class="fas fa-trash text-danger"></i></button>';
                     }
                     html += '</div></div>';
-                    html += '<div style="font-size:0.875rem;white-space:pre-wrap;margin-top:0.25rem">' + c.content + '</div>';
+                    html += '<div class="js-comment-content" style="font-size:0.875rem;white-space:pre-wrap;margin-top:0.25rem">' + escapeHtml(c.content) + '</div>';
+                    // 編輯區（預設隱藏，圖片不可異動）
+                    html += '<div class="js-comment-edit d-none mt-1">';
+                    html += '<textarea class="form-control form-control-sm js-comment-edit-input" rows="3" maxlength="2000" style="font-size:0.875rem">' + escapeHtml(c.content) + '</textarea>';
+                    html += '<div class="d-flex justify-content-end align-items-center gap-1 mt-1">';
+                    if (c.images && c.images.length > 0) {
+                        html += '<small class="text-muted me-auto" style="font-size:0.75rem">' + @json(trans('task_board.comment_image_locked')) + '</small>';
+                    }
+                    html += '<button type="button" class="btn btn-sm btn-secondary js-comment-edit-cancel">' + @json(trans('task_board.action_cancel')) + '</button>';
+                    html += '<button type="button" class="btn btn-sm btn-primary js-comment-edit-save" data-id="' + c.id + '">' + @json(trans('task_board.action_save')) + '</button>';
+                    html += '</div></div>';
                     if (c.images && c.images.length > 0) {
                         html += '<div class="d-flex flex-wrap gap-1 mt-1">';
                         c.images.forEach(function (url) {
@@ -1184,6 +1222,51 @@ $(function () {
                     $('#delete-comment-confirm-id').val($(this).data('id'));
                     $('#delete-comment-confirm-task-id').val(taskId);
                     showBsModal('modal-delete-comment-confirm');
+                });
+
+                // 進入編輯：切換成文字框，圖片維持原樣不動
+                $('.js-edit-comment').off('click').on('click', function () {
+                    var $item = $(this).closest('.comment-item');
+                    $item.find('.js-comment-content').addClass('d-none');
+                    $item.find('.js-comment-edit').removeClass('d-none');
+                    $item.find('.js-comment-edit-input').focus();
+                });
+
+                // 取消編輯：文字框還原成原內容
+                $('.js-comment-edit-cancel').off('click').on('click', function () {
+                    var $item = $(this).closest('.comment-item');
+                    $item.find('.js-comment-edit-input').val($item.find('.js-comment-content').text());
+                    $item.find('.js-comment-edit').addClass('d-none');
+                    $item.find('.js-comment-content').removeClass('d-none');
+                });
+
+                // 儲存編輯
+                $('.js-comment-edit-save').off('click').on('click', function () {
+                    var $btn = $(this);
+                    var $item = $btn.closest('.comment-item');
+                    var content = $item.find('.js-comment-edit-input').val().trim();
+                    if (!content) {
+                        showMsg(@json(trans('task_board.msg.comment_content_required')));
+                        return;
+                    }
+
+                    $btn.prop('disabled', true);
+                    $.ajax({
+                        url: '/admin/task-board/ajax-update-comment/' + $btn.data('id'),
+                        method: 'PUT',
+                        headers: { 'X-CSRF-TOKEN': csrfToken },
+                        contentType: 'application/json',
+                        data: JSON.stringify({ content: content }),
+                        success: function () {
+                            $btn.prop('disabled', false);
+                            loadComments(taskId);
+                            showMsg(@json(trans('task_board.msg.comment_updated')));
+                        },
+                        error: function (xhr) {
+                            $btn.prop('disabled', false);
+                            showMsg(getCommentErrorMsg(xhr));
+                        }
+                    });
                 });
             }
         });

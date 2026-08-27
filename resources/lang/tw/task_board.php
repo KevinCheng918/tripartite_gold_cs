@@ -31,6 +31,11 @@ return [
     'action_edit'           => '編輯',
     'action_delete'         => '刪除',
     'action_filter'         => '篩選',
+    'action_edit_comment'   => '編輯留言',
+    'action_save'           => '儲存',
+    'action_cancel'         => '取消',
+    'comment_edited'        => '已編輯',
+    'comment_image_locked'  => '圖片無法編輯',
 
     'msg' => [
         'task_created'        => '任務已新增',
@@ -41,5 +46,10 @@ return [
         'task_delete_failed'  => '任務刪除失敗',
         'project_create_failed' => '專案新增失敗',
         'confirm_delete'      => '確定刪除此任務？',
+        'comment_updated'         => '留言已更新',
+        'comment_update_failed'   => '留言更新失敗',
+        'comment_not_owner'       => '只能編輯自己的留言',
+        'comment_content_required' => '留言內容不可為空',
+        'comment_content_max'     => '留言內容不可超過 :value 字元',
     ],
 ];

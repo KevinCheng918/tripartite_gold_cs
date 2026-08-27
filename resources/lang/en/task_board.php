@@ -31,6 +31,11 @@ return [
     'action_edit'           => 'Edit',
     'action_delete'         => 'Delete',
     'action_filter'         => 'Filter',
+    'action_edit_comment'   => 'Edit comment',
+    'action_save'           => 'Save',
+    'action_cancel'         => 'Cancel',
+    'comment_edited'        => 'edited',
+    'comment_image_locked'  => 'Images cannot be edited',
 
     'msg' => [
         'task_created'        => 'Task created',
@@ -41,5 +46,10 @@ return [
         'task_delete_failed'  => 'Failed to delete task',
         'project_create_failed' => 'Failed to create project',
         'confirm_delete'      => 'Are you sure to delete this task?',
+        'comment_updated'         => 'Comment updated',
+        'comment_update_failed'   => 'Failed to update comment',
+        'comment_not_owner'       => 'You can only edit your own comments',
+        'comment_content_required' => 'Comment content is required',
+        'comment_content_max'     => 'Comment must not exceed :value characters',
     ],
 ];

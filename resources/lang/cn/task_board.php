@@ -31,6 +31,11 @@ return [
     'action_edit'           => '编辑',
     'action_delete'         => '删除',
     'action_filter'         => '筛选',
+    'action_edit_comment'   => '编辑留言',
+    'action_save'           => '储存',
+    'action_cancel'         => '取消',
+    'comment_edited'        => '已编辑',
+    'comment_image_locked'  => '图片无法编辑',
 
     'msg' => [
         'task_created'        => '任务已新增',
@@ -41,5 +46,10 @@ return [
         'task_delete_failed'  => '任务删除失败',
         'project_create_failed' => '项目新增失败',
         'confirm_delete'      => '确定删除此任务？',
+        'comment_updated'         => '留言已更新',
+        'comment_update_failed'   => '留言更新失败',
+        'comment_not_owner'       => '只能编辑自己的留言',
+        'comment_content_required' => '留言内容不可为空',
+        'comment_content_max'     => '留言内容不可超过 :value 字元',
     ],
 ];

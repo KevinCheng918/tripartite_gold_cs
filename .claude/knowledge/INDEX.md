@@ -23,7 +23,7 @@
 | [features/attendance.md](features/attendance.md) | 打卡出勤 | 已完成（持續迭代） |
 | [features/changelog.md](features/changelog.md) | 版本紀錄（左下角變更日誌） | 規劃中 |
 | [features/login-log.md](features/login-log.md) | 登入紀錄（每帳號登入時間/IP/裝置/成敗） | 已完成 |
-| [features/task-board.md](features/task-board.md) | 任務看板（Kanban 五欄、封存系統、活動紀錄、多人指派） | 已完成（持續迭代） |
+| [features/task-board.md](features/task-board.md) | 任務看板（Kanban 五欄、封存系統、活動紀錄、多人指派、留言編輯） | 已完成（持續迭代） |
 
 ## Bug 修復紀錄（bugfix/）
 

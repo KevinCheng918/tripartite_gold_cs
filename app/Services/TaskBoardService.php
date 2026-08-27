@@ -345,4 +345,16 @@ class TaskBoardService
             'images'  => $images,
         ]);
     }
+
+    /**
+     * 更新留言內容（圖片不受影響）
+     *
+     * @param \App\Models\TaskComment $comment
+     * @param string                  $content
+     * @return \App\Models\TaskComment
+     */
+    public function updateComment($comment, $content)
+    {
+        return $this->taskRepository->updateComment($comment, $content);
+    }
 }
