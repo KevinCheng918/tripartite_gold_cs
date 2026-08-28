@@ -57,7 +57,9 @@ class CreditTopup extends Model
      */
     public function station(): BelongsTo
     {
-        return $this->belongsTo(Station::class)->select(['id', 'system_id', 'name', 'domain', 'api_url', 'api_key']);
+        // telegram_group_id 供補點審核通過後發送 Telegram 通知使用，漏掉會讀成 null
+        return $this->belongsTo(Station::class)
+            ->select(['id', 'system_id', 'name', 'domain', 'api_url', 'api_key', 'telegram_group_id']);
     }
 
     /**

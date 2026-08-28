@@ -146,6 +146,14 @@ $this->telegramChatService->sendReply($groupId, $message, $userId, $name, null, 
 - 站台沒綁 Telegram 群組、或主站沒回 `msg` 就略過
 - 通知失敗只記 log 不往外拋：**點數已經加扣完成了**，不能因為通知失敗而讓補點紀錄看起來失敗
 
+> ⚠️ **關聯上的 `select()` 是個陷阱**：`CreditTopup::station()` 為了符合「SELECT 指定欄位」
+> 的規範，只撈固定幾個欄位。第一版漏了 `telegram_group_id`，
+> 導致 `$station->telegram_group_id` 恆為 `null` —— 站台明明綁好了，通知卻一直被略過，
+> 而且 log 顯示的是「站台未綁定 Telegram 群組」，反而把人引導到錯誤方向。
+>
+> **透過關聯讀新欄位前，先確認該關聯的 `select()` 有含這一欄。**
+> 專案多處關聯都有 select（如 `TelegramMessage::user()` 只取 `id`、`nickname`）。
+
 ### 送失敗就不要留下「已送出」的紀錄
 
 `sendReply()` 原本不檢查 Bot API 的回傳值，Telegram 明明退件了，
