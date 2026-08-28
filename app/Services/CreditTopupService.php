@@ -172,9 +172,9 @@ class CreditTopupService
             );
         } catch (\Exception $e) {
             Log::error('補點結果發送 Telegram 失敗', [
-                'station_id'       => $station->id,
+                'station_id'        => $station->id,
                 'telegram_group_id' => $station->telegram_group_id,
-                'error'            => $e->getMessage(),
+                'error'             => $e->getMessage(),
             ]);
         }
     }
