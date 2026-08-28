@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Vm\GenerateBillingRequest;
 use App\Http\Resources\VmBillingResource;
 use App\Http\Resources\VmServerResource;
 use App\Models\VmBilling;
@@ -241,12 +242,9 @@ class VmController extends Controller
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function ajaxGenerateBilling(Request $request)
+    public function ajaxGenerateBilling(GenerateBillingRequest $request)
     {
-        $params = $request->validate([
-            'month'        => 'nullable|string|date_format:Y-m',
-            'force_update' => 'nullable|boolean',
-        ]);
+        $params = $request->validated();
 
         try {
             $forceUpdate = !empty($params['force_update']);
@@ -305,12 +303,14 @@ class VmController extends Controller
                 $imageUrl = asset("storage/{$config->image}");
             }
 
+            // 最後一個參數 false：這是系統通知，不該把客戶還在等的提問標記成已回覆
             $this->chatService->sendReply(
                 (int) $params['group_id'],
                 $text,
                 Auth::id(),
                 Auth::user()->nickname,
-                $imageUrl
+                $imageUrl,
+                false
             );
 
             return response()->json(['message' => trans('payment_config.msg.sent')]);

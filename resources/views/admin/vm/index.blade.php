@@ -293,6 +293,30 @@
     </div>
 
     {{-- 二次確認 Modal --}}
+    {{-- 產生帳單：選擇月份（只能選本月或之後） --}}
+    <div class="modal fade" id="modal-generate-billing" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">{{ trans('vm.action_generate') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label fw-bold" for="generate-billing-month">{{ trans('vm.generate_billing_month') }}</label>
+                    <input type="month" id="generate-billing-month" class="form-control"
+                           min="{{ date('Y-m') }}" value="{{ date('Y-m') }}">
+                    <small class="text-muted d-block mt-2">
+                        <i class="fas fa-info-circle me-1"></i>{{ trans('vm.generate_billing_hint') }}
+                    </small>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="btn-generate-billing-ok">確認</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="modal-vm-confirm" tabindex="-1">
         <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content">
@@ -1101,9 +1125,32 @@ $(function () {
         });
     }
 
+    // 產生帳單先讓使用者選月份，不再沿用上方搜尋條件的月份
     $('#btn-generate-billing').on('click', function () {
-        var month = $('#billing-month').val();
-        doGenerateBilling(month, false);
+        var currentMonth = '{{ date('Y-m') }}';
+        var $input = $('#generate-billing-month');
+
+        // 每次開啟都重設為本月，避免沿用上次選的月份
+        $input.attr('min', currentMonth).val(currentMonth);
+        showBsModal('modal-generate-billing');
+    });
+
+    $('#btn-generate-billing-ok').on('click', function () {
+        var month = $('#generate-billing-month').val();
+        var currentMonth = '{{ date('Y-m') }}';
+
+        if (!month) {
+            showMessage(@json(trans('vm.msg.month_format_invalid')));
+            return;
+        }
+        // 瀏覽器的 min 屬性擋不住手動輸入，這裡再擋一次（後端也會驗）
+        if (month < currentMonth) {
+            showMessage(@json(trans('vm.msg.month_cannot_be_past')));
+            return;
+        }
+
+        hideBsModal(document.getElementById('modal-generate-billing'));
+        setTimeout(function () { doGenerateBilling(month, false); }, 400);
     });
 
     // 上傳證明 — 圖片預覽

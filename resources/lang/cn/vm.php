@@ -51,6 +51,8 @@ return [
     'filter_paid'    => '已收',
     'filter_pending' => '待审核',
     'filter_overdue' => '逾期',
+    'generate_billing_month' => '账单月份',
+    'generate_billing_hint'  => '只能产生本月或之后的账单',
 
     'msg' => [
         'create_failed'    => '虚拟机新增失败',
@@ -65,5 +67,7 @@ return [
         'mark_failed'      => '标记失败',
         'billing_generated' => '已产生 :count 笔账单',
         'generate_failed'  => '账单产生失败',
+        'month_cannot_be_past' => '只能产生本月或之后的账单',
+        'month_format_invalid' => '月份格式不正确',
     ],
 ];

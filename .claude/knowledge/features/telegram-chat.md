@@ -108,6 +108,12 @@ Telegram 抓不到，會回：
 是的話改用 multipart 直接把檔案上傳給 Telegram（`sendMediaGroup` 用 `attach://欄位名` 對應），
 外部網址才維持原本交給 Telegram 自行抓取的做法。
 
+> **`resolveLocalPath()` 只比對 path，不比對 host。**
+> 同一份檔案的網址可能帶不同 host —— `APP_URL` 是 `localhost`，但 `asset()` 會用當下請求的
+> host（`tripartite_gold_cs` 或正式網域）。第一版拿完整網址前綴去比對，
+> VM 繳款通知的圖片就因此被誤判成外部網址、又走回讓 Telegram 反向抓取的老路而 400。
+> 比對後仍有 `file_exists()` 把關，本地沒有對應檔案就退回 URL 模式。
+
 這樣**不再依賴 `APP_URL` 是否對外可達** —— 正式環境也不必為了傳圖把 storage 目錄公開。
 `sendDocument` 本來就是 multipart，所以文件一直傳得出去、只有圖片會失敗。
 
@@ -133,9 +139,8 @@ Telegram photo 的限制：**寬 + 高 ≤ 10000**，且**長短邊比例 ≤ 20
 $this->telegramChatService->sendReply($groupId, $message, $userId, $name, null, false);
 ```
 
-目前傳 `false` 的呼叫端：`CreditTopupService`。
-> ⚠️ `VmController::ajaxSendPaymentNotice`（繳款通知）同樣是系統通知，但**尚未**加上這個參數，
-> 仍會消掉未回覆告警 —— 待確認是否要一併調整。
+目前傳 `false` 的呼叫端：`CreditTopupService`（補點通知）、
+`VmController::ajaxSendPaymentNotice`（VM 繳款通知）。
 
 ### 補點審核結果通知
 

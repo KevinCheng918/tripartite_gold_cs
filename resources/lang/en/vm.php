@@ -51,6 +51,8 @@ return [
     'filter_paid'    => 'Paid',
     'filter_pending' => 'Pending',
     'filter_overdue' => 'Overdue',
+    'generate_billing_month' => 'Billing month',
+    'generate_billing_hint'  => 'Only the current month or later can be generated',
 
     'msg' => [
         'create_failed'    => 'Failed to create VM',
@@ -65,5 +67,7 @@ return [
         'mark_failed'      => 'Failed to mark payment',
         'billing_generated' => 'Generated :count billing records',
         'generate_failed'  => 'Failed to generate billing',
+        'month_cannot_be_past' => 'Only the current month or later can be generated',
+        'month_format_invalid' => 'Invalid month format',
     ],
 ];

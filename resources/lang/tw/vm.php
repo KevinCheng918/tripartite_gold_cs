@@ -56,6 +56,8 @@ return [
     'filter_paid'    => '已收',
     'filter_pending' => '待審核',
     'filter_overdue' => '逾期',
+    'generate_billing_month' => '帳單月份',
+    'generate_billing_hint'  => '只能產生本月或之後的帳單',
 
     // 訊息
     'msg' => [
@@ -71,5 +73,7 @@ return [
         'mark_failed'      => '標記失敗',
         'billing_generated' => '已產生 :count 筆帳單',
         'generate_failed'  => '帳單產生失敗',
+        'month_cannot_be_past' => '只能產生本月或之後的帳單',
+        'month_format_invalid' => '月份格式不正確',
     ],
 ];

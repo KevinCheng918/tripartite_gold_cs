@@ -233,15 +233,25 @@ class TelegramBotService
      */
     private function resolveLocalPath($url)
     {
-        $publicUrl = rtrim((string) config('filesystems.disks.public.url'), '/');
-        if (!filled($publicUrl) || strpos((string) $url, $publicUrl) !== 0) {
+        // 只比對路徑不比對 host：同一份檔案的網址可能帶不同 host
+        // （APP_URL 是 localhost、實際請求卻是 tripartite_gold_cs 或正式網域），
+        // 用完整網址前綴比對會誤判成外部網址而讓 Telegram 反向抓取，最後 400。
+        $path = parse_url((string) $url, PHP_URL_PATH);
+        if (!filled($path)) {
             return null;
         }
 
-        $relative = ltrim(substr($url, strlen($publicUrl)), '/');
-        $path = Storage::disk('public')->path($relative);
+        $publicPath = parse_url((string) config('filesystems.disks.public.url'), PHP_URL_PATH);
+        $publicPath = rtrim($publicPath ?: '/storage', '/');
 
-        return file_exists($path) ? $path : null;
+        if (strpos($path, $publicPath . '/') !== 0) {
+            return null;
+        }
+
+        $relative = ltrim(substr($path, strlen($publicPath)), '/');
+        $file = Storage::disk('public')->path(rawurldecode($relative));
+
+        return file_exists($file) ? $file : null;
     }
 
     /**
