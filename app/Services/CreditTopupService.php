@@ -147,8 +147,10 @@ class CreditTopupService
      */
     private function notifyTelegram($station, $result, $reviewerId, $reviewerName)
     {
+        // 以下兩種情況是「該通知卻沒通知」，用 warning 而非 info：
+        // 正式環境常把 LOG_LEVEL 設在 warning/error，info 會被整個濾掉而無從追查
         if (!filled($station->telegram_group_id)) {
-            Log::info('站台未綁定 Telegram 群組，略過補點通知', [
+            Log::warning('站台未綁定 Telegram 群組，略過補點通知', [
                 'station_id' => $station->id,
                 'station'    => $station->name,
             ]);
@@ -158,7 +160,7 @@ class CreditTopupService
 
         $message = $result['msg'] ?? null;
         if (blank($message)) {
-            Log::info('補點成功但主站未回傳訊息，略過 Telegram 通知', [
+            Log::warning('補點成功但主站未回傳訊息，略過 Telegram 通知', [
                 'station_id' => $station->id,
                 'response'   => $result,
             ]);
