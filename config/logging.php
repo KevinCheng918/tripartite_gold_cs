@@ -4,6 +4,23 @@ use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
 
+/*
+ * 檔案類 channel 共用的格式設定（對齊主系統 tripartite_gold）
+ *
+ * - allowInlineLineBreaks：例外堆疊、多行訊息保持原樣，不會被壓成一行
+ * - ignoreEmptyContextAndExtra：沒有 context 時不印出多餘的 [] []
+ * - dateFormat 帶微秒：同一秒內的多筆記錄仍可分辨先後
+ */
+$fileFormatter = [
+    'formatter'      => Monolog\Formatter\LineFormatter::class,
+    'formatter_with' => [
+        'dateFormat'                 => 'Y-m-d H:i:s.u',
+        'format'                     => "[%datetime%] %channel%.%level_name%: %message% %context% %extra%\n",
+        'allowInlineLineBreaks'      => true,
+        'ignoreEmptyContextAndExtra' => true,
+    ],
+];
+
 return [
 
     /*
@@ -50,22 +67,26 @@ return [
     'channels' => [
         'stack' => [
             'driver' => 'stack',
-            'channels' => ['single'],
+            // 用 daily 而非 single：單一檔案會無限成長，daily 每天一檔並保留 14 天
+            'channels' => ['daily'],
             'ignore_exceptions' => false,
         ],
 
+        // level 一律寫死 debug，不吃 env('LOG_LEVEL')
+        // —— 正式環境若把 LOG_LEVEL 設成 error，info/warning 會被整個濾掉，
+        //    出事時完全查不到線索（2026-08-29 追補點通知就是卡在這裡）
         'single' => [
             'driver' => 'single',
             'path' => storage_path('logs/laravel.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
-        ],
+            'level' => 'debug',
+        ] + $fileFormatter,
 
         'daily' => [
             'driver' => 'daily',
             'path' => storage_path('logs/laravel.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
+            'level' => 'debug',
             'days' => 14,
-        ],
+        ] + $fileFormatter,
 
         'slack' => [
             'driver' => 'slack',
