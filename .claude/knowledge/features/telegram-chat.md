@@ -120,6 +120,32 @@ Telegram photo 的限制：**寬 + 高 ≤ 10000**，且**長短邊比例 ≤ 20
 不符規格就**自動改用 `sendDocument`** —— 顯示成檔案，但至少送得出去，而且原圖不會被 Telegram 壓縮。
 判斷不了尺寸時照原流程送，交給 Telegram 決定。
 
+### 系統自動發出的通知要傳 `markReplied = false`
+
+`sendReply()` 預設會呼叫 `markMessagesReplied()`，把該群組**所有未回覆的客戶訊息標記為已回覆** ——
+未回覆告警（工作日 5 分鐘／假日 30 分鐘）就是靠這個標記。
+
+所以**系統自動發出的通知必須傳 `$markReplied = false`**，否則客戶還在等的提問會被誤判成已處理、
+告警不會觸發。客服在聊天視窗手動回覆才該用預設的 `true`。
+
+```php
+// 補點審核通過的自動通知（CreditTopupService::notifyTelegram）
+$this->telegramChatService->sendReply($groupId, $message, $userId, $name, null, false);
+```
+
+目前傳 `false` 的呼叫端：`CreditTopupService`。
+> ⚠️ `VmController::ajaxSendPaymentNotice`（繳款通知）同樣是系統通知，但**尚未**加上這個參數，
+> 仍會消掉未回覆告警 —— 待確認是否要一併調整。
+
+### 補點審核結果通知
+
+站台補點／扣點審核通過、且主站 API 回 `code === 1` 時，
+`CreditTopupService::approve()` 會把主站回傳的 `msg` 送到 `station.telegram_group_id` 對應的對話。
+
+- 通知在 **`DB::transaction` 之外**執行 —— Telegram 是外部呼叫，不該把交易撐在那裡等
+- 站台沒綁 Telegram 群組、或主站沒回 `msg` 就略過
+- 通知失敗只記 log 不往外拋：**點數已經加扣完成了**，不能因為通知失敗而讓補點紀錄看起來失敗
+
 ### 送失敗就不要留下「已送出」的紀錄
 
 `sendReply()` 原本不檢查 Bot API 的回傳值，Telegram 明明退件了，

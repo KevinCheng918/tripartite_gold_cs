@@ -308,7 +308,7 @@ class StationController extends Controller
     public function ajaxTopupApprove(CreditTopup $topup)
     {
         try {
-            $result = $this->topupService->approve($topup, Auth::id());
+            $result = $this->topupService->approve($topup, Auth::id(), Auth::user()->nickname);
             $msg = (int) $result->status === CreditTopup::STATUS_COMPLETED
                 ? trans('station.topup_approved')
                 : trans('station.topup_api_failed');

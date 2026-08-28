@@ -15,13 +15,16 @@ class CreditTopupService
 {
     private $topupRepository;
     private $mainSystemApi;
+    private $telegramChatService;
 
     public function __construct(
         CreditTopupRepository $topupRepository,
-        MainSystemApiService $mainSystemApi
+        MainSystemApiService $mainSystemApi,
+        TelegramChatService $telegramChatService
     ) {
         $this->topupRepository = $topupRepository;
         $this->mainSystemApi = $mainSystemApi;
+        $this->telegramChatService = $telegramChatService;
     }
 
     /**
@@ -60,12 +63,15 @@ class CreditTopupService
     /**
      * 審核通過 — 呼叫站台 API 補點/扣點
      *
+     * 加扣點成功後，會把主站回傳的訊息送到站台對應的 Telegram 對話。
+     *
      * @param CreditTopup $topup
      * @param int         $reviewerId
+     * @param string|null $reviewerName 顯示在 Telegram 對話中的發送者名稱
      * @return CreditTopup
      * @throws ValidationException
      */
-    public function approve(CreditTopup $topup, $reviewerId)
+    public function approve(CreditTopup $topup, $reviewerId, $reviewerName = null)
     {
         if ((int) $topup->status !== CreditTopup::STATUS_PENDING
             && (int) $topup->status !== CreditTopup::STATUS_FAILED) {
@@ -96,7 +102,7 @@ class CreditTopupService
             $action
         );
 
-        return DB::transaction(function () use ($topup, $reviewerId, $result) {
+        $updated = DB::transaction(function () use ($topup, $reviewerId, $result) {
             if ($result && ($result['code'] ?? 0) === 1) {
                 return $this->topupRepository->update($topup, [
                     'status'       => CreditTopup::STATUS_COMPLETED,
@@ -119,6 +125,58 @@ class CreditTopupService
                 'reviewed_at'  => now(),
             ]);
         });
+
+        // 通知放在交易外：Telegram 是外部呼叫，不該把交易撐在那邊等
+        if ((int) $updated->status === CreditTopup::STATUS_COMPLETED) {
+            $this->notifyTelegram($station, $result, $reviewerId, $reviewerName);
+        }
+
+        return $updated;
+    }
+
+    /**
+     * 把主站回傳的訊息送到站台對應的 Telegram 對話
+     *
+     * 通知失敗不能影響補點結果（點數已經加扣完成），因此只記 log 不往外拋。
+     *
+     * @param \App\Models\Station $station
+     * @param array               $result 主站 API 回應
+     * @param int                 $reviewerId
+     * @param string|null         $reviewerName
+     * @return void
+     */
+    private function notifyTelegram($station, $result, $reviewerId, $reviewerName)
+    {
+        if (!filled($station->telegram_group_id)) {
+            return;
+        }
+
+        $message = $result['msg'] ?? null;
+        if (blank($message)) {
+            Log::info('補點成功但主站未回傳訊息，略過 Telegram 通知', [
+                'station_id' => $station->id,
+            ]);
+
+            return;
+        }
+
+        try {
+            // 最後一個參數 false：這是系統通知，不該把客戶還在等的提問標記成已回覆
+            $this->telegramChatService->sendReply(
+                (int) $station->telegram_group_id,
+                $message,
+                $reviewerId,
+                $reviewerName ?: '',
+                null,
+                false
+            );
+        } catch (\Exception $e) {
+            Log::error('補點結果發送 Telegram 失敗', [
+                'station_id'       => $station->id,
+                'telegram_group_id' => $station->telegram_group_id,
+                'error'            => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

@@ -362,9 +362,12 @@ class TelegramChatService
      * @param int         $userId    後台使用者 ID
      * @param string      $nickname  後台使用者暱稱
      * @param string|null $imageUrl  圖片 URL（本地上傳後的公開 URL）
+     * @param bool        $markReplied 是否把該群組未回覆的客戶訊息標記為已回覆。
+     *                                 系統自動發出的通知要傳 false，否則會消掉未回覆告警，
+     *                                 讓客戶還在等的問題被誤判成已處理。
      * @return \App\Models\TelegramMessage
      */
-    public function sendReply($groupId, $content, $userId, $nickname, $imageUrl = null)
+    public function sendReply($groupId, $content, $userId, $nickname, $imageUrl = null, $markReplied = true)
     {
         $group = $this->telegramRepository->findGroup($groupId);
 
@@ -407,7 +410,9 @@ class TelegramChatService
         ]);
 
         // 標記該群組所有未回覆 inbound 訊息為已回覆
-        $this->telegramRepository->markMessagesReplied($group->id);
+        if ($markReplied) {
+            $this->telegramRepository->markMessagesReplied($group->id);
+        }
 
         // Broadcasting
         try {
