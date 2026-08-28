@@ -46,28 +46,28 @@
                         @endif
                     </div>
                     <a href="javascript:void(0)" class="text-muted text-decoration-none" data-bs-toggle="collapse" data-bs-target="#vm-search-collapse" aria-expanded="true">
-                        — 折疊 —
+                        {{ trans('vm.action_collapse') }}
                     </a>
                 </div>
                 <div class="collapse show" id="vm-search-collapse">
                     <div class="card-body pt-3">
                         <div class="row g-3 mb-3">
                             <div class="col-md-3 col-6">
-                                <label class="form-label fw-bold">系統：</label>
+                                <label class="form-label fw-bold">{{ trans('vm.field_system') }}：</label>
                                 <select id="vm-search-system" class="form-select">
-                                    <option value="">全部</option>
+                                    <option value="">{{ trans('vm.filter_all') }}</option>
                                     @foreach($systems as $sys)
                                         <option value="{{ $sys->id }}">{{ $sys->name }}</option>
                                     @endforeach
                                 </select>
                             </div>
                             <div class="col-md-3 col-6">
-                                <label class="form-label fw-bold">站台：</label>
+                                <label class="form-label fw-bold">{{ trans('vm.field_station') }}：</label>
                                 <div class="searchable-select" style="position:relative">
-                                    <input type="text" class="form-control" id="vm-search-station-text" placeholder="搜尋站台..." autocomplete="off">
+                                    <input type="text" class="form-control" id="vm-search-station-text" placeholder="{{ trans('vm.search_station_ph') }}" autocomplete="off">
                                     <input type="hidden" id="vm-search-station" value="">
                                     <div class="searchable-dropdown" id="vm-search-station-dropdown" style="display:none;position:absolute;z-index:1050;background:#fff;border:1px solid #dee2e6;border-radius:0.25rem;max-height:200px;overflow-y:auto;width:100%;box-shadow:0 2px 8px rgba(0,0,0,0.15)">
-                                        <a href="javascript:void(0)" class="dropdown-item js-vm-station-opt" data-id="" style="display:block;padding:0.35rem 0.75rem;font-size:0.875rem">全部站台</a>
+                                        <a href="javascript:void(0)" class="dropdown-item js-vm-station-opt" data-id="" style="display:block;padding:0.35rem 0.75rem;font-size:0.875rem">{{ trans('vm.all_stations') }}</a>
                                         @foreach($stations as $st)
                                             <a href="javascript:void(0)" class="dropdown-item js-vm-station-opt" data-id="{{ $st->id }}" data-name="{{ $st->name }}" style="display:block;padding:0.35rem 0.75rem;font-size:0.875rem">{{ $st->name }}</a>
                                         @endforeach
@@ -92,7 +92,7 @@
                             <div class="col-md-3 col-6">
                                 <label class="form-label fw-bold">{{ trans('vm.field_power') }}：</label>
                                 <select id="vm-search-power" class="form-select">
-                                    <option value="">全部</option>
+                                    <option value="">{{ trans('vm.filter_all') }}</option>
                                     <option value="1">{{ trans('vm.power_on') }}</option>
                                     <option value="0">{{ trans('vm.power_off') }}</option>
                                 </select>
@@ -100,16 +100,16 @@
                             <div class="col-md-3 col-6">
                                 <label class="form-label fw-bold">{{ trans('vm.field_status') }}：</label>
                                 <select id="vm-search-status" class="form-select">
-                                    <option value="">全部</option>
+                                    <option value="">{{ trans('vm.filter_all') }}</option>
                                     <option value="1">{{ trans('vm.status_active') }}</option>
                                     <option value="0">{{ trans('vm.status_disabled') }}</option>
                                 </select>
                             </div>
                         </div>
                         <div class="d-flex justify-content-end gap-2">
-                            <button type="button" class="btn btn-outline-secondary" id="btn-vm-reset">重置</button>
+                            <button type="button" class="btn btn-outline-secondary" id="btn-vm-reset">{{ trans('vm.action_reset') }}</button>
                             <button type="button" class="btn btn-primary" id="btn-vm-search">
-                                <i class="fas fa-search me-1"></i>搜尋
+                                <i class="fas fa-search me-1"></i>{{ trans('vm.action_search') }}
                             </button>
                         </div>
                     </div>
@@ -132,9 +132,9 @@
                 <div class="card-body">
                     <div class="row g-3 align-items-end">
                         <div class="col-auto">
-                            <label class="form-label fw-bold">系統</label>
+                            <label class="form-label fw-bold">{{ trans('vm.field_system') }}</label>
                             <select id="billing-system" class="form-select">
-                                <option value="">全部</option>
+                                <option value="">{{ trans('vm.filter_all') }}</option>
                                 @foreach($systems as $sys)
                                     <option value="{{ $sys->id }}">{{ $sys->name }}</option>
                                 @endforeach
@@ -157,7 +157,7 @@
                         </div>
                         <div class="col-auto">
                             <button class="btn btn-primary" id="btn-search-billing">
-                                <i class="fas fa-search me-1"></i>搜尋
+                                <i class="fas fa-search me-1"></i>{{ trans('vm.action_search') }}
                             </button>
                         </div>
                         @if(Auth::user()->hasPermission('vm.billing_approve'))
@@ -192,7 +192,7 @@
                         <div class="mb-3">
                             <label class="form-label">{{ trans('vm.field_station') }}</label>
                             <select id="vm-station" class="form-select" name="station_id" required>
-                                <option value="">選擇站台</option>
+                                <option value="">{{ trans('vm.select_station') }}</option>
                             </select>
                         </div>
                         <div class="mb-3">
@@ -209,11 +209,11 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('vm.field_model_type') }}</label>
-                            <input id="vm-model-type" type="text" class="form-control" name="model_type" placeholder="例：AWS t3.medium">
+                            <input id="vm-model-type" type="text" class="form-control" name="model_type" placeholder="{{ trans('vm.model_type_ph') }}">
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('vm.field_spec') }}</label>
-                            <input id="vm-spec" type="text" class="form-control" name="spec" required placeholder="例：2C4G 50GB">
+                            <input id="vm-spec" type="text" class="form-control" name="spec" required placeholder="{{ trans('vm.spec_ph') }}">
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('vm.field_monthly_fee') }}</label>
@@ -240,8 +240,8 @@
                             <input id="vm-note" type="text" class="form-control" name="note">
                         </div>
                         <div class="text-end">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                            <button type="submit" class="btn btn-primary">確認</button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('vm.action_cancel') }}</button>
+                            <button type="submit" class="btn btn-primary">{{ trans('vm.action_confirm') }}</button>
                         </div>
                     </form>
                 </div>
@@ -261,15 +261,15 @@
                     <form id="form-upload-proof" enctype="multipart/form-data">
                         <input type="hidden" id="upload-billing-id">
                         <div class="mb-3">
-                            <label class="form-label">選擇圖片</label>
+                            <label class="form-label">{{ trans('vm.select_image') }}</label>
                             <input id="proof-file" type="file" class="form-control" accept="image/*" required>
                         </div>
                         <div id="proof-preview" class="mb-3" style="display:none">
                             <img id="proof-preview-img" style="max-width:100%;border-radius:0.375rem" alt="preview">
                         </div>
                         <div class="text-end">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                            <button type="submit" class="btn btn-primary">上傳</button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('vm.action_cancel') }}</button>
+                            <button type="submit" class="btn btn-primary">{{ trans('vm.action_upload') }}</button>
                         </div>
                     </form>
                 </div>
@@ -310,8 +310,8 @@
                     </small>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    <button type="button" class="btn btn-primary" id="btn-generate-billing-ok">確認</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('vm.action_cancel') }}</button>
+                    <button type="button" class="btn btn-primary" id="btn-generate-billing-ok">{{ trans('vm.action_confirm') }}</button>
                 </div>
             </div>
         </div>
@@ -326,8 +326,8 @@
                 </div>
                 <div class="modal-body" id="modal-vm-confirm-body"></div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    <button type="button" class="btn btn-primary" id="btn-vm-confirm-ok">確認</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('vm.action_cancel') }}</button>
+                    <button type="button" class="btn btn-primary" id="btn-vm-confirm-ok">{{ trans('vm.action_confirm') }}</button>
                 </div>
             </div>
         </div>
@@ -353,6 +353,25 @@
 <script>
 $(function () {
     var csrfToken = $('meta[name="csrf-token"]').attr('content');
+
+    // 整包 vm 語系，避免 JS 內散落數十個 json/trans 呼叫
+    // 註：blade 註解裡不要寫 @ 開頭的指令語法，會被當成真的指令編譯
+    var i18n = @json(trans('vm'));
+
+    /**
+     * 取代語系字串中的 :placeholder
+     *
+     * @param {string} text
+     * @param {Object} params
+     * @returns {string}
+     */
+    function transReplace(text, params) {
+        Object.keys(params).forEach(function (key) {
+            text = text.split(':' + key).join(params[key]);
+        });
+
+        return text;
+    }
     var canUpdate = {{ Auth::user()->hasPermission('vm.update') ? 'true' : 'false' }};
     var canUpload = {{ Auth::user()->hasPermission('vm.billing_upload') ? 'true' : 'false' }};
     var canApprove = {{ Auth::user()->hasPermission('vm.billing_approve') ? 'true' : 'false' }};
@@ -410,7 +429,7 @@ $(function () {
         var totalOn = 0, totalOff = 0, totalAmount = 0;
 
         servers.forEach(function (vm) {
-            var sysName = vm.station && vm.station.system ? vm.station.system : '未分類';
+            var sysName = vm.station && vm.station.system ? vm.station.system : i18n.uncategorized;
             if (!systems[sysName]) { systems[sysName] = { on: 0, off: 0, amount: 0 }; }
             if (vm.power_status === 1) {
                 systems[sysName].on++;
@@ -446,12 +465,12 @@ $(function () {
             '<div class="flex-fill">' +
             '<div class="fw-bold">' + label + '</div>' +
             '<div class="d-flex gap-3 mt-1">' +
-            '<span class="badge bg-success">▶ 開機 ' + onCount + '</span>' +
-            '<span class="badge bg-danger">■ 關機 ' + offCount + '</span>' +
+            '<span class="badge bg-success">▶ ' + i18n.power_on + ' ' + onCount + '</span>' +
+            '<span class="badge bg-danger">■ ' + i18n.power_off + ' ' + offCount + '</span>' +
             '</div></div>' +
             '<div class="text-end">' +
             '<div class="fw-bold" style="font-size:1.25rem;color:' + color + '">' + amount.toFixed(2) + '</div>' +
-            '<small class="text-muted">總費用</small>' +
+            '<small class="text-muted">' + i18n.total_fee + '</small>' +
             '</div></div></div>';
     }
 
@@ -460,8 +479,8 @@ $(function () {
      */
     function renderVmStats(stats) {
         var html = '<div class="main-card mb-3 card">' +
-            '<div class="card-header py-2"><strong><i class="fas fa-chart-bar me-2 text-muted"></i>虛擬機總覽</strong>' +
-            '<small class="text-muted ms-2">即時掌握各系統運作狀態</small></div>' +
+            '<div class="card-header py-2"><strong><i class="fas fa-chart-bar me-2 text-muted"></i>' + i18n.overview_title + '</strong>' +
+            '<small class="text-muted ms-2">' + i18n.overview_subtitle + '</small></div>' +
             '<div class="card-body py-3"><div class="row g-3">';
 
         var colorIdx = 0;
@@ -474,7 +493,7 @@ $(function () {
         });
 
         html += buildStatCard(
-            '總計 ' + (stats.totalOn + stats.totalOff) + ' 台', '',
+            transReplace(i18n.total_count, { count: stats.totalOn + stats.totalOff }), '',
             '#0d9488', stats.totalOn, stats.totalOff, stats.totalAmount, true
         );
 
@@ -489,7 +508,7 @@ $(function () {
     function renderServers(servers) {
         if (servers.length === 0) {
             $('#vm-stats').html('');
-            $('#vm-server-list').html('<div class="text-center text-muted py-4">暫無資料</div>');
+            $('#vm-server-list').html('<div class="text-center text-muted py-4">' + i18n.no_data + '</div>');
             return;
         }
 
@@ -501,7 +520,7 @@ $(function () {
             '<div class="main-card mb-3 card d-none d-md-block"><div class="card-body p-0"><div class="table-responsive">' +
             '<table class="table table-hover table-striped align-middle mb-0"><thead class="table-light"><tr>' +
             '<th>#</th>' +
-            '<th>系統</th>' +
+            '<th>' + i18n.field_system + '</th>' +
             '<th>' + '{{ trans("vm.field_station") }}' + '</th>' +
             '<th>' + '{{ trans("vm.field_hostname") }}' + '</th>' +
             '<th>' + '{{ trans("vm.field_model_type") }}' + '</th>' +
@@ -511,7 +530,7 @@ $(function () {
             '<th>' + '{{ trans("vm.field_total_fee") }}' + '</th>' +
             '<th>' + '{{ trans("vm.field_power") }}' + '</th>' +
             '<th>' + '{{ trans("vm.field_status") }}' + '</th>' +
-            '<th>操作</th>' +
+            '<th>' + i18n.field_action + '</th>' +
             '</tr></thead><tbody>';
 
         // 手機版卡片
@@ -541,7 +560,7 @@ $(function () {
                     '<button class="btn btn-sm btn-outline-secondary js-toggle-power" data-id="' + vm.id + '"' +
                     ' data-system="' + systemName + '" data-station="' + stationName + '" data-hostname="' + vm.hostname + '"' +
                     ' data-power="' + vm.power_status + '">' +
-                    '<i class="fas fa-power-off me-1"></i>' + (vm.power_status === 1 ? '關機' : '開機') + '</button>';
+                    '<i class="fas fa-power-off me-1"></i>' + (vm.power_status === 1 ? i18n.power_off : i18n.power_on) + '</button>';
             }
 
             tableHtml +=
@@ -566,12 +585,12 @@ $(function () {
                 '<div><strong style="font-size:1.0625rem">' + vm.hostname + '</strong>' +
                 '<div class="text-muted" style="font-size:0.8125rem">' + systemName + ' / ' + stationName + '</div></div>' +
                 '<div class="d-flex gap-1">' + powerBadge + statusBadge + '</div></div>' +
-                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">機型</span><span>' + (vm.model_type || '-') + '</span></div>' +
-                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">規格</span><span>' + vm.spec + '</span></div>' +
-                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">內網 IP</span><span>' + (vm.internal_ip || '-') + '</span></div>' +
-                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">外網 IP</span><span>' + (vm.external_ip || '-') + '</span></div>' +
-                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">總金額</span><strong>' + vm.total_fee + '</strong></div>' +
-                '<div class="d-flex justify-content-between mb-2" style="font-size:0.875rem"><span class="text-muted">帳單日</span><span>每月 ' + vm.billing_day + ' 日</span></div>' +
+                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + i18n.field_model_type + '</span><span>' + (vm.model_type || '-') + '</span></div>' +
+                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + i18n.field_spec + '</span><span>' + vm.spec + '</span></div>' +
+                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + i18n.field_internal_ip + '</span><span>' + (vm.internal_ip || '-') + '</span></div>' +
+                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + i18n.field_external_ip + '</span><span>' + (vm.external_ip || '-') + '</span></div>' +
+                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + i18n.field_total_fee + '</span><strong>' + vm.total_fee + '</strong></div>' +
+                '<div class="d-flex justify-content-between mb-2" style="font-size:0.875rem"><span class="text-muted">' + i18n.field_billing_day + '</span><span>' + transReplace(i18n.billing_day_text, { day: vm.billing_day }) + '</span></div>' +
                 '<div class="d-flex gap-1 flex-wrap">' + actions + '</div>' +
                 '</div></div>';
         });
@@ -613,18 +632,18 @@ $(function () {
             var station = $btn.data('station');
             var hostname = $btn.data('hostname');
             var isOn = $btn.data('power') == 1;
-            var actionWord = isOn ? '關機' : '開機';
+            var actionWord = isOn ? i18n.power_off : i18n.power_on;
 
             var confirmHtml = '<div class="text-center">' +
-                '<p><strong>確定要' + actionWord + '？</strong></p>' +
+                '<p><strong>' + transReplace(i18n.confirm_toggle, { action: actionWord }) + '</strong></p>' +
                 '<table class="table table-sm mt-2 text-center"><tbody>' +
-                '<tr><th style="width:80px">系統</th><td>' + system + '</td></tr>' +
-                '<tr><th>站台</th><td>' + station + '</td></tr>' +
-                '<tr><th>主機</th><td>' + hostname + '</td></tr>' +
-                '<tr><th>操作</th><td><strong class="' + (isOn ? 'text-danger' : 'text-success') + '">' + actionWord + '</strong></td></tr>' +
+                '<tr><th style="width:80px">' + i18n.field_system + '</th><td>' + system + '</td></tr>' +
+                '<tr><th>' + i18n.field_station + '</th><td>' + station + '</td></tr>' +
+                '<tr><th>' + i18n.field_hostname + '</th><td>' + hostname + '</td></tr>' +
+                '<tr><th>' + i18n.field_action + '</th><td><strong class="' + (isOn ? 'text-danger' : 'text-success') + '">' + actionWord + '</strong></td></tr>' +
                 '</tbody></table></div>';
 
-            $('#modal-vm-confirm-title').text('操作確認');
+            $('#modal-vm-confirm-title').text(i18n.confirm_title);
             $('#modal-vm-confirm-body').html(confirmHtml);
             pendingVmAction = function () {
                 $.ajax({
@@ -634,7 +653,7 @@ $(function () {
                     contentType: 'application/json',
                     success: function () { loadServers(); },
                     error: function (xhr) {
-                        showMessage((xhr.responseJSON && xhr.responseJSON.message) || '操作失敗');
+                        showMessage((xhr.responseJSON && xhr.responseJSON.message) || i18n.msg.action_failed);
                     }
                 });
             };
@@ -649,7 +668,7 @@ $(function () {
             headers: { 'X-CSRF-TOKEN': csrfToken },
             success: function (body) {
                 var list = body.data || [];
-                var html = '<option value="">選擇站台</option>';
+                var html = '<option value="">{{ trans('vm.select_station') }}</option>';
                 list.forEach(function (s) {
                     html += '<option value="' + s.id + '">' + s.name + '</option>';
                 });
@@ -696,7 +715,7 @@ $(function () {
                 loadServers();
             },
             error: function (xhr) {
-                var msg = (xhr.responseJSON && xhr.responseJSON.message) || '操作失敗';
+                var msg = (xhr.responseJSON && xhr.responseJSON.message) || i18n.msg.action_failed;
                 showMessage(msg);
             }
         });
@@ -730,7 +749,7 @@ $(function () {
 
     function renderBillings(billings) {
         if (billings.length === 0) {
-            $('#vm-billing-list').html('<div class="text-center text-muted py-4">暫無資料</div>');
+            $('#vm-billing-list').html('<div class="text-center text-muted py-4">' + i18n.no_data + '</div>');
             return;
         }
 
@@ -738,14 +757,14 @@ $(function () {
             '<div class="main-card mb-3 card d-none d-md-block"><div class="card-body p-0"><div class="table-responsive">' +
             '<table class="table table-hover table-striped align-middle mb-0"><thead class="table-light"><tr>' +
             '<th>#</th>' +
-            '<th>系統</th>' +
+            '<th>' + i18n.field_system + '</th>' +
             '<th>{{ trans("vm.field_station") }}</th>' +
             '<th>{{ trans("vm.field_month") }}</th>' +
             '<th>{{ trans("vm.field_amount") }}</th>' +
             '<th>{{ trans("vm.field_due_date") }}</th>' +
             '<th>{{ trans("vm.field_paid") }}</th>' +
             '<th>{{ trans("vm.field_overdue_days") }}</th>' +
-            '<th>操作</th>' +
+            '<th>' + i18n.field_action + '</th>' +
             '</tr></thead><tbody>';
 
         var cardsHtml = '<div class="d-md-none">';
@@ -770,7 +789,7 @@ $(function () {
             }
             var overdueText = '';
             if (!vmPowerOff && b.paid === 0 && b.overdue_days > 0) {
-                overdueText = '<span class="text-danger fw-bold">' + b.overdue_days + ' 天</span>';
+                overdueText = '<span class="text-danger fw-bold">' + transReplace(i18n.days_unit, { days: b.overdue_days }) + '</span>';
                 paidBadge = '<span class="badge bg-danger">{{ trans("vm.overdue") }}</span>';
             } else {
                 overdueText = '-';
@@ -825,7 +844,7 @@ $(function () {
                 }
                 if (canUpload) {
                     actions += '<button class="btn btn-sm btn-outline-secondary js-upload-proof" data-id="' + b.id + '">' +
-                        '<i class="fas fa-redo me-1"></i>重新上傳</button> ';
+                        '<i class="fas fa-redo me-1"></i>' + i18n.action_reupload + '</button> ';
                 }
                 if (canApprove) {
                     actions += '<button class="btn btn-sm btn-primary js-approve-paid" data-id="' + b.id + '"' +
@@ -855,10 +874,10 @@ $(function () {
                 '<div><strong style="font-size:1.0625rem">' + stationName + '</strong>' +
                 '<div class="text-muted" style="font-size:0.8125rem">' + billingSystemName + '</div></div>' +
                 paidBadge + '</div>' +
-                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">月份</span><span>' + b.billing_month + '</span></div>' +
-                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">金額</span><strong>' + b.amount + '</strong></div>' +
-                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">應收日</span><span>' + (b.due_date || '-') + '</span></div>' +
-                (b.paid === 0 && b.overdue_days > 0 ? '<div class="d-flex justify-content-between mb-2" style="font-size:0.875rem"><span class="text-muted">逾期</span><span class="text-danger fw-bold">' + b.overdue_days + ' 天</span></div>' : '') +
+                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + i18n.field_month + '</span><span>' + b.billing_month + '</span></div>' +
+                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + i18n.field_amount + '</span><strong>' + b.amount + '</strong></div>' +
+                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + i18n.field_due_date + '</span><span>' + (b.due_date || '-') + '</span></div>' +
+                (b.paid === 0 && b.overdue_days > 0 ? '<div class="d-flex justify-content-between mb-2" style="font-size:0.875rem"><span class="text-muted">' + i18n.overdue + '</span><span class="text-danger fw-bold">' + b.overdue_days + ' 天</span></div>' : '') +
                 '<div class="d-flex gap-1">' + actions + '</div>' +
                 '</div></div>';
         });
@@ -877,12 +896,12 @@ $(function () {
         var html = '<div class="text-center">' +
             '<p><strong>' + title + '</strong></p>' +
             '<table class="table table-sm mt-2 text-center"><tbody>' +
-            '<tr><th style="width:80px">站台</th><td>' + (detail.station || '-') + '</td></tr>' +
-            '<tr><th>月份</th><td>' + (detail.month || '-') + '</td></tr>' +
-            '<tr><th>金額</th><td><strong>' + (detail.amount || '-') + '</strong></td></tr>' +
+            '<tr><th style="width:80px">' + i18n.field_station + '</th><td>' + (detail.station || '-') + '</td></tr>' +
+            '<tr><th>' + i18n.field_month + '</th><td>' + (detail.month || '-') + '</td></tr>' +
+            '<tr><th>' + i18n.field_amount + '</th><td><strong>' + (detail.amount || '-') + '</strong></td></tr>' +
             '</tbody></table>';
         if (detail.proof) {
-            html += '<div class="mt-2"><p class="text-muted mb-1">繳款證明：</p>' +
+            html += '<div class="mt-2"><p class="text-muted mb-1">' + i18n.proof_label + '</p>' +
                 '<img src="' + detail.proof + '" style="max-width:100%;border-radius:0.375rem" alt="proof"></div>';
         }
         html += '</div>';
@@ -890,7 +909,7 @@ $(function () {
     }
 
     function showConfirm(title, detail, onConfirm) {
-        $('#modal-vm-confirm-title').text('操作確認');
+        $('#modal-vm-confirm-title').text(i18n.confirm_title);
         $('#modal-vm-confirm-body').html(buildConfirmHtml(title, detail));
         pendingVmAction = onConfirm;
         showBsModal('modal-vm-confirm');
@@ -918,7 +937,7 @@ $(function () {
                 amount: $btn.data('amount'),
                 proof: $btn.data('proof') || ''
             };
-            showConfirm('確定要標記此帳單為已收款？', detail, function () {
+            showConfirm(i18n.confirm_mark_paid, detail, function () {
                 $.ajax({
                     url: '/admin/vm/ajax-mark-paid/' + id,
                     method: 'PUT',
@@ -929,7 +948,7 @@ $(function () {
                         loadBillings();
                     },
                     error: function (xhr) {
-                        showMessage((xhr.responseJSON && xhr.responseJSON.message) || '操作失敗');
+                        showMessage((xhr.responseJSON && xhr.responseJSON.message) || i18n.msg.action_failed);
                     }
                 });
             });
@@ -960,7 +979,7 @@ $(function () {
                 amount: $btn.data('amount'),
                 proof: $btn.data('proof') || ''
             };
-            showConfirm('確定要審核通過此繳款？', detail, function () {
+            showConfirm(i18n.confirm_approve, detail, function () {
                 $.ajax({
                     url: '/admin/vm/ajax-approve-paid/' + id,
                     method: 'PUT',
@@ -971,7 +990,7 @@ $(function () {
                         loadBillings();
                     },
                     error: function (xhr) {
-                        showMessage((xhr.responseJSON && xhr.responseJSON.message) || '操作失敗');
+                        showMessage((xhr.responseJSON && xhr.responseJSON.message) || i18n.msg.action_failed);
                     }
                 });
             });
@@ -1029,7 +1048,7 @@ $(function () {
             sendingBilling = true;
             var $btn = $(this);
             var originalHtml = $btn.html();
-            $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>發送中...');
+            $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>' + i18n.sending);
             // 鎖定所有發送按鈕
             $('.js-send-billing').prop('disabled', true);
 
@@ -1047,7 +1066,7 @@ $(function () {
                     due_date: $btn.data('due-date') || '',
                 }),
                 success: function () {
-                    $btn.html('<i class="fas fa-check me-1"></i>已發送');
+                    $btn.html('<i class="fas fa-check me-1"></i>' + i18n.sent);
                     setTimeout(function () {
                         sendingBilling = false;
                         $btn.prop('disabled', false).html(originalHtml);
@@ -1084,9 +1103,9 @@ $(function () {
 
                 // 有金額差異需要確認
                 if (body.mismatches && body.mismatches.length > 0 && !forceUpdate) {
-                    var html = '<div class="text-center"><p><strong>以下帳單金額與目前費用不同，是否更新？</strong></p></div>' +
+                    var html = '<div class="text-center"><p><strong>' + i18n.mismatch_hint + '</strong></p></div>' +
                         '<table class="table table-sm mt-2"><thead><tr>' +
-                        '<th>站台</th><th>主機</th><th>原金額</th><th>新金額</th>' +
+                        '<th>' + i18n.field_station + '</th><th>' + i18n.field_hostname + '</th><th>' + i18n.mismatch_old + '</th><th>' + i18n.mismatch_new + '</th>' +
                         '</tr></thead><tbody>';
                     body.mismatches.forEach(function (m) {
                         html += '<tr>' +
@@ -1099,10 +1118,10 @@ $(function () {
                     html += '</tbody></table>';
 
                     if (body.generated > 0) {
-                        html += '<p class="text-muted mt-2">已新增 ' + body.generated + ' 筆帳單</p>';
+                        html += '<p class="text-muted mt-2">' + transReplace(i18n.generated_count, { count: body.generated }) + '</p>';
                     }
 
-                    $('#modal-vm-confirm-title').text('金額差異確認');
+                    $('#modal-vm-confirm-title').text(i18n.mismatch_title);
                     $('#modal-vm-confirm-body').html(html);
                     pendingVmAction = function () {
                         doGenerateBilling(month, true);
@@ -1111,16 +1130,16 @@ $(function () {
                     return;
                 }
 
-                var msg = body.message || '完成';
+                var msg = body.message || i18n.msg.done;
                 if (body.updated > 0) {
-                    msg += '，已更新 ' + body.updated + ' 筆金額';
+                    msg += transReplace(i18n.updated_count, { count: body.updated });
                 }
                 showMessage(msg);
                 loadBillings();
             },
             error: function (xhr) {
                 $btn.prop('disabled', false);
-                showMessage((xhr.responseJSON && xhr.responseJSON.message) || '產生失敗');
+                showMessage((xhr.responseJSON && xhr.responseJSON.message) || i18n.msg.generate_failed);
             }
         });
     }
@@ -1191,7 +1210,7 @@ $(function () {
                 loadBillings();
             },
             error: function (xhr) {
-                showMessage((xhr.responseJSON && xhr.responseJSON.message) || '上傳失敗');
+                showMessage((xhr.responseJSON && xhr.responseJSON.message) || i18n.msg.upload_failed);
             }
         });
     });
@@ -1247,8 +1266,8 @@ $(function () {
     // 折疊文字切換
     var $vmCollapse = $('#vm-search-collapse');
     var $vmToggle = $('[data-bs-target="#vm-search-collapse"]');
-    $vmCollapse.on('show.bs.collapse', function () { $vmToggle.text('— 折疊 —'); });
-    $vmCollapse.on('hide.bs.collapse', function () { $vmToggle.text('— 展開 —'); });
+    $vmCollapse.on('show.bs.collapse', function () { $vmToggle.text(i18n.action_collapse); });
+    $vmCollapse.on('hide.bs.collapse', function () { $vmToggle.text(i18n.action_expand); });
 
     // 即時計算總金額
     function updateTotalFee() {

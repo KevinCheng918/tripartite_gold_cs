@@ -37,6 +37,17 @@ return [
     'paid_pending'   => '待审核',
     'overdue'        => '逾期',
 
+    'field_system'       => '系统',
+    'field_action'       => '操作',
+
+    'action_search'        => '搜寻',
+    'action_reset'         => '重置',
+    'action_cancel'        => '取消',
+    'action_confirm'       => '确认',
+    'action_upload'        => '上传',
+    'action_reupload'      => '重新上传',
+    'action_collapse'      => '— 折叠 —',
+    'action_expand'        => '— 展开 —',
     'action_create'        => '新增虚拟机',
     'action_edit'          => '编辑',
     'action_toggle_power'  => '切换开关机',
@@ -54,6 +65,41 @@ return [
     'generate_billing_month' => '账单月份',
     'generate_billing_hint'  => '只能产生本月或之后的账单',
 
+    // 选单／输入提示
+    'all_stations'        => '全部站台',
+    'select_station'      => '选择站台',
+    'select_image'        => '选择图片',
+    'search_station_ph'   => '搜寻站台...',
+    'model_type_ph'       => '例：AWS t3.medium',
+    'spec_ph'             => '例：2C4G 50GB',
+
+    // 总览统计
+    'overview_title'    => '虚拟机总览',
+    'overview_subtitle' => '即时掌握各系统运作状态',
+    'uncategorized'     => '未分类',
+    'total_fee'         => '总费用',
+    'total_count'       => '总计 :count 台',
+
+    // 列表／明细
+    'no_data'           => '暂无资料',
+    'days_unit'         => ':days 天',
+    'billing_day_text'  => '每月 :day 日',
+    'proof_label'       => '缴款证明：',
+    'sending'           => '发送中...',
+    'sent'              => '已发送',
+
+    // 确认视窗
+    'confirm_title'      => '操作确认',
+    'confirm_toggle'     => '确定要:action？',
+    'confirm_mark_paid'  => '确定要标记此账单为已收款？',
+    'confirm_approve'    => '确定要审核通过此缴款？',
+    'mismatch_title'     => '金额差异确认',
+    'mismatch_hint'      => '以下账单金额与目前费用不同，是否更新？',
+    'mismatch_old'       => '原金额',
+    'mismatch_new'       => '新金额',
+    'generated_count'    => '已新增 :count 笔账单',
+    'updated_count'      => '，已更新 :count 笔金额',
+
     'msg' => [
         'create_failed'    => '虚拟机新增失败',
         'update_failed'    => '虚拟机更新失败',
@@ -69,5 +115,7 @@ return [
         'generate_failed'  => '账单产生失败',
         'month_cannot_be_past' => '只能产生本月或之后的账单',
         'month_format_invalid' => '月份格式不正确',
+        'action_failed'    => '操作失败',
+        'done'             => '完成',
     ],
 ];

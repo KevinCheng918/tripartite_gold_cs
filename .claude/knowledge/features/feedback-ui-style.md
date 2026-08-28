@@ -26,6 +26,31 @@
 
 > `js-` 開頭的 class 只作為 JS hook，樣式另外用語意 class（如 `qr-category-item`），不要混用。
 
+## Blade 註解裡不要寫 `@` 指令語法
+
+Blade 的指令解析**不管它在不在註解裡**。這行 JS 註解就會讓整個頁面壞掉：
+
+```js
+// 避免散落數十個 @json(trans(...))     ← 被當成真的 @json 指令
+```
+
+編譯成 `json_encode(trans(...))`，`...` 不是合法 PHP →
+`syntax error, unexpected ')'`（2026-08-29 在 vm 頁面踩到）。
+
+要在註解裡提到指令就避開 `@`（寫成「json/trans 呼叫」），或用 `@@json` 轉義。
+
+### 驗證方式：`view:cache` 成功不代表沒問題
+
+`php artisan view:cache` 只做 blade → PHP 的轉換，**不檢查產出的 PHP 語法**，
+上面那個錯誤它照樣顯示「Blade templates cached successfully!」。
+
+要確實驗證得檢查編譯後的檔案：
+
+```bash
+php artisan view:clear && php artisan view:cache
+for f in storage/framework/views/*.php; do php -l "$f" | grep -v 'No syntax errors'; done
+```
+
 ## 刪除按鈕
 
 **不要用 `btn-outline-danger`**，在本專案會顯示成淺底淺字、幾乎看不見

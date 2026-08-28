@@ -37,6 +37,17 @@ return [
     'paid_pending'   => 'Pending',
     'overdue'        => 'Overdue',
 
+    'field_system'       => 'System',
+    'field_action'       => 'Action',
+
+    'action_search'        => 'Search',
+    'action_reset'         => 'Reset',
+    'action_cancel'        => 'Cancel',
+    'action_confirm'       => 'Confirm',
+    'action_upload'        => 'Upload',
+    'action_reupload'      => 'Re-upload',
+    'action_collapse'      => '— Collapse —',
+    'action_expand'        => '— Expand —',
     'action_create'        => 'Add VM',
     'action_edit'          => 'Edit',
     'action_toggle_power'  => 'Toggle Power',
@@ -54,6 +65,41 @@ return [
     'generate_billing_month' => 'Billing month',
     'generate_billing_hint'  => 'Only the current month or later can be generated',
 
+    // Selects / placeholders
+    'all_stations'        => 'All stations',
+    'select_station'      => 'Select station',
+    'select_image'        => 'Select image',
+    'search_station_ph'   => 'Search station...',
+    'model_type_ph'       => 'e.g. AWS t3.medium',
+    'spec_ph'             => 'e.g. 2C4G 50GB',
+
+    // Overview
+    'overview_title'    => 'VM Overview',
+    'overview_subtitle' => 'Real-time status by system',
+    'uncategorized'     => 'Uncategorized',
+    'total_fee'         => 'Total fee',
+    'total_count'       => ':count units in total',
+
+    // List / detail
+    'no_data'           => 'No data',
+    'days_unit'         => ':days days',
+    'billing_day_text'  => 'Day :day of each month',
+    'proof_label'       => 'Payment proof:',
+    'sending'           => 'Sending...',
+    'sent'              => 'Sent',
+
+    // Confirm dialogs
+    'confirm_title'      => 'Confirm action',
+    'confirm_toggle'     => 'Confirm :action?',
+    'confirm_mark_paid'  => 'Mark this billing as paid?',
+    'confirm_approve'    => 'Approve this payment?',
+    'mismatch_title'     => 'Amount mismatch',
+    'mismatch_hint'      => 'The following billings differ from current fees. Update them?',
+    'mismatch_old'       => 'Old amount',
+    'mismatch_new'       => 'New amount',
+    'generated_count'    => ':count billings created',
+    'updated_count'      => ', :count amounts updated',
+
     'msg' => [
         'create_failed'    => 'Failed to create VM',
         'update_failed'    => 'Failed to update VM',
@@ -69,5 +115,7 @@ return [
         'generate_failed'  => 'Failed to generate billing',
         'month_cannot_be_past' => 'Only the current month or later can be generated',
         'month_format_invalid' => 'Invalid month format',
+        'action_failed'    => 'Operation failed',
+        'done'             => 'Done',
     ],
 ];
