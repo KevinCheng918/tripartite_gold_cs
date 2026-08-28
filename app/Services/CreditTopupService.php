@@ -148,6 +148,11 @@ class CreditTopupService
     private function notifyTelegram($station, $result, $reviewerId, $reviewerName)
     {
         if (!filled($station->telegram_group_id)) {
+            Log::info('站台未綁定 Telegram 群組，略過補點通知', [
+                'station_id' => $station->id,
+                'station'    => $station->name,
+            ]);
+
             return;
         }
 
@@ -155,6 +160,7 @@ class CreditTopupService
         if (blank($message)) {
             Log::info('補點成功但主站未回傳訊息，略過 Telegram 通知', [
                 'station_id' => $station->id,
+                'response'   => $result,
             ]);
 
             return;
@@ -170,6 +176,11 @@ class CreditTopupService
                 null,
                 false
             );
+
+            Log::info('補點結果已發送 Telegram', [
+                'station_id'        => $station->id,
+                'telegram_group_id' => $station->telegram_group_id,
+            ]);
         } catch (\Exception $e) {
             Log::error('補點結果發送 Telegram 失敗', [
                 'station_id'        => $station->id,
