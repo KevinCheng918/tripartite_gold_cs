@@ -2,7 +2,7 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>{{ __('login.title') }}</title>
     <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
     <link rel="apple-touch-icon" href="{{ asset('img/pwa-apple-icon.png') }}">
@@ -17,8 +17,17 @@
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
+        /* 捲動容器其實是 html，只在 body 設 overflow:hidden 擋不住滑動。
+           登入頁內容固定就這些，兩層都鎖住，手機上不該有捲動空間。
+           100dvh 讓手機瀏覽器的網址列伸縮時高度跟著變，不會多出一截。 */
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+
         body {
             min-height: 100vh;
+            min-height: 100dvh;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -26,8 +35,15 @@
             background: #0a0a0a;
             font-family: 'Noto Sans TC', sans-serif;
             position: relative;
-            overflow: hidden;
             color: #fff;
+        }
+
+        /* 橫向或極矮的螢幕內容可能放不下，這時才允許捲動，免得被裁掉看不到 */
+        @media (max-height: 640px) {
+            html, body {
+                height: auto;
+                overflow-y: auto;
+            }
         }
 
         /* ---- 背景裝飾 ---- */
@@ -174,6 +190,8 @@
             display: flex;
             width: 90%;
             max-width: 900px;
+            /* 視窗再窄也不讓卡片被壓扁 */
+            min-width: 300px;
             overflow: hidden;
             backdrop-filter: blur(16px);
             box-shadow: 0 24px 80px rgba(0,0,0,0.5), 0 0 1px rgba(212, 175, 55, 0.3);
@@ -360,7 +378,20 @@
         }
 
         /* ---- 手機版 ---- */
-        @media (max-width: 767.98px) {
+        /* 中等寬度（平板、縮小的桌機視窗）維持雙欄，只把左側品牌區收窄，
+           不要一過 768px 就整個塌成單欄窄卡片 */
+        @media (max-width: 991.98px) and (min-width: 576px) {
+            .login-card { width: 94%; }
+            .login-card__left { flex: 0.85; padding: 2rem 1.25rem; }
+            .login-card__left img { max-height: 200px; margin-bottom: 1rem; }
+            .login-card__left h3 { font-size: 1.0625rem; letter-spacing: 0.12em; }
+            .login-card__left .left-sub { font-size: 0.625rem; letter-spacing: 0.15em; }
+            .login-card__right { padding: 2.25rem 1.75rem; }
+            .login-header { margin-bottom: 1.75rem; }
+        }
+
+        /* 真正的手機才收成單欄 */
+        @media (max-width: 575.98px) {
             .login-card__left { display: none; }
             .login-card { max-width: 420px; border-radius: 14px; }
             .login-card__right { padding: 2rem 1.5rem; border-left: none; }

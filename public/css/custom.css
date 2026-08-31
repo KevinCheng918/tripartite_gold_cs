@@ -81,6 +81,18 @@
     padding: 0 !important;
 }
 
+/* ---- iPhone 瀏海／動態島（safe area） ---- */
+/* header 背景長到螢幕最頂端，但文字內容推到瀏海下方，不然標題會被瀏海壓住。
+   需搭配 viewport meta 的 viewport-fit=cover，否則 env() 一律是 0。
+   桌機與沒有瀏海的裝置 env() 就是 0，等同沒有這段。 */
+.fixed-header .app-header {
+    height: calc(60px + env(safe-area-inset-top, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
+}
+.fixed-header .app-main {
+    padding-top: calc(60px + env(safe-area-inset-top, 0px));
+}
+
 /* ---- 聊天 RWD（手機版） ---- */
 @media (max-width: 767.98px) {
     .chat-layout .app-inner-layout__wrapper {
@@ -91,7 +103,7 @@
         display: flex !important;
         flex-direction: column !important;
         position: fixed !important;
-        top: 60px;
+        top: calc(60px + env(safe-area-inset-top, 0px));
         left: 0;
         right: 0;
         bottom: 0;
@@ -106,6 +118,9 @@
         flex: 1 !important;
         overflow-y: auto !important;
         -webkit-overflow-scrolling: touch;
+        /* 手機瀏覽器的底部工具列會蓋住 bottom:0 的區域，最後一筆對話捲到底也看不到。
+           多留一段捲動空間，並用 safe-area 讓 iPhone 的 home indicator 也不擋。 */
+        padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important;
     }
     .chat-layout .app-inner-layout__content {
         width: 100% !important;
@@ -121,7 +136,7 @@
         display: flex !important;
         flex-direction: column !important;
         position: fixed !important;
-        top: 60px;
+        top: calc(60px + env(safe-area-inset-top, 0px));
         left: 0;
         right: 0;
         bottom: 0;
