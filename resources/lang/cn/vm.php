@@ -117,5 +117,9 @@ return [
         'month_format_invalid' => '月份格式不正确',
         'action_failed'    => '操作失败',
         'done'             => '完成',
+        'station_not_found' => '站台不存在',
+        'max_string'       => ':field 不可超过 :value 字元',
+        'numeric_required' => ':field 必须为数字',
+        'billing_day_range' => '账单日必须是 1 到 :max 之间的数字',
     ],
 ];

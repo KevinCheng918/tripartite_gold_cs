@@ -359,6 +359,32 @@ $(function () {
     var i18n = @json(trans('vm'));
 
     /**
+     * 取出後端錯誤訊息：優先顯示欄位層級的驗證錯誤
+     *
+     * 只取 message 的話，422 會顯示成沒有資訊量的
+     * 「The given data was invalid.」，看不出是哪個欄位不合格。
+     *
+     * @param {Object} xhr
+     * @param {string} fallback
+     * @returns {string}
+     */
+    function getErrorMsg(xhr, fallback) {
+        var body = xhr.responseJSON || {};
+
+        if (body.errors) {
+            var messages = [];
+            Object.keys(body.errors).forEach(function (field) {
+                messages = messages.concat(body.errors[field]);
+            });
+            if (messages.length) {
+                return messages.join('\n');
+            }
+        }
+
+        return body.message || fallback;
+    }
+
+    /**
      * 取代語系字串中的 :placeholder
      *
      * @param {string} text
@@ -693,30 +719,40 @@ $(function () {
         var url = id ? '/admin/vm/ajax-update/' + id : '/admin/vm/ajax-store';
         var method = id ? 'PUT' : 'POST';
 
+        var payload = {
+            station_id: parseInt($('#vm-station').val(), 10),
+            hostname: $('#vm-hostname').val(),
+            internal_ip: $('#vm-internal-ip').val(),
+            external_ip: $('#vm-external-ip').val(),
+            model_type: $('#vm-model-type').val(),
+            spec: $('#vm-spec').val(),
+            monthly_fee: parseFloat($('#vm-fee').val()),
+            vpn_fee: parseFloat($('#vm-vpn-fee').val()) || 0,
+            google_fee: parseFloat($('#vm-google-fee').val()) || 0,
+            billing_day: parseInt($('#vm-billing-day').val(), 10),
+            note: $('#vm-note').val(),
+        };
+
+        // 欄位空白時 parseInt/parseFloat 會得到 NaN，JSON.stringify 又把它變成 null，
+        // 後端規則是 sometimes|integer（沒有 nullable）就會驗證失敗。
+        // 直接拿掉該欄位，sometimes 才會跳過不驗。
+        Object.keys(payload).forEach(function (key) {
+            if (typeof payload[key] === 'number' && isNaN(payload[key])) {
+                delete payload[key];
+            }
+        });
+
         $.ajax({
             url: url, method: method,
             headers: { 'X-CSRF-TOKEN': csrfToken },
             contentType: 'application/json',
-            data: JSON.stringify({
-                station_id: parseInt($('#vm-station').val(), 10),
-                hostname: $('#vm-hostname').val(),
-                internal_ip: $('#vm-internal-ip').val(),
-                external_ip: $('#vm-external-ip').val(),
-                model_type: $('#vm-model-type').val(),
-                spec: $('#vm-spec').val(),
-                monthly_fee: parseFloat($('#vm-fee').val()),
-                vpn_fee: parseFloat($('#vm-vpn-fee').val()) || 0,
-                google_fee: parseFloat($('#vm-google-fee').val()) || 0,
-                billing_day: parseInt($('#vm-billing-day').val(), 10),
-                note: $('#vm-note').val(),
-            }),
+            data: JSON.stringify(payload),
             success: function () {
                 hideBsModal(document.getElementById('modal-vm'));
                 loadServers();
             },
             error: function (xhr) {
-                var msg = (xhr.responseJSON && xhr.responseJSON.message) || i18n.msg.action_failed;
-                showMessage(msg);
+                showMessage(getErrorMsg(xhr, i18n.msg.action_failed));
             }
         });
     });

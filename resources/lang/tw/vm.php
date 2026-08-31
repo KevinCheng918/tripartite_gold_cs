@@ -123,5 +123,9 @@ return [
         'month_format_invalid' => '月份格式不正確',
         'action_failed'    => '操作失敗',
         'done'             => '完成',
+        'station_not_found' => '站台不存在',
+        'max_string'       => ':field 不可超過 :value 字元',
+        'numeric_required' => ':field 必須為數字',
+        'billing_day_range' => '帳單日必須是 1 到 :max 之間的數字',
     ],
 ];

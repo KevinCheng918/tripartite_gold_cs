@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Vm\GenerateBillingRequest;
+use App\Http\Requests\Vm\StoreServerRequest;
+use App\Http\Requests\Vm\UpdateServerRequest;
 use App\Http\Resources\VmBillingResource;
 use App\Http\Resources\VmServerResource;
 use App\Models\VmBilling;
@@ -76,21 +78,9 @@ class VmController extends Controller
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse|VmServerResource
      */
-    public function ajaxStore(Request $request)
+    public function ajaxStore(StoreServerRequest $request)
     {
-        $params = $request->validate([
-            'station_id'   => 'required|integer|exists:station,id',
-            'hostname'     => 'required|string|max:100',
-            'internal_ip'  => 'nullable|string|max:45',
-            'external_ip'  => 'nullable|string|max:45',
-            'model_type'   => 'nullable|string|max:100',
-            'spec'         => 'required|string|max:255',
-            'monthly_fee'  => 'required|numeric|min:0',
-            'vpn_fee'      => 'nullable|numeric|min:0',
-            'google_fee'   => 'nullable|numeric|min:0',
-            'billing_day'  => 'required|integer|min:1|max:31',
-            'note'         => 'nullable|string',
-        ]);
+        $params = $request->validated();
 
         try {
             $server = $this->vmService->createServer($params);
@@ -110,22 +100,9 @@ class VmController extends Controller
      * @param VmServer $vm
      * @return \Illuminate\Http\JsonResponse|VmServerResource
      */
-    public function ajaxUpdate(Request $request, VmServer $vm)
+    public function ajaxUpdate(UpdateServerRequest $request, VmServer $vm)
     {
-        $params = $request->validate([
-            'station_id'   => 'sometimes|integer|exists:station,id',
-            'hostname'     => 'sometimes|string|max:100',
-            'internal_ip'  => 'nullable|string|max:45',
-            'external_ip'  => 'nullable|string|max:45',
-            'model_type'   => 'nullable|string|max:100',
-            'spec'         => 'sometimes|string|max:255',
-            'monthly_fee'  => 'sometimes|numeric|min:0',
-            'vpn_fee'      => 'nullable|numeric|min:0',
-            'google_fee'   => 'nullable|numeric|min:0',
-            'billing_day'  => 'sometimes|integer|min:1|max:28',
-            'status'       => 'sometimes|integer|in:0,1',
-            'note'         => 'nullable|string',
-        ]);
+        $params = $request->validated();
 
         try {
             $server = $this->vmService->updateServer($vm, $params);

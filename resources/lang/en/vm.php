@@ -117,5 +117,9 @@ return [
         'month_format_invalid' => 'Invalid month format',
         'action_failed'    => 'Operation failed',
         'done'             => 'Done',
+        'station_not_found' => 'Station not found',
+        'max_string'       => ':field must not exceed :value characters',
+        'numeric_required' => ':field must be a number',
+        'billing_day_range' => 'Billing day must be between 1 and :max',
     ],
 ];
