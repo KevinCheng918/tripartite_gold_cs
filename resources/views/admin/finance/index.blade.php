@@ -189,8 +189,8 @@
                         </div>
                         <div class="mb-3">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="expense-reimbursed">
-                                <label class="form-check-label" for="expense-reimbursed">已請款</label>
+                                <input class="form-check-input" type="checkbox" id="expense-reimbursed-check">
+                                <label class="form-check-label" for="expense-reimbursed-check">已請款</label>
                             </div>
                         </div>
                         <div class="mb-3">
@@ -444,7 +444,7 @@ $(function () {
         $('#expense-amount').val($btn.data('amount'));
         $('#expense-currency').val($btn.data('currency') || 'TWD');
         $('#expense-date').val($btn.data('date'));
-        $('#expense-reimbursed').prop('checked', parseInt($btn.data('reimbursed'), 10) === 1);
+        $('#expense-reimbursed-check').prop('checked', parseInt($btn.data('reimbursed'), 10) === 1);
         $('#expense-note').val($btn.data('note'));
         showBsModal('modal-expense');
     });
@@ -463,7 +463,7 @@ $(function () {
             amount: parseFloat($('#expense-amount').val()),
             currency: $('#expense-currency').val(),
             expense_date: $('#expense-date').val() || null,
-            reimbursed: $('#expense-reimbursed').is(':checked') ? 1 : 0,
+            reimbursed: $('#expense-reimbursed-check').is(':checked') ? 1 : 0,
             note: $('#expense-note').val().trim() || null
         };
         if (!data.name || !data.amount) return;
