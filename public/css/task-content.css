@@ -1,0 +1,94 @@
+/* 任務描述的內容樣式
+   同時給兩個地方用：任務詳情面板、以及 TinyMCE 編輯器內（透過 content_css 載入），
+   兩邊共用這一份才不會改了一處另一處沒跟上。 */
+
+/* ---- 編號清單分級 ---- */
+/* 巢狀編號如果每層都是 1. 2. 3. 根本看不出層級，逐層換成英文字母、羅馬數字 */
+.tb-content ol,
+.mce-content-body ol {
+    list-style-type: decimal;
+}
+
+.tb-content ol ol,
+.mce-content-body ol ol {
+    list-style-type: lower-alpha;
+}
+
+.tb-content ol ol ol,
+.mce-content-body ol ol ol {
+    list-style-type: lower-roman;
+}
+
+.tb-content ol ol ol ol,
+.mce-content-body ol ol ol ol {
+    list-style-type: upper-alpha;
+}
+
+/* ---- 項目符號分級 ---- */
+.tb-content ul,
+.mce-content-body ul {
+    list-style-type: disc;
+}
+
+.tb-content ul ul,
+.mce-content-body ul ul {
+    list-style-type: circle;
+}
+
+.tb-content ul ul ul,
+.mce-content-body ul ul ul {
+    list-style-type: square;
+}
+
+/* ---- 勾選清單 ---- */
+/* 放在分級規則之後，蓋掉上面 ul 的項目符號 */
+.tb-checklist,
+.tb-checklist ul,
+.mce-content-body .tb-checklist {
+    list-style: none !important;
+    padding-left: 0;
+    margin: 0.5rem 0;
+}
+
+.tb-checklist li {
+    position: relative;
+    padding-left: 1.85rem;
+    margin-bottom: 0.35rem;
+    line-height: 1.6;
+}
+
+.tb-checklist li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.15em;
+    width: 1.1em;
+    height: 1.1em;
+    border: 2px solid #a67c00;
+    border-radius: 0.25rem;
+    box-sizing: border-box;
+}
+
+.tb-checklist li[data-checked="1"]::before {
+    background: #a67c00;
+}
+
+.tb-checklist li[data-checked="1"]::after {
+    content: '\2713';
+    position: absolute;
+    left: 0.22em;
+    top: 0.02em;
+    color: #fff;
+    font-size: 0.85em;
+    font-weight: 700;
+}
+
+.tb-checklist li[data-checked="1"] {
+    text-decoration: line-through;
+    opacity: 0.55;
+}
+
+/* 詳情面板裡可以直接點方塊切換，游標提示可互動 */
+.side-field .tb-checklist li {
+    cursor: pointer;
+}

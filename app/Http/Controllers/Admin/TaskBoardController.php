@@ -7,8 +7,11 @@ use App\Http\Requests\TaskBoard\MoveTaskRequest;
 use App\Http\Requests\TaskBoard\ReorderTaskRequest;
 use App\Http\Requests\TaskBoard\StoreCommentRequest;
 use App\Http\Requests\TaskBoard\StoreTaskRequest;
+use App\Http\Requests\TaskBoard\UpdateChecklistRequest;
 use App\Http\Requests\TaskBoard\UpdateCommentRequest;
 use App\Http\Requests\TaskBoard\UpdateTaskRequest;
+use App\Http\Requests\TaskBoard\UploadEditorFileRequest;
+use App\Http\Requests\TaskBoard\UploadEditorImageRequest;
 use App\Http\Resources\TaskActivityResource;
 use App\Http\Resources\TaskCommentResource;
 use App\Http\Resources\TaskResource;
@@ -110,14 +113,15 @@ class TaskBoardController extends Controller
     /**
      * Ajax 新增任務
      *
-     * @param Request $request
+     * @param StoreTaskRequest $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function ajaxStoreTask(StoreTaskRequest $request)
     {
         $params = $request->validated();
         $params['images'] = $request->hasFile('images')
-            ? $this->imageUploadService->uploadMultiple($request->file('images'), 'task')
+            // 附件不限圖片，檔名保留原始名稱才看得出是什麼檔
+            ? $this->imageUploadService->uploadMultipleKeepName($request->file('images'), 'task')
             : [];
 
         try {
@@ -137,8 +141,8 @@ class TaskBoardController extends Controller
     /**
      * Ajax 更新任務
      *
-     * @param Request $request
-     * @param Task    $task
+     * @param UpdateTaskRequest $request
+     * @param Task              $task
      * @return \Illuminate\Http\JsonResponse
      */
     public function ajaxUpdateTask(UpdateTaskRequest $request, Task $task)
@@ -146,7 +150,7 @@ class TaskBoardController extends Controller
         $params = $request->validated();
         if ($request->hasFile('images')) {
             $existing = $task->images ?? [];
-            $newImages = $this->imageUploadService->uploadMultiple($request->file('images'), 'task');
+            $newImages = $this->imageUploadService->uploadMultipleKeepName($request->file('images'), 'task');
             $params['images'] = array_merge($existing, $newImages);
         }
 
@@ -239,7 +243,7 @@ class TaskBoardController extends Controller
     /**
      * Ajax 批次重排
      *
-     * @param Request $request
+     * @param ReorderTaskRequest $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function ajaxReorder(ReorderTaskRequest $request)
@@ -274,16 +278,63 @@ class TaskBoardController extends Controller
     /**
      * Ajax 編輯器圖片上傳（TinyMCE）
      *
-     * @param Request $request
+     * @param UploadEditorImageRequest $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function ajaxUploadEditorImage(Request $request)
+    public function ajaxUploadEditorImage(UploadEditorImageRequest $request)
     {
-        $request->validate(['file' => 'required|image|max:5120']);
-
         $path = $this->imageUploadService->upload($request->file('file'), 'task-editor');
 
         return response()->json(['location' => asset("storage/{$path}")]);
+    }
+
+    /**
+     * Ajax 上傳任務描述的附件（圖片以外的檔案）
+     *
+     * @param UploadEditorFileRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxUploadEditorFile(UploadEditorFileRequest $request)
+    {
+        try {
+            $file = $request->file('file');
+
+            // 附件必須看得出原始檔名，走 uploadKeepName 而非 upload 的 uniqid 命名
+            $path = $this->imageUploadService->uploadKeepName($file, 'task-editor');
+
+            return response()->json([
+                'location' => asset("storage/{$path}"),
+                'name'     => $file->getClientOriginalName(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('任務附件上傳失敗', ['error' => $e->getMessage()]);
+
+            return response()->json(['message' => trans('task_board.msg.file_upload_failed')], 500);
+        }
+    }
+
+    /**
+     * Ajax 更新描述中的勾選清單狀態
+     *
+     * 走獨立端點而非 ajaxUpdateTask，避免每勾一次就寫一筆活動紀錄。
+     *
+     * @param UpdateChecklistRequest $request
+     * @param Task                   $task
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxUpdateChecklist(UpdateChecklistRequest $request, Task $task)
+    {
+        $params = $request->validated();
+
+        try {
+            $this->taskBoardService->updateChecklist($task, $params['description']);
+
+            return response()->json(['message' => trans('task_board.msg.checklist_updated')]);
+        } catch (\Exception $e) {
+            Log::error('勾選清單更新失敗', ['error' => $e->getMessage(), 'task_id' => $task->id]);
+
+            return response()->json(['message' => trans('task_board.msg.checklist_update_failed')], 500);
+        }
     }
 
     /**
@@ -302,8 +353,8 @@ class TaskBoardController extends Controller
     /**
      * Ajax 新增留言
      *
-     * @param Request $request
-     * @param Task    $task
+     * @param StoreCommentRequest $request
+     * @param Task                $task
      * @return \Illuminate\Http\JsonResponse
      */
     public function ajaxStoreComment(StoreCommentRequest $request, Task $task)

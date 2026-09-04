@@ -131,6 +131,21 @@ class TaskBoardService
     }
 
     /**
+     * 更新任務描述中的勾選清單狀態
+     *
+     * 刻意不寫活動紀錄：勾選是高頻操作，走 updateTask() 會每勾一次就記一筆
+     * 「描述變更」，而且 from/to 存的是整段 HTML，活動紀錄很快就被灌爆。
+     *
+     * @param Task   $task
+     * @param string $description 已更新勾選狀態的完整描述 HTML
+     * @return Task
+     */
+    public function updateChecklist(Task $task, $description)
+    {
+        return $this->taskRepository->update($task, ['description' => $description]);
+    }
+
+    /**
      * 移動任務（拖曳換欄位）
      *
      * @param Task  $task

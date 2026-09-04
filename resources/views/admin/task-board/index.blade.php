@@ -6,6 +6,9 @@
 
 @section('content')
 
+    {{-- 任務描述內容樣式（清單分級、勾選清單）：詳情面板與 TinyMCE 編輯器內共用同一份 --}}
+    <link rel="stylesheet" href="{{ asset('css/task-content.css') }}?v={{ filemtime(public_path('css/task-content.css')) }}">
+
     <style>
         .app-main__outer, .app-main__inner { overflow-x: hidden !important; }
         .taskboard-toolbar { background: #fff; }
@@ -96,6 +99,21 @@
         [data-theme="dark"] #modal-archived-list .form-select,
         [data-theme="dark"] #modal-archived-list .form-control { background: #2d2d2d; color: #e0e0e0; border-color: #444; }
         [data-theme="dark"] #modal-restore-confirm .modal-content { background: #1e1e1e; color: #e0e0e0; }
+        /* 新增任務的站台下拉：清單浮在上層，不把 modal 內其他欄位往下擠 */
+        .tb-station-picker { position: relative; }
+        .tb-station-picker #task-station-toggle.is-open { border-color: #86b7fe; box-shadow: 0 0 0 0.25rem rgba(13,110,253,0.25); }
+        .tb-station-panel {
+            position: absolute; z-index: 5; top: calc(100% + 2px); left: 0; right: 0;
+            background: #fff; border: 1px solid #dee2e6; border-radius: 0.25rem;
+            box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+        }
+        .tb-station-panel #task-station-list { max-height: 200px; overflow-y: auto; }
+        .tb-station-panel .js-task-station-pick { font-size: 0.875rem; border-left: 0; border-right: 0; border-radius: 0; }
+        [data-theme="dark"] .tb-station-panel { background: #2d2d2d; border-color: #444; }
+        [data-theme="dark"] .tb-station-panel .js-task-station-pick { background: #2d2d2d; color: #e0e0e0; border-color: #444; }
+        [data-theme="dark"] .tb-station-panel .js-task-station-pick:hover { background: #3a3a3a; }
+        [data-theme="dark"] .tb-station-panel .js-task-station-pick.active { background: #0d6efd; color: #fff; }
+        [data-theme="dark"] #task-station-toggle { background-color: #2d2d2d; color: #e0e0e0; border-color: #444; }
         @media (max-width: 767px) {
             #task-side-panel { width: 100% !important; }
         }
@@ -220,14 +238,44 @@
                                 @endforeach
                             </select>
                         </div>
+                        {{-- 站台數量多，用系統篩選 + 關鍵字搜尋，與編輯任務時的選擇方式一致 --}}
                         <div class="mb-3">
-                            <label class="form-label">站台</label>
-                            <select id="task-station" class="form-select">
-                                <option value="">未選擇</option>
-                                @foreach($stations as $st)
-                                    <option value="{{ $st->id }}">{{ $st->name }}</option>
-                                @endforeach
-                            </select>
+                            <label class="form-label">{{ trans('task_board.field_station') }}</label>
+                            {{-- 收合式：預設只顯示目前選擇，點擊才展開篩選與清單 --}}
+                            <div class="tb-station-picker">
+                                <button type="button" class="form-select text-start" id="task-station-toggle">
+                                    <span id="task-station-label">{{ trans('task_board.station_unset') }}</span>
+                                </button>
+                                <div class="tb-station-panel d-none" id="task-station-panel">
+                                    <div class="row g-2 p-2">
+                                        <div class="col">
+                                            <select class="form-select form-select-sm" id="task-station-system">
+                                                <option value="">{{ trans('task_board.all_systems') }}</option>
+                                                @foreach($systems as $sys)
+                                                    <option value="{{ $sys->id }}">{{ $sys->name }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="col">
+                                            <input type="text" class="form-control form-control-sm" id="task-station-search"
+                                                   placeholder="{{ trans('task_board.station_search_ph') }}" autocomplete="off">
+                                        </div>
+                                    </div>
+                                    <div id="task-station-list">
+                                        <a href="javascript:void(0)" class="list-group-item list-group-item-action js-task-station-pick active"
+                                           data-id="" data-label="{{ trans('task_board.station_unset') }}">{{ trans('task_board.station_unset') }}</a>
+                                        @foreach($stations as $st)
+                                            <a href="javascript:void(0)" class="list-group-item list-group-item-action js-task-station-pick"
+                                               data-id="{{ $st->id }}" data-system="{{ $st->system_id }}" data-name="{{ strtolower($st->name) }}"
+                                               data-label="{{ ($st->system ? $st->system->name : '-') }} / {{ $st->name }}">
+                                                <span class="text-muted">{{ trans('task_board.field_system') }}：</span>{{ $st->system ? $st->system->name : '-' }}
+                                                <span class="text-muted ms-2">{{ trans('task_board.field_station') }}：</span><strong>{{ $st->name }}</strong>
+                                            </a>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
+                            <input type="hidden" id="task-station" value="">
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('task_board.field_title') }} <span class="text-danger">*</span></label>
@@ -266,8 +314,8 @@
                             <input type="date" id="task-due-date" class="form-control">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">上傳圖片</label>
-                            <input type="file" class="form-control" id="task-images" accept="image/*" multiple>
+                            <label class="form-label">{{ trans('task_board.field_attachment') }}</label>
+                            <input type="file" class="form-control" id="task-images" multiple>
                             <div id="task-image-previews" class="d-flex flex-wrap gap-2 mt-2"></div>
                         </div>
                         <div class="text-end">
@@ -693,20 +741,31 @@ $(function () {
 
 
                 // 描述（中間主要區域）
-                html += '<div class="side-field" data-field="description" data-type="richtext"><label class="fw-bold">{{ trans("task_board.field_description") }}</label><div class="field-value" style="min-height:100px">' + (t.description || '<span class="text-muted">點擊新增描述...</span>') + '</div></div>';
+                // 描述不像其他欄位點一下就進編輯 —— 平常要留給勾選清單用，改由右上角的編輯鈕觸發
+                html += '<div class="side-field" data-field="description" data-type="richtext">';
+                html += '<div class="d-flex align-items-center justify-content-between">';
+                html += '<label class="fw-bold mb-0">{{ trans("task_board.field_description") }}</label>';
+                if (canUpdate) {
+                    html += '<button type="button" class="btn btn-sm btn-outline-secondary js-edit-description">'
+                        + '<i class="fas fa-pen me-1"></i>{{ trans("task_board.action_edit") }}</button>';
+                }
+                html += '</div>';
+                html += '<div class="field-value tb-content" style="min-height:100px;cursor:default">'
+                    + (t.description || '<span class="text-muted">{{ trans("task_board.description_empty") }}</span>')
+                    + '</div></div>';
 
-                // 圖片
+                // 附件（不限圖片；欄位仍沿用 images 這個舊名）
                 if ((t.images && t.images.length > 0) || canUpdate) {
                     html += '<div class="mb-3">';
                     if (t.images && t.images.length > 0) {
-                        html += '<div class="d-flex flex-wrap gap-2 mb-2">';
+                        html += '<div class="d-flex flex-wrap gap-2 mb-2 align-items-start">';
                         t.images.forEach(function (url) {
-                            html += '<a href="' + url + '" target="_blank"><img src="' + url + '" style="width:80px;height:80px;object-fit:cover;border-radius:0.375rem;border:1px solid #dee2e6"></a>';
+                            html += isImageUrl(url) ? attachmentThumbHtml(url) : attachmentFileHtml(url);
                         });
                         html += '</div>';
                     }
                     if (canUpdate) {
-                        html += '<input type="file" class="form-control form-control-sm" id="panel-upload-images" accept="image/*" multiple>';
+                        html += '<input type="file" class="form-control form-control-sm" id="panel-upload-images" multiple>';
                     }
                     html += '</div>';
                 }
@@ -731,6 +790,7 @@ $(function () {
                 $('#side-panel-body').data('task', t);
 
                 bindInlineEdit();
+                bindChecklist(taskId);
                 bindPropEdit(t);
                 loadComments(taskId);
 
@@ -809,13 +869,153 @@ $(function () {
     var editConfirmBtn = '<button class="btn btn-outline-secondary js-edit-confirm" type="button" title="確認"><i class="fas fa-check text-success"></i></button>';
     var editCancelBtn = '<button class="btn btn-outline-secondary js-edit-cancel" type="button" title="取消" style="margin-left:2px"><i class="fas fa-times text-danger"></i></button>';
 
+    var CHECKLIST_PROGRESS_TEXT = @json(trans('task_board.checklist_progress'));
+
+    /**
+     * 依副檔名判斷附件能不能直接當圖片預覽
+     *
+     * @param {string} url
+     * @returns {boolean}
+     */
+    function isImageUrl(url) {
+        return /\.(jpe?g|png|gif|webp|bmp|svg)(\?|$)/i.test(String(url));
+    }
+
+    /**
+     * 從附件網址取回可讀的檔名
+     *
+     * 上傳時檔名格式是「時間戳_uniqid_原始檔名」，顯示時把前綴去掉。
+     * 舊資料沒有原始檔名（早期只存圖片），取到什麼就顯示什麼。
+     *
+     * @param {string} url
+     * @returns {string}
+     */
+    function attachmentName(url) {
+        var name = String(url).split('?')[0].split('/').pop();
+
+        try { name = decodeURIComponent(name); } catch (e) { /* 保留原字串 */ }
+
+        return name.replace(/^\d+_[a-z0-9]+_/i, '');
+    }
+
+    /**
+     * @param {string} url
+     * @returns {string}
+     */
+    function attachmentThumbHtml(url) {
+        return '<a href="' + url + '" target="_blank" rel="noopener">'
+            + '<img src="' + url + '" style="width:80px;height:80px;object-fit:cover;border-radius:0.375rem;border:1px solid #dee2e6"></a>';
+    }
+
+    /**
+     * 非圖片附件顯示成可下載的檔案卡片
+     *
+     * @param {string} url
+     * @returns {string}
+     */
+    function attachmentFileHtml(url) {
+        return '<a href="' + url + '" target="_blank" rel="noopener" download '
+            + 'class="d-inline-flex align-items-center gap-1 text-decoration-none border rounded px-2 py-1" '
+            + 'style="font-size:0.8125rem;max-width:180px">'
+            + '<i class="fas fa-paperclip text-muted"></i>'
+            + '<span class="text-truncate">' + $('<span>').text(attachmentName(url)).html() + '</span></a>';
+    }
+
+    /**
+     * 描述裡的勾選清單：顯示進度，並讓有編輯權限的人直接點方塊打勾
+     *
+     * @param {number} taskId
+     */
+    function bindChecklist(taskId) {
+        var $desc = $('#side-panel-body').find('.side-field[data-field="description"] .field-value');
+        if (!$desc.length) return;
+
+        renderChecklistProgress($desc);
+
+        if (!canUpdate) return;
+
+        $desc.find('.tb-checklist li').off('click').on('click', function (e) {
+            // 描述欄位整塊點下去會進入編輯模式，勾選不能讓事件冒上去
+            e.stopPropagation();
+
+            var $li = $(this);
+            $li.attr('data-checked', $li.attr('data-checked') === '1' ? '0' : '1');
+
+            renderChecklistProgress($desc);
+            saveChecklist(taskId, $desc);
+        });
+    }
+
+    /**
+     * 進度標記放在欄位標題旁，不放進 .field-value —— 那裡的內容會被原樣存回描述
+     *
+     * @param {Object} $desc jQuery 物件
+     */
+    function renderChecklistProgress($desc) {
+        var $label = $desc.closest('.side-field').find('label').first();
+        $label.find('.js-checklist-progress').remove();
+
+        var $items = $desc.find('.tb-checklist li');
+        if (!$items.length) return;
+
+        var text = CHECKLIST_PROGRESS_TEXT
+            .split(':done').join($items.filter('[data-checked="1"]').length)
+            .split(':total').join($items.length);
+
+        $label.append('<span class="js-checklist-progress badge bg-secondary ms-2" style="font-weight:400">' + text + '</span>');
+    }
+
+    /**
+     * 勾選後立即寫回，不必按儲存。走專用端點避免灌爆活動紀錄。
+     *
+     * @param {number} taskId
+     * @param {Object} $desc jQuery 物件
+     */
+    function saveChecklist(taskId, $desc) {
+        var description = $desc.html();
+
+        // 同步面板暫存的資料，否則之後進編輯模式會載到舊的描述、把勾選蓋掉
+        var t = $('#side-panel-body').data('task');
+        if (t) { t.description = description; }
+
+        $.ajax({
+            url: '/admin/task-board/ajax-update-checklist/' + taskId,
+            method: 'PUT',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            contentType: 'application/json',
+            data: JSON.stringify({ description: description }),
+            error: function (xhr) {
+                showMsg((xhr.responseJSON && xhr.responseJSON.message) || @json(trans('task_board.msg.checklist_update_failed')));
+            }
+        });
+    }
+
     function bindInlineEdit() {
         if (!canUpdate) return;
 
         var t = $('#side-panel-body').data('task');
 
+        // 描述改由右上角的編輯鈕進入編輯模式，內容區平常留給勾選清單
+        $('#side-panel-body').find('.js-edit-description').off('click').on('click', function (e) {
+            e.stopPropagation();
+            startFieldEdit($(this).closest('.side-field'), t);
+        });
+
         $('#side-panel-body').find('.side-field[data-field]').off('click').on('click', function () {
             var $field = $(this);
+            if ($field.data('type') === 'richtext') return;
+            startFieldEdit($field, t);
+        });
+    }
+
+    /**
+     * 進入單一欄位的編輯狀態
+     *
+     * @param {Object} $field jQuery 物件（.side-field）
+     * @param {Object} t      面板目前的任務資料
+     */
+    function startFieldEdit($field, t) {
+        (function () {
             if ($field.find('input, select, textarea').length) return;
             var fieldName = $field.data('field');
             var fieldType = $field.data('type');
@@ -934,7 +1134,7 @@ $(function () {
             $valueDiv.find('input, select, textarea').on('keydown', function (e) {
                 if (e.which === 27) $valueDiv.find('.js-edit-cancel').trigger('click');
             });
-        });
+        })();
     }
 
     function saveField(fieldName, value) {
@@ -1577,14 +1777,31 @@ $(function () {
     function renderTaskImagePreviews() {
         var $container = $('#task-image-previews');
         $container.empty();
+
         taskImageFiles.forEach(function (file, idx) {
+            var removeBtn = '<button type="button" class="btn-close position-absolute top-0 end-0 bg-white rounded-circle"'
+                + ' style="font-size:0.5rem;padding:0.25rem" data-remove="' + idx + '"></button>';
+
+            // 非圖片沒有縮圖可看，改顯示檔名卡片
+            if (file.type.indexOf('image/') !== 0) {
+                $container.append(
+                    '<div class="position-relative border rounded d-flex align-items-center gap-1 px-2 py-1"'
+                    + ' style="max-width:180px;height:80px;font-size:0.8125rem">'
+                    + '<i class="fas fa-paperclip text-muted"></i>'
+                    + '<span class="text-truncate">' + $('<span>').text(file.name).html() + '</span>'
+                    + removeBtn + '</div>'
+                );
+
+                return;
+            }
+
             var reader = new FileReader();
             reader.onload = function (e) {
-                var html = '<div class="position-relative" style="width:80px;height:80px">';
-                html += '<img src="' + e.target.result + '" style="width:80px;height:80px;object-fit:cover;border-radius:0.375rem;border:1px solid #dee2e6">';
-                html += '<button type="button" class="btn-close position-absolute top-0 end-0 bg-white rounded-circle" style="font-size:0.5rem;padding:0.25rem" data-remove="' + idx + '"></button>';
-                html += '</div>';
-                $container.append(html);
+                $container.append(
+                    '<div class="position-relative" style="width:80px;height:80px">'
+                    + '<img src="' + e.target.result + '" style="width:80px;height:80px;object-fit:cover;border-radius:0.375rem;border:1px solid #dee2e6">'
+                    + removeBtn + '</div>'
+                );
             };
             reader.readAsDataURL(file);
         });
@@ -1603,6 +1820,71 @@ $(function () {
         renderTaskImagePreviews();
     });
 
+    // 站台清單：系統篩選 + 關鍵字搜尋（form reset 不會清掉這些，開啟時要自己重設）
+    function filterTaskStations() {
+        var kw = ($('#task-station-search').val() || '').toLowerCase();
+        var sysId = $('#task-station-system').val();
+
+        $('#task-station-list .js-task-station-pick').each(function () {
+            var $item = $(this);
+
+            // 「未選擇」永遠留著，否則篩到沒結果時就無法取消選擇
+            if (!$item.data('id')) { $item.show(); return; }
+
+            var nameMatch = !kw || ($item.data('name') || '').indexOf(kw) !== -1;
+            var sysMatch = !sysId || $item.data('system') == sysId;
+            $item.toggle(nameMatch && sysMatch);
+        });
+    }
+
+    $('#task-station-search').on('input', filterTaskStations);
+    $('#task-station-system').on('change', filterTaskStations);
+
+    /**
+     * 展開／收合站台清單
+     *
+     * @param {boolean} open
+     */
+    function toggleTaskStationPanel(open) {
+        $('#task-station-panel').toggleClass('d-none', !open);
+        $('#task-station-toggle').toggleClass('is-open', open);
+        if (open) $('#task-station-search').trigger('focus');
+    }
+
+    $('#task-station-toggle').on('click', function () {
+        toggleTaskStationPanel($('#task-station-panel').hasClass('d-none'));
+    });
+
+    // 點選單以外的地方就收起來，避免蓋住底下的欄位
+    $(document).on('click', function (e) {
+        if ($(e.target).closest('.tb-station-picker').length) return;
+        toggleTaskStationPanel(false);
+    });
+
+    $('#task-station-list').on('click', '.js-task-station-pick', function (e) {
+        e.preventDefault();
+        $('#task-station-list .js-task-station-pick').removeClass('active');
+        $(this).addClass('active');
+        $('#task-station').val($(this).data('id') || '');
+        $('#task-station-label').text($(this).data('label'));
+        toggleTaskStationPanel(false);
+    });
+
+    /**
+     * 站台選擇重設回「未選擇」並清掉篩選條件
+     */
+    function resetTaskStationPicker() {
+        $('#task-station').val('');
+        $('#task-station-search').val('');
+        $('#task-station-system').val('');
+        $('#task-station-list .js-task-station-pick').removeClass('active').show();
+        $('#task-station-list .js-task-station-pick').filter(function () {
+            return !$(this).data('id');
+        }).addClass('active');
+        $('#task-station-label').text('{{ trans("task_board.station_unset") }}');
+        toggleTaskStationPanel(false);
+    }
+
     $('#btn-open-create-task').on('click', function () {
         $('#task-id').val('');
         $('#form-task')[0].reset();
@@ -1610,6 +1892,7 @@ $(function () {
         $('#modal-task-title').text('{{ trans("task_board.action_create_task") }}');
         taskImageFiles = [];
         $('#task-image-previews').empty();
+        resetTaskStationPicker();
         showBsModal('modal-task');
     });
 
@@ -1688,6 +1971,116 @@ $(function () {
 @endphp
 <script src="{{ $tinyBase }}/tinymce.min.js" referrerpolicy="origin"></script>
 <script>
+// 描述內容樣式來自 public/css/task-content.css，編輯器與詳情面板共用同一份
+var TASK_CONTENT_CSS_URL = '{{ asset('css/task-content.css') }}?v={{ filemtime(public_path('css/task-content.css')) }}';
+
+var CHECKLIST_TOOLTIP = @json(trans('task_board.checklist_tooltip'));
+var CHECKLIST_PLACEHOLDER = @json(trans('task_board.checklist_placeholder'));
+var FILE_TOOLTIP = @json(trans('task_board.file_tooltip'));
+var FILE_UPLOAD_FAILED = @json(trans('task_board.msg.file_upload_failed'));
+
+/**
+ * 從圖片對話框選檔上傳，成功後把網址回填給 TinyMCE
+ *
+ * @param {File}     file
+ * @param {Function} callback TinyMCE file_picker 的回呼
+ */
+function uploadEditorImage(file, callback) {
+    var fd = new FormData();
+    fd.append('file', file);
+
+    var xhr = new XMLHttpRequest();
+    xhr.withCredentials = true;
+    xhr.open('POST', '{{ route('admin.task-board.ajax-upload-editor-image') }}');
+    xhr.setRequestHeader('X-CSRF-TOKEN', '{{ csrf_token() }}');
+
+    xhr.onload = function () {
+        var body = {};
+        try { body = JSON.parse(xhr.responseText); } catch (e) { body = {}; }
+
+        if (xhr.status < 200 || xhr.status >= 300) {
+            notifyEditorError(uploadErrorMessage(body));
+
+            return;
+        }
+
+        callback(body.location, { alt: file.name });
+    };
+
+    xhr.onerror = function () { notifyEditorError(FILE_UPLOAD_FAILED); };
+    xhr.send(fd);
+}
+
+/**
+ * 取出上傳失敗的原因：優先顯示欄位層級的驗證錯誤
+ *
+ * @param {Object} body 後端回應
+ * @returns {string}
+ */
+function uploadErrorMessage(body) {
+    if (body.errors && body.errors.file && body.errors.file.length) {
+        return body.errors.file[0];
+    }
+
+    return body.message || FILE_UPLOAD_FAILED;
+}
+
+/**
+ * 用編輯器內的通知列顯示錯誤（專案規範是不用 alert）
+ *
+ * @param {string} message
+ */
+function notifyEditorError(message) {
+    var editor = tinymce.activeEditor;
+    if (editor && editor.notificationManager) {
+        editor.notificationManager.open({ text: message, type: 'error' });
+
+        return;
+    }
+
+    showMsg(message);
+}
+
+/**
+ * 上傳附件並在游標處插入下載連結
+ *
+ * @param {File}   file
+ * @param {Object} editor TinyMCE 實例
+ */
+function uploadEditorFile(file, editor) {
+    var fd = new FormData();
+    fd.append('file', file);
+
+    var xhr = new XMLHttpRequest();
+    xhr.withCredentials = true;
+    xhr.open('POST', '{{ route('admin.task-board.ajax-upload-editor-file') }}');
+    xhr.setRequestHeader('X-CSRF-TOKEN', '{{ csrf_token() }}');
+
+    xhr.onload = function () {
+        var body = {};
+        try { body = JSON.parse(xhr.responseText); } catch (e) { body = {}; }
+
+        if (xhr.status < 200 || xhr.status >= 300) {
+            // 驗證錯誤（檔案過大、類型不允許）要讓使用者看到原因
+            editor.notificationManager.open({ text: uploadErrorMessage(body), type: 'error' });
+
+            return;
+        }
+
+        editor.insertContent(
+            '<p><a href="' + body.location + '" target="_blank" rel="noopener">'
+            + '<i class="fas fa-paperclip"></i> ' + editor.dom.encode(body.name)
+            + '</a></p>'
+        );
+    };
+
+    xhr.onerror = function () {
+        editor.notificationManager.open({ text: FILE_UPLOAD_FAILED, type: 'error' });
+    };
+
+    xhr.send(fd);
+}
+
 function getTinyConfig(overrides) {
     var dark = document.documentElement.getAttribute('data-theme') === 'dark';
     var config = {
@@ -1695,11 +2088,10 @@ function getTinyConfig(overrides) {
         suffix: '.min',
         license_key: 'gpl',
         skin: dark ? 'oxide-dark' : 'oxide',
-        content_css: dark ? 'dark' : 'default',
         height: 300,
         menubar: false,
         plugins: ['autolink', 'link', 'lists', 'image', 'table', 'code'],
-        toolbar: 'undo redo | fontfamily fontsize | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright | bullist numlist | link image table | code',
+        toolbar: 'undo redo | fontfamily fontsize | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright | bullist numlist tbchecklist | link image tbfile table | code',
         font_family_formats:
             '系統預設=inherit;' +
             '微軟正黑體=Microsoft JhengHei,PingFang TC,Heiti TC,sans-serif;' +
@@ -1729,11 +2121,60 @@ function getTinyConfig(overrides) {
             });
         },
         paste_data_images: true,
+        // images_upload_handler 只負責「貼上／拖曳」進來的圖片；
+        // 點工具列圖片按鈕開的對話框要能選本機檔案，得另外給 file_picker_callback，
+        // 否則那裡只有一個網址輸入框，看起來就像不能上傳。
+        file_picker_types: 'image',
+        file_picker_callback: function (callback, value, meta) {
+            if (meta.filetype !== 'image') { return; }
+
+            var input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = function () {
+                if (!this.files.length) { return; }
+                uploadEditorImage(this.files[0], callback);
+            };
+            input.click();
+        },
+        // 確保勾選清單的 data-checked 不會被 TinyMCE 的 schema 濾掉，否則存檔後勾選狀態會消失
+        extended_valid_elements: 'li[data-checked|class|style|id],ul[class|style|id]',
         relative_urls: false,
         convert_urls: false,
         branding: false,
         promotion: false,
-        content_style: 'body { font-family: "PingFang TC", "Microsoft JhengHei", Arial, sans-serif; font-size: 14px; line-height: 1.6; ' + (dark ? 'background: #2d2d2d; color: #e0e0e0;' : '') + ' }'
+        // 勾選清單：用 data-checked 屬性而非 <input type="checkbox">，
+        // input 在 TinyMCE 裡不好編輯，也不會隨 HTML 一起存回勾選狀態
+        setup: function (editor) {
+            editor.ui.registry.addButton('tbchecklist', {
+                icon: 'checkmark',
+                tooltip: CHECKLIST_TOOLTIP,
+                onAction: function () {
+                    editor.insertContent(
+                        '<ul class="tb-checklist">' +
+                        '<li data-checked="0">' + CHECKLIST_PLACEHOLDER + '</li>' +
+                        '</ul>'
+                    );
+                }
+            });
+
+            // 圖片走 TinyMCE 內建的 image 上傳，這顆負責圖片以外的附件
+            editor.ui.registry.addButton('tbfile', {
+                icon: 'upload',
+                tooltip: FILE_TOOLTIP,
+                onAction: function () {
+                    var input = document.createElement('input');
+                    input.type = 'file';
+                    input.onchange = function () {
+                        if (this.files.length) { uploadEditorFile(this.files[0], editor); }
+                    };
+                    input.click();
+                }
+            });
+        },
+        content_css: [dark ? 'dark' : 'default', TASK_CONTENT_CSS_URL],
+        content_style: 'body { font-family: "PingFang TC", "Microsoft JhengHei", Arial, sans-serif; font-size: 14px; line-height: 1.6; '
+            + (dark ? 'background: #2d2d2d; color: #e0e0e0;' : '') + ' }'
     };
     if (overrides) {
         for (var key in overrides) { config[key] = overrides[key]; }

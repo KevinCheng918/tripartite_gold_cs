@@ -23,13 +23,6 @@ class ImageUploadService
      *
      * @param UploadedFile $file      上傳的檔案
      * @param string       $subFolder 子目錄（例如 'topup', 'telegram', 'broadcast'）
-     * @return string 完整的圖片 URL
-     */
-    /**
-     * 上傳單張圖片
-     *
-     * @param UploadedFile $file      上傳的檔案
-     * @param string       $subFolder 子目錄（例如 'topup', 'telegram', 'broadcast'）
      * @return string 相對路徑（storage 下），前端顯示時用 asset("storage/{$path}") 組合完整 URL
      */
     public function upload(UploadedFile $file, $subFolder)
@@ -58,5 +51,44 @@ class ImageUploadService
         }
 
         return $urls;
+    }
+
+    /**
+     * 上傳附件並在檔名中保留原始名稱
+     *
+     * 圖片可以直接看縮圖，但 pdf、xlsx 這類附件必須顯示檔名，
+     * upload() 的 uniqid 命名會讓人完全看不出那是什麼檔案。
+     *
+     * @param UploadedFile $file
+     * @param string       $subFolder
+     * @return string 相對路徑（storage 下）
+     */
+    public function uploadKeepName(UploadedFile $file, $subFolder)
+    {
+        $dir = self::BASE_PATH . "/{$subFolder}";
+        $safeName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
+        $filename = time() . '_' . uniqid() . '_' . $safeName;
+
+        Storage::disk(self::DISK)->putFileAs($dir, $file, $filename);
+
+        return "{$dir}/{$filename}";
+    }
+
+    /**
+     * 上傳多個附件（保留原始檔名）
+     *
+     * @param UploadedFile[] $files
+     * @param string         $subFolder
+     * @return string[]
+     */
+    public function uploadMultipleKeepName(array $files, $subFolder)
+    {
+        $paths = [];
+
+        foreach ($files as $file) {
+            $paths[] = $this->uploadKeepName($file, $subFolder);
+        }
+
+        return $paths;
     }
 }

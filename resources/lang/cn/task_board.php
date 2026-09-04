@@ -25,6 +25,12 @@ return [
     'field_assignee'    => '指派人员',
     'field_creator'     => '建立者',
     'field_due_date'    => '预期完成日',
+    'field_attachment'  => '附件',
+    'field_system'      => '系统',
+    'field_station'     => '站台',
+    'all_systems'       => '全部系统',
+    'station_search_ph' => '搜寻站台...',
+    'station_unset'     => '未选择',
 
     'action_create_task'    => '新增任务',
     'action_create_project' => '新增项目',
@@ -35,6 +41,11 @@ return [
     'action_save'           => '储存',
     'action_cancel'         => '取消',
     'comment_edited'        => '已编辑',
+    'description_empty'     => '尚无描述，点右上角「编辑」新增',
+    'checklist_tooltip'     => '勾选清单',
+    'file_tooltip'          => '上传档案',
+    'checklist_placeholder' => '待办事项',
+    'checklist_progress'    => '已完成 :done / :total',
     'comment_image_locked'  => '图片无法编辑',
 
     'msg' => [
@@ -51,5 +62,12 @@ return [
         'comment_not_owner'       => '只能编辑自己的留言',
         'comment_content_required' => '留言内容不可为空',
         'comment_content_max'     => '留言内容不可超过 :value 字元',
+        'description_required'    => '描述内容不可为空',
+        'checklist_updated'       => '已更新',
+        'checklist_update_failed' => '勾选更新失败',
+        'file_required'      => '请选择档案',
+        'file_too_large'     => '档案不可超过 :value MB',
+        'file_type_blocked'  => '不支援此档案类型',
+        'file_upload_failed' => '档案上传失败',
     ],
 ];

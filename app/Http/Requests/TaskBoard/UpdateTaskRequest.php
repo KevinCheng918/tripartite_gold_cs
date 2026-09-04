@@ -2,10 +2,18 @@
 
 namespace App\Http\Requests\TaskBoard;
 
+use App\Http\Requests\TaskBoard\Concerns\HasAttachmentRules;
 use Illuminate\Foundation\Http\FormRequest;
 
+/**
+ * 更新任務驗證
+ *
+ * images 欄位沿用舊名，實際上收的是各類附件（不限圖片）。
+ */
 class UpdateTaskRequest extends FormRequest
 {
+    use HasAttachmentRules;
+
     public function authorize()
     {
         return true;
@@ -24,7 +32,14 @@ class UpdateTaskRequest extends FormRequest
             'assignee_ids.*' => 'integer',
             'due_date'    => 'nullable|date',
             'images'      => 'nullable|array',
-            'images.*'    => 'image|max:5120',
+            'images.*'    => $this->attachmentRules(),
+        ];
+    }
+
+    public function messages()
+    {
+        return [
+            'images.*.max' => $this->attachmentMaxMessage(),
         ];
     }
 }

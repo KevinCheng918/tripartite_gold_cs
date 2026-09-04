@@ -25,6 +25,12 @@ return [
     'field_assignee'    => 'Assignee',
     'field_creator'     => 'Creator',
     'field_due_date'    => 'Due Date',
+    'field_attachment'  => 'Attachments',
+    'field_system'      => 'System',
+    'field_station'     => 'Station',
+    'all_systems'       => 'All systems',
+    'station_search_ph' => 'Search station...',
+    'station_unset'     => 'Not selected',
 
     'action_create_task'    => 'New Task',
     'action_create_project' => 'New Project',
@@ -35,6 +41,11 @@ return [
     'action_save'           => 'Save',
     'action_cancel'         => 'Cancel',
     'comment_edited'        => 'edited',
+    'description_empty'     => 'No description yet — click Edit above',
+    'checklist_tooltip'     => 'Checklist',
+    'file_tooltip'          => 'Upload file',
+    'checklist_placeholder' => 'To-do item',
+    'checklist_progress'    => ':done / :total done',
     'comment_image_locked'  => 'Images cannot be edited',
 
     'msg' => [
@@ -51,5 +62,12 @@ return [
         'comment_not_owner'       => 'You can only edit your own comments',
         'comment_content_required' => 'Comment content is required',
         'comment_content_max'     => 'Comment must not exceed :value characters',
+        'description_required'    => 'Description cannot be empty',
+        'checklist_updated'       => 'Updated',
+        'checklist_update_failed' => 'Failed to update checklist',
+        'file_required'      => 'Please select a file',
+        'file_too_large'     => 'File must not exceed :value MB',
+        'file_type_blocked'  => 'This file type is not supported',
+        'file_upload_failed' => 'File upload failed',
     ],
 ];

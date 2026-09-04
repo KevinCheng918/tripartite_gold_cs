@@ -25,6 +25,12 @@ return [
     'field_assignee'    => '指派人員',
     'field_creator'     => '建立者',
     'field_due_date'    => '預期完成日',
+    'field_attachment'  => '附件',
+    'field_system'      => '系統',
+    'field_station'     => '站台',
+    'all_systems'       => '全部系統',
+    'station_search_ph' => '搜尋站台...',
+    'station_unset'     => '未選擇',
 
     'action_create_task'    => '新增任務',
     'action_create_project' => '新增專案',
@@ -35,6 +41,11 @@ return [
     'action_save'           => '儲存',
     'action_cancel'         => '取消',
     'comment_edited'        => '已編輯',
+    'description_empty'     => '尚無描述，點右上角「編輯」新增',
+    'checklist_tooltip'     => '勾選清單',
+    'file_tooltip'          => '上傳檔案',
+    'checklist_placeholder' => '待辦事項',
+    'checklist_progress'    => '已完成 :done / :total',
     'comment_image_locked'  => '圖片無法編輯',
 
     'msg' => [
@@ -51,5 +62,12 @@ return [
         'comment_not_owner'       => '只能編輯自己的留言',
         'comment_content_required' => '留言內容不可為空',
         'comment_content_max'     => '留言內容不可超過 :value 字元',
+        'description_required'    => '描述內容不可為空',
+        'checklist_updated'       => '已更新',
+        'checklist_update_failed' => '勾選更新失敗',
+        'file_required'      => '請選擇檔案',
+        'file_too_large'     => '檔案不可超過 :value MB',
+        'file_type_blocked'  => '不支援此檔案類型',
+        'file_upload_failed' => '檔案上傳失敗',
     ],
 ];

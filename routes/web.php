@@ -186,6 +186,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-archived-list', [TaskBoardController::class, 'ajaxArchivedList'])->middleware('can:task_board.view')->name('ajax-archived-list');
         Route::put('/ajax-restore-task/{task}', [TaskBoardController::class, 'ajaxRestoreTask'])->middleware('can:task_board.delete')->name('ajax-restore-task');
         Route::put('/ajax-move-task/{task}', [TaskBoardController::class, 'ajaxMoveTask'])->middleware('can:task_board.update')->name('ajax-move-task');
+        Route::put('/ajax-update-checklist/{task}', [TaskBoardController::class, 'ajaxUpdateChecklist'])->middleware('can:task_board.update')->name('ajax-update-checklist');
         Route::post('/ajax-reorder', [TaskBoardController::class, 'ajaxReorder'])->middleware('can:task_board.update')->name('ajax-reorder');
         Route::get('/ajax-projects', [TaskBoardController::class, 'ajaxProjects'])->middleware('can:task_board.view')->name('ajax-projects');
         Route::get('/ajax-assignees', [TaskBoardController::class, 'ajaxAssignees'])->middleware('can:task_board.view')->name('ajax-assignees');
@@ -194,6 +195,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::put('/ajax-update-comment/{comment}', [TaskBoardController::class, 'ajaxUpdateComment'])->middleware('can:task_board.view')->name('ajax-update-comment');
         Route::delete('/ajax-delete-comment/{comment}', [TaskBoardController::class, 'ajaxDeleteComment'])->middleware('can:task_board.delete_comment')->name('ajax-delete-comment');
         Route::post('/ajax-upload-editor-image', [TaskBoardController::class, 'ajaxUploadEditorImage'])->middleware('can:task_board.create')->name('ajax-upload-editor-image');
+        Route::post('/ajax-upload-editor-file', [TaskBoardController::class, 'ajaxUploadEditorFile'])->middleware('can:task_board.create')->name('ajax-upload-editor-file');
         Route::get('/ajax-activities/{task}', [TaskBoardController::class, 'ajaxActivities'])->middleware('can:task_board.view')->name('ajax-activities');
     });
 
