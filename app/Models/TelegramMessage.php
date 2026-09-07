@@ -29,6 +29,7 @@ class TelegramMessage extends Model
         'direction' => 'integer',
         'replied'   => 'boolean',
         'reactions' => 'array',
+        'edited_at' => 'datetime',
     ];
 
     /**

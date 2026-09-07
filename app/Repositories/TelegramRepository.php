@@ -134,7 +134,7 @@ class TelegramRepository
     public function getMessagesByGroup($groupId, $perPage = 50)
     {
         return TelegramMessage::query()
-            ->select(['id', 'telegram_group_id', 'direction', 'telegram_message_id', 'sender_name', 'sender_user_id', 'content', 'media_type', 'media_url', 'media_name', 'reactions', 'replied', 'created_at'])
+            ->select(['id', 'telegram_group_id', 'direction', 'telegram_message_id', 'sender_name', 'sender_user_id', 'content', 'edited_at', 'media_type', 'media_url', 'media_name', 'reactions', 'replied', 'created_at'])
             ->where('telegram_group_id', $groupId)
             ->orderByDesc('created_at')
             ->paginate($perPage);
@@ -218,6 +218,39 @@ class TelegramRepository
             })
             ->where('telegram_message_id', $telegramMsgId)
             ->first();
+    }
+
+    /**
+     * 依 chat_id 與 telegram_message_id 取訊息（處理編輯事件用）
+     *
+     * 與 findByTelegramMessageId() 分開：那支只為了改 reactions，
+     * select 沒有 content，拿來寫編輯內容會把其他欄位當成沒載入。
+     *
+     * @param int $chatId
+     * @param int $telegramMsgId
+     * @return TelegramMessage|null
+     */
+    public function findMessageForEdit($chatId, $telegramMsgId)
+    {
+        return TelegramMessage::query()
+            ->select(['id', 'telegram_group_id', 'telegram_message_id', 'direction', 'content', 'edited_at'])
+            ->whereHas('group', function ($q) use ($chatId) {
+                $q->where('chat_id', $chatId);
+            })
+            ->where('telegram_message_id', $telegramMsgId)
+            ->first();
+    }
+
+    /**
+     * 更新訊息內容（編輯事件用）
+     *
+     * @param TelegramMessage $message
+     * @param array           $attributes
+     * @return void
+     */
+    public function updateMessage(TelegramMessage $message, $attributes)
+    {
+        $message->update($attributes);
     }
 
     /**

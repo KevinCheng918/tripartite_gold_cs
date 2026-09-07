@@ -243,6 +243,37 @@ $this->telegramChatService->sendReply($groupId, $message, $userId, $name, null, 
 > 貼上與拖曳仍走**待送區**（`pendingFiles`）那條路：縮圖在輸入框上方、
 > 打完字按發送一起送出，且支援多檔。兩條路徑刻意不同，改動時不要誤以為重複。
 
+### 訊息編輯與「刪除同步做不到」（2026-09-07）
+
+> ⚠️ **Bot API 沒有訊息刪除事件**。客人在 Telegram 按「收回／刪除」，
+> Bot 收不到任何通知 —— update 類型裡就是沒有這種事件，
+> 也沒有任何 API 能查詢歷史訊息或某則訊息是否還存在。
+> **「客人刪除 → 後台自動移除」無法實作**，不要再嘗試。
+>
+> `getUpdates` 也不是出路：webhook 啟用時呼叫它會直接回 **409 Conflict**
+> （兩者互斥），而且它只回傳未消化的新事件、不是聊天歷史，同樣沒有刪除事件。
+
+`edited_message` 則是**收得到的**，已由 `handleEditedMessage()` 處理。
+
+> ⚠️ 編輯事件的 payload key 是 `edited_message` **不是** `message`。
+> 沒有獨立分支的話會被 `handleIncomingMessage()` 當成空訊息直接 return —— 靜默失效。
+
+- 同步內容、記 `edited_at`、前端標示「已編輯」
+- 讀 `text` 或 `caption`（改圖說也會觸發）
+- 內容變更後 `replied` 重設為 false，避免客服看到已回覆就略過
+
+> ⚠️ **不能用 `updated_at > created_at` 判斷已編輯**：
+> `markMessagesReplied()` 是批次 `update()`，Eloquent 會連帶更新 `updated_at`，
+> 所有訊息都會被誤判。所以另開 `edited_at` 欄位。
+
+### setWebhook 的 allowed_updates
+
+> ⚠️ 不指定 `allowed_updates` 時 Telegram 用預設清單，
+> 而預設**不含 `message_reaction`** —— 表情回應功能會完全收不到事件。
+> `TelegramSetWebhookCommand` 現在明確宣告
+> `['message', 'edited_message', 'message_reaction']`。
+> **改完要重跑 `php artisan telegram:set-webhook` 才生效。**
+
 ### webhook 支援的媒體類型（2026-09-07）
 
 > ⚠️ **沒列到的類型會讓整則訊息消失**：`handleMessage()` 判斷完媒體後有一行

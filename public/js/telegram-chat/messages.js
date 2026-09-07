@@ -74,6 +74,12 @@
 
         var textHtml = m.content ? T.escapeHtml(m.content) : '';
 
+        // 客人改過內容就標示出來，提醒客服現在看到的不是最初那句
+        if (m.is_edited) {
+            textHtml += '<span class="text-muted ms-1" style="font-size:0.75rem">（' +
+                T.escapeHtml(T.i18n.message_edited) + '）</span>';
+        }
+
         var reactHtml = '';
         if (m.reactions && m.reactions.length > 0) {
             reactHtml += '<div class="d-flex flex-wrap gap-1 mt-1">';

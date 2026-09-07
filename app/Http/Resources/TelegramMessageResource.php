@@ -21,6 +21,7 @@ class TelegramMessageResource extends JsonResource
             'telegram_message_id' => $this->telegram_message_id,
             'sender_name'         => $this->sender_name,
             'content'             => $this->content,
+            'is_edited'           => filled($this->edited_at),
             'media_type'          => $this->media_type,
             'media_url'           => $this->media_url,
             'media_name'          => $this->media_name,

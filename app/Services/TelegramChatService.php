@@ -115,6 +115,74 @@ class TelegramChatService
      * @param array $payload Telegram Update 物件
      * @return void
      */
+    /**
+     * 處理 Telegram 的 edited_message 事件
+     *
+     * 客人改了訊息內容，後台不同步的話客服會照舊內容回覆。
+     *
+     * 註：Bot API **沒有**刪除訊息的事件，客人「收回」是收不到通知的；
+     * 實務上不少人是改用編輯來更正，這支能涵蓋那部分情境。
+     *
+     * @param array $payload Telegram update payload
+     * @return void
+     */
+    public function handleEditedMessage($payload)
+    {
+        $edited = $payload['edited_message'] ?? null;
+        $chatId = $edited['chat']['id'] ?? null;
+        $messageId = $edited['message_id'] ?? null;
+
+        if (!filled($chatId) || !filled($messageId)) {
+            return;
+        }
+
+        $message = $this->telegramRepository->findMessageForEdit($chatId, $messageId);
+
+        // 找不到多半是訊息已超過保留天數被清掉，不是異常
+        if (!filled($message)) {
+            Log::info('收到編輯事件但查無對應訊息', [
+                'chat_id'    => $chatId,
+                'message_id' => $messageId,
+            ]);
+
+            return;
+        }
+
+        // caption 是圖片／檔案的說明文字，改圖說也會觸發編輯事件
+        $newText = $edited['text'] ?? $edited['caption'] ?? '';
+
+        $this->telegramRepository->updateMessage($message, [
+            'content'   => $newText,
+            'edited_at' => now(),
+            // 內容變了就當成新的未回覆，避免客服看到舊內容已回覆就略過
+            'replied'   => false,
+        ]);
+
+        $this->broadcastEdited($message->telegram_group_id, $message->id, $newText);
+    }
+
+    /**
+     * 廣播編輯事件，讓正在看該對話的客服即時看到新內容
+     *
+     * @param int    $groupId
+     * @param int    $messageId
+     * @param string $content
+     * @return void
+     */
+    private function broadcastEdited($groupId, $messageId, $content)
+    {
+        try {
+            event(new \App\Events\TelegramMessageReceived($groupId, [
+                'id'        => $messageId,
+                'edited'    => true,
+                'content'   => $content,
+                'group_id'  => $groupId,
+            ]));
+        } catch (\Exception $e) {
+            Log::error('編輯訊息廣播失敗', ['group_id' => $groupId, 'error' => $e->getMessage()]);
+        }
+    }
+
     public function handleIncomingMessage($payload)
     {
         $message = $payload['message'] ?? null;

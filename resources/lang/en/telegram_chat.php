@@ -23,6 +23,7 @@ return [
     'btn_remove_image'   => 'Remove',
     'drop_hint'          => 'Drop to attach',
     'download_file'      => 'Download file',
+    'message_edited'     => 'edited',
     'btn_quick_reply'    => 'Quick reply',
     'qr_search'          => 'Search questions...',
     'qr_back'            => 'Back',

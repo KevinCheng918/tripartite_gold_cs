@@ -92,7 +92,14 @@ class TelegramSetWebhookCommand extends Command
         $secret = config('telegram.webhook_secret');
 
         foreach ($tokens as $label => $token) {
-            $params = ['url' => $webhookUrl];
+            $params = [
+                'url' => $webhookUrl,
+                // 明確宣告要收哪些事件。不指定時 Telegram 用預設清單，
+                // 而預設**不含 message_reaction**，表情回應功能就收不到事件。
+                // edited_message 雖在預設內，一併列出來讓需求一目了然
+                'allowed_updates' => json_encode(['message', 'edited_message', 'message_reaction']),
+            ];
+
             if (filled($secret)) {
                 $params['secret_token'] = $secret;
             }

@@ -54,6 +54,10 @@ class TelegramWebhookController extends Controller
 
             if (isset($payload['message_reaction'])) {
                 $this->chatService->handleReactionUpdate($payload);
+            } elseif (isset($payload['edited_message'])) {
+                // 編輯事件的 payload 是 edited_message 不是 message，
+                // 沒有這個分支會被 handleIncomingMessage 當成空訊息直接丟掉
+                $this->chatService->handleEditedMessage($payload);
             } else {
                 $this->chatService->handleIncomingMessage($payload);
             }

@@ -22,6 +22,12 @@
                     if (msg.group_id === T.selectedGroupId) { T.loadMessages(T.selectedGroupId); }
                     return;
                 }
+                // 編輯是既有訊息的內容改變，不能當新訊息 append，要整份重載
+                if (msg.edited) {
+                    T.loadGroups();
+                    if (msg.group_id === T.selectedGroupId) { T.loadMessages(T.selectedGroupId); }
+                    return;
+                }
                 T.loadGroups();
                 if (msg.group_id === T.selectedGroupId) { T.appendMessage(msg); }
             });
