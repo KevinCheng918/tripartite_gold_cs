@@ -310,7 +310,7 @@ class TelegramBroadcastService
         })->filter();
 
         // 查發送者暱稱
-        $sender = \App\Models\User::query()->select(['id', 'nickname'])->find($senderId);
+        $sender = $this->telegramRepository->findSender($senderId);
         $senderName = $sender ? $sender->nickname : '系統';
 
         // 逐一發送（根據站台系統切換 Bot Token）

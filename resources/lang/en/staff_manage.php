@@ -1,0 +1,102 @@
+<?php
+
+return [
+    'page_title' => 'Staff Management',
+    'subtitle'   => 'Onboarding and equipment management',
+
+    'tab_staff'     => 'Staff',
+    'tab_equipment' => 'Equipment',
+
+    // Shared
+    'action_search'  => 'Search',
+    'action_reset'   => 'Reset',
+    'action_cancel'  => 'Cancel',
+    'action_save'    => 'Save',
+    'action_add'     => 'Add',
+    'action_edit'    => 'Edit',
+    'action_collapse' => '— Collapse —',
+    'action_expand'  => '— Expand —',
+    'filter_all'     => 'All',
+    'filter_unlimited' => 'Any',
+    'not_set'        => 'Not set',
+    'no_data'        => 'No data',
+    'loading'        => 'Loading...',
+    'please_select'  => 'Please select',
+    'sort_default'   => 'Default (ID)',
+    'label_sort'     => 'Sort',
+    'unit_year'      => 'y',
+    'unit_month'     => 'm',
+    'unit_day'       => 'd',
+    'unit_person'    => 'people',
+    'unit_item'      => 'items',
+    'total'          => 'Total',
+
+    // Staff fields
+    'field_account'   => 'Account',
+    'field_nickname'  => 'Nickname',
+    'field_level'     => 'Role',
+    'field_hired_at'  => 'Hired on',
+    'field_resigned_at' => 'Resigned on',
+    'field_tenure'    => 'Tenure',
+    'field_action'    => 'Actions',
+    'field_status'    => 'Status',
+    'filter_tenure'   => 'Tenure filter',
+
+    'status_on_job'   => 'Active',
+    'status_resigned' => 'Resigned',
+    'status_on_job_now' => 'Active',
+
+    'sort_tenure_desc' => 'Tenure: longest first',
+    'sort_tenure_asc'  => 'Tenure: shortest first',
+    'sort_level_asc'   => 'Role: highest first',
+    'sort_level_desc'  => 'Role: lowest first',
+
+    'edit_staff'    => 'Edit staff',
+    'not_yet_hired' => 'Not started yet',
+    'tenure_prefix' => 'Tenure: ',
+    'hired_today'   => 'Started today',
+
+    // Equipment
+    'field_staff'       => 'Staff',
+    'field_eq_name'     => 'Equipment',
+    'field_model'       => 'Model',
+    'field_serial'      => 'Serial',
+    'field_received_at' => 'Received on',
+    'field_returned_at' => 'Returned on',
+    'field_duration'    => 'Duration',
+    'field_holder'      => 'Assigned to',
+    'field_equipment'   => 'Equipment',
+    'field_received'    => 'Received',
+    'field_returned'    => 'Returned',
+    'field_duration_short' => 'Duration',
+
+    'filter_duration' => 'Usage period',
+    'eq_status'       => 'Equipment status',
+    'eq_in_use'       => 'In use',
+    'eq_returned'     => 'Returned',
+    'eq_not_received' => 'Not received',
+
+    'sort_received_desc' => 'Received: newest first',
+    'sort_received_asc'  => 'Received: oldest first',
+    'sort_duration_desc' => 'Duration: longest first',
+    'sort_duration_asc'  => 'Duration: shortest first',
+
+    'add_equipment'    => 'Add equipment',
+    'equipment_manage' => 'Equipment',
+    'no_equipment'     => 'No equipment',
+    'no_equipment_yet' => 'No equipment yet',
+    'action_return'    => 'Return',
+    'action_confirm_return' => 'Confirm return',
+    'return_confirm'   => 'Return this equipment?',
+    'return_date'      => 'Return date',
+    'today'            => 'today',
+    'duration_used'    => '',
+
+    'msg' => [
+        'updated'       => 'Updated',
+        'update_failed' => 'Update failed',
+        'added'         => 'Added',
+        'returned'      => 'Returned',
+        'action_failed' => 'Action failed',
+    ],
+];

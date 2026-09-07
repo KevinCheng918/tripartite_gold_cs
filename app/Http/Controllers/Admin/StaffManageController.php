@@ -64,11 +64,11 @@ class StaffManageController extends Controller
         try {
             $this->accountService->update($user, $params);
 
-            return response()->json(['message' => '已更新']);
+            return response()->json(['message' => trans('staff_manage.msg.updated')]);
         } catch (\Exception $e) {
             Log::error('內部管理更新失敗', ['error' => $e->getMessage(), 'user_id' => $user->id]);
 
-            return response()->json(['message' => '更新失敗'], 500);
+            return response()->json(['message' => trans('staff_manage.msg.update_failed')], 500);
         }
     }
 }

@@ -21,6 +21,8 @@ class UpdateAccountRequest extends FormRequest
 
         return [
             'nickname' => 'sometimes|max:100',
+            // Telegram 對話署名。會直接附在送給客戶的訊息結尾，長度壓短一點
+            'telegram_nickname' => 'nullable|string|max:30',
             'account'  => ['sometimes', 'max:100', Rule::unique('user', 'account')->ignore($userId)],
             'password' => ['sometimes', 'nullable', config('rules.USER_PASSWORD_REGEX')],
             'level'          => 'sometimes|integer|in:0,1,2,3,4',
@@ -36,6 +38,7 @@ class UpdateAccountRequest extends FormRequest
     {
         return [
             'nickname.max'     => trans('account.msg.max_string', ['value' => '100']),
+            'telegram_nickname.max' => trans('account.msg.telegram_nickname_max', ['value' => '30']),
             'account.unique'   => trans('account.msg.unique'),
             'password.regex'   => trans('account.msg.regex_password'),
             'status.in'        => trans('account.msg.invalid_status'),

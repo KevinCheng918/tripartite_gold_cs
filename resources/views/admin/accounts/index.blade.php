@@ -17,7 +17,7 @@
                 @endif
             </div>
             <a href="javascript:void(0)" class="text-muted text-decoration-none" data-bs-toggle="collapse" data-bs-target="#account-search-collapse" aria-expanded="true">
-                — 折疊 —
+                {{ trans('account.action_collapse') }}
             </a>
         </div>
         <div class="collapse show" id="account-search-collapse">
@@ -35,7 +35,7 @@
                         <div class="col-md-3 col-6">
                             <label class="form-label fw-bold">{{ trans('account.field_status') }}：</label>
                             <select name="status" class="form-select">
-                                <option value="">全部</option>
+                                <option value="">{{ trans('account.filter_all') }}</option>
                                 <option value="1" {{ ($filters['status'] ?? '') === '1' ? 'selected' : '' }}>{{ trans('account.status_normal') }}</option>
                                 <option value="2" {{ ($filters['status'] ?? '') === '2' ? 'selected' : '' }}>{{ trans('account.status_lock') }}</option>
                                 <option value="0" {{ ($filters['status'] ?? '') === '0' ? 'selected' : '' }}>{{ trans('account.status_deactivate') }}</option>
@@ -44,7 +44,7 @@
                         <div class="col-md-3 col-6">
                             <label class="form-label fw-bold">{{ trans('account.field_level') }}：</label>
                             <select name="level" class="form-select">
-                                <option value="">全部</option>
+                                <option value="">{{ trans('account.filter_all') }}</option>
                                 @foreach(config('constants.USER.LEVEL') as $key => $val)
                                     @if($val !== config('constants.USER.LEVEL.ADMIN'))
                                         <option value="{{ $val }}" {{ ($filters['level'] ?? '') == $val ? 'selected' : '' }}>{{ \App\Presenters\UserPresenter::levelName($val) }}</option>
@@ -54,9 +54,9 @@
                         </div>
                     </div>
                     <div class="d-flex justify-content-end gap-2">
-                        <a href="{{ route('admin.accounts.index') }}" class="btn btn-outline-secondary">重置</a>
+                        <a href="{{ route('admin.accounts.index') }}" class="btn btn-outline-secondary">{{ trans('account.action_reset') }}</a>
                         <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-search me-1"></i>搜尋
+                            <i class="fas fa-search me-1"></i>{{ trans('account.action_search') }}
                         </button>
                     </div>
                 </form>
@@ -68,7 +68,7 @@
     <div class="row g-3 mb-3">
         <div class="col">
             <div class="card shadow-sm">
-                <div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong style="font-size:1.0625rem"><i class="fas fa-users me-2" style="color:#d4af37"></i>身份</strong></div>
+                <div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong style="font-size:1.0625rem"><i class="fas fa-users me-2" style="color:#d4af37"></i>{{ trans('account.field_level') }}</strong></div>
                 <div class="card-body py-2">
                     <div class="d-flex flex-wrap text-center">
                         @foreach(config('constants.USER.LEVEL') as $key => $val)
@@ -85,7 +85,7 @@
         </div>
         <div class="col">
             <div class="card shadow-sm">
-                <div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong style="font-size:1.0625rem"><i class="fas fa-toggle-on me-2" style="color:#28a745"></i>狀態</strong></div>
+                <div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong style="font-size:1.0625rem"><i class="fas fa-toggle-on me-2" style="color:#28a745"></i>{{ trans('account.field_status') }}</strong></div>
                 <div class="card-body py-2">
                     <div class="d-flex flex-wrap text-center">
                         <div class="flex-fill">
@@ -106,10 +106,10 @@
         </div>
         <div class="col-auto d-flex">
             <div class="card shadow-sm d-flex justify-content-center" style="min-width:100px">
-                <div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong style="font-size:1.0625rem"><i class="fas fa-chart-bar me-2" style="color:#0284c7"></i>總計</strong></div>
+                <div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong style="font-size:1.0625rem"><i class="fas fa-chart-bar me-2" style="color:#0284c7"></i>{{ trans('account.stat_total') }}</strong></div>
                 <div class="card-body py-2 d-flex flex-column align-items-center justify-content-center">
                     <div class="fw-bold" style="font-size:1.25rem">{{ $accountStats['total'] }}</div>
-                    <small class="text-muted">人</small>
+                    <small class="text-muted">{{ trans('account.unit_person') }}</small>
                 </div>
             </div>
         </div>
@@ -125,9 +125,10 @@
                             <th>#</th>
                             <th>{{ trans('account.field_account') }}</th>
                             <th>{{ trans('account.field_nickname') }}</th>
+                            <th>{{ trans('account.label_telegram_nickname') }}</th>
                             <th>{{ trans('account.field_status') }}</th>
                             <th>{{ trans('account.field_level') }}</th>
-                            <th>操作</th>
+                            <th>{{ trans('account.field_action') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -142,6 +143,13 @@
                                 <td>{{ $account->account }}</td>
                                 <td><strong>{{ $account->nickname }}</strong></td>
                                 <td>
+                                    @if(filled($account->telegram_nickname))
+                                        <span class="badge bg-secondary">-{{ $account->telegram_nickname }}</span>
+                                    @else
+                                        <span class="text-muted">{{ trans('account.not_set') }}</span>
+                                    @endif
+                                </td>
+                                <td>
                                     @if($account->status == config('constants.USER.STATUS.NORMAL'))
                                         <span class="badge bg-success">{{ trans('account.status_normal') }}</span>
                                     @elseif($account->status == config('constants.USER.STATUS.LOCK'))
@@ -155,6 +163,7 @@
                                     <button class="btn btn-sm btn-outline-secondary js-edit"
                                             data-id="{{ $account->id }}"
                                             data-nickname="{{ $account->nickname }}"
+                                            data-telegram-nickname="{{ $account->telegram_nickname }}"
                                             data-level="{{ $account->level }}"
                                             data-project-ids="{{ json_encode($account->project_ids ?? []) }}">
                                         <i class="fas fa-edit me-1"></i>{{ trans('account.action_edit') }}
@@ -177,7 +186,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="text-center text-muted py-4">暫無資料</td>
+                                <td colspan="7" class="text-center text-muted py-4">{{ trans('account.no_data') }}</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -221,7 +230,10 @@
                     <div class="d-grid gap-1" style="grid-template-columns: 1fr 1fr">
                         <button class="btn btn-sm btn-outline-secondary js-edit"
                                 data-id="{{ $account->id }}"
-                                data-nickname="{{ $account->nickname }}">
+                                data-nickname="{{ $account->nickname }}"
+                                data-telegram-nickname="{{ $account->telegram_nickname }}"
+                                data-level="{{ $account->level }}"
+                                data-project-ids="{{ json_encode($account->project_ids ?? []) }}">
                             <i class="fas fa-edit me-1"></i>{{ trans('account.action_edit') }}
                         </button>
                         <button class="btn btn-sm btn-outline-secondary js-change-status"
@@ -242,7 +254,7 @@
                 </div>
             </div>
         @empty
-            <div class="text-center text-muted py-4">暫無資料</div>
+            <div class="text-center text-muted py-4">{{ trans('account.no_data') }}</div>
         @endforelse
         @if($accounts instanceof \Illuminate\Pagination\LengthAwarePaginator && $accounts->hasPages())
             <div class="mt-2">{{ $accounts->links() }}</div>
@@ -297,6 +309,12 @@
                             <input id="edit-nickname" type="text" class="form-control" name="nickname" required>
                         </div>
                         <div class="mb-3">
+                            <label class="form-label">{{ trans('account.field_telegram_nickname') }}</label>
+                            <input id="edit-telegram-nickname" type="text" class="form-control" maxlength="30"
+                                   placeholder="{{ trans('account.telegram_nickname_ph') }}">
+                            <div class="form-text">{{ trans('account.telegram_nickname_hint') }}</div>
+                        </div>
+                        <div class="mb-3">
                             <label class="form-label">{{ trans('account.field_password') }}（{{ trans('account.password_hint') }}）</label>
                             <input id="edit-password" type="password" class="form-control" name="password" minlength="8">
                         </div>
@@ -307,7 +325,7 @@
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">參與專案</label>
+                            <label class="form-label">{{ trans('account.field_project') }}</label>
                             <div id="edit-project-list" style="max-height:150px;overflow-y:auto;border:1px solid #dee2e6;border-radius:0.25rem;padding:0.5rem">
                                 @foreach($projects as $p)
                                     <div class="form-check">
@@ -429,8 +447,8 @@ $(function () {
     // 折疊文字切換
     var $acCollapse = $('#account-search-collapse');
     var $acToggle = $('[data-bs-target="#account-search-collapse"]');
-    $acCollapse.on('show.bs.collapse', function () { $acToggle.text('— 折疊 —'); });
-    $acCollapse.on('hide.bs.collapse', function () { $acToggle.text('— 展開 —'); });
+    $acCollapse.on('show.bs.collapse', function () { $acToggle.text(@json(trans('account.action_collapse'))); });
+    $acCollapse.on('hide.bs.collapse', function () { $acToggle.text(@json(trans('account.action_expand'))); });
 
     function showMessage(msg) {
         $('#modal-account-message-text').text(msg);
@@ -451,6 +469,7 @@ $(function () {
         var $btn = $(this);
         $('#edit-account-id').val($btn.data('id'));
         $('#edit-nickname').val($btn.data('nickname'));
+        $('#edit-telegram-nickname').val($btn.data('telegram-nickname') || '');
         $('#edit-level').val($btn.data('level'));
         $('#edit-password').val('');
         // 帶入參與專案
@@ -505,7 +524,12 @@ $(function () {
     // 編輯帳號
     $('#form-edit-account').on('submit', function (e) {
         e.preventDefault();
-        var data = { nickname: $('#edit-nickname').val(), level: parseInt($('#edit-level').val(), 10) };
+        var data = {
+            nickname: $('#edit-nickname').val(),
+            level: parseInt($('#edit-level').val(), 10),
+            // 送 null 代表清空署名，後端用 array_key_exists 判斷所以一定要帶這個 key
+            telegram_nickname: $('#edit-telegram-nickname').val().trim() || null,
+        };
         var pw = $('#edit-password').val();
         if (pw && hasFullWidth(pw)) {
             showMessage(@json(trans('account.msg.full_width_password')));
@@ -562,9 +586,9 @@ $(function () {
         else if (/Trident/i.test(ua)) { engine = 'Trident'; }
 
         return '<div style="line-height:1.6">'
-            + '<div><strong>作業系統：</strong>' + escapeHtml(os) + '</div>'
-            + '<div><strong>瀏覽器：</strong>' + escapeHtml(browser) + '</div>'
-            + '<div><strong>裝置：</strong>' + escapeHtml(engine) + '</div>'
+            + '<div><strong>' + @json(trans('account.log_os')) + '：</strong>' + escapeHtml(os) + '</div>'
+            + '<div><strong>' + @json(trans('account.log_browser')) + '：</strong>' + escapeHtml(browser) + '</div>'
+            + '<div><strong>' + @json(trans('account.log_device')) + '：</strong>' + escapeHtml(engine) + '</div>'
             + '</div>';
     }
 
@@ -581,7 +605,7 @@ $(function () {
             success: function (res) {
                 var rows = '';
                 if (!res.data || res.data.length === 0) {
-                    rows = '<tr><td colspan="5" class="text-center text-muted py-4">暫無紀錄</td></tr>';
+                    rows = '<tr><td colspan="5" class="text-center text-muted py-4">' + @json(trans('account.no_log')) + '</td></tr>';
                 } else {
                     for (var i = 0; i < res.data.length; i++) {
                         var log = res.data[i];
@@ -613,7 +637,7 @@ $(function () {
                 }
             },
             error: function () {
-                $tbody.html('<tr><td colspan="5" class="text-center text-danger py-3">載入失敗</td></tr>');
+                $tbody.html('<tr><td colspan="5" class="text-center text-danger py-3">' + @json(trans('account.load_failed')) + '</td></tr>');
             }
         });
     }

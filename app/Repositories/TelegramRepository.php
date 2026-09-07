@@ -4,6 +4,7 @@ namespace App\Repositories;
 
 use App\Models\TelegramGroup;
 use App\Models\TelegramMessage;
+use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -137,6 +138,21 @@ class TelegramRepository
             ->where('telegram_group_id', $groupId)
             ->orderByDesc('created_at')
             ->paginate($perPage);
+    }
+
+    /**
+     * 取送出者（暱稱與 Telegram 署名）
+     *
+     * 兩個欄位一起撈：署名用於訊息結尾，nickname 存進 sender_name。
+     *
+     * @param int $userId
+     * @return User|null
+     */
+    public function findSender($userId)
+    {
+        return User::query()
+            ->select(['id', 'nickname', 'telegram_nickname'])
+            ->find($userId);
     }
 
     /**

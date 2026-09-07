@@ -399,6 +399,9 @@ class TelegramChatService
         // 根據站台系統切換 Bot Token
         $this->switchBotToken($group);
 
+        // 署名在送出前加上，寫進紀錄的內容才會與客戶看到的一致
+        $content = $this->appendSignature($content, $userId);
+
         // 透過 Bot API 發送到 Telegram
         $result = filled($imageUrl)
             ? $this->botService->sendPhoto($group->chat_id, $imageUrl, $content)
@@ -607,6 +610,33 @@ class TelegramChatService
     }
 
     /**
+     * 在訊息結尾附上送出者的 Telegram 署名
+     *
+     * 讓客戶知道是哪位客服回的。暱稱由管理者在帳號管理設定，
+     * 沒設定就原樣送出 —— 這功能是逐一帳號開啟的。
+     *
+     * @param string   $content
+     * @param int|null $userId
+     * @return string
+     */
+    private function appendSignature($content, $userId)
+    {
+        if (!filled($userId)) {
+            return $content;
+        }
+
+        $user = $this->telegramRepository->findSender($userId);
+        $nickname = $user ? $user->telegram_nickname : null;
+
+        if (!filled($nickname)) {
+            return $content;
+        }
+
+        // 空內容（例如只傳圖片）也要署名，否則客戶不知道是誰傳的
+        return filled($content) ? "{$content} -{$nickname}" : "-{$nickname}";
+    }
+
+    /**
      * 依 MIME 決定 document 要用哪種 media_type
      *
      * 瀏覽器不是每種音訊／影片格式都放得出來（例如 wmv、flac），
@@ -799,10 +829,11 @@ class TelegramChatService
             return false;
         }
 
+        $caption = $this->appendSignature($caption, $senderId);
         $result = $this->botService->sendDocument($group->chat_id, $diskPath, $file->original_name, $caption);
 
         if ($result && isset($result['ok']) && $result['ok']) {
-            $sender = $senderId ? \App\Models\User::query()->select(['id', 'nickname'])->find($senderId) : null;
+            $sender = $senderId ? $this->telegramRepository->findSender($senderId) : null;
             $msgId = $result['result']['message_id'] ?? null;
 
             $this->telegramRepository->createMessage([
@@ -811,7 +842,8 @@ class TelegramChatService
                 'telegram_message_id' => $msgId,
                 'sender_name'         => $sender ? $sender->nickname : '系統',
                 'sender_user_id'      => $senderId,
-                'content'             => $caption ?: "[檔案] {$file->original_name}",
+                // content 只放說明文字。檔名由 media_name 提供，前端的檔案卡片直接讀它
+                'content'             => $caption ?: '',
                 'media_type'          => 'document',
                 'media_url'           => asset("storage/{$file->file_path}"),
                 'media_name'          => $file->original_name,
@@ -854,6 +886,7 @@ class TelegramChatService
             throw new \RuntimeException(trans('telegram_chat.msg.file_send_failed'));
         }
 
+        $caption = $this->appendSignature($caption, $userId);
         $result = $this->botService->sendDocument($group->chat_id, $diskPath, $originalName, $caption);
 
         // Telegram 沒收到就不要留下「已送出」的紀錄，否則客服會以為傳送成功

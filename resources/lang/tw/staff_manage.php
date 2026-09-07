@@ -1,0 +1,102 @@
+<?php
+
+return [
+    'page_title' => '內勤管理',
+    'subtitle'   => '人員到職與設備管理',
+
+    'tab_staff'     => '人員管理',
+    'tab_equipment' => '設備管理',
+
+    // 共用
+    'action_search'  => '搜尋',
+    'action_reset'   => '重置',
+    'action_cancel'  => '取消',
+    'action_save'    => '儲存',
+    'action_add'     => '新增',
+    'action_edit'    => '編輯',
+    'action_collapse' => '— 折疊 —',
+    'action_expand'  => '— 展開 —',
+    'filter_all'     => '全部',
+    'filter_unlimited' => '不限',
+    'not_set'        => '未設定',
+    'no_data'        => '暫無資料',
+    'loading'        => 'Loading...',
+    'please_select'  => '請選擇',
+    'sort_default'   => '預設（ID）',
+    'label_sort'     => '排序',
+    'unit_year'      => '年',
+    'unit_month'     => '月',
+    'unit_day'       => '天',
+    'unit_person'    => '人',
+    'unit_item'      => '件',
+    'total'          => '總計',
+
+    // 人員欄位
+    'field_account'   => '帳號',
+    'field_nickname'  => '暱稱',
+    'field_level'     => '身份',
+    'field_hired_at'  => '到職日',
+    'field_resigned_at' => '離職日',
+    'field_tenure'    => '年資',
+    'field_action'    => '操作',
+    'field_status'    => '狀態',
+    'filter_tenure'   => '年資篩選',
+
+    'status_on_job'   => '在職',
+    'status_resigned' => '離職',
+    'status_on_job_now' => '在職中',
+
+    'sort_tenure_desc' => '年資 長→短',
+    'sort_tenure_asc'  => '年資 短→長',
+    'sort_level_asc'   => '身份 高→低',
+    'sort_level_desc'  => '身份 低→高',
+
+    'edit_staff'    => '編輯人員',
+    'not_yet_hired' => '尚未到職',
+    'tenure_prefix' => '年資：',
+    'hired_today'   => '今天到職',
+
+    // 設備
+    'field_staff'       => '員工',
+    'field_eq_name'     => '設備名稱',
+    'field_model'       => '型號',
+    'field_serial'      => '編號',
+    'field_received_at' => '領用日期',
+    'field_returned_at' => '退還日期',
+    'field_duration'    => '使用時長',
+    'field_holder'      => '領用人',
+    'field_equipment'   => '設備',
+    'field_received'    => '領用',
+    'field_returned'    => '退還',
+    'field_duration_short' => '時長',
+
+    'filter_duration' => '使用年限',
+    'eq_status'       => '設備狀態',
+    'eq_in_use'       => '使用中',
+    'eq_returned'     => '已退還',
+    'eq_not_received' => '未領取',
+
+    'sort_received_desc' => '領用日期 新→舊',
+    'sort_received_asc'  => '領用日期 舊→新',
+    'sort_duration_desc' => '使用時長 長→短',
+    'sort_duration_asc'  => '使用時長 短→長',
+
+    'add_equipment'    => '新增設備',
+    'equipment_manage' => '設備管理',
+    'no_equipment'     => '暫無設備',
+    'no_equipment_yet' => '尚無設備',
+    'action_return'    => '歸還',
+    'action_confirm_return' => '確定歸還',
+    'return_confirm'   => '確定歸還此設備？',
+    'return_date'      => '歸還日期',
+    'today'            => '今天',
+    'duration_used'    => '已',
+
+    'msg' => [
+        'updated'       => '已更新',
+        'update_failed' => '更新失敗',
+        'added'         => '已新增',
+        'returned'      => '已歸還',
+        'action_failed' => '操作失敗',
+    ],
+];

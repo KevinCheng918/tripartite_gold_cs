@@ -217,6 +217,32 @@ $this->telegramChatService->sendReply($groupId, $message, $userId, $name, null, 
 - 副檔名黑名單移到 `config('rules.UPLOAD_BLOCKED_EXTENSIONS')`，
   與任務看板附件共用同一份 —— 原本各存一份，改一邊漏一邊就會一鬆一緊
 
+### 對話署名（2026-09-07）
+
+`user.telegram_nickname`（管理者在**帳號管理**設定，不是內勤管理）。
+送出時由 `TelegramChatService::appendSignature()` 在結尾接上 ` -暱稱`。
+
+- 三個送出點都會經過：`sendReply()`、`sendFileReply()`、`sendDocumentFromSharedFile()`
+- 署名在**送出前**加上，寫進 `content` 的內容才會與客戶看到的一致
+- 未設定就原樣送出，等於逐一帳號開啟
+- 空內容（只傳圖片）也會署名，否則客戶不知道是誰傳的
+
+> ⚠️ `AccountService::update()` 是**白名單制**，新欄位沒加進去就會被靜默丟掉 ——
+> 症狀是畫面顯示「已更新」但 DB 沒變。用 `array_key_exists` 而非 `filled` 判斷，
+> 才能把暱稱清空。
+
+> ⚠️ **檔案卡片的標籤不能用 `content`**：加了署名之後 content 從空字串變成 `-Ａ`，
+> 會把檔名蓋掉。卡片一律讀 `media_name`。
+
+### 傳送檔案的預覽視窗
+
+按鈕選檔後不直接送出，先開 `modal-tg-send-file` 確認 ——
+選錯檔案送到客戶群組是收不回來的。圖片給縮圖，其他檔案只給檔名與大小
+（pdf、doc 在這裡也預覽不了，硬塞一個框只是佔空間）。
+
+> 貼上與拖曳仍走**待送區**（`pendingFiles`）那條路：縮圖在輸入框上方、
+> 打完字按發送一起送出，且支援多檔。兩條路徑刻意不同，改動時不要誤以為重複。
+
 ### webhook 支援的媒體類型（2026-09-07）
 
 > ⚠️ **沒列到的類型會讓整則訊息消失**：`handleMessage()` 判斷完媒體後有一行

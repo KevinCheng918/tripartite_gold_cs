@@ -1,0 +1,102 @@
+<?php
+
+return [
+    'page_title' => '内勤管理',
+    'subtitle'   => '人员到职与设备管理',
+
+    'tab_staff'     => '人员管理',
+    'tab_equipment' => '设备管理',
+
+    // 共用
+    'action_search'  => '搜寻',
+    'action_reset'   => '重置',
+    'action_cancel'  => '取消',
+    'action_save'    => '储存',
+    'action_add'     => '新增',
+    'action_edit'    => '编辑',
+    'action_collapse' => '— 折叠 —',
+    'action_expand'  => '— 展开 —',
+    'filter_all'     => '全部',
+    'filter_unlimited' => '不限',
+    'not_set'        => '未设定',
+    'no_data'        => '暂无资料',
+    'loading'        => 'Loading...',
+    'please_select'  => '请选择',
+    'sort_default'   => '预设（ID）',
+    'label_sort'     => '排序',
+    'unit_year'      => '年',
+    'unit_month'     => '月',
+    'unit_day'       => '天',
+    'unit_person'    => '人',
+    'unit_item'      => '件',
+    'total'          => '总计',
+
+    // 人员栏位
+    'field_account'   => '帐号',
+    'field_nickname'  => '昵称',
+    'field_level'     => '身份',
+    'field_hired_at'  => '到职日',
+    'field_resigned_at' => '离职日',
+    'field_tenure'    => '年资',
+    'field_action'    => '操作',
+    'field_status'    => '状态',
+    'filter_tenure'   => '年资筛选',
+
+    'status_on_job'   => '在职',
+    'status_resigned' => '离职',
+    'status_on_job_now' => '在职中',
+
+    'sort_tenure_desc' => '年资 长→短',
+    'sort_tenure_asc'  => '年资 短→长',
+    'sort_level_asc'   => '身份 高→低',
+    'sort_level_desc'  => '身份 低→高',
+
+    'edit_staff'    => '编辑人员',
+    'not_yet_hired' => '尚未到职',
+    'tenure_prefix' => '年资：',
+    'hired_today'   => '今天到职',
+
+    // 设备
+    'field_staff'       => '员工',
+    'field_eq_name'     => '设备名称',
+    'field_model'       => '型号',
+    'field_serial'      => '编号',
+    'field_received_at' => '领用日期',
+    'field_returned_at' => '退还日期',
+    'field_duration'    => '使用时长',
+    'field_holder'      => '领用人',
+    'field_equipment'   => '设备',
+    'field_received'    => '领用',
+    'field_returned'    => '退还',
+    'field_duration_short' => '时长',
+
+    'filter_duration' => '使用年限',
+    'eq_status'       => '设备状态',
+    'eq_in_use'       => '使用中',
+    'eq_returned'     => '已退还',
+    'eq_not_received' => '未领取',
+
+    'sort_received_desc' => '领用日期 新→旧',
+    'sort_received_asc'  => '领用日期 旧→新',
+    'sort_duration_desc' => '使用时长 长→短',
+    'sort_duration_asc'  => '使用时长 短→长',
+
+    'add_equipment'    => '新增设备',
+    'equipment_manage' => '设备管理',
+    'no_equipment'     => '暂无设备',
+    'no_equipment_yet' => '尚无设备',
+    'action_return'    => '归还',
+    'action_confirm_return' => '确定归还',
+    'return_confirm'   => '确定归还此设备？',
+    'return_date'      => '归还日期',
+    'today'            => '今天',
+    'duration_used'    => '已',
+
+    'msg' => [
+        'updated'       => '已更新',
+        'update_failed' => '更新失败',
+        'added'         => '已新增',
+        'returned'      => '已归还',
+        'action_failed' => '操作失败',
+    ],
+];

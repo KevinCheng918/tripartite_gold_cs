@@ -112,6 +112,11 @@ class AccountService
             $attributes['equipments'] = $params['equipments'] ?? [];
         }
 
+        // 用 array_key_exists 而非 filled：要能把暱稱清空（送 null 代表取消署名）
+        if (array_key_exists('telegram_nickname', $params)) {
+            $attributes['telegram_nickname'] = $params['telegram_nickname'] ?: null;
+        }
+
         return DB::transaction(function () use ($user, $attributes) {
             return $this->userRepository->update($user, $attributes);
         });

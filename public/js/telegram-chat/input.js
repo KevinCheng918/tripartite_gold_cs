@@ -570,15 +570,15 @@
     }
 
     /**
-     * 從按鈕選檔後直接送出。走與待送區同一條上傳流程，
-     * 才會有相同的傳送中標示與進度條
+     * 選檔後先開預覽視窗確認，不直接送出 ——
+     * 選錯檔案卻已經送到客戶群組是收不回來的
      *
      * @param {File} file
      */
     function sendAttachment(file) {
         if (!T.selectedGroupId) { return; }
 
-        // 超過上限先擋下來，不必等整個檔案上傳完才收到 422
+        // 超過上限先擋下來，不必等使用者填完說明才發現送不出去
         if (isImageFile(file)) {
             if (file.size > MAX_IMAGE_BYTES) {
                 showInputError(T.i18n.msg.image_too_large || '圖片超過 5MB，無法傳送');
@@ -589,16 +589,96 @@
             return;
         }
 
-        var textarea = document.getElementById('tg-reply-text');
-        var caption = textarea ? textarea.value.trim() : '';
-
         showInputError('');
-        showUploadProgress(file.name, 1, 1);
+        openSendFileModal(file);
+    }
 
+    // 等待確認送出的檔案
+    var stagedFile = null;
+
+    /**
+     * 傳送確認視窗：圖片顯示縮圖、其他只顯示檔名與大小，可另外填說明文字
+     *
+     * @param {File} file
+     */
+    function openSendFileModal(file) {
+        stagedFile = file;
+
+        var modalEl = document.getElementById('modal-tg-send-file');
+        if (!modalEl) {
+            document.body.insertAdjacentHTML('beforeend',
+                '<div class="modal fade" id="modal-tg-send-file" tabindex="-1">' +
+                '<div class="modal-dialog modal-dialog-scrollable">' +
+                '<div class="modal-content">' +
+                '<div class="modal-header py-2">' +
+                '<h5 class="modal-title" style="font-size:0.9375rem">' + T.escapeHtml(T.i18n.send_file_title || '傳送檔案') + '</h5>' +
+                '<button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>' +
+                '<div class="modal-body">' +
+                '<div id="tg-send-file-preview" class="text-center mb-3"></div>' +
+                '<label class="form-label" style="font-size:0.8125rem">' + T.escapeHtml(T.i18n.send_file_caption || '說明文字') + '</label>' +
+                '<textarea id="tg-send-file-caption" class="form-control" rows="2" maxlength="1024"></textarea>' +
+                '</div>' +
+                '<div class="modal-footer py-2">' +
+                '<button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">' + T.escapeHtml(T.i18n.btn_cancel || '取消') + '</button>' +
+                '<button type="button" class="btn btn-primary btn-sm" id="btn-tg-send-file-ok">' +
+                '<i class="fas fa-paper-plane me-1"></i>' + T.escapeHtml(T.i18n.btn_send || '發送') + '</button>' +
+                '</div></div></div></div>');
+
+            modalEl = document.getElementById('modal-tg-send-file');
+            document.getElementById('btn-tg-send-file-ok').addEventListener('click', confirmSendFile);
+
+            // 關閉時清掉暫存，避免下次開啟殘留上一個檔案
+            modalEl.addEventListener('hidden.bs.modal', function () {
+                stagedFile = null;
+                document.getElementById('tg-send-file-preview').innerHTML = '';
+                document.getElementById('tg-send-file-caption').value = '';
+            });
+        }
+
+        renderStagedPreview(file);
+        document.getElementById('tg-send-file-caption').value = '';
+        showBsModal('modal-tg-send-file');
+    }
+
+    /**
+     * 圖片給縮圖，其他檔案只給檔名與大小 ——
+     * pdf、doc 這類沒辦法在這裡預覽內容，硬塞一個框只是浪費空間
+     *
+     * @param {File} file
+     */
+    function renderStagedPreview(file) {
+        var $box = $('#tg-send-file-preview').empty();
+
+        if (isImageFile(file)) {
+            var img = document.createElement('img');
+            img.src = URL.createObjectURL(file);
+            img.style.cssText = 'max-width:100%;max-height:260px;border-radius:0.375rem';
+            img.onload = function () { URL.revokeObjectURL(img.src); };
+            $box.append(img);
+        } else {
+            $box.append($('<div class="d-inline-flex align-items-center gap-2 px-3 py-2">')
+                .css({ border: '1px solid #dee2e6', borderRadius: '0.375rem', background: 'rgba(0,0,0,0.03)' })
+                .append($('<i class="fas fa-file-alt fa-2x text-muted">'))
+                .append($('<div class="text-start" style="min-width:0">')
+                    .append($('<div class="text-truncate" style="max-width:220px;font-size:0.875rem">').text(file.name))
+                    .append($('<div class="text-muted" style="font-size:0.75rem">').text(formatSize(file.size)))));
+        }
+    }
+
+    /**
+     * 按下傳送：關掉視窗後才開始上傳，進度條顯示在輸入區
+     */
+    function confirmSendFile() {
+        var file = stagedFile;
+        if (!file) { return; }
+
+        var caption = $('#tg-send-file-caption').val().trim();
+        hideBsModal(document.getElementById('modal-tg-send-file'));
+
+        showUploadProgress(file.name, 1, 1);
         uploadAttachment(file, caption, updateUploadProgress)
             .then(function () {
                 hideUploadProgress();
-                if (textarea) { textarea.value = ''; textarea.focus(); }
                 T.loadMessages(T.selectedGroupId);
             })
             .catch(function (error) {
