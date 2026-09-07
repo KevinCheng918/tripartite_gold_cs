@@ -34,9 +34,12 @@
         } else if (m.media_type === 'sticker' && m.media_url) {
             mediaHtml = '<div class="mb-1"><img src="' + m.media_url + '" alt="sticker" loading="lazy" style="max-width:120px;max-height:120px;display:block"></div>';
         } else if (m.media_type === 'document' && m.media_url) {
+            // media_name 是上傳當下留下的原始檔名。存檔時中文會被換成底線，
+            // 從網址反推救不回來，所以優先用它；舊資料沒有這欄才退回推網址
+            var docName = m.media_name || fileNameFromUrl(m.media_url);
             // 沒有說明文字時顯示檔名，讓人看得出這是檔案而不是空白連結
-            var docLabel = m.content || fileNameFromUrl(m.media_url) || T.i18n.download_file;
-            mediaHtml = '<div class="mb-1"><a href="' + m.media_url + '" target="_blank" download class="d-inline-flex align-items-center gap-1 text-decoration-none" style="padding:6px 10px;border-radius:6px;background:rgba(0,0,0,0.05);font-size:0.875rem"><i class="fas fa-file-download" style="font-size:1rem"></i><span>' + T.escapeHtml(docLabel) + '</span></a></div>';
+            var docLabel = m.content || docName || T.i18n.download_file;
+            mediaHtml = '<div class="mb-1"><a href="' + m.media_url + '" target="_blank" download="' + T.escapeHtml(docName || '') + '" class="d-inline-flex align-items-center gap-1 text-decoration-none" style="padding:6px 10px;border-radius:6px;background:rgba(0,0,0,0.05);font-size:0.875rem"><i class="fas fa-file-download" style="font-size:1rem"></i><span>' + T.escapeHtml(docLabel) + '</span></a></div>';
         }
 
         var replyHtml = '';

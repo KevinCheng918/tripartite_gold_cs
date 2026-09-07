@@ -47,6 +47,28 @@ class SharedFileService
     }
 
     /**
+     * 取得可切換查看的使用者清單（僅管理者用得到）
+     *
+     * @param int $currentUserId
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getSelectableUsers($currentUserId)
+    {
+        return $this->repository->getOtherUsers($currentUserId);
+    }
+
+    /**
+     * 取得單一資料夾（Controller 判斷權限用）
+     *
+     * @param int $folderId
+     * @return \App\Models\SharedFolder|null
+     */
+    public function findFolder($folderId)
+    {
+        return $this->repository->findFolder($folderId);
+    }
+
+    /**
      * 新增資料夾（可指定上層成為子資料夾）
      *
      * 有指定上層時，type 與 user_id 一律沿用上層 ——

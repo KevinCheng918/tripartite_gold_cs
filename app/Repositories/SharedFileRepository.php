@@ -4,6 +4,7 @@ namespace App\Repositories;
 
 use App\Models\SharedFile;
 use App\Models\SharedFolder;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 
 /**
@@ -11,6 +12,21 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class SharedFileRepository
 {
+    /**
+     * 取得除自己以外的所有使用者（管理者切換查看個人文件用）
+     *
+     * @param int $excludeUserId
+     * @return Collection
+     */
+    public function getOtherUsers($excludeUserId)
+    {
+        return User::query()
+            ->select(['id', 'nickname', 'account'])
+            ->where('id', '!=', $excludeUserId)
+            ->orderBy('nickname')
+            ->get();
+    }
+
     /**
      * 取得共用資料夾列表
      *

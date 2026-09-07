@@ -139,6 +139,7 @@ class TelegramChatService
         // 解析媒體（圖片）
         $mediaType = null;
         $mediaUrl = null;
+        $mediaName = null;
 
         if (isset($message['photo'])) {
             $mediaType = 'photo';
@@ -174,6 +175,10 @@ class TelegramChatService
             if (filled($fileId)) {
                 $mediaUrl = $this->downloadTelegramFile($fileId, 'document');
             }
+
+            // 本地存檔名是 document_時間戳_亂數，原始檔名只有這裡拿得到，
+            // 不留下來的話下載時就還原不了
+            $mediaName = $fileName;
 
             // 檔名放到 text 前面方便顯示
             if (!filled($text)) {
@@ -231,6 +236,7 @@ class TelegramChatService
             'content'            => $text,
             'media_type'         => $mediaType,
             'media_url'          => $mediaUrl,
+            'media_name'         => $mediaName,
             'reply_to_sender'    => $replyToSender,
             'reply_to_text'      => $replyToText,
             'replied'            => false,
@@ -245,6 +251,7 @@ class TelegramChatService
                 'content'     => $msg->content,
                 'media_type'  => $msg->media_type,
                 'media_url'   => $msg->media_url,
+                'media_name'  => $msg->media_name,
                 'created_at'  => $msg->created_at->toDateTimeString(),
                 'group_id'    => $group->id,
                 'group_title' => $group->title,
@@ -423,6 +430,7 @@ class TelegramChatService
                 'content'     => $msg->content,
                 'media_type'  => $msg->media_type,
                 'media_url'   => $msg->media_url,
+                'media_name'  => $msg->media_name,
                 'created_at'  => $msg->created_at->toDateTimeString(),
                 'group_id'    => $group->id,
                 'group_title' => $group->title,
@@ -692,6 +700,7 @@ class TelegramChatService
                 'content'             => $caption ?: "[檔案] {$file->original_name}",
                 'media_type'          => 'document',
                 'media_url'           => asset("storage/{$file->file_path}"),
+                'media_name'          => $file->original_name,
                 'replied'             => true,
             ]);
 
@@ -753,6 +762,7 @@ class TelegramChatService
             'content'             => $caption ?: '',
             'media_type'          => 'document',
             'media_url'           => asset("storage/{$filePath}"),
+            'media_name'          => $originalName,
             'replied'             => true,
         ]);
 
@@ -767,6 +777,7 @@ class TelegramChatService
                 'content'     => $msg->content,
                 'media_type'  => $msg->media_type,
                 'media_url'   => $msg->media_url,
+                'media_name'  => $msg->media_name,
                 'created_at'  => $msg->created_at->toDateTimeString(),
                 'group_id'    => $group->id,
                 'group_title' => $group->title,

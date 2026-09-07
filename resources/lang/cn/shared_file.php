@@ -26,6 +26,10 @@ return [
     'action_cancel'        => '取消',
     'action_confirm'       => '确认',
     'action_confirm_delete' => '确定删除',
+    'action_close'         => '关闭',
+
+    'preview_unsupported'   => '此档案类型无法预览，请下载后开启',
+    'preview_open_new_tab'  => '在新分页开启',
 
     'select_folder' => '请选择资料夹',
     'no_folders'    => '尚无资料夹',
@@ -41,5 +45,15 @@ return [
         'create_failed' => '建立失败',
         'upload_failed' => '上传失败',
         'delete_failed' => '删除失败',
+
+        'no_permission'     => '无权限',
+        'folder_not_found'  => '资料夹不存在',
+        'folder_created'    => '资料夹已建立',
+        'folder_deleted'    => '资料夹已删除',
+        'file_uploaded'     => '档案已上传',
+        'file_deleted'      => '档案已删除',
+        'file_required'     => '请选择档案',
+        'file_too_large'    => '档案不可超过 :value MB',
+        'file_type_blocked' => '不支援此档案类型',
     ],
 ];

@@ -50,3 +50,30 @@
 [data-theme="dark"] .sf-folder-list .sf-folder-item.active {
     background: rgba(212, 175, 55, 0.15);
 }
+
+/* 檔案預覽 Modal
+   modal-body 是唯一的捲動容器，內容元素不要再自帶 overflow */
+#sf-preview-body {
+    min-height: 200px;
+    /* iOS 沒有這行會沒有慣性捲動，滑起來很卡 */
+    -webkit-overflow-scrolling: touch;
+}
+
+#sf-preview-body pre {
+    text-align: left;
+    font-size: 0.8125rem;
+}
+
+[data-theme="dark"] #modal-sf-preview .modal-content {
+    background: #1e1e1e;
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] #modal-sf-preview .modal-header {
+    border-bottom-color: #333;
+}
+
+[data-theme="dark"] #sf-preview-body pre {
+    background: #2d2d2d;
+    color: #e0e0e0;
+}

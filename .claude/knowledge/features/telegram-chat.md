@@ -217,6 +217,24 @@ $this->telegramChatService->sendReply($groupId, $message, $userId, $name, null, 
 - 副檔名黑名單移到 `config('rules.UPLOAD_BLOCKED_EXTENSIONS')`，
   與任務看板附件共用同一份 —— 原本各存一份，改一邊漏一邊就會一鬆一緊
 
+### 附件下載要還原原始檔名（2026-09-07）
+
+> ⚠️ **原始檔名無法從網址反推**：`uploadKeepName()` 存檔時會加時間戳前綴，
+> 且把非 ASCII 換成底線 —— `YONGXIN接口V3.9.pdf` 落地就變成
+> `1788756999_6a9e..._YONGXIN______V3.9.pdf`，**中文在那一刻就沒了**。
+> 客戶傳進來的檔案更極端，本地存成 `document_<時間戳>_<亂數>.pdf`，
+> 原始檔名完全不在路徑裡。
+>
+> 因此 `telegram_message` 加了 `media_name` 欄位，四個寫入點都要帶：
+> inbound webhook（`document.file_name`）、`sendFileReply()`、
+> `sendDocumentFromSharedFile()`、群發公告的 `sendFilesTo()`。
+>
+> `TelegramRepository` 的 select 與 `TelegramMessageResource`、
+> 三處 Pusher 廣播 payload 也都要加，漏掉就恆為 null。
+
+前端 `download="<media_name>"`，舊資料沒有這欄才退回 `fileNameFromUrl()`。
+**既有訊息的原始檔名已無法回填**。
+
 ### 上傳進度條
 
 `uploadAttachment()` 用 **XMLHttpRequest 而非 fetch** —— fetch 沒有上傳進度事件，

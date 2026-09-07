@@ -67,6 +67,32 @@ blade 原本 550 行，內嵌 `<style>` 與 `<script>`，已拆成：
 > 症狀是選中／hover／分隔線全部消失。
 > 正確做法與 task-board 一致：`<link>` 放在 `@section('content')` 開頭。
 
+## 檔案預覽（2026-09-07）
+
+點檔名開 Modal 預覽。支援圖片、PDF、影片、音訊、純文字，其餘明講「無法預覽，請下載」。
+
+- **SVG 用 `<img>` 而非內嵌**：SVG 可夾帶 `<script>`，內嵌會執行，放 `<img>` 不會
+- **純文字先看 `content-length`**，超過 1MB 就不抓，否則開一個大 log 會把瀏覽器卡死
+- Modal 關閉時清空內容，不然影片／音訊會在背景繼續播
+- 不放下載鈕：檔案列表那列本來就有一顆
+
+> ⚠️ **內容元素不能自帶 `max-height` / `overflow`**：
+> `modal-dialog-scrollable` 的 modal-body 已經是捲動容器，
+> 再包一層會變成兩個容器搶同一個手勢 —— **手機上完全滑不動**。
+> iOS 另需 `-webkit-overflow-scrolling: touch` 才有慣性捲動。
+
+> ⚠️ **不要用 `modal-dialog-centered`**：`min-height` 會把 dialog 撐成全高，
+> 看起來像上下多一個框。全專案的慣例是 `modal-dialog-scrollable`。
+
+**PDF 在手機一律改用「在新分頁開啟」** —— iOS Safari 的 iframe 內嵌 PDF
+只顯示第一頁且無法捲動，這是系統限制，改 CSS 沒用。
+
+## 上傳限制
+
+`UploadFileRequest` 使用共用的 `BlocksExecutableUploads` trait
+（黑名單在 `config('rules.UPLOAD_BLOCKED_EXTENSIONS')`，與任務看板、Telegram 傳檔、群發公告同一份）。
+上限 20MB。
+
 ## 架構檔案
 
 - `app/Models/SharedFolder.php` — `parent()` / `children()`
@@ -81,5 +107,6 @@ blade 原本 550 行，內嵌 `<style>` 與 `<script>`，已拆成：
 
 - 權限 keyword：`shared_file.view` / `upload` / `delete`
 - 共用區要有 `shared_file.upload` 才能建資料夾，個人區一律可以
-- `SharedFileController::ajaxUpload` **尚未加副檔名黑名單**，
-  可考慮改用 [[broadcast]] 那支 `BlocksExecutableUploads` trait
+- 上傳的 `original_name` 存的是使用者當下的檔名，**不做任何加工**。
+  若使用者上傳的是先前從 Telegram 下載的檔案，檔名本來就帶
+  `時間戳_uniqid_` 前綴，那是來源檔名而非程式的問題

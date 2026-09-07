@@ -133,7 +133,7 @@ class TelegramRepository
     public function getMessagesByGroup($groupId, $perPage = 50)
     {
         return TelegramMessage::query()
-            ->select(['id', 'telegram_group_id', 'direction', 'telegram_message_id', 'sender_name', 'sender_user_id', 'content', 'media_type', 'media_url', 'reactions', 'replied', 'created_at'])
+            ->select(['id', 'telegram_group_id', 'direction', 'telegram_message_id', 'sender_name', 'sender_user_id', 'content', 'media_type', 'media_url', 'media_name', 'reactions', 'replied', 'created_at'])
             ->where('telegram_group_id', $groupId)
             ->orderByDesc('created_at')
             ->paginate($perPage);

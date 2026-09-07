@@ -26,6 +26,10 @@ return [
     'action_cancel'        => 'Cancel',
     'action_confirm'       => 'Confirm',
     'action_confirm_delete' => 'Delete',
+    'action_close'         => 'Close',
+
+    'preview_unsupported'   => 'This file type cannot be previewed. Please download it instead',
+    'preview_open_new_tab'  => 'Open in new tab',
 
     'select_folder' => 'Select a folder',
     'no_folders'    => 'No folders yet',
@@ -41,5 +45,15 @@ return [
         'create_failed' => 'Failed to create',
         'upload_failed' => 'Upload failed',
         'delete_failed' => 'Delete failed',
+
+        'no_permission'     => 'Permission denied',
+        'folder_not_found'  => 'Folder not found',
+        'folder_created'    => 'Folder created',
+        'folder_deleted'    => 'Folder deleted',
+        'file_uploaded'     => 'File uploaded',
+        'file_deleted'      => 'File deleted',
+        'file_required'     => 'Please select a file',
+        'file_too_large'    => 'File must not exceed :value MB',
+        'file_type_blocked' => 'This file type is not supported',
     ],
 ];

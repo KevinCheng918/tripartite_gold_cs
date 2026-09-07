@@ -228,7 +228,10 @@ $(function () {
                 (type === 'personal' && (f.uploaded_by === currentUserId || isAdmin));
 
             html += '<tr>';
-            html += '<td><i class="fas fa-file me-1 text-muted"></i>' + escapeHtml(f.original_name) + '</td>';
+            html += '<td><a href="javascript:void(0)" class="js-preview-file text-decoration-none"' +
+                ' data-path="' + escapeHtml(f.file_path) + '" data-name="' + escapeHtml(f.original_name) + '">' +
+                '<i class="fas ' + fileIcon(f.original_name) + ' me-1 text-muted"></i>' +
+                escapeHtml(f.original_name) + '</a></td>';
             html += '<td>' + fmtSize(f.file_size) + '</td>';
             html += '<td>' + escapeHtml(f.uploader ? f.uploader.nickname : '-') + '</td>';
             html += '<td>' + (f.created_at ? f.created_at.substring(0, 16).replace('T', ' ') : '-') + '</td>';
@@ -274,7 +277,174 @@ $(function () {
         $actions.html(html).css('display', html ? '' : 'none');
     }
 
+    // ===== 檔案預覽 =====
+
+    /** 可直接在瀏覽器裡呈現的類型。其餘一律導向下載 */
+    var PREVIEW_TYPES = {
+        image: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'ico'],
+        pdf:   ['pdf'],
+        video: ['mp4', 'webm', 'ogv'],
+        audio: ['mp3', 'wav', 'ogg', 'm4a'],
+        text:  ['txt', 'csv', 'log', 'json', 'xml', 'md', 'ini', 'yml', 'yaml']
+    };
+
+    /** 純文字預覽的大小上限，太大會把瀏覽器拖垮 */
+    var TEXT_PREVIEW_MAX_BYTES = 1024 * 1024;
+
+    /**
+     * @param {string} filename
+     * @returns {string} 副檔名（小寫，不含點）
+     */
+    function fileExt(filename) {
+        var parts = String(filename).split('.');
+
+        return parts.length > 1 ? parts.pop().toLowerCase() : '';
+    }
+
+    /**
+     * @param {string} filename
+     * @returns {string|null} PREVIEW_TYPES 的 key，無法預覽回 null
+     */
+    function previewKind(filename) {
+        var ext = fileExt(filename);
+        var kinds = Object.keys(PREVIEW_TYPES);
+
+        for (var i = 0; i < kinds.length; i++) {
+            if (PREVIEW_TYPES[kinds[i]].indexOf(ext) !== -1) { return kinds[i]; }
+        }
+
+        return null;
+    }
+
+    /**
+     * 依類型挑列表的圖示
+     *
+     * @param {string} filename
+     * @returns {string} Font Awesome class
+     */
+    function fileIcon(filename) {
+        var map = {
+            image: 'fa-file-image',
+            pdf: 'fa-file-pdf',
+            video: 'fa-file-video',
+            audio: 'fa-file-audio',
+            text: 'fa-file-alt'
+        };
+
+        return map[previewKind(filename)] || 'fa-file';
+    }
+
+    /**
+     * 把檔案渲染進預覽區
+     *
+     * @param {string} url
+     * @param {string} filename
+     */
+    function renderPreview(url, filename) {
+        var $body = $('#sf-preview-body');
+        var kind = previewKind(filename);
+
+        // 內容一律不自帶 max-height / overflow：
+        // modal-dialog-scrollable 的 modal-body 已經是捲動容器，
+        // 再包一層會變成兩個容器搶同一個手勢，手機上就完全滑不動
+        if (kind === 'image') {
+            // 用 <img> 而非內嵌：SVG 若含腳本，在 img 情境下不會執行
+            $body.html($('<img class="img-fluid">').attr('src', url).attr('alt', filename));
+            return;
+        }
+
+        if (kind === 'pdf') {
+            renderPdfPreview(url);
+            return;
+        }
+
+        if (kind === 'video') {
+            $body.html($('<video controls class="img-fluid">').attr('src', url));
+            return;
+        }
+
+        if (kind === 'audio') {
+            $body.html($('<audio controls class="w-100 p-3">').attr('src', url));
+            return;
+        }
+
+        if (kind === 'text') {
+            renderTextPreview(url);
+            return;
+        }
+
+        // 無法預覽：不要留白，明講並引導去下載
+        $body.html('<div class="text-center text-muted py-5">' +
+            '<i class="fas fa-file fa-3x mb-3 d-block"></i>' +
+            escapeHtml(i18n.preview_unsupported) + '</div>');
+    }
+
+    /**
+     * PDF 預覽
+     *
+     * iOS Safari 的 iframe 內嵌 PDF 只會顯示第一頁且無法捲動，
+     * 手機一律改用「在新分頁開啟」交給系統的檢視器。
+     *
+     * @param {string} url
+     */
+    function renderPdfPreview(url) {
+        var $body = $('#sf-preview-body');
+
+        if (window.innerWidth < 768) {
+            $body.html('<div class="text-center text-muted py-5">' +
+                '<i class="fas fa-file-pdf fa-3x mb-3 d-block"></i>' +
+                '<a href="' + url + '" target="_blank" rel="noopener" class="btn btn-primary btn-sm">' +
+                '<i class="fas fa-external-link-alt me-1"></i>' + escapeHtml(i18n.preview_open_new_tab) + '</a></div>');
+            return;
+        }
+
+        $body.html($('<iframe style="width:100%;height:75vh;border:0;display:block">').attr('src', url));
+    }
+
+    /**
+     * 純文字預覽。先看大小再決定要不要抓，避免把整份大檔拉進記憶體
+     *
+     * @param {string} url
+     */
+    function renderTextPreview(url) {
+        var $body = $('#sf-preview-body');
+        $body.html('<div class="text-center text-muted py-5">' + escapeHtml(i18n.loading) + '</div>');
+
+        fetch(url)
+            .then(function (res) {
+                if (!res.ok) { throw new Error('fetch failed'); }
+
+                var size = parseInt(res.headers.get('content-length') || '0', 10);
+                if (size > TEXT_PREVIEW_MAX_BYTES) { throw new Error('too large'); }
+
+                return res.text();
+            })
+            .then(function (text) {
+                $body.html($('<pre class="mb-0 p-3" style="white-space:pre-wrap;word-break:break-all">').text(text));
+            })
+            .catch(function () {
+                $body.html('<div class="text-center text-muted py-5">' +
+                    escapeHtml(i18n.preview_unsupported) + '</div>');
+            });
+    }
+
     // ===== 事件 =====
+
+    // 點檔名開預覽
+    $(document).on('click', '.js-preview-file', function () {
+        var path = $(this).data('path');
+        var name = $(this).data('name');
+        var url = '/storage/' + path;
+
+        $('#sf-preview-title').text(name);
+        renderPreview(url, name);
+        showBsModal('modal-sf-preview');
+    });
+
+    // 關掉時清空內容：影片／音訊不清會在背景繼續播
+    $('#modal-sf-preview').on('hidden.bs.modal', function () {
+        $('#sf-preview-body').empty();
+    });
 
     // 點選資料夾
     $(document).on('click', '.sf-folder-item', function (e) {
@@ -362,6 +532,10 @@ $(function () {
         if (!file) { return; }
 
         var folderId = $(this).data('folder');
+        // 從所在的操作區判斷分頁，不要用 selectedSharedFolder === folderId 比對 ——
+        // 個人與共用的資料夾 id 撞號時會判錯邊
+        var type = $(this).closest('#personal-file-actions').length ? 'personal' : 'shared';
+
         var fd = new FormData();
         fd.append('folder_id', folderId);
         fd.append('file', file);
@@ -373,9 +547,9 @@ $(function () {
             data: fd,
             processData: false,
             contentType: false,
-            success: function () {
-                var type = selectedSharedFolder === folderId ? 'shared' : 'personal';
+            success: function (body) {
                 loadFiles(type, folderId);
+                showMsg((body && body.message) || i18n.msg.file_uploaded);
             },
             error: function (xhr) {
                 showMsg((xhr.responseJSON && xhr.responseJSON.message) || i18n.msg.upload_failed);
@@ -385,8 +559,12 @@ $(function () {
         this.value = '';
     });
 
+    // 刪的是檔案還是資料夾，決定成功後要重載哪一邊
+    var pendingDeleteKind = null;
+
     // 刪除檔案
     $(document).on('click', '.js-delete-file', function () {
+        pendingDeleteKind = 'file';
         $('#modal-sf-delete-text').text(trans(i18n.confirm_delete_file, { name: $(this).data('name') }));
         $('#sf-delete-url').val('/admin/shared-file/ajax-delete-file/' + $(this).data('id'));
         showBsModal('modal-sf-delete');
@@ -398,6 +576,7 @@ $(function () {
 
         var id = parseInt($(this).data('id'), 10);
         var type = $(this).data('type');
+        pendingDeleteKind = 'folder';
 
         // 刪父層會把整棵子樹一起帶走，先講清楚會少掉幾個資料夾 ——
         // 這動作不可逆，不能讓人按下去才發現
@@ -420,12 +599,16 @@ $(function () {
             url: url,
             method: 'DELETE',
             headers: { 'X-CSRF-TOKEN': csrfToken },
-            success: function () {
+            success: function (body) {
+                var kind = pendingDeleteKind;
                 hideBsModal(document.getElementById('modal-sf-delete'));
+
+                // 等前一個 modal 收完再開下一個，否則 backdrop 會疊在一起
                 setTimeout(function () {
-                    loadFolders('shared');
-                    loadFolders('personal');
+                    reloadAfterDelete(kind);
+                    showMsg((body && body.message) || i18n.msg.file_deleted);
                 }, 400);
+
                 $btn.prop('disabled', false);
             },
             error: function (xhr) {
@@ -438,6 +621,43 @@ $(function () {
         });
     });
 
+    /**
+     * 刪除成功後重載畫面
+     *
+     * 刪檔案時只需重載目前資料夾的檔案列表 —— 原本只重載資料夾清單，
+     * 被刪掉的那一列會繼續留在畫面上，看起來像沒刪掉。
+     *
+     * @param {string} kind file / folder
+     */
+    function reloadAfterDelete(kind) {
+        if (kind === 'file') {
+            if (selectedSharedFolder) { loadFiles('shared', selectedSharedFolder); }
+            if (selectedPersonalFolder) { loadFiles('personal', selectedPersonalFolder); }
+
+            return;
+        }
+
+        // 資料夾（含子樹）被刪掉，選取狀態要跟著清掉，否則標題會停在已不存在的資料夾
+        selectedSharedFolder = null;
+        selectedPersonalFolder = null;
+        resetFilePanel('shared');
+        resetFilePanel('personal');
+        loadFolders('shared');
+        loadFolders('personal');
+    }
+
+    /**
+     * 把檔案區還原成「請選擇資料夾」
+     *
+     * @param {string} type
+     */
+    function resetFilePanel(type) {
+        $('#' + type + '-folder-title').text(i18n.select_folder);
+        $('#' + type + '-file-body').html('<tr><td colspan="5" class="text-center text-muted py-3">' +
+            escapeHtml(i18n.select_folder) + '</td></tr>');
+        $('#' + type + '-file-actions').css('display', 'none');
+    }
+
     // Tab 切換時載入
     $('button[data-bs-target="#tab-shared"]').on('shown.bs.tab', function () { loadFolders('shared'); });
     $('button[data-bs-target="#tab-personal"]').on('shown.bs.tab', function () { loadFolders('personal'); });
@@ -445,10 +665,7 @@ $(function () {
     // 管理者切換要查看的用戶
     $('#personal-user-select').on('change', function () {
         selectedPersonalFolder = null;
-        $('#personal-folder-title').text(i18n.select_folder);
-        $('#personal-file-body').html('<tr><td colspan="5" class="text-center text-muted py-3">' +
-            escapeHtml(i18n.select_folder) + '</td></tr>');
-        $('#personal-file-actions').css('display', 'none');
+        resetFilePanel('personal');
         loadFolders('personal', $(this).val() || null);
     });
 

@@ -274,6 +274,7 @@ class TelegramBroadcastService
                 'content'             => '',
                 'media_type'          => 'document',
                 'media_url'           => asset("storage/{$file['path']}"),
+                'media_name'          => $file['name'],
                 'replied'             => true,
             ]);
         }

@@ -26,6 +26,10 @@ return [
     'action_cancel'        => '取消',
     'action_confirm'       => '確認',
     'action_confirm_delete' => '確定刪除',
+    'action_close'         => '關閉',
+
+    'preview_unsupported'   => '此檔案類型無法預覽，請下載後開啟',
+    'preview_open_new_tab'  => '在新分頁開啟',
 
     'select_folder' => '請選擇資料夾',
     'no_folders'    => '尚無資料夾',
@@ -41,5 +45,15 @@ return [
         'create_failed' => '建立失敗',
         'upload_failed' => '上傳失敗',
         'delete_failed' => '刪除失敗',
+
+        'no_permission'     => '無權限',
+        'folder_not_found'  => '資料夾不存在',
+        'folder_created'    => '資料夾已建立',
+        'folder_deleted'    => '資料夾已刪除',
+        'file_uploaded'     => '檔案已上傳',
+        'file_deleted'      => '檔案已刪除',
+        'file_required'     => '請選擇檔案',
+        'file_too_large'    => '檔案不可超過 :value MB',
+        'file_type_blocked' => '不支援此檔案類型',
     ],
 ];

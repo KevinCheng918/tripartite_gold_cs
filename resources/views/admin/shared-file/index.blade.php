@@ -169,6 +169,24 @@
         </div>
     </div>
 
+    {{-- 檔案預覽 Modal
+         不用 modal-dialog-centered：它的 min-height 會把 dialog 撐成全高，
+         看起來像上下多一個框（同 quick-reply 的訊息 Modal） --}}
+    <div class="modal fade" id="modal-sf-preview" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h5 class="modal-title text-truncate" id="sf-preview-title" style="font-size:0.9375rem"></h5>
+                    {{-- 不放下載鈕：檔案列表那列本來就有一顆，重複提供沒有意義 --}}
+                    <button type="button" class="btn btn-sm btn-outline-secondary flex-shrink-0" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>{{ trans('shared_file.action_close') }}
+                    </button>
+                </div>
+                <div class="modal-body text-center p-0" id="sf-preview-body"></div>
+            </div>
+        </div>
+    </div>
+
     {{-- 訊息 Modal --}}
     <div class="modal fade" id="modal-sf-msg" tabindex="-1">
         <div class="modal-dialog modal-sm"><div class="modal-content"><div class="modal-body text-center py-4">
