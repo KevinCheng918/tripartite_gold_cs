@@ -1,0 +1,52 @@
+/**
+ * 文件區（共用／個人）樣式
+ *
+ * 原本內嵌在 resources/views/admin/shared-file/index.blade.php，
+ * 依專案規範抽出到 public/css。
+ */
+
+.sf-folder-list .sf-folder-item {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    font-size: 0.9375rem;
+}
+
+.sf-folder-list .sf-folder-item:hover {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+.sf-folder-list .sf-folder-item.active {
+    background: rgba(212, 175, 55, 0.1);
+    font-weight: 700;
+    border-left: 3px solid #d4af37;
+}
+
+/* 收合箭頭。沒有子資料夾時留同寬的空位，名稱才會對齊 */
+.sf-folder-toggle {
+    display: inline-block;
+    width: 1rem;
+    text-align: center;
+    font-size: 0.6875rem;
+    color: #adb5bd;
+}
+
+.js-toggle-folder {
+    cursor: pointer;
+}
+
+.js-toggle-folder:hover {
+    color: #6c757d;
+}
+
+[data-theme="dark"] .sf-folder-list .sf-folder-item {
+    border-bottom-color: #333;
+}
+
+[data-theme="dark"] .sf-folder-list .sf-folder-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .sf-folder-list .sf-folder-item.active {
+    background: rgba(212, 175, 55, 0.15);
+}

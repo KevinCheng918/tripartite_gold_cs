@@ -92,8 +92,9 @@ class SharedFileController extends Controller
     public function ajaxStoreFolder(Request $request)
     {
         $params = $request->validate([
-            'name' => 'required|string|max:100',
-            'type' => 'required|string|in:shared,personal',
+            'name'      => 'required|string|max:100',
+            'type'      => 'required|string|in:shared,personal',
+            'parent_id' => 'nullable|integer|exists:shared_folder,id',
         ]);
 
         $user = Auth::user();

@@ -31,7 +31,8 @@ class SharedFile extends Model
      */
     public function folder(): BelongsTo
     {
-        return $this->belongsTo(SharedFolder::class, 'folder_id');
+        return $this->belongsTo(SharedFolder::class, 'folder_id')
+            ->select(['id', 'name', 'parent_id', 'type', 'user_id']);
     }
 
     /**

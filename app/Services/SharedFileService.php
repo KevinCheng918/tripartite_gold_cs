@@ -47,18 +47,30 @@ class SharedFileService
     }
 
     /**
-     * 新增資料夾
+     * 新增資料夾（可指定上層成為子資料夾）
      *
-     * @param array $params
+     * 有指定上層時，type 與 user_id 一律沿用上層 ——
+     * 否則會出現共用資料夾底下掛著個人資料夾這種矛盾的結構。
+     *
+     * @param array $params 含 name、type、parent_id
      * @param int   $userId
      * @return \App\Models\SharedFolder
      */
     public function createFolder($params, $userId)
     {
+        $type = $params['type'] ?? 'shared';
+        $parentId = $params['parent_id'] ?? null;
+        $parent = filled($parentId) ? $this->repository->findFolder($parentId) : null;
+
+        if (filled($parent)) {
+            $type = $parent->type;
+        }
+
         return $this->repository->createFolder([
             'name'       => $params['name'],
-            'type'       => $params['type'] ?? 'shared',
-            'user_id'    => ($params['type'] ?? 'shared') === 'personal' ? $userId : null,
+            'parent_id'  => filled($parent) ? $parent->id : null,
+            'type'       => $type,
+            'user_id'    => filled($parent) ? $parent->user_id : ($type === 'personal' ? $userId : null),
             'created_by' => $userId,
         ]);
     }
@@ -105,7 +117,10 @@ class SharedFileService
     }
 
     /**
-     * 刪除資料夾（含所有檔案）
+     * 刪除資料夾（含所有子資料夾與其中的檔案）
+     *
+     * 自己在 Service 遞迴刪，不依賴 DB 的 FK 串接 ——
+     * MySQL 自我參照的 cascade 行為不可靠，而且實體檔本來就得自己清。
      *
      * @param int $folderId
      * @return void
@@ -117,13 +132,37 @@ class SharedFileService
             return;
         }
 
-        // 刪除資料夾下所有檔案的實體檔
-        $files = $this->repository->getFilesByFolder($folderId);
+        // 自己 + 所有後代
+        $folderIds = array_merge([$folder->id], $this->repository->getDescendantIds($folder->id));
+
+        // 先刪實體檔：DB 刪掉後就查不到 file_path，硬碟上會留下孤兒檔
+        $files = $this->repository->getFilesByFolders($folderIds);
         foreach ($files as $file) {
             Storage::disk('public')->delete($file->file_path);
         }
 
-        $this->repository->deleteFolder($folder);
+        // 由下往上刪，避免子資料夾的 parent_id 指向已消失的父層
+        $this->repository->deleteFoldersByIds(array_reverse($folderIds));
+    }
+
+    /**
+     * 統計刪除某資料夾會一併移除的子資料夾與檔案數
+     *
+     * 給刪除確認視窗顯示用 —— 子資料夾整棵砍掉是不可逆的，
+     * 要讓人在按下去之前就知道會少掉什麼。
+     *
+     * @param int $folderId
+     * @return array{folders: int, files: int}
+     */
+    public function getDeleteImpact($folderId)
+    {
+        $descendantIds = $this->repository->getDescendantIds($folderId);
+        $folderIds = array_merge([$folderId], $descendantIds);
+
+        return [
+            'folders' => count($descendantIds),
+            'files'   => $this->repository->getFilesByFolders($folderIds)->count(),
+        ];
     }
 
     /**

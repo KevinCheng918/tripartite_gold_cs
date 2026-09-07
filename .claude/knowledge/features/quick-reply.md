@@ -38,6 +38,11 @@
 防誤觸沿用任務看板同一組設定：`delay: 500` + `delayOnTouchOnly` + `touchStartThreshold: 5`
 （長按才拖、手指移動超過 5px 改判為捲動、桌機滑鼠不受延遲影響）。
 
+> ⚠️ **重綁前一定要 `destroy()` 舊實例**：`renderCategories()` / `renderItems()`
+> 每次都會呼叫 `bindSortable()`，不先銷毀的話同一個容器上會疊出多個 Sortable 實例，
+> 它們互相搶同一批 touch 事件 —— **手機上拖過一次之後就再也拖不動**。
+> 任務看板用 `sortableInstances` 陣列處理，這裡用容器 id 當 key。
+
 ### 手機版點類別像沒反應
 
 版面是 `col-md-4` / `col-md-8`，**手機上會上下堆疊**，問答區在類別清單下方。

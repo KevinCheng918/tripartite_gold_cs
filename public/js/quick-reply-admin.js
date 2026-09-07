@@ -344,6 +344,9 @@
             '<span class="text-danger">' + escapeHtml(i18n.action_delete) + '</span></button>';
     }
 
+    // 每個容器目前的 Sortable 實例，重綁前要先銷毀
+    var sortableInstances = {};
+
     /**
      * 綁定拖曳排序
      *
@@ -358,7 +361,13 @@
     function bindSortable(container, url, itemSelector) {
         if (!canEdit || typeof Sortable === 'undefined') { return; }
 
-        Sortable.create(container, {
+        // 每次重新渲染都會呼叫這裡。不先銷毀的話同一個容器上會疊出多個實例，
+        // 它們互相搶同一批 touch 事件 —— 手機上拖過一次之後就再也拖不動
+        if (sortableInstances[container.id]) {
+            sortableInstances[container.id].destroy();
+        }
+
+        sortableInstances[container.id] = Sortable.create(container, {
             draggable: itemSelector,
             animation: 150,
             ghostClass: 'qr-drag-ghost',
