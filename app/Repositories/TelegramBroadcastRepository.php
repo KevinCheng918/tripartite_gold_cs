@@ -19,7 +19,7 @@ class TelegramBroadcastRepository
     public function paginate($perPage = 20)
     {
         return TelegramBroadcast::query()
-            ->select(['id', 'content', 'target_type', 'target_group_ids', 'send_results', 'status', 'scheduled_at', 'image_urls', 'total_count', 'success_count', 'fail_count', 'sender_id', 'sent_at', 'created_at'])
+            ->select(['id', 'content', 'target_type', 'target_group_ids', 'send_results', 'status', 'scheduled_at', 'image_urls', 'file_urls', 'total_count', 'success_count', 'fail_count', 'sender_id', 'sent_at', 'created_at'])
             ->with('sender')
             ->orderByDesc('id')
             ->paginate($perPage);
@@ -37,7 +37,7 @@ class TelegramBroadcastRepository
     public function getDueScheduled($now)
     {
         return TelegramBroadcast::query()
-            ->select(['id', 'content', 'target_type', 'target_group_ids', 'status', 'scheduled_at', 'image_urls', 'sender_id'])
+            ->select(['id', 'content', 'target_type', 'target_group_ids', 'status', 'scheduled_at', 'image_urls', 'file_urls', 'sender_id'])
             ->where('status', TelegramBroadcast::STATUS_PENDING)
             ->where('scheduled_at', '<=', $now)
             ->orderBy('scheduled_at')

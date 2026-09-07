@@ -38,8 +38,9 @@
                                 <div class="text-end mt-1" style="font-size:0.8125rem"><span id="bc-content-count">0</span> / 4096</div>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label">{{ trans('broadcast.field_image') }}</label>
-                                <input id="bc-images" type="file" class="form-control" accept="image/*" multiple>
+                                <label class="form-label">{{ trans('broadcast.field_attachment') }}</label>
+                                {{-- 不設 accept：圖片與一般檔案都從這裡選，送出前再依 MIME 拆成兩個欄位 --}}
+                                <input id="bc-images" type="file" class="form-control" multiple>
                                 <div id="bc-image-preview" class="mt-2 d-flex flex-wrap gap-2" style="display:none"></div>
                             </div>
                             <div class="mb-3">
@@ -162,13 +163,7 @@
                                             @endif
                                         </td>
                                         <td>{{ $record->sender ? $record->sender->nickname : '-' }}</td>
-                                        <td>
-                                            @if($record->target_type == 1)
-                                                <a href="javascript:void(0)" class="badge bg-primary js-show-send-detail" style="cursor:pointer;text-decoration:none" data-results="{{ json_encode($record->send_results ?? []) }}">{{ trans('broadcast.target_all') }}</a>
-                                            @else
-                                                <a href="javascript:void(0)" class="badge bg-secondary js-show-send-detail" style="cursor:pointer;text-decoration:none" data-results="{{ json_encode($record->send_results ?? []) }}">{{ trans('broadcast.target_selected') }}</a>
-                                            @endif
-                                        </td>
+                                        <td>@include('admin.telegram-broadcast.partials.target-badge', ['record' => $record, 'groups' => $groups])</td>
                                         <td>{{ Str::limit($record->content, 50) }}</td>
                                         <td>{{ $record->total_count }}</td>
                                         <td><span class="badge bg-success">{{ $record->success_count }}</span></td>
@@ -221,11 +216,7 @@
                                         @endif
                                     </div>
                                 </div>
-                                @if($record->target_type == 1)
-                                    <a href="javascript:void(0)" class="badge bg-primary js-show-send-detail" style="cursor:pointer;text-decoration:none" data-results="{{ json_encode($record->send_results ?? []) }}">{{ trans('broadcast.target_all') }}</a>
-                                @else
-                                    <a href="javascript:void(0)" class="badge bg-secondary js-show-send-detail" style="cursor:pointer;text-decoration:none" data-results="{{ json_encode($record->send_results ?? []) }}">{{ trans('broadcast.target_selected') }}</a>
-                                @endif
+                                @include('admin.telegram-broadcast.partials.target-badge', ['record' => $record, 'groups' => $groups])
                             </div>
                             <div class="mb-2" style="font-size:0.875rem; white-space:pre-wrap; word-break:break-all">{{ $record->content }}</div>
                             <div class="d-flex justify-content-between align-items-center">
@@ -300,6 +291,9 @@
                     </div>
                     <div id="send-detail-table-wrap" style="display:none">
                         <div class="d-flex gap-3 mb-3" id="send-detail-summary"></div>
+                        <div id="send-detail-note" class="alert alert-warning py-2 d-none" style="font-size:0.8125rem">
+                            <i class="fas fa-info-circle me-1"></i>{{ trans('broadcast.pending_all_note') }}
+                        </div>
                         <table class="table table-sm align-middle mb-0">
                             <thead>
                                 <tr>
@@ -407,31 +401,74 @@ $(function () {
         $(this).val('');
     });
 
+    /**
+     * @param {File} file
+     * @returns {boolean}
+     */
+    function isImageFile(file) {
+        return (file.type || '').indexOf('image/') === 0;
+    }
+
+    /**
+     * 檔案大小顯示成 KB / MB
+     *
+     * @param {number} bytes
+     * @returns {string}
+     */
+    function formatSize(bytes) {
+        if (bytes < 1024 * 1024) { return Math.max(1, Math.round(bytes / 1024)) + ' KB'; }
+
+        return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+    }
+
+    /**
+     * 移除鈕。用閉包記住 index，不放 data-remove ——
+     * 縮圖是非同步載入的，靠屬性取 index 會對到錯的那一個
+     *
+     * @param {number} idx
+     * @returns {jQuery}
+     */
+    function removeAttachButton(idx) {
+        return $('<button type="button" class="btn btn-sm btn-danger position-absolute">')
+            .css({ top: '-5px', right: '-5px', padding: '0 4px', fontSize: '0.625rem', lineHeight: '1.2', borderRadius: '50%' })
+            .html('&times;')
+            .on('click', function () {
+                bcImageFiles.splice(idx, 1);
+                renderImagePreviews();
+            });
+    }
+
     function renderImagePreviews() {
         var $preview = $('#bc-image-preview');
         $preview.empty();
         if (bcImageFiles.length === 0) { $preview.hide(); return; }
 
+        // 同步依序建立節點，縮圖等 FileReader 回來再填 src，順序才與陣列一致
         bcImageFiles.forEach(function (file, idx) {
-            var reader = new FileReader();
-            reader.onload = function (e) {
-                $preview.append(
-                    '<div class="position-relative" style="display:inline-block">' +
-                    '<img src="' + e.target.result + '" style="width:80px;height:80px;object-fit:cover;border-radius:0.375rem" alt="preview">' +
-                    '<button type="button" class="btn btn-sm btn-danger position-absolute" style="top:-5px;right:-5px;padding:0 4px;font-size:0.625rem;line-height:1.2;border-radius:50%" data-remove="' + idx + '">&times;</button>' +
-                    '</div>'
-                );
-            };
-            reader.readAsDataURL(file);
-        });
-        $preview.show();
+            var $wrap = $('<div class="position-relative">').css('display', 'inline-block');
 
-        // 刪除單張
-        $preview.off('click', '[data-remove]').on('click', '[data-remove]', function () {
-            var rmIdx = parseInt($(this).data('remove'), 10);
-            bcImageFiles.splice(rmIdx, 1);
-            renderImagePreviews();
+            if (isImageFile(file)) {
+                var $img = $('<img alt="preview">')
+                    .css({ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '0.375rem' });
+                var reader = new FileReader();
+                reader.onload = function (e) { $img.attr('src', e.target.result); };
+                reader.readAsDataURL(file);
+                $wrap.append($img);
+            } else {
+                $wrap.append(
+                    $('<div class="d-flex flex-column justify-content-center px-2">')
+                        .css({ width: '120px', height: '80px', border: '1px solid #dee2e6', borderRadius: '0.375rem', background: 'rgba(0,0,0,0.03)', fontSize: '0.75rem' })
+                        .append($('<i class="fas fa-file-alt text-muted mb-1">'))
+                        .append($('<div class="text-truncate">').text(file.name).attr('title', file.name))
+                        .append($('<div class="text-muted">').text(formatSize(file.size)))
+                );
+            }
+
+            $wrap.append(removeAttachButton(idx));
+            $preview.append($wrap);
         });
+
+        $preview.show();
     }
 
     // 預約傳送：勾選才展開時間欄位，並把送出鈕文字換成「預約傳送」
@@ -510,8 +547,9 @@ $(function () {
             ids.forEach(function (id) { formData.append('group_ids[]', id); });
         }
 
+        // 圖片走 sendPhoto（客戶端看得到縮圖），其他走 sendDocument，後端驗證規則也不同
         bcImageFiles.forEach(function (file) {
-            formData.append('images[]', file);
+            formData.append(isImageFile(file) ? 'images[]' : 'files[]', file);
         });
 
         $('#btn-send').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>' + BC_I18N.sending);
@@ -557,38 +595,81 @@ $(function () {
         });
     });
 
+    /**
+     * 待發送：只有預定對象，還沒有成敗可言
+     *
+     * @param {string[]} targets 站台名稱
+     */
+    function renderPendingTargets(targets) {
+        var html = '';
+        targets.forEach(function (name) {
+            html += '<tr><td>' + $('<span>').text(name).html() + '</td>'
+                + '<td class="text-center"><span class="badge bg-warning text-dark">' + BC_I18N.status_pending + '</span></td></tr>';
+        });
+
+        $('#send-detail-summary').html(
+            '<span class="text-muted" style="font-size:0.875rem">' + BC_I18N.detail_total.replace(':count', targets.length) + '</span>'
+        );
+        $('#send-detail-body').html(html);
+    }
+
+    /**
+     * 已發送：顯示每站台成敗
+     *
+     * @param {Object[]} results
+     */
+    function renderSendResults(results) {
+        var successCount = 0;
+        var failCount = 0;
+        var html = '';
+
+        results.forEach(function (r) {
+            if (r.success) { successCount++; } else { failCount++; }
+            html += '<tr>';
+            html += '<td>' + $('<span>').text(r.name).html() + '</td>';
+            html += '<td class="text-center">';
+            if (r.success) {
+                html += '<span class="badge bg-success">' + BC_I18N.field_success + '</span>';
+            } else {
+                html += '<span class="badge bg-danger">' + BC_I18N.field_fail + '</span>';
+            }
+            html += '</td></tr>';
+        });
+
+        $('#send-detail-summary').html(
+            '<span class="text-muted" style="font-size:0.875rem">' + BC_I18N.detail_total.replace(':count', results.length) + '</span>' +
+            '<span style="font-size:0.875rem"><span class="badge bg-success">' + successCount + '</span> ' + BC_I18N.field_success + '</span>' +
+            (failCount > 0 ? '<span style="font-size:0.875rem"><span class="badge bg-danger">' + failCount + '</span> ' + BC_I18N.field_fail + '</span>' : '')
+        );
+        $('#send-detail-body').html(html);
+    }
+
     // 發送明細
     $(document).on('click', '.js-show-send-detail', function () {
-        var results = $(this).data('results') || [];
+        var $badge = $(this);
+        var isPending = String($badge.data('pending')) === '1';
+        // 待發送的還沒送出，send_results 必然是空的，改看預定對象
+        var rows = isPending ? ($badge.data('targets') || []) : ($badge.data('results') || []);
+
         $('#send-detail-empty, #send-detail-table-wrap').hide();
-        if (!results.length) {
+        $('#send-detail-note').addClass('d-none');
+
+        if (!rows.length) {
             $('#send-detail-empty').show();
         } else {
-            var successCount = 0;
-            var failCount = 0;
-            var html = '';
-            results.forEach(function (r) {
-                if (r.success) { successCount++; } else { failCount++; }
-                html += '<tr>';
-                html += '<td>' + $('<span>').text(r.name).html() + '</td>';
-                html += '<td class="text-center">';
-                if (r.success) {
-                    html += '<span class="badge bg-success">' + BC_I18N.field_success + '</span>';
-                } else {
-                    html += '<span class="badge bg-danger">' + BC_I18N.field_fail + '</span>';
+            if (isPending) {
+                renderPendingTargets(rows);
+                // 「全部群組」的預約在送出當下才決定對象，現在看到的只是目前的清單
+                if (String($badge.data('target-type')) === '1') {
+                    $('#send-detail-note').removeClass('d-none');
                 }
-                html += '</td></tr>';
-            });
-            $('#send-detail-summary').html(
-                '<span class="text-muted" style="font-size:0.875rem">' + BC_I18N.detail_total.replace(':count', results.length) + '</span>' +
-                '<span style="font-size:0.875rem"><span class="badge bg-success">' + successCount + '</span> ' + BC_I18N.field_success + '</span>' +
-                (failCount > 0 ? '<span style="font-size:0.875rem"><span class="badge bg-danger">' + failCount + '</span> ' + BC_I18N.field_fail + '</span>' : '')
-            );
-            $('#send-detail-body').html(html);
+            } else {
+                renderSendResults(rows);
+            }
             $('#send-detail-table-wrap').show();
         }
-        var modal = new bootstrap.Modal(document.getElementById('modal-send-detail'));
-        modal.show();
+
+        showBsModal('modal-send-detail');
     });
 
     // 字數即時計算

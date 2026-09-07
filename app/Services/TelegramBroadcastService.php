@@ -7,6 +7,7 @@ use App\Repositories\StationRepository;
 use App\Repositories\TelegramBroadcastRepository;
 use App\Repositories\TelegramRepository;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Telegram 群發公告 Service
@@ -82,6 +83,30 @@ class TelegramBroadcastService
     }
 
     /**
+     * 上傳公告附件
+     *
+     * 存的是**相對路徑而非網址**：sendDocument 要的是本地絕對路徑，
+     * 只留網址的話送出時還得反推路徑。原始檔名也一併留著，
+     * 否則客戶收到的會是「時間戳_uniqid_原檔名」。
+     *
+     * @param \Illuminate\Http\UploadedFile[] $files
+     * @return array [{path, name}]
+     */
+    public function uploadFiles($files)
+    {
+        $result = [];
+
+        foreach ($files as $file) {
+            $result[] = [
+                'path' => $this->imageUploadService->uploadKeepName($file, 'broadcast'),
+                'name' => $file->getClientOriginalName(),
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
      * 建立預約公告
      *
      * 只寫紀錄不發送，實際送出由 telegram:send-scheduled 排程負責。
@@ -103,6 +128,7 @@ class TelegramBroadcastService
             'target_type'      => $targetType,
             'target_group_ids' => $stationIds,
             'image_urls'       => $params['image_urls'] ?? null,
+            'file_urls'        => $params['file_urls'] ?? null,
             'status'           => TelegramBroadcast::STATUS_PENDING,
             'scheduled_at'     => $params['scheduled_at'],
             'total_count'      => 0,
@@ -183,6 +209,7 @@ class TelegramBroadcastService
             'target_type'      => $targetType,
             'target_group_ids' => $targetType === TelegramBroadcast::TARGET_SELECTED ? ($params['group_ids'] ?? []) : null,
             'image_urls'       => $params['image_urls'] ?? null,
+            'file_urls'        => $params['file_urls'] ?? null,
             'status'           => TelegramBroadcast::STATUS_SENT,
             'scheduled_at'     => null,
             'total_count'      => 0,
@@ -193,6 +220,65 @@ class TelegramBroadcastService
         ]);
 
         return $this->dispatch($broadcast);
+    }
+
+    /**
+     * 把附件逐一送到單一站台的群組
+     *
+     * @param \App\Models\Station $station
+     * @param array               $files [{path, name}]
+     * @param int                 $senderId
+     * @param string              $senderName
+     * @param int                 $broadcastId
+     * @return bool 全部送成功才回 true
+     */
+    private function sendFilesTo($station, $files, $senderId, $senderName, $broadcastId)
+    {
+        if (empty($files)) {
+            return true;
+        }
+
+        $chatId = $station->telegramGroup->chat_id;
+        $allOk = true;
+
+        foreach ($files as $file) {
+            $diskPath = Storage::disk('public')->path($file['path']);
+
+            if (!file_exists($diskPath)) {
+                Log::error('群發公告附件不存在', [
+                    'broadcast_id' => $broadcastId,
+                    'path'         => $diskPath,
+                ]);
+                $allOk = false;
+                continue;
+            }
+
+            $result = $this->botService->sendDocument($chatId, $diskPath, $file['name']);
+
+            if (!$result || empty($result['ok'])) {
+                Log::warning('群發公告附件發送失敗', [
+                    'broadcast_id' => $broadcastId,
+                    'chat_id'      => $chatId,
+                    'filename'     => $file['name'],
+                ]);
+                $allOk = false;
+                continue;
+            }
+
+            $this->telegramRepository->createMessage([
+                'telegram_group_id'   => $station->telegramGroup->id,
+                'direction'           => config('constants.TELEGRAM.DIRECTION.OUTBOUND'),
+                'telegram_message_id' => $result['result']['message_id'] ?? null,
+                'sender_name'         => $senderName,
+                'sender_user_id'      => $senderId,
+                'content'             => '',
+                'media_type'          => 'document',
+                'media_url'           => asset("storage/{$file['path']}"),
+                'replied'             => true,
+            ]);
+        }
+
+        return $allOk;
     }
 
     /**
@@ -207,6 +293,7 @@ class TelegramBroadcastService
     {
         $content = $broadcast->content;
         $imageUrls = $broadcast->image_urls ?? [];
+        $files = $broadcast->file_urls ?? [];
         $senderId = $broadcast->sender_id;
 
         // 從站台列表取得目標（僅啟用且有 Telegram 群組的）
@@ -252,36 +339,46 @@ class TelegramBroadcastService
                 $result = $this->botService->sendMessage($chatId, $content);
             }
 
-            if ($result && isset($result['ok']) && $result['ok']) {
-                $sendResults[] = ['station_id' => $station->id, 'name' => $station->name, 'success' => true];
-                $success++;
-
-                // 存入 outbound 訊息到對話紀錄（多張取第一張）
-                $firstImage = !empty($imageUrls) ? $imageUrls[0] : null;
-                $msgId = null;
-                if (isset($result['result'])) {
-                    // sendMediaGroup 回傳陣列，取第一個
-                    $msgResult = is_array($result['result']) && isset($result['result'][0])
-                        ? $result['result'][0] : $result['result'];
-                    $msgId = $msgResult['message_id'] ?? null;
-                }
-
-                $this->telegramRepository->createMessage([
-                    'telegram_group_id'  => $station->telegramGroup->id,
-                    'direction'          => config('constants.TELEGRAM.DIRECTION.OUTBOUND'),
-                    'telegram_message_id' => $msgId,
-                    'sender_name'        => $senderName,
-                    'sender_user_id'     => $senderId,
-                    'content'            => $content ?: '',
-                    'media_type'         => filled($firstImage) ? 'photo' : null,
-                    'media_url'          => $firstImage,
-                    'replied'            => true,
-                ]);
-            } else {
+            if (!$result || empty($result['ok'])) {
                 $sendResults[] = ['station_id' => $station->id, 'name' => $station->name, 'success' => false];
                 $fail++;
                 Log::warning('群發公告發送失敗', ['chat_id' => $station->telegramGroup->chat_id, 'broadcast_id' => $broadcast->id]);
+                continue;
             }
+
+            // 存入 outbound 訊息到對話紀錄（多張取第一張）
+            $firstImage = !empty($imageUrls) ? $imageUrls[0] : null;
+            $msgId = null;
+            if (isset($result['result'])) {
+                // sendMediaGroup 回傳陣列，取第一個
+                $msgResult = is_array($result['result']) && isset($result['result'][0])
+                    ? $result['result'][0] : $result['result'];
+                $msgId = $msgResult['message_id'] ?? null;
+            }
+
+            $this->telegramRepository->createMessage([
+                'telegram_group_id'  => $station->telegramGroup->id,
+                'direction'          => config('constants.TELEGRAM.DIRECTION.OUTBOUND'),
+                'telegram_message_id' => $msgId,
+                'sender_name'        => $senderName,
+                'sender_user_id'     => $senderId,
+                'content'            => $content ?: '',
+                'media_type'         => filled($firstImage) ? 'photo' : null,
+                'media_url'          => $firstImage,
+                'replied'            => true,
+            ]);
+
+            // 附件在正文之後逐一送出。有任何一個沒送成功，
+            // 這個站台就算失敗 —— 客服才知道要補送，而不是誤以為全都送到了
+            $filesOk = $this->sendFilesTo($station, $files, $senderId, $senderName, $broadcast->id);
+
+            $sendResults[] = ['station_id' => $station->id, 'name' => $station->name, 'success' => $filesOk];
+            if ($filesOk) {
+                $success++;
+                continue;
+            }
+
+            $fail++;
         }
 
         // 更新結果。預約公告到這裡才轉成已發送並補上 sent_at

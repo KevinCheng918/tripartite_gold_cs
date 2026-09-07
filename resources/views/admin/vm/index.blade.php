@@ -189,11 +189,15 @@
                 <div class="modal-body">
                     <form id="form-vm">
                         <input type="hidden" id="vm-id">
+                        {{-- 站台可搜尋。modal 是 scrollable，body 有 overflow-y，
+                             絕對定位的下拉會被裁掉，所以改成行內展開 --}}
                         <div class="mb-3">
                             <label class="form-label">{{ trans('vm.field_station') }}</label>
-                            <select id="vm-station" class="form-select" name="station_id" required>
-                                <option value="">{{ trans('vm.select_station') }}</option>
-                            </select>
+                            <input type="text" class="form-control" id="vm-station-text"
+                                   placeholder="{{ trans('vm.search_station_ph') }}" autocomplete="off">
+                            <input type="hidden" id="vm-station" name="station_id" value="">
+                            <div id="vm-station-dropdown" class="mt-1 d-none"
+                                 style="border:1px solid #dee2e6;border-radius:0.25rem;max-height:180px;overflow-y:auto"></div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('vm.field_hostname') }}</label>
@@ -634,7 +638,7 @@ $(function () {
             var stationId = $btn.data('station-id');
             loadStations(function () {
                 $('#vm-id').val($btn.data('id'));
-                $('#vm-station').val(stationId);
+                setStationPicker(stationId);
                 $('#vm-hostname').val($btn.data('hostname'));
                 $('#vm-internal-ip').val($btn.data('internal-ip'));
                 $('#vm-external-ip').val($btn.data('external-ip'));
@@ -687,29 +691,123 @@ $(function () {
         });
     }
 
+    // 站台清單快取。開一次 modal 就打一次 API 沒必要，站台不會在使用期間變動
+    var vmStationList = [];
+
     // 載入站台選單
     function loadStations(callback) {
+        if (vmStationList.length) {
+            renderStationOptions();
+            if (callback) { callback(); }
+
+            return;
+        }
+
         $.ajax({
             url: '/admin/stations/ajax-list?per_page=200',
             headers: { 'X-CSRF-TOKEN': csrfToken },
             success: function (body) {
-                var list = body.data || [];
-                var html = '<option value="">{{ trans('vm.select_station') }}</option>';
-                list.forEach(function (s) {
-                    html += '<option value="' + s.id + '">' + s.name + '</option>';
-                });
-                $('#vm-station').html(html);
+                vmStationList = body.data || [];
+                renderStationOptions();
                 if (callback) { callback(); }
             }
         });
     }
+
+    /**
+     * 依關鍵字渲染站台選項
+     *
+     * @param {string} [keyword]
+     */
+    function renderStationOptions(keyword) {
+        var kw = (keyword || '').toLowerCase();
+        var html = '';
+
+        // 只放 id，名稱在點擊時回查。站台名若含引號，塞進 data-name 會把屬性截斷
+        vmStationList.forEach(function (s) {
+            if (kw && String(s.name).toLowerCase().indexOf(kw) === -1) { return; }
+
+            html += '<a href="javascript:void(0)" class="dropdown-item js-vm-station-pick" data-id="' + s.id + '"'
+                + ' style="display:block;padding:0.35rem 0.75rem;font-size:0.875rem">'
+                + $('<div>').text(s.name).html() + '</a>';
+        });
+
+        if (!html) {
+            html = '<div class="text-muted text-center py-2" style="font-size:0.875rem">' + i18n.no_station_found + '</div>';
+        }
+
+        $('#vm-station-dropdown').html(html);
+    }
+
+    /**
+     * 清空站台選擇（新增時用）
+     */
+    function resetStationPicker() {
+        $('#vm-station').val('');
+        $('#vm-station-text').val('');
+        $('#vm-station-dropdown').addClass('d-none');
+        renderStationOptions();
+    }
+
+    /**
+     * 從快取的清單找出站台
+     *
+     * @param {number|string} stationId
+     * @returns {Object|undefined}
+     */
+    function findStation(stationId) {
+        return vmStationList.filter(function (s) {
+            return String(s.id) === String(stationId);
+        })[0];
+    }
+
+    /**
+     * 帶入已選站台（編輯時用）
+     *
+     * @param {number|string} stationId
+     */
+    function setStationPicker(stationId) {
+        var matched = findStation(stationId);
+
+        $('#vm-station').val(matched ? matched.id : '');
+        $('#vm-station-text').val(matched ? matched.name : '');
+        $('#vm-station-dropdown').addClass('d-none');
+        renderStationOptions();
+    }
+
+    // 站台搜尋：打字即篩選，選了才寫回 hidden
+    $('#vm-station-text').on('focus', function () {
+        $('#vm-station-dropdown').removeClass('d-none');
+    });
+
+    $('#vm-station-text').on('input', function () {
+        // 打字代表要重選，先清掉舊的 id，避免改了文字卻送出舊站台
+        $('#vm-station').val('');
+        renderStationOptions($(this).val());
+        $('#vm-station-dropdown').removeClass('d-none');
+    });
+
+    $('#vm-station-dropdown').on('click', '.js-vm-station-pick', function () {
+        var station = findStation($(this).data('id'));
+        if (!station) { return; }
+
+        $('#vm-station').val(station.id);
+        $('#vm-station-text').val(station.name);
+        $('#vm-station-dropdown').addClass('d-none');
+    });
+
+    // 點選單外就收起來
+    $(document).on('mousedown', function (e) {
+        if ($(e.target).closest('#vm-station-dropdown, #vm-station-text').length) { return; }
+        $('#vm-station-dropdown').addClass('d-none');
+    });
 
     // 新增 Modal 打開時清空
     $('[data-bs-target="#modal-vm"]').on('click', function () {
         $('#vm-id').val('');
         $('#form-vm')[0].reset();
         $('#modal-vm .modal-title').text('{{ trans("vm.action_create") }}');
-        loadStations();
+        loadStations(resetStationPicker);
     });
 
     // 新增/編輯提交
@@ -718,6 +816,12 @@ $(function () {
         var id = $('#vm-id').val();
         var url = id ? '/admin/vm/ajax-update/' + id : '/admin/vm/ajax-store';
         var method = id ? 'PUT' : 'POST';
+
+        // 站台改用 hidden input，瀏覽器的 required 不會驗到，得自己擋
+        if (!$('#vm-station').val()) {
+            showMessage(i18n.select_station);
+            return;
+        }
 
         var payload = {
             station_id: parseInt($('#vm-station').val(), 10),

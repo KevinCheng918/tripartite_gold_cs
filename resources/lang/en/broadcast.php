@@ -20,6 +20,7 @@ return [
     'no_history'      => 'No history',
 
     'field_image'      => 'Images (optional, multiple)',
+    'field_attachment' => 'Attachments (images or files, optional, multiple)',
     'field_scope'      => 'Recipients',
     'schedule_enable'  => 'Schedule',
     'field_schedule'   => 'Send at',
@@ -44,6 +45,7 @@ return [
     'copied'           => 'Copied',
     'send_detail'      => 'Delivery detail',
     'no_send_detail'   => 'No delivery detail for this record',
+    'pending_all_note' => 'Recipients for an "All groups" schedule are resolved at send time; the list below reflects the current stations and may change',
     'detail_total'     => ':count stations',
 
     'msg' => [
@@ -53,6 +55,9 @@ return [
         'no_group_selected' => 'Please select at least one group',
         'content_too_long'  => 'Content must not exceed 4096 characters',
         'too_many_images'   => 'At most :value images',
+        'too_many_files'    => 'At most :value files',
+        'file_too_large'    => 'File must not exceed :value MB',
+        'file_type_blocked' => 'This file type is not supported',
         'image_invalid'     => 'Only images can be uploaded',
         'image_too_large'   => 'Image must not exceed :value MB',
         'schedule_required' => 'Please choose a scheduled time',

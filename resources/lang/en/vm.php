@@ -70,6 +70,7 @@ return [
     'select_station'      => 'Select station',
     'select_image'        => 'Select image',
     'search_station_ph'   => 'Search station...',
+    'no_station_found'    => 'No matching station',
     'model_type_ph'       => 'e.g. AWS t3.medium',
     'spec_ph'             => 'e.g. 2C4G 50GB',
 

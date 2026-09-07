@@ -1,0 +1,76 @@
+# 虛擬機管理（VM）
+
+## 現況
+
+已完成，持續迭代。
+
+> 本文件於 2026-09-07 補建，起因是「新增虛擬機的站台可搜尋」這次改動。
+> 功能範圍是依路由、Model、權限對照回填的，**部分實作細節尚未逐一查證**，
+> 後續動到相關程式時請一併補完，不要把這裡的描述當成完整規格。
+
+## 功能概述
+
+管理各站台的虛擬機主機與月費帳務。
+
+- **主機管理**：新增／編輯虛擬機（站台、hostname、內外網 IP、機型、規格、月費、VPN 費、Google 費、帳單日、備註）
+- **開關機**：`ajax-toggle-power`，`vm_server.powered_off_at` 記錄關機時間
+- **帳務**：每月產生帳單、上傳繳款證明、審核通過、直接標記已付
+- **繳款通知**：把帳單資訊送到站台的 Telegram 群組（見 [[telegram-chat]]）
+- 帳單有匯率欄位（`add_exchange_rate_to_vm_billing_table`）
+
+## 站台可搜尋（2026-09-07）
+
+新增／編輯 modal 的站台從 `<select>` 改為「文字輸入 + 隱藏 id + 可篩選清單」。
+
+### 為什麼是行內展開而不是浮層
+
+`#modal-vm` 用 `modal-dialog-scrollable`，`.modal-body` 有 `overflow-y: auto`，
+而站台是**第一個欄位** —— 絕對定位的下拉會被 body 邊界裁掉。
+因此清單直接接在輸入框下方展開（自身 `max-height:180px` 可捲）。
+
+> 頁面上方搜尋列那組站台下拉（`js-vm-station-opt`）用的是絕對定位，
+> 那裡不在 scrollable 容器內所以沒問題。兩組是**不同的 class**
+> （modal 是 `js-vm-station-pick`），改動時不要混用。
+
+### 三個容易漏掉的點
+
+- **`required` 會失效**：原本 `required` 在 `<select>` 上，改成 hidden input 後
+  瀏覽器不會驗證，必須在 submit handler 自己擋
+- **改了文字沒重選**：在輸入框打字時要立即清掉隱藏的 id，
+  否則使用者選了 A 再把文字改成 B，送出去的還是 A
+- **站台名含引號**：名稱不要塞進 `data-name` 屬性，`A"B` 會把屬性截斷。
+  只放 `data-id`，點擊時用 `findStation()` 從快取清單回查名稱
+
+### 站台清單快取
+
+`vmStationList` 存第一次載入的結果，之後開 modal 直接用。
+原本每次開都打一次 `/admin/stations/ajax-list?per_page=200`。
+
+## 架構檔案
+
+### Model / Migration
+- `app/Models/VmServer.php`、`app/Models/VmBilling.php`
+- `database/migrations/2026_08_12_000001_create_vm_server_table.php`
+- `database/migrations/2026_08_12_000002_create_vm_billing_table.php`
+- 後續 migration：繳款證明、額外費用、關機時間、匯率
+
+### Controller / Service / Command
+- `app/Http/Controllers/Admin/VmController.php`
+- `app/Services/VmService.php`
+- `app/Console/Commands/GenerateVmBilling.php` — `vm:generate-billing`，Kernel 每月 1 號 00:00
+
+### Request
+- `app/Http/Requests/Vm/*`
+
+### View
+- `resources/views/admin/vm/index.blade.php`
+
+### 路由 / 權限
+- `routes/web.php` — prefix `vm`
+- `config/permissionMap.php` — `vm.view` / `create` / `update` / `billing_view` / `billing_upload` / `billing_approve`
+
+## 注意事項
+
+- 產生帳單只能選本月或之後的月份，不能補產生過去的月份
+- 帳單日可填到 31，編輯時的驗證上限要與新增一致（曾經新增可填 31、編輯只准 28）
+- 這頁的 JS 全部寫在 blade 的 `@section('scripts')` 內，與專案其他 admin 頁面一致

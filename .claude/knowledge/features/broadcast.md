@@ -42,6 +42,46 @@ Laravel 排程最細就是 `everyMinute()`，秒級預約無法真正兌現。
 差別只在 `send()` 建立紀錄時就 `status = STATUS_SENT`、`sent_at = now()`；
 預約的建立時是 `STATUS_PENDING`、`sent_at = null`，由 `dispatch()` 補上。
 
+### 待發送的「發送對象」不能讀 send_results
+
+> ⚠️ 歷史紀錄的發送對象 badge 點開是讀 `send_results`（每站台成敗）。
+> **預約中的公告還沒送出，`send_results` 必然是空的**，第一版點開是一片空白。
+>
+> 現在 badge 會依 `status` 分流：待發送的改帶 `data-targets`
+> （由 `target_group_ids` 對照 `$groups` 取出站台名稱），前端渲染「預定對象」清單。
+
+`target_type = TARGET_ALL` 的預約要額外提示：對象在送出當下才解析，
+畫面上顯示的只是**目前**的站台清單，屆時可能增減。
+
+badge markup 抽成 `partials/target-badge.blade.php` ——
+原本桌面表格與手機卡片各寫兩份（共四處），改一處就會漏掉其他三處。
+
+### 附件（2026-09-07）
+
+單一檔案選擇框（無 `accept`），送出前依 MIME 拆成 `images[]` 與 `files[]`。
+
+> ⚠️ **`file_urls` 不能和 `image_urls` 合併**：
+> `sendPhoto` 吃的是網址，`sendDocument` 吃的是**本地絕對路徑**。
+> 因此 `file_urls` 存 `[{path, name}]` —— `path` 是 storage 相對路徑
+> （送出時用 `Storage::disk('public')->path()` 轉絕對路徑），
+> `name` 是原始檔名，否則客戶收到的會是 `時間戳_uniqid_原檔名`。
+
+發送順序：每站台先送正文（圖片當 caption），再由 `sendFilesTo()` 逐一送附件。
+
+**站台要全部送成功才記為 success**。正文送到但附件失敗仍算失敗 ——
+否則客服看到「成功」就不會補送，客戶其實沒收到檔案。
+
+限制：圖片 10 張／5MB，檔案 10 個／50MB（Telegram Bot API 上傳天花板）。
+副檔名黑名單走共用的 `BlocksExecutableUploads` trait。
+
+### 附件預覽的 index 錯位
+
+> 原本預覽是在 `FileReader.onload` 裡 `append`，**回呼完成順序不保證**，
+> 而移除鈕的 index 寫在 `data-remove` 屬性上 —— 選多張時會刪到錯的那一個。
+>
+> 改成同步依序建立節點、縮圖等 reader 回來再填 `src`，
+> 移除鈕用**閉包**記住 index 而非讀屬性。
+
 ### 其他設計
 
 - `sendDue()` 用 `scheduled_at <= now()` 而非等於：機器停過一段時間後，
@@ -59,6 +99,7 @@ Laravel 排程最細就是 `everyMinute()`，秒級預約無法真正兌現。
 - `database/migrations/2026_08_06_000001_create_telegram_broadcast_table.php`
 - `database/migrations/2026_08_21_000001_add_send_results_to_telegram_broadcast_table.php`
 - `database/migrations/2026_09_07_000001_add_schedule_to_telegram_broadcast_table.php` — status / scheduled_at / image_urls
+- `database/migrations/2026_09_07_000002_add_file_urls_to_telegram_broadcast_table.php` — file_urls
 
 ### Controller / Service / Repository / Command
 - `app/Http/Controllers/Admin/TelegramBroadcastController.php`
@@ -67,11 +108,14 @@ Laravel 排程最細就是 `everyMinute()`，秒級預約無法真正兌現。
 - `app/Console/Commands/SendScheduledBroadcastCommand.php` — `telegram:send-scheduled`，Kernel 每分鐘
 
 ### Request
-- `app/Http/Requests/TelegramBroadcast/SendBroadcastRequest.php` — 圖片 10 張 / 5MB、`scheduled_at` 格式與 `after:now`
+- `app/Http/Requests/TelegramBroadcast/SendBroadcastRequest.php` — 圖片 10 張 / 5MB、檔案 10 個 / 50MB、`scheduled_at` 格式與 `after:now`
+- `app/Http/Requests/Concerns/BlocksExecutableUploads.php` — 擋可執行檔的共用 trait，
+  任務看板附件、Telegram 傳檔、群發公告三處共用（黑名單本體在 `config('rules.UPLOAD_BLOCKED_EXTENSIONS')`）
 
 ### View
 - `resources/views/admin/telegram-broadcast/index.blade.php`
-- `resources/views/admin/telegram-broadcast/partials/status-badge.blade.php` — 桌面表格與手機卡片共用
+- `resources/views/admin/telegram-broadcast/partials/status-badge.blade.php` — 狀態標籤，桌面表格與手機卡片共用
+- `resources/views/admin/telegram-broadcast/partials/target-badge.blade.php` — 發送對象標籤，同上
 
 ### 路由
 - `routes/web.php` — prefix `telegram-broadcast`，全部掛 `can:telegram_chat.broadcast`

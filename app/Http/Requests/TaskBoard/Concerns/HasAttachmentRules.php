@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\TaskBoard\Concerns;
 
+use App\Http\Requests\Concerns\BlocksExecutableUploads;
+
 /**
  * 任務附件的共用驗證規則
  *
@@ -10,6 +12,8 @@ namespace App\Http\Requests\TaskBoard\Concerns;
  */
 trait HasAttachmentRules
 {
+    use BlocksExecutableUploads;
+
     /** @var int 檔案大小上限（KB），與文件區一致 */
     public static $attachmentMaxKb = 20480;
 
@@ -23,25 +27,8 @@ trait HasAttachmentRules
         return [
             'file',
             'max:' . self::$attachmentMaxKb,
-            $this->blockedExtensionRule(),
+            $this->blockedExtensionRule('task_board.msg.file_type_blocked'),
         ];
-    }
-
-    /**
-     * @return \Closure
-     */
-    protected function blockedExtensionRule()
-    {
-        return function ($attribute, $value, $fail) {
-            if (!$value || !method_exists($value, 'getClientOriginalExtension')) {
-                return;
-            }
-
-            $ext = strtolower((string) $value->getClientOriginalExtension());
-            if (in_array($ext, config('rules.UPLOAD_BLOCKED_EXTENSIONS'), true)) {
-                $fail(trans('task_board.msg.file_type_blocked'));
-            }
-        };
     }
 
     /**

@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int         $status           1=已發送, 2=待發送, 3=已取消
  * @property string|null $scheduled_at     預約發送時間，null 表示立即發送
  * @property array|null  $image_urls       附帶圖片網址陣列
+ * @property array|null  $file_urls        附件陣列 [{path, name}]
  * @property string|null $sent_at          發送時間
  */
 class TelegramBroadcast extends Model
@@ -46,6 +47,7 @@ class TelegramBroadcast extends Model
         'target_group_ids' => 'array',
         'send_results'     => 'array',
         'image_urls'       => 'array',
+        'file_urls'        => 'array',
         'status'           => 'integer',
         'total_count'      => 'integer',
         'success_count'    => 'integer',

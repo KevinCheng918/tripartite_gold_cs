@@ -71,9 +71,13 @@ class TelegramBroadcastController extends Controller
     {
         $params = $request->validated();
 
-        // 預約的公告到了時間才送，圖片必須先存起來並落庫，否則屆時找不到圖
+        // 預約的公告到了時間才送，附件必須先存起來並落庫，否則屆時找不到檔案
         if ($request->hasFile('images')) {
             $params['image_urls'] = $this->broadcastService->uploadImages($request->file('images'));
+        }
+
+        if ($request->hasFile('files')) {
+            $params['file_urls'] = $this->broadcastService->uploadFiles($request->file('files'));
         }
 
         try {

@@ -20,6 +20,7 @@ return [
     'no_history'      => '尚无历史记录',
 
     'field_image'      => '图片（选填，可多选）',
+    'field_attachment' => '附件（图片或档案，选填，可多选）',
     'field_scope'      => '发送范围',
     'schedule_enable'  => '预约传送',
     'field_schedule'   => '传送时间',
@@ -44,6 +45,7 @@ return [
     'copied'           => '已复制',
     'send_detail'      => '发送明细',
     'no_send_detail'   => '此记录无发送明细',
+    'pending_all_note' => '「全部群组」的预约在送出当下才决定对象，以下为目前的站台清单，届时可能会有变动',
     'detail_total'     => '共 :count 站',
 
     'msg' => [
@@ -53,6 +55,9 @@ return [
         'no_group_selected' => '请至少选择一个群组',
         'content_too_long'  => '公告内容不可超过 4096 字元',
         'too_many_images'   => '图片最多 :value 张',
+        'too_many_files'    => '档案最多 :value 个',
+        'file_too_large'    => '档案不可超过 :value MB',
+        'file_type_blocked' => '不支援此档案类型',
         'image_invalid'     => '只能上传图片',
         'image_too_large'   => '图片不可超过 :value MB',
         'schedule_required' => '请选择预约传送时间',

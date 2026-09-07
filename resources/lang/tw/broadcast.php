@@ -20,6 +20,7 @@ return [
     'no_history'      => '尚無歷史紀錄',
 
     'field_image'      => '圖片（選填，可多選）',
+    'field_attachment' => '附件（圖片或檔案，選填，可多選）',
     'field_scope'      => '發送範圍',
     'schedule_enable'  => '預約傳送',
     'field_schedule'   => '傳送時間',
@@ -44,6 +45,7 @@ return [
     'copied'           => '已複製',
     'send_detail'      => '發送明細',
     'no_send_detail'   => '此紀錄無發送明細',
+    'pending_all_note' => '「全部群組」的預約在送出當下才決定對象，以下為目前的站台清單，屆時可能會有變動',
     'detail_total'     => '共 :count 站',
 
     'msg' => [
@@ -53,6 +55,9 @@ return [
         'no_group_selected' => '請至少選擇一個群組',
         'content_too_long'  => '公告內容不可超過 4096 字元',
         'too_many_images'   => '圖片最多 :value 張',
+        'too_many_files'    => '檔案最多 :value 個',
+        'file_too_large'    => '檔案不可超過 :value MB',
+        'file_type_blocked' => '不支援此檔案類型',
         'image_invalid'     => '只能上傳圖片',
         'image_too_large'   => '圖片不可超過 :value MB',
         'schedule_required' => '請選擇預約傳送時間',

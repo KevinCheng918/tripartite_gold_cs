@@ -75,6 +75,7 @@ return [
     'select_station'      => '選擇站台',
     'select_image'        => '選擇圖片',
     'search_station_ph'   => '搜尋站台...',
+    'no_station_found'    => '找不到符合的站台',
     'model_type_ph'       => '例：AWS t3.medium',
     'spec_ph'             => '例：2C4G 50GB',
 

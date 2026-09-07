@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\TelegramChat;
 
+use App\Http\Requests\Concerns\BlocksExecutableUploads;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -11,6 +12,8 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class SendFileRequest extends FormRequest
 {
+    use BlocksExecutableUploads;
+
     /** @var int 檔案大小上限（KB），Telegram Bot API 上傳上限為 50MB */
     public static $maxKb = 51200;
 
@@ -26,26 +29,9 @@ class SendFileRequest extends FormRequest
     {
         return [
             'group_id' => 'required|integer|exists:telegram_group,id',
-            'file'     => ['required', 'file', 'max:' . self::$maxKb, $this->blockedExtensionRule()],
+            'file'     => ['required', 'file', 'max:' . self::$maxKb, $this->blockedExtensionRule('telegram_chat.msg.file_type_blocked')],
             'caption'  => 'nullable|string|max:1024',
         ];
-    }
-
-    /**
-     * @return \Closure
-     */
-    protected function blockedExtensionRule()
-    {
-        return function ($attribute, $value, $fail) {
-            if (!$value || !method_exists($value, 'getClientOriginalExtension')) {
-                return;
-            }
-
-            $ext = strtolower((string) $value->getClientOriginalExtension());
-            if (in_array($ext, config('rules.UPLOAD_BLOCKED_EXTENSIONS'), true)) {
-                $fail(trans('telegram_chat.msg.file_type_blocked'));
-            }
-        };
     }
 
     public function messages()
