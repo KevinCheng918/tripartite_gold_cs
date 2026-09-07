@@ -143,56 +143,53 @@ class QuickReplyService
     }
 
     /**
-     * 類別上下移：與相鄰的一筆交換 sort
+     * 依前端拖曳後的順序重排類別
      *
-     * @param QuickReplyCategory $category
-     * @param bool               $isUp
-     * @return bool 是否有移動（已在頭尾時回 false）
-     */
-    public function moveCategory(QuickReplyCategory $category, $isUp)
-    {
-        $neighbor = $this->quickReplyRepository->findAdjacentCategory($category, $isUp);
-        if (!filled($neighbor)) {
-            return false;
-        }
-
-        $this->swapSort($category, $neighbor);
-
-        return true;
-    }
-
-    /**
-     * 問答上下移：與同類別中相鄰的一筆交換 sort
-     *
-     * @param QuickReplyItem $item
-     * @param bool           $isUp
-     * @return bool 是否有移動（已在頭尾時回 false）
-     */
-    public function moveItem(QuickReplyItem $item, $isUp)
-    {
-        $neighbor = $this->quickReplyRepository->findAdjacentItem($item, $isUp);
-        if (!filled($neighbor)) {
-            return false;
-        }
-
-        $this->swapSort($item, $neighbor);
-
-        return true;
-    }
-
-    /**
-     * 交換兩筆的 sort（兩張表通用，兩筆寫入需在同一個交易內）
-     *
-     * @param QuickReplyCategory|QuickReplyItem $a
-     * @param QuickReplyCategory|QuickReplyItem $b
+     * @param array $ids 由上到下的類別 id
      * @return void
      */
-    private function swapSort($a, $b)
+    public function reorderCategories($ids)
     {
-        DB::transaction(function () use ($a, $b) {
-            $sortA = $a->sort;
-            $a->update(['sort' => $b->sort]);
-            $b->update(['sort' => $sortA]);
+        $this->applyOrder($this->quickReplyRepository->getCategoriesByIds($ids), $ids);
+    }
+
+    /**
+     * 依前端拖曳後的順序重排問答
+     *
+     * @param array $ids 由上到下的問答 id
+     * @return void
+     */
+    public function reorderItems($ids)
+    {
+        $this->applyOrder($this->quickReplyRepository->getItemsByIds($ids), $ids);
+    }
+
+    /**
+     * 依 id 陣列的先後把 sort 重寫成 1..n
+     *
+     * 只更新查得到的資料 —— 前端送來的 id 若已被別人刪掉就跳過，
+     * 不能因為一筆不存在就整批失敗。多筆寫入包在同一個交易內。
+     *
+     * @param \Illuminate\Support\Collection $records
+     * @param array                          $ids
+     * @return void
+     */
+    private function applyOrder($records, $ids)
+    {
+        $keyed = $records->keyBy('id');
+
+        DB::transaction(function () use ($keyed, $ids) {
+            $sort = 1;
+            foreach ($ids as $id) {
+                $record = $keyed->get($id);
+                if (!filled($record)) {
+                    continue;
+                }
+
+                $record->update(['sort' => $sort]);
+                $sort++;
+            }
         });
     }
+
 }

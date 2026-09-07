@@ -27,6 +27,7 @@
     <script src="{{ asset('js/telegram-chat/layout.js') }}?v={{ filemtime(public_path('js/telegram-chat/layout.js')) }}"></script>
     <script src="{{ asset('js/telegram-chat/messages.js') }}?v={{ filemtime(public_path('js/telegram-chat/messages.js')) }}"></script>
     <script src="{{ asset('js/telegram-chat/reactions.js') }}?v={{ filemtime(public_path('js/telegram-chat/reactions.js')) }}"></script>
+    <script src="{{ asset('js/telegram-chat/emoji.js') }}?v={{ filemtime(public_path('js/telegram-chat/emoji.js')) }}"></script>
     <script src="{{ asset('js/telegram-chat/input.js') }}?v={{ filemtime(public_path('js/telegram-chat/input.js')) }}"></script>
     <script src="{{ asset('js/telegram-chat/quick-reply.js') }}?v={{ filemtime(public_path('js/telegram-chat/quick-reply.js')) }}"></script>
     <script src="{{ asset('js/telegram-chat/alert.js') }}?v={{ filemtime(public_path('js/telegram-chat/alert.js')) }}"></script>

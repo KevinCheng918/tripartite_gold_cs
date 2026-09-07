@@ -56,6 +56,9 @@
         // 切換群組時清空，避免附件誤送到別的對話
         pendingFiles = [];
 
+        // 輸入區會整個重建，殘留的表情選單會指向已消失的按鈕
+        if (T.closeEmojiPicker) { T.closeEmojiPicker(); }
+
         if (!T.canReply) {
             inputArea.style.display = 'none';
             return;
@@ -75,7 +78,11 @@
             toolButton('btn-tg-quick-reply', 'fa-bolt', T.i18n.btn_quick_reply || '快速回覆') +
             '</div>' +
             '<div class="d-flex align-items-center gap-1 px-3 py-2">' +
+            // 表情鈕嵌在輸入框內側右邊（Telegram / LINE 的做法），送出鈕留在框外
+            '<div class="tg-input-wrap">' +
             '<textarea id="tg-reply-text" class="form-control form-control-sm" placeholder="' + placeholder() + '" rows="1" style="resize:none;max-height:100px;border-radius:1rem;font-size:' + INPUT_FONT_SIZE + '"></textarea>' +
+            '<button class="tg-emoji-btn" id="btn-tg-emoji" type="button" title="' + (T.i18n.btn_emoji || '表情') + '"><i class="far fa-smile"></i></button>' +
+            '</div>' +
             '<button class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center ms-1" id="btn-tg-send" type="button" style="width:38px;height:38px;flex-shrink:0"><i class="fas fa-paper-plane" style="font-size:0.875rem"></i></button>' +
             '</div>';
 
@@ -97,6 +104,12 @@
         var sfBtn = document.getElementById('btn-tg-shared-file');
         if (sfBtn) {
             sfBtn.addEventListener('click', function () { openSharedFileModal(); });
+        }
+
+        // 表情選單按鈕（實作在 emoji.js）
+        var emojiBtn = document.getElementById('btn-tg-emoji');
+        if (emojiBtn && T.toggleEmojiPicker) {
+            emojiBtn.addEventListener('click', function () { T.toggleEmojiPicker(emojiBtn); });
         }
 
         // 快速回覆按鈕（實作在 quick-reply.js）

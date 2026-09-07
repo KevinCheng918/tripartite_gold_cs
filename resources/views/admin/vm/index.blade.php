@@ -141,6 +141,19 @@
                             </select>
                         </div>
                         <div class="col-auto">
+                            <label class="form-label fw-bold">{{ trans('vm.field_station') }}</label>
+                            <div class="searchable-select" style="position:relative">
+                                <input type="text" class="form-control" id="billing-station-text" placeholder="{{ trans('vm.search_station_ph') }}" autocomplete="off">
+                                <input type="hidden" id="billing-station" value="">
+                                <div class="searchable-dropdown" id="billing-station-dropdown" style="display:none;position:absolute;z-index:1050;background:#fff;border:1px solid #dee2e6;border-radius:0.25rem;max-height:200px;overflow-y:auto;width:100%;box-shadow:0 2px 8px rgba(0,0,0,0.15)">
+                                    <a href="javascript:void(0)" class="dropdown-item js-vm-station-opt" data-id="" style="display:block;padding:0.35rem 0.75rem;font-size:0.875rem">{{ trans('vm.all_stations') }}</a>
+                                    @foreach($stations as $st)
+                                        <a href="javascript:void(0)" class="dropdown-item js-vm-station-opt" data-id="{{ $st->id }}" data-name="{{ $st->name }}" style="display:block;padding:0.35rem 0.75rem;font-size:0.875rem">{{ $st->name }}</a>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-auto">
                             <label class="form-label fw-bold">{{ trans('vm.field_month') }}</label>
                             <input type="month" id="billing-month" class="form-control" value="{{ date('Y-m') }}">
                         </div>
@@ -869,8 +882,10 @@ $(function () {
         var month = $('#billing-month').val();
         var filter = $('#billing-filter').val();
         var systemId = $('#billing-system').val();
+        var stationId = $('#billing-station').val();
         var params = 'per_page=100';
         if (systemId) { params += '&system_id=' + systemId; }
+        if (stationId) { params += '&station_id=' + stationId; }
         if (month) { params += '&billing_month=' + month; }
         if (filter === 'overdue') {
             params += '&overdue=true';
@@ -1363,11 +1378,18 @@ $(function () {
 
     // 搜尋 / 重置
     $('#btn-vm-search').on('click', function () { loadServers(); });
-    // 站台搜尋下拉
-    (function () {
-        var $input = $('#vm-search-station-text');
-        var $hidden = $('#vm-search-station');
-        var $dropdown = $('#vm-search-station-dropdown');
+    /**
+     * 綁定站台搜尋下拉
+     *
+     * 主機與帳務兩個 tab 各一組，共用這支以免各寫一份而行為分岔。
+     *
+     * @param {string} prefix 三個元素的 id 前綴（{prefix}-text / {prefix} / {prefix}-dropdown）
+     */
+    function bindStationSearch(prefix) {
+        var $input = $('#' + prefix + '-text');
+        var $hidden = $('#' + prefix);
+        var $dropdown = $('#' + prefix + '-dropdown');
+        if (!$input.length) { return; }
 
         $input.on('focus', function () { $dropdown.show(); });
         $input.on('input', function () {
@@ -1377,6 +1399,7 @@ $(function () {
                 $(this).toggle(name.indexOf(keyword) !== -1 || !keyword);
             });
             $dropdown.show();
+            // 打字代表要重選，先清掉舊 id，避免改了文字卻用舊站台查詢
             $hidden.val('');
         });
         $dropdown.on('click', '.js-vm-station-opt', function () {
@@ -1389,7 +1412,10 @@ $(function () {
         $(document).on('mousedown', function (e) {
             if (!$(e.target).closest($input.parent()).length) { $dropdown.hide(); }
         });
-    })();
+    }
+
+    bindStationSearch('vm-search-station');
+    bindStationSearch('billing-station');
 
     $('#btn-vm-reset').on('click', function () {
         $('#vm-search-system').val('');

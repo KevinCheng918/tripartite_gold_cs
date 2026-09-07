@@ -215,11 +215,11 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::post('/ajax-store-category', [QuickReplyController::class, 'ajaxStoreCategory'])->middleware('can:quick_reply.edit')->name('ajax-store-category');
         Route::put('/ajax-update-category/{category}', [QuickReplyController::class, 'ajaxUpdateCategory'])->middleware('can:quick_reply.edit')->name('ajax-update-category');
         Route::delete('/ajax-delete-category/{category}', [QuickReplyController::class, 'ajaxDeleteCategory'])->middleware('can:quick_reply.edit')->name('ajax-delete-category');
-        Route::put('/ajax-move-category/{category}', [QuickReplyController::class, 'ajaxMoveCategory'])->middleware('can:quick_reply.edit')->name('ajax-move-category');
         Route::post('/ajax-store-item', [QuickReplyController::class, 'ajaxStoreItem'])->middleware('can:quick_reply.edit')->name('ajax-store-item');
         Route::put('/ajax-update-item/{item}', [QuickReplyController::class, 'ajaxUpdateItem'])->middleware('can:quick_reply.edit')->name('ajax-update-item');
         Route::delete('/ajax-delete-item/{item}', [QuickReplyController::class, 'ajaxDeleteItem'])->middleware('can:quick_reply.edit')->name('ajax-delete-item');
-        Route::put('/ajax-move-item/{item}', [QuickReplyController::class, 'ajaxMoveItem'])->middleware('can:quick_reply.edit')->name('ajax-move-item');
+        Route::post('/ajax-reorder-categories', [QuickReplyController::class, 'ajaxReorderCategories'])->middleware('can:quick_reply.edit')->name('ajax-reorder-categories');
+        Route::post('/ajax-reorder-items', [QuickReplyController::class, 'ajaxReorderItems'])->middleware('can:quick_reply.edit')->name('ajax-reorder-items');
     });
 
     // 專案管理

@@ -41,6 +41,19 @@
 - **站台名含引號**：名稱不要塞進 `data-name` 屬性，`A"B` 會把屬性截斷。
   只放 `data-id`，點擊時用 `findStation()` 從快取清單回查名稱
 
+### 兩組站台搜尋下拉
+
+主機列表與帳務紀錄各有一組（搜尋列用），互動邏輯共用 `bindStationSearch(prefix)`，
+傳入 id 前綴即可（`{prefix}-text` / `{prefix}` / `{prefix}-dropdown`）。
+
+原本是寫死三個 id 的 IIFE，加第二組得整段複製 —— 之後只在其中一邊修 bug 就會行為分岔。
+
+> modal 內的站台選擇是**另一套**（`js-vm-station-pick` + 行內展開），
+> 與這兩組（`js-vm-station-opt` + 絕對定位）不同，別混用。
+
+帳務的站台條件下在 `vm_server.station_id`，不是 `vmServer.station` 關聯 ——
+`vm_server` 表本身就有這欄，不必為了篩選再 join 一層 `station`。
+
 ### 站台清單快取
 
 `vmStationList` 存第一次載入的結果，之後開 modal 直接用。

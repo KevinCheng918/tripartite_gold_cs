@@ -478,6 +478,9 @@
     <script src="{{ asset('vendors/architect-ui/js/scrollbar.js') }}"></script>
     <script src="{{ asset('vendors/architect-ui/js/bs5-modal-to-body.js') }}"></script>
 
+    {{-- 全站共用行為（數字欄位停用滾輪改值等） --}}
+    <script src="{{ asset('js/common.js') }}?v={{ filemtime(public_path('js/common.js')) }}"></script>
+
     {{-- Flatpickr --}}
     <script src="{{ asset('vendor/flatpickr/flatpickr.min.js') }}"></script>
     <script src="{{ asset('vendor/flatpickr/zh-tw.js') }}"></script>

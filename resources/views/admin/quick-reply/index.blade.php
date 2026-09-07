@@ -152,5 +152,7 @@
 @endsection
 
 @section('scripts')
+    {{-- 拖曳排序。與任務看板用同一份 SortableJS --}}
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script src="{{ asset('js/quick-reply-admin.js') }}?v={{ filemtime(public_path('js/quick-reply-admin.js')) }}"></script>
 @endsection

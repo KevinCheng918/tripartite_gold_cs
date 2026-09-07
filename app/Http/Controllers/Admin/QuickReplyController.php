@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\QuickReply\MoveRequest;
+use App\Http\Requests\QuickReply\ReorderRequest;
 use App\Http\Requests\QuickReply\StoreCategoryRequest;
 use App\Http\Requests\QuickReply\StoreItemRequest;
 use App\Http\Requests\QuickReply\UpdateCategoryRequest;
@@ -190,40 +190,42 @@ class QuickReplyController extends Controller
     }
 
     /**
-     * Ajax 類別上下移
+     * Ajax 類別拖曳重排
      *
-     * @param MoveRequest        $request
-     * @param QuickReplyCategory $category
+     * @param ReorderRequest $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function ajaxMoveCategory(MoveRequest $request, QuickReplyCategory $category)
+    public function ajaxReorderCategories(ReorderRequest $request)
     {
+        $params = $request->validated();
+
         try {
-            $this->quickReplyService->moveCategory($category, $request->isUp());
+            $this->quickReplyService->reorderCategories($params['ids']);
 
             return response()->json(['message' => trans('quick_reply.msg.sorted')]);
         } catch (\Exception $e) {
-            Log::error('快速回覆類別排序失敗', ['error' => $e->getMessage(), 'category_id' => $category->id]);
+            Log::error('快速回覆類別拖曳排序失敗', ['error' => $e->getMessage(), 'ids' => $params['ids']]);
 
             return response()->json(['message' => trans('quick_reply.msg.sort_failed')], 500);
         }
     }
 
     /**
-     * Ajax 問答上下移
+     * Ajax 問答拖曳重排
      *
-     * @param MoveRequest    $request
-     * @param QuickReplyItem $item
+     * @param ReorderRequest $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function ajaxMoveItem(MoveRequest $request, QuickReplyItem $item)
+    public function ajaxReorderItems(ReorderRequest $request)
     {
+        $params = $request->validated();
+
         try {
-            $this->quickReplyService->moveItem($item, $request->isUp());
+            $this->quickReplyService->reorderItems($params['ids']);
 
             return response()->json(['message' => trans('quick_reply.msg.sorted')]);
         } catch (\Exception $e) {
-            Log::error('快速回覆問答排序失敗', ['error' => $e->getMessage(), 'item_id' => $item->id]);
+            Log::error('快速回覆問答拖曳排序失敗', ['error' => $e->getMessage(), 'ids' => $params['ids']]);
 
             return response()->json(['message' => trans('quick_reply.msg.sort_failed')], 500);
         }

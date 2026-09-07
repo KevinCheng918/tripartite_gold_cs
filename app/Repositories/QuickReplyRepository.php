@@ -74,36 +74,31 @@ class QuickReplyRepository
     }
 
     /**
-     * 找排序上的相鄰類別（交換 sort 用）
+     * 依 id 取多筆類別（拖曳重排用）
      *
-     * @param QuickReplyCategory $category
-     * @param bool               $isUp true=往前找，false=往後找
-     * @return QuickReplyCategory|null
+     * @param array $ids
+     * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function findAdjacentCategory(QuickReplyCategory $category, $isUp)
+    public function getCategoriesByIds($ids)
     {
         return QuickReplyCategory::query()
             ->select(self::CATEGORY_COLUMNS)
-            ->where('sort', $isUp ? '<' : '>', $category->sort)
-            ->orderBy('sort', $isUp ? 'desc' : 'asc')
-            ->first();
+            ->whereIn('id', $ids)
+            ->get();
     }
 
     /**
-     * 找同類別內排序上的相鄰問答（交換 sort 用）
+     * 依 id 取多筆問答（拖曳重排用）
      *
-     * @param QuickReplyItem $item
-     * @param bool           $isUp true=往前找，false=往後找
-     * @return QuickReplyItem|null
+     * @param array $ids
+     * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function findAdjacentItem(QuickReplyItem $item, $isUp)
+    public function getItemsByIds($ids)
     {
         return QuickReplyItem::query()
             ->select(self::ITEM_COLUMNS)
-            ->where('category_id', $item->category_id)
-            ->where('sort', $isUp ? '<' : '>', $item->sort)
-            ->orderBy('sort', $isUp ? 'desc' : 'asc')
-            ->first();
+            ->whereIn('id', $ids)
+            ->get();
     }
 
     /**

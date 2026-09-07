@@ -1873,6 +1873,176 @@ table tbody tr:hover { background: rgba(0, 0, 0, 0.02); }
     transform: scale(0.9);
 }
 
+/* 快速回覆題庫的拖曳排序 */
+
+/* 整列都可拖曳，把手只是視覺提示。
+   不設 touch-action:none —— 那會讓這塊區域完全不能捲動 */
+.qr-drag-handle {
+    cursor: grab;
+    flex-shrink: 0;
+    padding: 0.125rem 0.25rem;
+}
+
+.qr-drag-handle:active {
+    cursor: grabbing;
+}
+
+/* 長按進入拖曳時不要選到文字，也不要跳出系統的長按選單 */
+.js-qr-category,
+.js-qr-item {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
+.qr-drag-ghost {
+    opacity: 0.4;
+    background: #e9ecef;
+}
+
+[data-theme="dark"] .qr-drag-ghost {
+    background: #3a3a3a;
+}
+
+/* 表情鈕嵌在輸入框內側右邊（Telegram / LINE 的做法） */
+.tg-input-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+}
+
+/* 右側留白給笑臉，文字才不會跑到圖示底下 */
+.tg-input-wrap #tg-reply-text {
+    padding-right: 2.25rem;
+}
+
+.tg-emoji-btn {
+    position: absolute;
+    right: 0.5rem;
+    bottom: 0.25rem;
+    width: 1.75rem;
+    height: 1.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    color: #6c757d;
+    font-size: 1.125rem;
+    line-height: 1;
+    padding: 0;
+    cursor: pointer;
+    border-radius: 50%;
+    transition: color 0.1s, background 0.1s;
+}
+
+.tg-emoji-btn:hover {
+    color: #0d6efd;
+    background: rgba(13, 110, 253, 0.08);
+}
+
+[data-theme="dark"] .tg-emoji-btn {
+    color: #adb5bd;
+}
+
+[data-theme="dark"] .tg-emoji-btn:hover {
+    color: #6ea8fe;
+    background: rgba(110, 168, 254, 0.12);
+}
+
+/* 輸入區的表情選單。用 fixed 定位避免被聊天區的 overflow 裁掉 */
+.tg-emoji-picker {
+    position: fixed;
+    z-index: 100;
+    width: 288px;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.tg-emoji-picker__tabs {
+    display: flex;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.tg-emoji-picker__tab {
+    flex: 1;
+    border: none;
+    background: none;
+    padding: 0.4rem 0.25rem;
+    font-size: 0.75rem;
+    color: #6c757d;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+}
+
+.tg-emoji-picker__tab:hover {
+    background: #f3f4f6;
+}
+
+.tg-emoji-picker__tab.is-active {
+    color: #0d6efd;
+    border-bottom-color: #0d6efd;
+    font-weight: 700;
+}
+
+.tg-emoji-picker__grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 0.125rem;
+    padding: 0.5rem;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.tg-emoji-picker__item {
+    border: none;
+    background: none;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 0.375rem;
+    transition: background 0.1s, transform 0.12s ease;
+    touch-action: manipulation;
+}
+
+.tg-emoji-picker__item:hover {
+    background: #f3f4f6;
+    transform: scale(1.25);
+}
+
+.tg-emoji-picker__item:active {
+    transform: scale(0.9);
+}
+
+[data-theme="dark"] .tg-emoji-picker {
+    background: #2d2d2d;
+    border-color: #444;
+}
+
+[data-theme="dark"] .tg-emoji-picker__tabs {
+    border-bottom-color: #444;
+}
+
+[data-theme="dark"] .tg-emoji-picker__tab {
+    color: #adb5bd;
+}
+
+[data-theme="dark"] .tg-emoji-picker__tab:hover,
+[data-theme="dark"] .tg-emoji-picker__item:hover {
+    background: #3a3a3a;
+}
+
+[data-theme="dark"] .tg-emoji-picker__tab.is-active {
+    color: #6ea8fe;
+    border-bottom-color: #6ea8fe;
+}
+
 [data-theme="dark"] .tg-reaction {
     background: rgba(255, 255, 255, 0.1);
 }

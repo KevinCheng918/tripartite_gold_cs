@@ -114,7 +114,7 @@
         }
 
         var html = '';
-        categories.forEach(function (category, index) {
+        categories.forEach(function (category) {
             var active = category.id === selectedCategoryId ? ' bg-light' : '';
             // 狀態放名稱前面：這欄有 text-truncate，放後面遇到長名稱會被截掉
             var disabled = category.status ? '' :
@@ -123,6 +123,7 @@
             html += '<div class="px-3 py-2 border-bottom qr-category-item js-qr-category' + active + '" ' +
                 'data-id="' + category.id + '" style="cursor:pointer">' +
                 '<div class="d-flex align-items-center">' +
+                (canEdit ? dragHandle() : '') +
                 '<div class="flex-fill text-truncate">' + disabled + escapeHtml(category.label) + '</div>' +
                 '<small class="text-muted ms-2" style="flex-shrink:0">' +
                 escapeHtml(i18n.item_count.replace(':count', category.items.length)) + '</small>' +
@@ -131,7 +132,6 @@
             // 左欄較窄，操作鈕另起一行才放得下文字
             if (canEdit) {
                 html += '<div class="d-flex flex-wrap gap-1 mt-2">' +
-                    moveButtons('category', category.id, index === 0, index === categories.length - 1) +
                     editButtons('category', category.id) +
                     '</div>';
             }
@@ -147,6 +147,7 @@
             selectedCategoryId = parseInt(el.dataset.id, 10);
             renderCategories();
             renderItems();
+            scrollToItemsOnMobile();
         });
 
         if (!canEdit) { return; }
@@ -158,7 +159,7 @@
             confirmDelete(i18n.confirm_delete_category,
                 '/admin/quick-reply/ajax-delete-category/' + btn.dataset.id);
         });
-        bindMove(container, 'category');
+        bindSortable(container, '/admin/quick-reply/ajax-reorder-categories', '.js-qr-category');
     }
 
     function openCategoryModal(category) {
@@ -219,18 +220,21 @@
         }
 
         var html = '';
-        category.items.forEach(function (item, index) {
+        category.items.forEach(function (item) {
             var disabled = item.status ? '' :
                 '<span class="badge bg-secondary me-1">' + escapeHtml(i18n.status_disabled) + '</span>';
 
-            html += '<div class="px-3 py-2 border-bottom">' +
+            html += '<div class="px-3 py-2 border-bottom js-qr-item" data-id="' + item.id + '">' +
+                '<div class="d-flex align-items-start">' +
+                (canEdit ? dragHandle() : '') +
+                '<div class="flex-fill" style="min-width:0">' +
                 '<div class="fw-bold" style="font-size:0.875rem">' + disabled + escapeHtml(item.label) + '</div>' +
                 '<div class="text-muted mt-1" style="font-size:0.8125rem;white-space:pre-wrap">' +
-                escapeHtml(item.answer) + '</div>';
+                escapeHtml(item.answer) + '</div>' +
+                '</div></div>';
 
             if (canEdit) {
                 html += '<div class="d-flex flex-wrap gap-1 mt-2">' +
-                    moveButtons('item', item.id, index === 0, index === category.items.length - 1) +
                     editButtons('item', item.id) +
                     '</div>';
             }
@@ -250,7 +254,7 @@
         bindAll(container, '.js-qr-del-item', function (btn) {
             confirmDelete(i18n.confirm_delete_item, '/admin/quick-reply/ajax-delete-item/' + btn.dataset.id);
         });
-        bindMove(container, 'item');
+        bindSortable(container, '/admin/quick-reply/ajax-reorder-items', '.js-qr-item');
     }
 
     function openItemModal(item) {
@@ -297,19 +301,30 @@
     // ===== 排序 =====
 
     /**
-     * @param {string}  type     category / item
-     * @param {number}  id
-     * @param {boolean} isFirst  已在頂端就不給上移
-     * @param {boolean} isLast   已在底端就不給下移
+     * 手機版兩欄會上下堆疊，問答區在類別清單「下方」——
+     * 點了類別但畫面沒動，看起來像沒反應，所以要自動捲過去。
+     * 桌機是左右並排，捲動反而多餘。
+     */
+    function scrollToItemsOnMobile() {
+        // 對齊 Bootstrap 的 md 斷點（col-md-4 / col-md-8 在此以下才堆疊）
+        if (window.innerWidth >= 768) { return; }
+
+        var target = document.getElementById('qr-item-title');
+        if (!target) { return; }
+
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    /**
+     * 拖曳把手
+     *
+     * 只有把手能拖（Sortable 的 handle），否則點編輯／刪除鈕時會誤觸拖曳。
+     *
      * @returns {string}
      */
-    function moveButtons(type, id, isFirst, isLast) {
-        return '<button class="btn btn-sm btn-outline-secondary js-qr-move" data-type="' + type + '" ' +
-            'data-id="' + id + '" data-direction="up"' + (isFirst ? ' disabled' : '') + '>' +
-            '<i class="fas fa-arrow-up me-1"></i>' + escapeHtml(i18n.action_move_up) + '</button>' +
-            '<button class="btn btn-sm btn-outline-secondary js-qr-move" data-type="' + type + '" ' +
-            'data-id="' + id + '" data-direction="down"' + (isLast ? ' disabled' : '') + '>' +
-            '<i class="fas fa-arrow-down me-1"></i>' + escapeHtml(i18n.action_move_down) + '</button>';
+    function dragHandle() {
+        return '<span class="qr-drag-handle text-muted me-2" title="' + escapeHtml(i18n.action_drag_sort) + '">' +
+            '<i class="fas fa-grip-vertical"></i></span>';
     }
 
     /**
@@ -329,15 +344,49 @@
             '<span class="text-danger">' + escapeHtml(i18n.action_delete) + '</span></button>';
     }
 
-    function bindMove(container, type) {
-        bindAll(container, '.js-qr-move[data-type="' + type + '"]', function (btn) {
-            var url = '/admin/quick-reply/ajax-move-' + type + '/' + btn.dataset.id;
-            apiFetch(url, {
-                method: 'PUT',
-                body: JSON.stringify({ direction: btn.dataset.direction }),
-            })
-                .then(function () { loadAll(); })
-                .catch(function (error) { showMsg(errorMessage(error, i18n.msg.sort_failed)); });
+    /**
+     * 綁定拖曳排序
+     *
+     * 拖完直接把整份順序送回後端重寫 sort，不必逐筆交換。
+     * 沒有編輯權限或 SortableJS 載入失敗（例如 CDN 被擋）就靜默跳過，
+     * 清單仍可正常瀏覽，只是不能排序。
+     *
+     * @param {HTMLElement} container
+     * @param {string}      url      重排端點
+     * @param {string}      itemSelector 可拖曳項目的 class
+     */
+    function bindSortable(container, url, itemSelector) {
+        if (!canEdit || typeof Sortable === 'undefined') { return; }
+
+        Sortable.create(container, {
+            draggable: itemSelector,
+            animation: 150,
+            ghostClass: 'qr-drag-ghost',
+            // 不限定只能抓把手：手機上那個圖示太小很難按中，
+            // 整列都可拖、把手只當「這列可拖曳」的視覺提示
+            // filter 讓編輯／刪除鈕不會觸發拖曳，preventOnFilter=false 才不會吃掉點擊
+            filter: 'button',
+            preventOnFilter: false,
+            // 手機防誤觸（與任務看板同一組設定）：
+            // 長按 500ms 才進入拖曳，中途手指移動超過 5px 就取消改判為捲動，
+            // delayOnTouchOnly 讓桌機滑鼠拖曳維持即時、不受延遲影響
+            delay: 500,
+            delayOnTouchOnly: true,
+            touchStartThreshold: 5,
+            onEnd: function () {
+                var ids = [];
+                container.querySelectorAll(itemSelector).forEach(function (el) {
+                    ids.push(parseInt(el.dataset.id, 10));
+                });
+
+                apiFetch(url, { method: 'POST', body: JSON.stringify({ ids: ids }) })
+                    // 重新載入讓畫面與 DB 的順序一致，避免後端有筆資料被別人刪掉時兩邊對不上
+                    .then(function () { loadAll(); })
+                    .catch(function (error) {
+                        showMsg(errorMessage(error, i18n.msg.sort_failed));
+                        loadAll();
+                    });
+            },
         });
     }
 

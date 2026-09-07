@@ -17,8 +17,7 @@ return [
     'action_add_item'     => '新增问答',
     'action_edit'         => '编辑',
     'action_delete'       => '删除',
-    'action_move_up'      => '上移',
-    'action_move_down'    => '下移',
+    'action_drag_sort'    => '按住拖曳排序',
     'action_save'         => '储存',
     'action_cancel'       => '取消',
 

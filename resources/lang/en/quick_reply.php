@@ -17,8 +17,7 @@ return [
     'action_add_item'     => 'Add Q&A',
     'action_edit'         => 'Edit',
     'action_delete'       => 'Delete',
-    'action_move_up'      => 'Move up',
-    'action_move_down'    => 'Move down',
+    'action_drag_sort'    => 'Hold to drag and reorder',
     'action_save'         => 'Save',
     'action_cancel'       => 'Cancel',
 

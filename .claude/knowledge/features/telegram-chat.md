@@ -184,6 +184,26 @@ $this->telegramChatService->sendReply($groupId, $message, $userId, $name, null, 
 功能鈕原本是同列的純圖示圓鈕，手機版會把輸入框擠到只剩一小截；
 改成獨立一列後輸入框可佔滿整列，文字說明在手機版也看得到（純圖示沒有 hover 可用）。
 
+### 表情符號選單（2026-09-07）
+
+`public/js/telegram-chat/emoji.js`，與 `reactions.js` 是**兩件不同的事**：
+後者是對「已收到的訊息」按表情回應，前者是把表情插進要送出的訊息。
+
+- 按鈕嵌在**輸入框內側右下角**（Telegram／LINE 的做法），不放功能鈕那列。
+  輸入框 `padding-right` 留白，文字才不會壓到圖示；用 `bottom` 定位而非垂直置中，
+  輸入框長高時圖示才會一直待在右下角
+- 選單用 `position: fixed`（同 reactions.js）—— 輸入區在聊天容器底部且有 overflow，
+  absolute 會被裁掉。預設開在按鈕上方，空間不足才翻到下方
+- 插入到**游標位置**而非句尾，插完手動 `dispatchEvent(new Event('input'))`，
+  否則輸入框自動長高的邏輯不會跑
+- 選完不關閉選單（可連續挑），點外面或再按一次才關
+- `showInput()` 會重建輸入區，切換群組時要呼叫 `T.closeEmojiPicker()`，
+  否則殘留的選單會指向已消失的按鈕
+
+> ⚠️ 分類標題的語系鍵是 `T.i18n['emoji_cat_' + key]` **動態組出來的**，
+> grep `emoji_cat_face` 在 JS 裡找不到任何字面。
+> 做「未使用語系鍵」清理時不要把它們刪掉（語系檔已加註解）。
+
 ### 傳送一般檔案（2026-09-07）
 
 - 迴紋針按鈕拿掉 `accept="image/*"`，圖片與一般檔案都從這裡選，選完依 MIME 分流：

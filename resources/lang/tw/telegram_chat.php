@@ -10,6 +10,12 @@ return [
     'input_placeholder'  => '輸入回覆訊息...',
     'input_placeholder_wide' => '輸入回覆訊息...（可直接貼上截圖）',
     'btn_send'           => '發送',
+    'btn_emoji'          => '表情',
+    // emoji_cat_* 由 emoji.js 以 'emoji_cat_' + key 動態組出來，grep 不到字面，勿當成未使用刪除
+    'emoji_cat_face'     => '表情',
+    'emoji_cat_gesture'  => '手勢',
+    'emoji_cat_object'   => '物件',
+    'emoji_cat_other'    => '其他',
     'btn_attachment'     => '檔案',
     'btn_file'           => '文件',
     'btn_remove_image'   => '移除',

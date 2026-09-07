@@ -197,6 +197,13 @@ class VmRepository
             });
         }
 
+        // 站台篩選。條件下在 vm_server 而非 station，少一層關聯查詢
+        if (filled($criteria['station_id'] ?? null)) {
+            $query->whereHas('vmServer', function ($q) use ($criteria) {
+                $q->where('station_id', $criteria['station_id']);
+            });
+        }
+
         return $query->paginate($perPage);
     }
 

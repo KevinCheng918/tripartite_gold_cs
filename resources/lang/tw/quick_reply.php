@@ -17,8 +17,8 @@ return [
     'action_add_item'     => '新增問答',
     'action_edit'         => '編輯',
     'action_delete'       => '刪除',
-    'action_move_up'      => '上移',
-    'action_move_down'    => '下移',
+    // action_move_up / action_move_down 已隨拖曳排序移除，改用 action_drag_sort
+    'action_drag_sort'    => '按住拖曳排序',
     'action_save'         => '儲存',
     'action_cancel'       => '取消',
 

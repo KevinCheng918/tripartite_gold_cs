@@ -108,6 +108,7 @@ class VmService
             'shutdown'      => $params['shutdown'] ?? null,
             'vm_server_id'  => $params['vm_server_id'] ?? null,
             'system_id'     => $params['system_id'] ?? null,
+            'station_id'    => $params['station_id'] ?? null,
         ];
 
         return $this->vmRepository->paginateBillings($criteria, (int) ($params['per_page'] ?? config('constants.PAGINATION.DEFAULT', 10)));
