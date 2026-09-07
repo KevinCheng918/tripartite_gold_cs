@@ -276,8 +276,10 @@ class StationController extends Controller
             'station_id'    => 'required|integer|exists:station,id',
             'action_type'   => 'required|integer|in:1,2',
             'credit_type'   => 'required|string|in:credit,shop_credit',
-            'usdt_amount'   => 'required|numeric|min:0.0001',
-            'exchange_rate' => 'required|numeric|min:0.0001',
+            // input_type = 2 為直接輸入點數，此時不需要 USDT 與匯率
+            'input_type'    => 'required|integer|in:1,2',
+            'usdt_amount'   => 'required_if:input_type,1|nullable|numeric|min:0.0001',
+            'exchange_rate' => 'required_if:input_type,1|nullable|numeric|min:0.0001',
             'credit_amount' => 'required|numeric|min:0.01',
             'note'          => 'nullable|string|max:500',
             'images'        => 'nullable|array',

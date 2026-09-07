@@ -89,6 +89,7 @@ class FinanceController extends Controller
             'topup_usdt'      => 'nullable|numeric',
             'topup_avg_rate'  => 'nullable|numeric',
             'topup_credit'    => 'nullable|numeric',
+            'topup_twd'       => 'nullable|numeric',
             'vm_income_usdt'  => 'nullable|numeric',
             'vm_income_count' => 'nullable|integer',
             'reset_field'     => 'nullable|string|in:topup,vm',

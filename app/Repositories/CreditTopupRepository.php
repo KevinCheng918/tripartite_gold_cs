@@ -12,7 +12,7 @@ class CreditTopupRepository
 {
     /** @var array 查詢欄位 */
     private const COLUMNS = [
-        'id', 'station_id', 'action_type', 'credit_type',
+        'id', 'station_id', 'action_type', 'credit_type', 'input_type',
         'usdt_amount', 'exchange_rate', 'credit_amount',
         'status', 'api_response', 'requested_by', 'reviewed_by',
         'reviewed_at', 'note', 'images', 'created_at',

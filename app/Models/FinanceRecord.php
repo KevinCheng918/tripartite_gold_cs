@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property float|null  $topup_usdt
  * @property float|null  $topup_avg_rate
  * @property float|null  $topup_credit
+ * @property float|null  $topup_twd       台幣補點總額
  * @property float|null  $vm_income_usdt
  * @property int|null    $vm_income_count
  * @property int|null    $created_by
@@ -28,6 +29,7 @@ class FinanceRecord extends Model
         'topup_usdt'      => 'decimal:4',
         'topup_avg_rate'   => 'decimal:4',
         'topup_credit'     => 'decimal:2',
+        'topup_twd'        => 'decimal:2',
         'vm_income_usdt'   => 'decimal:4',
         'vm_income_count'  => 'integer',
     ];

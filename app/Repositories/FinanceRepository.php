@@ -125,21 +125,52 @@ class FinanceRepository
     /**
      * 自動統計補點數據（該月已完成的）
      *
+     * 補點分兩種，對帳時要能分開看：
+     * - USDT 補點（input_type=1）：收 USDT，依匯率換算成點數
+     * - 台幣補點（input_type=2）：收台幣，與點數 1:1，沒有 USDT 也沒有匯率
+     *
+     * 台幣補點的 usdt_amount / exchange_rate 都存 0，SUM 加 0 沒差，
+     * 但 AVG 會把 0 算進分母拉低平均，因此均匯率必須用 CASE WHEN 排除。
+     *
      * @param string $yearMonth YYYY-MM
-     * @return array ['usdt' => float, 'avg_rate' => float, 'credit' => float]
+     * @return array{
+     *     usdt: float, twd: float, credit: float, credit_from_usdt: float,
+     *     avg_rate: float, count: int, usdt_count: int, twd_count: int
+     * }
      */
     public function calcTopupStats($yearMonth)
     {
         $row = DB::table('credit_topup')
-            ->selectRaw('SUM(usdt_amount) as usdt, AVG(exchange_rate) as avg_rate, SUM(credit_amount) as credit')
+            ->selectRaw(
+                'SUM(usdt_amount) as usdt,'
+                . ' SUM(CASE WHEN input_type = ? THEN credit_amount ELSE 0 END) as twd,'
+                . ' SUM(credit_amount) as credit,'
+                . ' SUM(CASE WHEN input_type = ? THEN credit_amount ELSE 0 END) as credit_from_usdt,'
+                . ' AVG(CASE WHEN input_type = ? THEN exchange_rate END) as avg_rate,'
+                . ' COUNT(*) as cnt,'
+                . ' SUM(CASE WHEN input_type = ? THEN 1 ELSE 0 END) as usdt_cnt,'
+                . ' SUM(CASE WHEN input_type = ? THEN 1 ELSE 0 END) as twd_cnt',
+                [
+                    CreditTopup::TYPE_CREDIT,
+                    CreditTopup::TYPE_USDT,
+                    CreditTopup::TYPE_USDT,
+                    CreditTopup::TYPE_USDT,
+                    CreditTopup::TYPE_CREDIT,
+                ]
+            )
             ->where('status', CreditTopup::STATUS_COMPLETED)
             ->whereRaw("DATE_FORMAT(created_at, '%Y-%m') = ?", [$yearMonth])
             ->first();
 
         return [
-            'usdt'     => (float) ($row->usdt ?? 0),
-            'avg_rate' => (float) ($row->avg_rate ?? 0),
-            'credit'   => (float) ($row->credit ?? 0),
+            'usdt'             => (float) ($row->usdt ?? 0),
+            'twd'              => (float) ($row->twd ?? 0),
+            'credit'           => (float) ($row->credit ?? 0),
+            'credit_from_usdt' => (float) ($row->credit_from_usdt ?? 0),
+            'avg_rate'         => (float) ($row->avg_rate ?? 0),
+            'count'            => (int) ($row->cnt ?? 0),
+            'usdt_count'       => (int) ($row->usdt_cnt ?? 0),
+            'twd_count'        => (int) ($row->twd_cnt ?? 0),
         ];
     }
 

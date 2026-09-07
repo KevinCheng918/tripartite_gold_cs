@@ -41,18 +41,25 @@ class CreditTopupService
     /**
      * 申請補點/扣點
      *
+     * 直接輸入點數時沒有 USDT 與匯率，兩欄存 0 並標記 input_type，
+     * 讓財務統計能把這種紀錄排除在均匯率之外。
+     *
      * @param array $params
      * @param int   $requesterId
      * @return CreditTopup
      */
     public function request($params, $requesterId)
     {
+        $inputType = (int) ($params['input_type'] ?? CreditTopup::TYPE_USDT);
+        $isDirectCredit = $inputType === CreditTopup::TYPE_CREDIT;
+
         return $this->topupRepository->create([
             'station_id'    => $params['station_id'],
             'action_type'   => (int) $params['action_type'],
             'credit_type'   => $params['credit_type'] ?? 'credit',
-            'usdt_amount'   => $params['usdt_amount'],
-            'exchange_rate' => $params['exchange_rate'],
+            'input_type'    => $inputType,
+            'usdt_amount'   => $isDirectCredit ? 0 : $params['usdt_amount'],
+            'exchange_rate' => $isDirectCredit ? 0 : $params['exchange_rate'],
             'credit_amount' => $params['credit_amount'],
             'requested_by'  => $requesterId,
             'note'          => $params['note'] ?? null,

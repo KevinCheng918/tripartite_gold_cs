@@ -37,15 +37,27 @@ class FinanceService
         $topupUsdt    = filled($record->topup_usdt) ? (float) $record->topup_usdt : $autoTopup['usdt'];
         $topupAvgRate = filled($record->topup_avg_rate) ? (float) $record->topup_avg_rate : $autoTopup['avg_rate'];
         $topupCredit  = filled($record->topup_credit) ? (float) $record->topup_credit : $autoTopup['credit'];
+        $topupTwd     = filled($record->topup_twd) ? (float) $record->topup_twd : $autoTopup['twd'];
+
+        // 台幣補點與點數 1:1，所以 USDT 補點換到的點數 = 總點數 − 台幣補點
+        $topupCreditFromUsdt = $topupCredit - $topupTwd;
 
         $topup = [
-            'usdt'          => $topupUsdt,
-            'avg_rate'      => $topupAvgRate,
-            'credit'        => $topupCredit,
-            'usdt_fmt'      => NumberPresenter::trimZeros($topupUsdt),
-            'avg_rate_fmt'  => NumberPresenter::trimZeros($topupAvgRate),
-            'credit_fmt'    => NumberPresenter::trimZeros($topupCredit, 2),
-            'is_manual'     => filled($record->topup_usdt),
+            'usdt'                  => $topupUsdt,
+            'twd'                   => $topupTwd,
+            'avg_rate'              => $topupAvgRate,
+            'credit'                => $topupCredit,
+            'credit_from_usdt'      => $topupCreditFromUsdt,
+            // 筆數沒有手動覆蓋欄位，一律用自動統計值
+            'count'                 => $autoTopup['count'],
+            'usdt_count'            => $autoTopup['usdt_count'],
+            'twd_count'             => $autoTopup['twd_count'],
+            'usdt_fmt'              => NumberPresenter::trimZeros($topupUsdt),
+            'twd_fmt'               => NumberPresenter::trimZeros($topupTwd, 2),
+            'avg_rate_fmt'          => NumberPresenter::trimZeros($topupAvgRate),
+            'credit_fmt'            => NumberPresenter::trimZeros($topupCredit, 2),
+            'credit_from_usdt_fmt'  => NumberPresenter::trimZeros($topupCreditFromUsdt, 2),
+            'is_manual'             => filled($record->topup_usdt),
         ];
 
         $vmUsdt    = filled($record->vm_income_usdt) ? (float) $record->vm_income_usdt : $autoVm['usdt'];
@@ -58,11 +70,17 @@ class FinanceService
             'count'         => $vmCount,
             'avg_rate'      => $vmAvgRate,
             'twd'           => $vmTwd,
+            // 台幣與點數 1:1，VM 收的 USDT 換算後就是可扣的系統點數
+            'credit'        => $vmTwd,
             'usdt_fmt'      => NumberPresenter::trimZeros($vmUsdt),
             'avg_rate_fmt'  => NumberPresenter::trimZeros($vmAvgRate),
             'twd_fmt'       => NumberPresenter::trimZeros($vmTwd, 2),
+            'credit_fmt'    => NumberPresenter::trimZeros($vmTwd, 2),
             'is_manual'     => filled($record->vm_income_usdt),
         ];
+
+        // 補點與虛擬機是兩條獨立的收入線，需求方明確要求分開看、不合併計算，
+        // 因此這裡不提供跨兩者的合計值，前端也各自呈現。
 
         // 支出分組
         $miscExpenses = $record->expenses->where('type', config('constants.FINANCE.EXPENSE_TYPE.MISC'))->values();
@@ -99,6 +117,8 @@ class FinanceService
             'name'              => $params['name'],
             'amount'            => (float) $params['amount'],
             'currency'          => $params['currency'] ?? 'TWD',
+            // 台幣支出不需要匯率，避免留下沒意義的舊值
+            'exchange_rate'     => ($params['currency'] ?? 'TWD') === 'TWD' ? null : ($params['exchange_rate'] ?? null),
             'expense_date'      => $params['expense_date'] ?? null,
             'reimbursed'        => (int) ($params['reimbursed'] ?? 0),
             'note'              => $params['note'] ?? null,
@@ -123,7 +143,9 @@ class FinanceService
             'category'     => $params['category'] ?? null,
             'name'         => $params['name'],
             'amount'       => (float) $params['amount'],
-            'currency'     => $params['currency'] ?? 'TWD',
+            'currency'      => $params['currency'] ?? 'TWD',
+            // 台幣支出不需要匯率，避免留下沒意義的舊值
+            'exchange_rate' => ($params['currency'] ?? 'TWD') === 'TWD' ? null : ($params['exchange_rate'] ?? null),
             'expense_date' => $params['expense_date'] ?? null,
             'reimbursed'   => (int) ($params['reimbursed'] ?? 0),
             'note'         => $params['note'] ?? null,
@@ -160,6 +182,7 @@ class FinanceService
             $data['topup_usdt'] = $params['topup_usdt'];
             $data['topup_avg_rate'] = $params['topup_avg_rate'] ?? null;
             $data['topup_credit'] = $params['topup_credit'] ?? null;
+            $data['topup_twd'] = $params['topup_twd'] ?? null;
         }
         if (array_key_exists('vm_income_usdt', $params)) {
             $data['vm_income_usdt'] = $params['vm_income_usdt'];
@@ -185,7 +208,7 @@ class FinanceService
 
         $data = [];
         if ($field === 'topup') {
-            $data = ['topup_usdt' => null, 'topup_avg_rate' => null, 'topup_credit' => null];
+            $data = ['topup_usdt' => null, 'topup_avg_rate' => null, 'topup_credit' => null, 'topup_twd' => null];
         } elseif ($field === 'vm') {
             $data = ['vm_income_usdt' => null, 'vm_income_count' => null];
         }

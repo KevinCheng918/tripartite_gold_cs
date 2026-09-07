@@ -25,6 +25,7 @@ class CreditTopupResource extends JsonResource
             'station_id'    => $this->station_id,
             'action_type'   => $this->action_type,
             'credit_type'   => $this->credit_type,
+            'input_type'    => $this->input_type,
             'usdt_amount'   => NumberPresenter::trimZeros($this->usdt_amount, 4),
             'exchange_rate' => NumberPresenter::trimZeros($this->exchange_rate, 4),
             'credit_amount' => NumberPresenter::trimZeros($this->credit_amount, 2),

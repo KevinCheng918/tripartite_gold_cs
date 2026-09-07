@@ -12,8 +12,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int         $station_id
  * @property int         $action_type     1=加點, 2=扣點
  * @property string      $credit_type     credit 或 shop_credit
- * @property float       $usdt_amount
- * @property float       $exchange_rate
+ * @property int         $input_type      1=輸入 USDT 換算, 2=直接輸入點數
+ * @property float       $usdt_amount     直接輸入點數時為 0
+ * @property float       $exchange_rate   直接輸入點數時為 0
  * @property float       $credit_amount
  * @property int         $status          0=待審核, 1=已完成, 2=拒絕, 3=API失敗
  * @property string|null $api_response
@@ -33,6 +34,11 @@ class CreditTopup extends Model
     /** @var int 扣點 */
     public const ACTION_DEDUCT = 2;
 
+    /** @var int 輸入 USDT 依匯率換算點數 */
+    public const TYPE_USDT = 1;
+    /** @var int 直接輸入點數，無 USDT 與匯率，不列入均匯率計算 */
+    public const TYPE_CREDIT = 2;
+
     /** @var int 待審核 */
     public const STATUS_PENDING = 0;
     /** @var int 已完成 */
@@ -44,6 +50,7 @@ class CreditTopup extends Model
 
     protected $casts = [
         'action_type'   => 'integer',
+        'input_type'    => 'integer',
         'usdt_amount'   => 'decimal:4',
         'exchange_rate' => 'decimal:4',
         'credit_amount' => 'decimal:2',

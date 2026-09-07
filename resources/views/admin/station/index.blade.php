@@ -18,6 +18,10 @@
         [data-theme="dark"] .btn-outline-danger { color: #ef5350; border-color: #8b3a3a; }
         [data-theme="dark"] .btn-outline-danger:hover { background: rgba(239,83,80,0.15); }
         [data-theme="dark"] .btn-check:checked + .btn-outline-danger { background: #c62828; color: #fff; border-color: #c62828; box-shadow: 0 0 0 3px rgba(198,40,40,0.4); }
+        /* 輸入方式切換：選中態比照 custom.css 對 .btn-outline-secondary.active 的處理，hover 時才不會變色 */
+        .btn-check:checked + .btn-outline-secondary { background-color: #212529 !important; color: #fff !important; border-color: #212529 !important; box-shadow: none !important; }
+        /* dark mode：custom.css 用 !important 蓋掉了 outline-secondary 的底色，選中態要同樣加權才蓋得回來 */
+        [data-theme="dark"] .btn-check:checked + .btn-outline-secondary { background: #d4af37 !important; color: #1a1200 !important; border-color: #d4af37 !important; box-shadow: 0 0 0 3px rgba(212,175,55,0.35) !important; }
     </style>
 
     @php
@@ -559,10 +563,24 @@
                             </select>
                         </div>
                         <div class="mb-3">
+                            <label class="form-label">{{ trans('station.topup_field_input_type') }} <span class="text-danger">*</span></label>
+                            <div class="d-flex gap-2">
+                                <input type="radio" class="btn-check" name="topup_input_type" value="1" id="topup-input-usdt" autocomplete="off" checked>
+                                <label class="btn btn-outline-secondary flex-fill" for="topup-input-usdt">
+                                    <i class="fas fa-dollar-sign me-1"></i>{{ trans('station.topup_input_usdt') }}
+                                </label>
+                                <input type="radio" class="btn-check" name="topup_input_type" value="2" id="topup-input-credit" autocomplete="off">
+                                <label class="btn btn-outline-secondary flex-fill" for="topup-input-credit">
+                                    <i class="fas fa-coins me-1"></i>{{ trans('station.topup_input_credit') }}
+                                </label>
+                            </div>
+                            <small class="text-muted">{{ trans('station.topup_input_credit_hint') }}</small>
+                        </div>
+                        <div class="mb-3 js-topup-usdt-field">
                             <label class="form-label">{{ trans('station.topup_field_usdt') }} <span class="text-danger">*</span></label>
                             <input id="topup-usdt" type="number" class="form-control" step="0.0001" min="0.0001" required>
                         </div>
-                        <div class="mb-3">
+                        <div class="mb-3 js-topup-usdt-field">
                             <label class="form-label">{{ trans('station.topup_field_rate') }} <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <input id="topup-rate" type="number" class="form-control" step="0.0001" min="0.0001" required>
@@ -572,9 +590,13 @@
                             </div>
                             <small class="text-muted" id="topup-rate-hint"></small>
                         </div>
-                        <div class="mb-3">
+                        <div class="mb-3 js-topup-usdt-field">
                             <label class="form-label fw-bold">{{ trans('station.topup_field_amount') }}</label>
                             <div id="topup-calc-amount" class="form-control-plaintext fw-bold" style="font-size:1.125rem">0.00</div>
+                        </div>
+                        <div class="mb-3 js-topup-credit-field" style="display:none">
+                            <label class="form-label fw-bold">{{ trans('station.topup_field_twd') }} <span class="text-danger">*</span></label>
+                            <input id="topup-credit" type="number" class="form-control" step="0.01" min="0.01">
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('station.topup_field_note') }}</label>
@@ -1201,6 +1223,17 @@ $(function () {
             : '<span class="text-danger"><i class="fas fa-minus-circle me-1"></i>扣' + creditLabel + '</span>';
     }
 
+    /**
+     * 補點列表的「USDT / 匯率」欄
+     * 直接輸入點數的紀錄沒有 USDT 與匯率，顯示標記而非 0
+     */
+    function topupUsdtCell(t) {
+        if (parseInt(t.input_type, 10) === 2) {
+            return '<span class="badge bg-secondary">{{ trans("station.topup_input_credit") }}</span>';
+        }
+        return t.usdt_amount + ' U<br><span class="text-muted">' + t.exchange_rate + '</span>';
+    }
+
     function formatNum(val, maxDecimals) {
         var n = parseFloat(val);
         if (isNaN(n)) return '0';
@@ -1258,13 +1291,14 @@ $(function () {
         // 用固定系統列表初始化
         var bySystem = {};
         allSystems.forEach(function (s) {
-            bySystem[s.name] = { name: s.name, count: 0, usdt: 0, amount: 0, rateSum: 0 };
+            bySystem[s.name] = { name: s.name, count: 0, usdt: 0, amount: 0, rateSum: 0, rateCount: 0 };
         });
 
         var totalUsdt = 0;
         var totalAmount = 0;
         var totalCount = 0;
         var totalRateSum = 0;
+        var totalRateCount = 0;
 
         list.forEach(function (t) {
             // 只有已完成（status=1）的才計入統計
@@ -1276,18 +1310,23 @@ $(function () {
             bySystem[sysName].count++;
             bySystem[sysName].usdt += parseFloat(t.usdt_amount) || 0;
             bySystem[sysName].amount += parseFloat(t.credit_amount) || 0;
-            bySystem[sysName].rateSum += parseFloat(t.exchange_rate) || 0;
             totalCount++;
             totalUsdt += parseFloat(t.usdt_amount) || 0;
             totalAmount += parseFloat(t.credit_amount) || 0;
+
+            // 直接輸入點數（input_type=2）沒有匯率，不能算進均匯率的分子與分母
+            if (parseInt(t.input_type, 10) === 2) return;
+            bySystem[sysName].rateSum += parseFloat(t.exchange_rate) || 0;
+            bySystem[sysName].rateCount++;
             totalRateSum += parseFloat(t.exchange_rate) || 0;
+            totalRateCount++;
         });
 
         var systems = allSystems.map(function (s) { return bySystem[s.name]; });
         var html = '';
 
         function statLine(stat) {
-            var avgRate = stat.count > 0 ? (stat.rateSum / stat.count).toFixed(4) : '0';
+            var avgRate = stat.rateCount > 0 ? (stat.rateSum / stat.rateCount).toFixed(4) : '0';
             var s = '<div class="d-flex flex-column gap-1 mt-1" style="font-size:0.8125rem">';
             s += '<div><span class="text-muted">均匯率：</span><strong>' + avgRate + '</strong></div>';
             s += '<div><span class="text-muted">USDT：</span><strong>' + stat.usdt.toFixed(4) + '</strong></div>';
@@ -1311,7 +1350,7 @@ $(function () {
         });
 
         // 總計
-        var totalStat = { count: totalCount, usdt: totalUsdt, amount: totalAmount, rateSum: totalRateSum };
+        var totalStat = { count: totalCount, usdt: totalUsdt, amount: totalAmount, rateSum: totalRateSum, rateCount: totalRateCount };
         html += '<div style="flex:1;min-width:200px">';
         html += '<div class="border rounded-3 p-3 d-flex align-items-center gap-3" style="border-left:4px solid #d4af37 !important;background:#fdf6e3">';
         html += '<div class="rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width:40px;height:40px;min-width:40px;background:#fdf6e3;color:#7a5c00;font-size:0.875rem"><i class="fas fa-clipboard-list"></i></div>';
@@ -1338,7 +1377,7 @@ $(function () {
             html += '<td>' + (t.system || '-') + '</td>';
             html += '<td>' + t.station + '</td>';
             html += '<td>' + topupActionLabel(t.action_type, t.credit_type) + '</td>';
-            html += '<td>' + t.usdt_amount + ' U<br><span class="text-muted">' + t.exchange_rate + '</span></td>';
+            html += '<td>' + topupUsdtCell(t) + '</td>';
             html += '<td><strong>' + t.credit_amount + '</strong></td>';
             html += '<td>' + topupStatusBadge(t.status) + '</td>';
             html += '<td>' + t.requester + (t.reviewer ? '<br><small class="text-muted">審核：' + t.reviewer + '</small>' : '') + '</td>';
@@ -1381,8 +1420,11 @@ $(function () {
             html += '<div><small class="text-muted">' + (t.system || '-') + '</small><br><strong>' + t.station + '</strong> ' + topupActionLabel(t.action_type, t.credit_type) + '</div>';
             html += topupStatusBadge(t.status);
             html += '</div>';
-            html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">USDT</span><span>' + t.usdt_amount + '</span></div>';
-            html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">{{ trans("station.topup_field_rate") }}</span><span>' + t.exchange_rate + '</span></div>';
+            // 直接輸入點數的紀錄沒有 USDT 與匯率，這兩列直接不顯示
+            if (parseInt(t.input_type, 10) !== 2) {
+                html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">USDT</span><span>' + t.usdt_amount + '</span></div>';
+                html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">{{ trans("station.topup_field_rate") }}</span><span>' + t.exchange_rate + '</span></div>';
+            }
             html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">{{ trans("station.topup_field_amount") }}</span><strong>' + t.credit_amount + '</strong></div>';
             html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">申請人</span><span>' + t.requester + '</span></div>';
             html += '<div class="d-flex justify-content-between mb-2" style="font-size:0.8125rem"><span class="text-muted">' + t.created_at + '</span>';
@@ -1534,6 +1576,9 @@ $(function () {
         $('#topup-station-search').val('');
         $('#topup-calc-amount').text('0.00');
         $('#topup-rate-hint').text('');
+        // reset() 不會觸發 change，需手動切回 USDT 模式
+        $('#topup-input-usdt').prop('checked', true);
+        switchTopupInputType();
         topupImageFiles = [];
         $('#topup-image-previews').empty();
         fetchUsdtRate();
@@ -1575,6 +1620,18 @@ $(function () {
     // 取得即時匯率按鈕
     $('#btn-fetch-rate').on('click', function () { fetchUsdtRate(); });
 
+    // 切換輸入方式：USDT 換算 / 直接輸入點數
+    // required 必須跟著隱藏一起拿掉，否則瀏覽器會擋在看不見的欄位上無法送出
+    function switchTopupInputType() {
+        var isDirectCredit = $('input[name="topup_input_type"]:checked').val() === '2';
+        $('.js-topup-usdt-field').toggle(!isDirectCredit);
+        $('.js-topup-credit-field').toggle(isDirectCredit);
+        $('#topup-usdt, #topup-rate').prop('required', !isDirectCredit);
+        $('#topup-credit').prop('required', isDirectCredit);
+    }
+
+    $('input[name="topup_input_type"]').on('change', function () { switchTopupInputType(); });
+
     // 送出申請
     $('#form-topup-apply').on('submit', function (e) {
         e.preventDefault();
@@ -1583,9 +1640,19 @@ $(function () {
             showMessage('請選擇站台');
             return;
         }
+        var inputType = $('input[name="topup_input_type"]:checked').val();
+        var isDirectCredit = inputType === '2';
         var usdt = parseFloat($('#topup-usdt').val()) || 0;
         var rate = parseFloat($('#topup-rate').val()) || 0;
-        if (usdt <= 0 || rate <= 0) {
+        var credit = isDirectCredit
+            ? (parseFloat($('#topup-credit').val()) || 0)
+            : usdt * rate;
+
+        if (isDirectCredit && credit <= 0) {
+            showMessage('請填入正確的點數');
+            return;
+        }
+        if (!isDirectCredit && (usdt <= 0 || rate <= 0)) {
             showMessage('請填入正確的 USDT 金額與匯率');
             return;
         }
@@ -1594,9 +1661,13 @@ $(function () {
         formData.append('station_id', stationId);
         formData.append('action_type', $('input[name="topup_action"]:checked').val());
         formData.append('credit_type', $('#topup-credit-type').val());
-        formData.append('usdt_amount', usdt);
-        formData.append('exchange_rate', rate);
-        formData.append('credit_amount', (usdt * rate).toFixed(2));
+        formData.append('input_type', inputType);
+        // 直接輸入點數時不帶 USDT 與匯率，後端會存 0 並排除於均匯率之外
+        if (!isDirectCredit) {
+            formData.append('usdt_amount', usdt);
+            formData.append('exchange_rate', rate);
+        }
+        formData.append('credit_amount', credit.toFixed(2));
         if ($('#topup-note').val()) {
             formData.append('note', $('#topup-note').val());
         }
