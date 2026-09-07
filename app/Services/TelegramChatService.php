@@ -9,6 +9,7 @@ use App\Repositories\TelegramRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /**
  * Telegram 客服聊天 Service
@@ -450,18 +451,28 @@ class TelegramChatService
     /**
      * 從後台回覆訊息到 Telegram 群組
      *
-     * @param int         $groupId   群組 ID
-     * @param string|null $content   回覆內容
-     * @param int         $userId    後台使用者 ID
-     * @param string      $nickname  後台使用者暱稱
-     * @param string|null $imageUrl  圖片 URL（本地上傳後的公開 URL）
-     * @param bool        $markReplied 是否把該群組未回覆的客戶訊息標記為已回覆。
-     *                                 系統自動發出的通知要傳 false，否則會消掉未回覆告警，
-     *                                 讓客戶還在等的問題被誤判成已處理。
+     * 選填項目用 $options 陣列而非一路往後加參數 ——
+     * 呼叫端寫成 `null, false` 這種裸值時，看不出哪個是什麼。
+     *
+     * @param int         $groupId  群組 ID
+     * @param string|null $content  回覆內容
+     * @param int         $userId   後台使用者 ID
+     * @param string      $nickname 後台使用者暱稱
+     * @param array       $options  {
+     *     @type string|null $image_url    圖片 URL（本地上傳後的公開 URL）
+     *     @type bool        $mark_replied 是否把該群組未回覆的客戶訊息標記為已回覆。
+     *                                     系統自動發出的通知要傳 false，否則會消掉未回覆告警，
+     *                                     讓客戶還在等的問題被誤判成已處理。預設 true
+     *     @type int|null    $reply_to_id  引用的訊息 id（後台的，非 Telegram 的）
+     * }
      * @return \App\Models\TelegramMessage
      */
-    public function sendReply($groupId, $content, $userId, $nickname, $imageUrl = null, $markReplied = true)
+    public function sendReply($groupId, $content, $userId, $nickname, $options = [])
     {
+        $imageUrl = $options['image_url'] ?? null;
+        $markReplied = $options['mark_replied'] ?? true;
+        $replyToId = $options['reply_to_id'] ?? null;
+
         $group = $this->telegramRepository->findGroup($groupId);
 
         // 根據站台系統切換 Bot Token
@@ -470,10 +481,13 @@ class TelegramChatService
         // 署名在送出前加上，寫進紀錄的內容才會與客戶看到的一致
         $content = $this->appendSignature($content, $userId);
 
+        // 引用的是後台的訊息 id，要換成 Telegram 那邊的 message_id 才送得出去
+        $quoted = filled($replyToId) ? $this->telegramRepository->findQuoted($group->id, $replyToId) : null;
+
         // 透過 Bot API 發送到 Telegram
         $result = filled($imageUrl)
             ? $this->botService->sendPhoto($group->chat_id, $imageUrl, $content)
-            : $this->botService->sendMessage($group->chat_id, $content);
+            : $this->botService->sendMessage($group->chat_id, $content, $quoted ? $quoted->telegram_message_id : null);
 
         // Telegram 沒收到就不要留下「已送出」的紀錄，否則客服會以為回覆成功
         if (!filled($result)) {
@@ -497,11 +511,15 @@ class TelegramChatService
         $msg = $this->telegramRepository->createMessage([
             'telegram_group_id' => $group->id,
             'direction'         => config('constants.TELEGRAM.DIRECTION.OUTBOUND'),
+            'telegram_message_id' => $result['result']['message_id'] ?? null,
             'sender_name'       => $nickname,
             'sender_user_id'    => $userId,
             'content'           => $content ?: '',
             'media_type'        => $mediaType,
             'media_url'         => $imageUrl,
+            // 引用資訊也存進來，後台才看得到自己引用了哪一則
+            'reply_to_sender'   => $quoted ? $quoted->sender_name : null,
+            'reply_to_text'     => $quoted ? Str::limit($quoted->content, 200) : null,
             'replied'           => true,
         ]);
 

@@ -103,7 +103,8 @@ class TelegramChatController extends Controller
                 (int) $params['group_id'],
                 $params['content'],
                 Auth::id(),
-                Auth::user()->nickname
+                Auth::user()->nickname,
+                ['reply_to_id' => $params['reply_to_id'] ?? null]
             );
 
             return new TelegramMessageResource($message);
@@ -140,7 +141,7 @@ class TelegramChatController extends Controller
                 $params['caption'] ?? '',
                 Auth::id(),
                 Auth::user()->nickname,
-                $imageUrl
+                ['image_url' => $imageUrl]
             );
 
             return new TelegramMessageResource($message);

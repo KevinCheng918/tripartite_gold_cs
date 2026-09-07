@@ -22,6 +22,51 @@
     // 待傳送的附件（截圖與一般檔案），按下發送才會真的送到客戶群組
     var pendingFiles = [];
 
+    // 目前引用的訊息 id，送出後清空
+    var quotedId = null;
+
+    /**
+     * 在輸入框上方顯示引用預覽
+     *
+     * @param {number} id     後台的訊息 id
+     * @param {string} sender
+     * @param {string} text
+     */
+    T.setQuote = function (id, sender, text) {
+        quotedId = id;
+
+        var $bar = $('#tg-quote-bar');
+        if (!$bar.length) { return; }
+
+        $bar.html($('<div class="d-flex align-items-center gap-2">')
+            .css({ borderLeft: '3px solid #a67c00', padding: '4px 8px', background: 'rgba(0,0,0,0.04)', borderRadius: '4px' })
+            .append($('<div class="flex-fill" style="min-width:0;font-size:0.8125rem">')
+                .append($('<div style="font-weight:700;color:#a67c00">').text(sender || ''))
+                .append($('<div class="text-truncate text-muted">').text(text || '')))
+            .append($('<button type="button" class="btn-close flex-shrink-0" style="font-size:0.625rem">')
+                .attr('title', T.i18n.action_cancel_quote)
+                .on('click', clearQuote))
+        ).show();
+
+        var textarea = document.getElementById('tg-reply-text');
+        if (textarea) { textarea.focus(); }
+    };
+
+    /**
+     * 取消引用
+     */
+    function clearQuote() {
+        quotedId = null;
+        $('#tg-quote-bar').hide().empty();
+    }
+
+    // 點訊息上的引用鈕
+    $(document).on('click', '.js-quote-msg', function (e) {
+        e.stopPropagation();
+        var $btn = $(this);
+        T.setQuote(parseInt($btn.data('id'), 10), $btn.data('sender'), $btn.data('text'));
+    });
+
     /**
      * 輸入區上方的功能鈕（圖示 + 文字說明）
      *
@@ -62,8 +107,9 @@
         var inputArea = document.getElementById('tg-input');
         if (!inputArea) { return; }
 
-        // 切換群組時清空，避免附件誤送到別的對話
+        // 切換群組時清空，避免附件或引用誤帶到別的對話
         pendingFiles = [];
+        quotedId = null;
 
         // 輸入區會整個重建，殘留的表情選單會指向已消失的按鈕
         if (T.closeEmojiPicker) { T.closeEmojiPicker(); }
@@ -75,6 +121,7 @@
 
         inputArea.style.display = 'block';
         inputArea.innerHTML =
+            '<div id="tg-quote-bar" class="px-3 pt-2" style="display:none"></div>' +
             '<div id="tg-pending-images" class="px-3 pt-2 flex-wrap gap-2 align-items-center" style="display:none"></div>' +
             '<div id="tg-upload-progress" class="px-3 pt-2" style="display:none"></div>' +
             '<div id="tg-input-error" class="px-3 pt-2 text-danger" style="display:none;font-size:0.8125rem"></div>' +
@@ -565,9 +612,14 @@
 
         T.apiFetch('/admin/telegram-chat/ajax-reply', {
             method: 'POST',
-            body: JSON.stringify({ group_id: T.selectedGroupId, content: content }),
+            body: JSON.stringify({
+                group_id: T.selectedGroupId,
+                content: content,
+                reply_to_id: quotedId,
+            }),
         })
             .then(function () {
+                clearQuote();
                 textarea.value = '';
                 textarea.style.height = '';
                 textarea.disabled = false;

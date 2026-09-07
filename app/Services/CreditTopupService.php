@@ -173,14 +173,13 @@ class CreditTopupService
         $content = filled($footer) ? "{$message}\n\n{$footer}" : $message;
 
         try {
-            // 最後一個參數 false：這是系統通知，不該把客戶還在等的提問標記成已回覆
+            // mark_replied = false：這是系統通知，不該把客戶還在等的提問標記成已回覆
             $this->telegramChatService->sendReply(
                 (int) $station->telegram_group_id,
                 $content,
                 $reviewerId,
                 $reviewerName ?: '',
-                null,
-                false
+                ['mark_replied' => false]
             );
 
             Log::info('補點結果已發送 Telegram', [

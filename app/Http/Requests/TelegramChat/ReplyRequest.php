@@ -19,6 +19,8 @@ class ReplyRequest extends FormRequest
         return [
             'group_id' => 'required|integer|exists:telegram_group,id',
             'content'  => 'required|string|max:4096',
+            // 引用的訊息 id（後台的），Service 會換算成 Telegram 的 message_id
+            'reply_to_id' => 'nullable|integer|exists:telegram_message,id',
         ];
     }
 

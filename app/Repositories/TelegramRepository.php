@@ -134,7 +134,8 @@ class TelegramRepository
     public function getMessagesByGroup($groupId, $perPage = 50)
     {
         return TelegramMessage::query()
-            ->select(['id', 'telegram_group_id', 'direction', 'telegram_message_id', 'sender_name', 'sender_user_id', 'content', 'edited_at', 'media_type', 'media_url', 'media_name', 'reactions', 'replied', 'created_at'])
+            // reply_to_* 漏掉會讓引用回覆永遠顯示不出來（欄位有值也讀不到）
+            ->select(['id', 'telegram_group_id', 'direction', 'telegram_message_id', 'sender_name', 'sender_user_id', 'content', 'edited_at', 'reply_to_sender', 'reply_to_text', 'media_type', 'media_url', 'media_name', 'reactions', 'replied', 'created_at'])
             ->where('telegram_group_id', $groupId)
             ->orderByDesc('created_at')
             ->paginate($perPage);
@@ -217,6 +218,25 @@ class TelegramRepository
                 $q->where('chat_id', $chatId);
             })
             ->where('telegram_message_id', $telegramMsgId)
+            ->first();
+    }
+
+    /**
+     * 取被引用的訊息（客服引用回覆用）
+     *
+     * 前端傳的是後台的訊息 id，要換成 Telegram 那邊的 message_id 才送得出去；
+     * 同時取回發送者與內容，寫進新訊息的 reply_to_* 供後台顯示。
+     *
+     * @param int $groupId
+     * @param int $messageId 後台的訊息 id
+     * @return TelegramMessage|null
+     */
+    public function findQuoted($groupId, $messageId)
+    {
+        return TelegramMessage::query()
+            ->select(['id', 'telegram_group_id', 'telegram_message_id', 'sender_name', 'content'])
+            ->where('telegram_group_id', $groupId)
+            ->where('id', $messageId)
             ->first();
     }
 

@@ -280,14 +280,13 @@ class VmController extends Controller
                 $imageUrl = asset("storage/{$config->image}");
             }
 
-            // 最後一個參數 false：這是系統通知，不該把客戶還在等的提問標記成已回覆
+            // mark_replied = false：這是系統通知，不該把客戶還在等的提問標記成已回覆
             $this->chatService->sendReply(
                 (int) $params['group_id'],
                 $text,
                 Auth::id(),
                 Auth::user()->nickname,
-                $imageUrl,
-                false
+                ['image_url' => $imageUrl, 'mark_replied' => false]
             );
 
             return response()->json(['message' => trans('payment_config.msg.sent')]);

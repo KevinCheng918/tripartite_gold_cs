@@ -243,6 +243,32 @@ $this->telegramChatService->sendReply($groupId, $message, $userId, $name, null, 
 > 貼上與拖曳仍走**待送區**（`pendingFiles`）那條路：縮圖在輸入框上方、
 > 打完字按發送一起送出，且支援多檔。兩條路徑刻意不同，改動時不要誤以為重複。
 
+### 引用回覆（2026-09-07）
+
+- **客人引用**：webhook 解析 `reply_to_message`，存進 `reply_to_sender` / `reply_to_text`
+- **客服引用**：`sendReply()` 的 `reply_to_id` 選項（後台的訊息 id），
+  Service 用 `findQuoted()` 換算成 Telegram 的 `message_id` 才送得出去
+
+> ⚠️ **曾經整個功能靜默失效**：`getMessagesByGroup()` 的 `select()` 漏了
+> `reply_to_sender` / `reply_to_text`。寫入端、Model、Resource、前端全對，
+> 但查詢沒撈這兩欄，Resource 讀到的永遠是 null。
+> **這是本專案第三次踩同一個坑**（前兩次是 `telegram_group_id`、`media_name`）——
+> 新增欄位後一定要回頭檢查所有 `select()`。
+
+> `sendMessage` 帶 `reply_to_message_id` 時要一併帶
+> **`allow_sending_without_reply: true`** —— 被引用的訊息若已被刪除，
+> Telegram 預設會整則拒收，加了才會退化成一般訊息送出。
+
+`sendReply()` 原本 outbound 沒存 `telegram_message_id`，
+導致客服無法引用自己送過的訊息，已補上。
+
+### sendReply 的選項用陣列
+
+`sendReply($groupId, $content, $userId, $nickname, $options)`。
+`image_url` / `mark_replied` / `reply_to_id` 放 `$options`，
+不要繼續往後加位置參數 —— 呼叫端寫成 `null, false,` 這種裸值看不出意義，
+也容易傳錯順序。
+
 ### 訊息編輯與「刪除同步做不到」（2026-09-07）
 
 > ⚠️ **Bot API 沒有訊息刪除事件**。客人在 Telegram 按「收回／刪除」，

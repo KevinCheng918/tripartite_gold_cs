@@ -35,6 +35,19 @@
     }
 
     /**
+     * 引用預覽用的文字。純媒體訊息沒有 content，退回用類型標示
+     *
+     * @param {Object} m
+     * @returns {string}
+     */
+    function quotePreview(m) {
+        if (m.content) { return m.content; }
+        if (m.media_type === 'document') { return m.media_name || T.i18n.download_file; }
+
+        return T.i18n['media_' + m.media_type] || '';
+    }
+
+    /**
      * 組合單則訊息 HTML
      */
     function buildMessageHtml(m) {
@@ -92,6 +105,15 @@
             reactHtml += '</div>';
         }
 
+        // 引用鈕。帶著顯示需要的欄位，省得再回查一次
+        var quoteBtn = T.canReply
+            ? '<button class="tg-quote-btn js-quote-msg" data-id="' + m.id +
+              '" data-sender="' + T.escapeHtml(m.sender_name || '') +
+              '" data-text="' + T.escapeHtml(quotePreview(m)) +
+              '" title="' + T.escapeHtml(T.i18n.action_quote) + '">' +
+              '<i class="fas fa-reply"></i></button>'
+            : '';
+
         var reactBtn = '';
 
         var avatarBg = isOutbound ? 'background:linear-gradient(135deg,#d4af37,#a67c00)' : 'background:#6c757d';
@@ -110,7 +132,7 @@
                 '<div class="chat-box-wrapper" data-msg-id="' + m.id + '" style="display:flex;justify-content:flex-end">' +
                 '<div style="text-align:right">' +
                 senderLabel +
-                '<div class="chat-box ' + darkBubbleBg + '" style="' + bubbleBg + ';display:inline-block">' + replyHtml + mediaHtml + textHtml + reactBtn + '</div>' +
+                '<div class="chat-box ' + darkBubbleBg + '" style="' + bubbleBg + ';display:inline-block">' + replyHtml + mediaHtml + textHtml + reactBtn + quoteBtn + '</div>' +
                 reactHtml +
                 timeHtml +
                 '</div>' +
@@ -124,7 +146,7 @@
             '<div class="me-2 flex-shrink-0">' + avatar + '</div>' +
             '<div>' +
             senderLabel +
-            '<div class="chat-box ' + darkBubbleBg + '" style="' + bubbleBg + '">' + replyHtml + mediaHtml + textHtml + reactBtn + '</div>' +
+            '<div class="chat-box ' + darkBubbleBg + '" style="' + bubbleBg + '">' + replyHtml + mediaHtml + textHtml + reactBtn + quoteBtn + '</div>' +
             reactHtml +
             timeHtml +
             '</div>' +

@@ -83,15 +83,24 @@ class TelegramBotService
      * @param string $text   訊息內容
      * @return array|null API 回傳
      */
-    public function sendMessage($chatId, $text)
+    public function sendMessage($chatId, $text, $replyToMessageId = null)
     {
         try {
+            $params = [
+                'chat_id'    => $chatId,
+                'text'       => $this->escapeHtml($text),
+                'parse_mode' => 'HTML',
+            ];
+
+            // 被引用的訊息若已被刪除，Telegram 會整則拒收；
+            // allow_sending_without_reply 讓它退化成一般訊息而不是失敗
+            if (filled($replyToMessageId)) {
+                $params['reply_to_message_id'] = (int) $replyToMessageId;
+                $params['allow_sending_without_reply'] = true;
+            }
+
             $response = $this->client->post("{$this->getBaseUrl()}/sendMessage", [
-                'json' => [
-                    'chat_id'    => $chatId,
-                    'text'       => $this->escapeHtml($text),
-                    'parse_mode' => 'HTML',
-                ],
+                'json' => $params,
             ]);
 
             return json_decode($response->getBody()->getContents(), true);
