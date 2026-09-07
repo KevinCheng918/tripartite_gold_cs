@@ -20,6 +20,31 @@
         return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
     };
 
+    /** @type {string[]} 星期簡稱，索引對應 JS 的 getDay()（0=日 … 6=六） */
+    var WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
+
+    /**
+     * 在日期後面加上星期，例如 2026-09-08 → 2026-09-08 (二)
+     *
+     * 用 new Date(y, m-1, d) 而非直接 parse 字串：
+     * 「2026-09-08」會被當成 UTC 午夜解析，在 UTC+8 顯示仍是同一天沒問題，
+     * 但負時區會倒退一天而算出錯誤的星期。拆開組件建立則一律是本地時間。
+     *
+     * @param {string} dateStr 日期字串，開頭需為 YYYY-MM-DD
+     * @returns {string} 加上星期的字串；無法解析時原樣回傳
+     */
+    window.withWeekday = function (dateStr) {
+        if (!dateStr) { return ''; }
+
+        var m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (!m) { return dateStr; }
+
+        var d = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+        if (isNaN(d.getTime())) { return dateStr; }
+
+        return m[0] + ' (' + WEEKDAYS[d.getDay()] + ')';
+    };
+
     /**
      * 停用 input[type=number] 的滾輪改值
      *

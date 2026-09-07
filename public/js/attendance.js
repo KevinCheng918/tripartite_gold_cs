@@ -465,7 +465,7 @@
             var lateOut = calcLateClockOut(r);
             return (
                 '<tr>' +
-                '<td>' + r.date + '</td>' +
+                '<td>' + withWeekday(r.date) + '</td>' +
                 '<td>' + shiftName + '</td>' +
                 '<td>' + (r.clock_in || '-') + (inAmend ? amendBadge : '') + '</td>' +
                 '<td>' + (r.late_minutes > 0 ? r.late_minutes + ' ' + i18n.unit_minutes : '-') + '</td>' +
@@ -504,7 +504,7 @@
             return (
                 '<div class="shift-card">' +
                 '<div class="shift-card__header">' +
-                '<span class="shift-card__title">' + r.date + '</span>' +
+                '<span class="shift-card__title">' + withWeekday(r.date) + '</span>' +
                 '<span class="badge ' + st.css + '">' + st.text + '</span>' +
                 '</div>' +
                 '<div class="shift-card__row"><span class="shift-card__label">' + (i18n.field_shift || '班別') + '</span><span>' + shiftNameCard + '</span></div>' +
@@ -685,7 +685,7 @@
         pageData.forEach(function (a) {
             var st = amendStatusMap[a.status] || { text: '-', css: '' };
             html += '<tr>' +
-                '<td>' + a.date + '</td>' +
+                '<td>' + withWeekday(a.date) + '</td>' +
                 '<td>' + (amendTypeMap[a.type] || '-') + '</td>' +
                 '<td>' + a.clock_time + '</td>' +
                 '<td><span class="badge ' + st.css + '">' + st.text + '</span></td>' +
@@ -755,7 +755,7 @@
 
                     tableHtml += '<tr>' +
                         '<td><strong>' + a.user + '</strong></td>' +
-                        '<td>' + a.date + '</td>' +
+                        '<td>' + withWeekday(a.date) + '</td>' +
                         '<td>' + typeName + '</td>' +
                         '<td>' + (a.type === 1 ? (a.original_clock_in || '<span class="text-danger">未打卡</span>') : (a.original_clock_out || '<span class="text-danger">未打卡</span>')) + '</td>' +
                         '<td>' + a.clock_time + '</td>' +
@@ -767,7 +767,7 @@
                     cardsHtml += '<div class="card mb-2 shadow-sm"><div class="card-body py-3">' +
                         '<div class="d-flex justify-content-between align-items-start mb-2">' +
                         '<div><strong style="font-size:1.0625rem">' + a.user + '</strong>' +
-                        '<div class="text-muted" style="font-size:0.8125rem">' + a.date + '</div></div>' +
+                        '<div class="text-muted" style="font-size:0.8125rem">' + withWeekday(a.date) + '</div></div>' +
                         '<span class="badge ' + st.css + '">' + st.text + '</span></div>' +
                         '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">類型</span><span>' + typeName + '</span></div>' +
                         '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">原始時間</span><span>' + (a.type === 1 ? (a.original_clock_in || '<span class="text-danger">未打卡</span>') : (a.original_clock_out || '<span class="text-danger">未打卡</span>')) + '</span></div>' +
@@ -800,7 +800,7 @@
                             '<p><strong>確定要' + actionWord + '此補打卡申請？</strong></p>' +
                             '<table class="table table-sm mt-2 text-center"><tbody>' +
                             '<tr><th style="width:100px">員工</th><td>' + user + '</td></tr>' +
-                            '<tr><th>日期</th><td>' + date + '</td></tr>' +
+                            '<tr><th>日期</th><td>' + withWeekday(date) + '</td></tr>' +
                             '<tr><th>類型</th><td>' + type + '</td></tr>' +
                             '<tr><th>原始時間</th><td>' + (origTime || '<span class="text-danger">未打卡</span>') + '</td></tr>' +
                             '<tr><th>申請時間</th><td>' + time + '</td></tr>' +

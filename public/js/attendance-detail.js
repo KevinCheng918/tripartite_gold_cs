@@ -84,7 +84,7 @@
 
             return (
                 '<tr>' +
-                '<td>' + r.date + '</td>' +
+                '<td>' + withWeekday(r.date) + '</td>' +
                 '<td>' + clockIn + '</td>' +
                 '<td>' + clockOut + '</td>' +
                 '<td>' + (r.late_minutes > 0 ? '<span class="att-warn">' + r.late_minutes + ' ' + i18n.unit_minutes + '</span>' : '-') + '</td>' +
@@ -118,7 +118,7 @@
             return (
                 '<div class="shift-card">' +
                 '<div class="shift-card__header">' +
-                '<span class="shift-card__title">' + r.date + '</span>' +
+                '<span class="shift-card__title">' + withWeekday(r.date) + '</span>' +
                 '<span class="badge ' + st.css + '">' + st.text + '</span>' +
                 '</div>' +
                 '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_clock_in + '</span><span>' + clockIn + '</span></div>' +

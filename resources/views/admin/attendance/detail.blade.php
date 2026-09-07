@@ -104,7 +104,7 @@
                     <tbody>
                         @forelse($records as $r)
                             <tr>
-                                <td>{{ $r->date->format('Y-m-d') }}</td>
+                                <td>{{ \App\Presenters\DatePresenter::withWeekday($r->date) }}</td>
                                 <td>{{ filled($r->assignment) && filled($r->assignment->shift) ? $r->assignment->shift->display_name : '-' }}</td>
                                 <td>
                                     {{ $r->clock_in ? $r->clock_in->format('H:i:s') : '-' }}
