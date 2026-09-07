@@ -1900,6 +1900,18 @@ table tbody tr:hover { background: rgba(0, 0, 0, 0.02); }
     background: #e9ecef;
 }
 
+/* forceFallback 模式跟著游標走的複製元素 */
+.qr-drag-fallback {
+    opacity: 0.9;
+    background: #fff;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.25);
+    cursor: grabbing;
+}
+
+[data-theme="dark"] .qr-drag-fallback {
+    background: #2d2d2d;
+}
+
 [data-theme="dark"] .qr-drag-ghost {
     background: #3a3a3a;
 }

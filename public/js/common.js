@@ -7,6 +7,20 @@
     'use strict';
 
     /**
+     * 是否為觸控為主的裝置
+     *
+     * 拖曳排序用來決定要不要加長按延遲。不依賴 SortableJS 的
+     * delayOnTouchOnly 判斷 —— 部分 Windows 環境（尤其虛擬機）會回報
+     * 具備觸控能力，導致滑鼠拖曳被當成觸控，必須長按且中途不能移動，
+     * 結果就是完全拖不動。
+     *
+     * @returns {boolean}
+     */
+    window.isCoarsePointer = function () {
+        return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+    };
+
+    /**
      * 停用 input[type=number] 的滾輪改值
      *
      * 數字欄位取得焦點後，滑鼠滾過去就會把金額、天數這類值改掉，

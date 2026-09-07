@@ -39,12 +39,21 @@
     }
 
     /**
+     * 是否為手機版面。對齊 Bootstrap 的 md 斷點
+     *
+     * @returns {boolean}
+     */
+    function isMobileViewport() {
+        return window.innerWidth < 768;
+    }
+
+    /**
      * 手機版寬度不夠放長提示，只有桌機顯示「可直接貼上截圖」
      *
      * @returns {string}
      */
     function placeholder() {
-        if (window.innerWidth < 768) { return T.i18n.input_placeholder; }
+        if (isMobileViewport()) { return T.i18n.input_placeholder; }
 
         return T.i18n.input_placeholder_wide || T.i18n.input_placeholder;
     }
@@ -142,6 +151,11 @@
         });
         textarea.addEventListener('keydown', function (e) {
             if (e.key !== 'Enter' || e.shiftKey || imeActive) { return; }
+
+            // 手機的 Enter 是軟鍵盤的換行鍵，攔下來當送出會讓人打不出多行訊息，
+            // 而且很容易在句子沒打完時誤送。手機一律只用送出鈕
+            if (isMobileViewport()) { return; }
+
             e.preventDefault();
             sendReply();
             textarea.style.height = '';

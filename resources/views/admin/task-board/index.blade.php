@@ -22,6 +22,8 @@
         .kanban-card { background: #fff; border-radius: 0.5rem; padding: 0.75rem; margin-bottom: 0.5rem; cursor: grab; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: box-shadow 0.2s; border-left: 3px solid transparent; }
         .kanban-card:hover { box-shadow: 0 3px 8px rgba(0,0,0,0.12); }
         .kanban-card.sortable-ghost { opacity: 0.4; }
+        /* forceFallback 模式跟著游標走的複製元素 */
+        .kanban-card.sortable-fallback { opacity: 0.9; box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.25); cursor: grabbing; }
         .kanban-card .card-project { font-size: 0.75rem; color: #6c757d; margin-bottom: 0.25rem; }
         .kanban-card .card-title-text { font-weight: 600; font-size: 0.9375rem; margin-bottom: 0.5rem; }
         .kanban-card .card-meta { display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem; }
@@ -1534,6 +1536,7 @@ $(function () {
 
     // SortableJS — 拖曳
     var sortableInstances = [];
+
     function initSortable() {
         sortableInstances.forEach(function (s) { s.destroy(); });
         sortableInstances = [];
@@ -1546,7 +1549,13 @@ $(function () {
                 group: 'tasks',
                 animation: 150,
                 ghostClass: 'sortable-ghost',
-                delay: 500,
+                // 強制使用 SortableJS 自己的拖曳實作，不走原生 HTML5 drag and drop。
+                // 原生 DnD 在各 OS／瀏覽器的行為差異很大（Windows 上常整個失效），
+                // fallback 模式各平台一致
+                forceFallback: true,
+                fallbackClass: 'sortable-fallback',
+                fallbackTolerance: 3,
+                delay: isCoarsePointer() ? 500 : 0,
                 delayOnTouchOnly: true,
                 touchStartThreshold: 5,
                 onEnd: function (evt) {

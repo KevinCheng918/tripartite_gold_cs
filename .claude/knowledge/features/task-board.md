@@ -97,6 +97,17 @@ Kanban 風格任務看板，五欄分組：待處理、進行中、測試中、�
 - `config/constants.php` — TASK.STATUS: PENDING=1, IN_PROGRESS=2, TESTING=3, IN_REVIEW=4, RESOLVED=5, ARCHIVED=6
 - `config/constants.php` — TASK.PRIORITY: LOW=1, MEDIUM=2, HIGH=3, URGENT=4
 
+## 拖曳（SortableJS）
+
+`initSortable()`。設定與 [[quick-reply]] 的題庫排序共用同一組原則：
+
+- `forceFallback: true` —— 原生 HTML5 DnD 在**部分 Windows 環境整個失效**（Mac 正常），
+  fallback 模式各平台一致。需搭配 `.sortable-fallback` 樣式
+- 長按延遲用全域的 `isCoarsePointer()`（`public/js/common.js`）決定，
+  **不要靠 `delayOnTouchOnly`** —— Windows 虛擬機常回報具備觸控能力，
+  會讓滑鼠拖曳被當成觸控而拖不動
+- 重新渲染前先 `destroy()` 舊實例，否則同容器疊出多個實例會互搶事件
+
 ## 注意事項
 - `assignee_ids` JSON 欄位可能存整數或字串，查詢時需同時用 `whereJsonContains` 比對 int 和 string
 - `LIST_COLUMNS` 需包含 `updated_at`，否則封存清單時間顯示為 1970/1/1

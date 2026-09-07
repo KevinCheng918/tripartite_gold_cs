@@ -6,6 +6,17 @@
  */
 return [
     [
+        'version' => 'v1.70',
+        'date'    => '2026-09-07',
+        'title'   => '修正 Windows 無法拖曳 + 手機 Enter 改為換行',
+        'content' => implode("\n", [
+            '• 修正部分 Windows 環境無法拖曳任務卡與快速回覆題庫的問題',
+            '• 拖曳改用一致的實作方式，各作業系統行為相同',
+            '• Telegram 對話在手機上按 Enter 改為換行，只有按送出鈕才送出',
+            '• 桌機維持 Enter 送出、Shift + Enter 換行',
+        ]),
+    ],
+    [
         'version' => 'v1.69',
         'date'    => '2026-09-07',
         'title'   => 'Telegram 對話署名 + 傳送檔案預覽',

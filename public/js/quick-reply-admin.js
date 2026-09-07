@@ -376,10 +376,16 @@
             // filter 讓編輯／刪除鈕不會觸發拖曳，preventOnFilter=false 才不會吃掉點擊
             filter: 'button',
             preventOnFilter: false,
-            // 手機防誤觸（與任務看板同一組設定）：
-            // 長按 500ms 才進入拖曳，中途手指移動超過 5px 就取消改判為捲動，
-            // delayOnTouchOnly 讓桌機滑鼠拖曳維持即時、不受延遲影響
-            delay: 500,
+            // 強制使用 SortableJS 自己的拖曳實作，不走原生 HTML5 drag and drop。
+            // 原生 DnD 在各 OS／瀏覽器行為差異很大（Windows 上常整個失效）
+            forceFallback: true,
+            fallbackClass: 'qr-drag-fallback',
+            fallbackTolerance: 3,
+            // 手機防誤觸（與任務看板同一組設定）：長按才進入拖曳，
+            // 中途手指移動超過 5px 就取消改判為捲動。
+            // 延遲只給觸控裝置 —— 部分 Windows 環境會回報具備觸控能力，
+            // 靠 delayOnTouchOnly 判斷會讓滑鼠拖曳被當成觸控而完全拖不動
+            delay: isCoarsePointer() ? 500 : 0,
             delayOnTouchOnly: true,
             touchStartThreshold: 5,
             onEnd: function () {

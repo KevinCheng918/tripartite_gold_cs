@@ -38,6 +38,18 @@
 防誤觸沿用任務看板同一組設定：`delay: 500` + `delayOnTouchOnly` + `touchStartThreshold: 5`
 （長按才拖、手指移動超過 5px 改判為捲動、桌機滑鼠不受延遲影響）。
 
+> ⚠️ **`forceFallback: true` 是必要的**：SortableJS 預設走瀏覽器原生的
+> HTML5 drag-and-drop，該 API 在各 OS／瀏覽器的實作差異很大，
+> **部分 Windows 環境整個拖不動**（Mac 正常）。fallback 模式用自己的
+> 指標事件實作，各平台一致。記得配 `fallbackClass` 樣式，
+> 否則跟著游標走的複製元素會沒有外觀。
+
+> ⚠️ **長按延遲不要靠 `delayOnTouchOnly` 判斷**：部分 Windows 環境
+> （尤其虛擬機）會回報具備觸控能力，滑鼠拖曳因此被當成觸控 ——
+> 需要長按 500ms 且中途不能移動，`touchStartThreshold` 又會取消它，
+> 結果就是完全拖不動。改用全域的 `isCoarsePointer()`
+> （`public/js/common.js`，靠 `matchMedia('(pointer: coarse)')` 判斷）。
+
 > ⚠️ **重綁前一定要 `destroy()` 舊實例**：`renderCategories()` / `renderItems()`
 > 每次都會呼叫 `bindSortable()`，不先銷毀的話同一個容器上會疊出多個 Sortable 實例，
 > 它們互相搶同一批 touch 事件 —— **手機上拖過一次之後就再也拖不動**。
