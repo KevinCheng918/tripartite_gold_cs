@@ -481,8 +481,19 @@ class TelegramChatService
         // 署名在送出前加上，寫進紀錄的內容才會與客戶看到的一致
         $content = $this->appendSignature($content, $userId);
 
-        // 引用的是後台的訊息 id，要換成 Telegram 那邊的 message_id 才送得出去
+        // 引用的是後台的訊息 id，要換成 Telegram 那邊的 message_id 才送得出去。
+        // 沒有 telegram_message_id 就當作沒引用 —— 否則後台會留下一筆
+        // 客戶端根本看不到的假引用（修正前送出的舊訊息都沒存這個 id）
         $quoted = filled($replyToId) ? $this->telegramRepository->findQuoted($group->id, $replyToId) : null;
+
+        if (filled($quoted) && !filled($quoted->telegram_message_id)) {
+            Log::info('引用目標沒有 telegram_message_id，改以一般訊息送出', [
+                'group_id'   => $group->id,
+                'message_id' => $replyToId,
+            ]);
+
+            $quoted = null;
+        }
 
         // 透過 Bot API 發送到 Telegram
         $result = filled($imageUrl)

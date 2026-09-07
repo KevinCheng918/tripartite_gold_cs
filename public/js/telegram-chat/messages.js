@@ -105,8 +105,10 @@
             reactHtml += '</div>';
         }
 
-        // 引用鈕。帶著顯示需要的欄位，省得再回查一次
-        var quoteBtn = T.canReply
+        // 引用鈕。沒有 telegram_message_id 就不給引用 ——
+        // Telegram 端沒有可指向的訊息，送出後只有後台看得到引用，形同騙人。
+        // 修正前送出的舊訊息都沒存這個 id
+        var quoteBtn = (T.canReply && m.telegram_message_id)
             ? '<button class="tg-quote-btn js-quote-msg" data-id="' + m.id +
               '" data-sender="' + T.escapeHtml(m.sender_name || '') +
               '" data-text="' + T.escapeHtml(quotePreview(m)) +
@@ -188,6 +190,7 @@
             container.scrollTop = container.scrollHeight;
         });
         T.bindReactionButtons();
+        if (T.bindSwipeReply) { T.bindSwipeReply(); }
     };
 
     /**
@@ -203,6 +206,7 @@
         container.insertAdjacentHTML('beforeend', buildMessageHtml(msg));
         container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
         T.bindReactionButtons();
+        if (T.bindSwipeReply) { T.bindSwipeReply(); }
     };
 
     // 圖片 Lightbox

@@ -255,6 +255,28 @@ $this->telegramChatService->sendReply($groupId, $message, $userId, $name, null, 
 > **這是本專案第三次踩同一個坑**（前兩次是 `telegram_group_id`、`media_name`）——
 > 新增欄位後一定要回頭檢查所有 `select()`。
 
+> ⚠️ **能不能引用取決於 `telegram_message_id`**：`sendReply()` 過去送出文字訊息後
+> 沒有存 Telegram 回傳的 `message_id`，那些舊訊息無法在 Telegram 端建立引用
+> （送出去會變成一般訊息，後台有引用、客戶端沒有）。
+> 現在所有送出點都會存，但**舊資料無法回填** —— Bot API 沒有查詢歷史訊息的方法。
+>
+> 前端因此只對有 `telegram_message_id` 的訊息渲染引用鈕，
+> Service 也再擋一次（沒有就當作沒引用並記 log），
+> 避免留下客戶端看不到的假引用。
+
+### 手機滑動引用
+
+`public/js/telegram-chat/swipe-reply.js`。左右滑動皆可觸發 ——
+Telegram 在 iOS 與 Android 的方向不一致，限定單向反而違背既有手感。
+
+- 只在 `isCoarsePointer()` 為真時綁定；手機的引用鈕以 CSS 隱藏，改用滑動
+- **能否滑動引用直接看引用鈕在不在**（`display:none` 仍查得到），
+  自動沿用「沒有 telegram_message_id 就不能引用」的規則，不必重複判斷
+- 橫向位移需大於縱向 1.5 倍才判定為滑動，否則讓給頁面捲動；
+  確認是橫滑才 `preventDefault`，所以 `touchmove` 必須 `passive: false`
+- 事件綁在 `#tg-messages` 容器上做委派，綁定前先 `removeEventListener` 避免疊加
+- 與 `reactions.js` 的長按不衝突：長按在移動超過 10px 時會自行取消
+
 > `sendMessage` 帶 `reply_to_message_id` 時要一併帶
 > **`allow_sending_without_reply: true`** —— 被引用的訊息若已被刪除，
 > Telegram 預設會整則拒收，加了才會退化成一般訊息送出。
