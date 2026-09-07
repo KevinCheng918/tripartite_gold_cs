@@ -8,6 +8,10 @@
     // 後端 ajax-send-image 限制 max:5120（KB）
     var MAX_IMAGE_BYTES = 5120 * 1024;
 
+    // 後端 SendFileRequest::$maxKb 限制 51200（KB），即 Telegram Bot API 的上傳上限
+    var MAX_FILE_MB = 50;
+    var MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
+
     // 輸入框與功能鈕共用同一個字級
     var INPUT_FONT_SIZE = '0.9375rem';
 
@@ -15,8 +19,8 @@
     // Font Awesome 的圖形只佔約 0.8em，不放大看起來會比文字小一截
     var ICON_FONT_SIZE = '1.15em';
 
-    // 待傳送的截圖，按下發送才會真的送到客戶群組
-    var pendingImages = [];
+    // 待傳送的附件（截圖與一般檔案），按下發送才會真的送到客戶群組
+    var pendingFiles = [];
 
     /**
      * 輸入區上方的功能鈕（圖示 + 文字說明）
@@ -49,8 +53,8 @@
         var inputArea = document.getElementById('tg-input');
         if (!inputArea) { return; }
 
-        // 切換群組時清空，避免截圖誤送到別的對話
-        pendingImages = [];
+        // 切換群組時清空，避免附件誤送到別的對話
+        pendingFiles = [];
 
         if (!T.canReply) {
             inputArea.style.display = 'none';
@@ -60,11 +64,13 @@
         inputArea.style.display = 'block';
         inputArea.innerHTML =
             '<div id="tg-pending-images" class="px-3 pt-2 flex-wrap gap-2 align-items-center" style="display:none"></div>' +
+            '<div id="tg-upload-progress" class="px-3 pt-2" style="display:none"></div>' +
             '<div id="tg-input-error" class="px-3 pt-2 text-danger" style="display:none;font-size:0.8125rem"></div>' +
             // 功能鈕獨立一列並帶文字說明，輸入框才有整列寬度
             '<div class="d-flex align-items-center flex-wrap gap-2 px-3 pt-2" id="tg-input-tools">' +
-            '<input type="file" id="tg-image-input" accept="image/*" style="display:none">' +
-            toolButton('btn-tg-image', 'fa-paperclip', T.i18n.btn_image || '圖片') +
+            // 不設 accept：圖片與一般檔案都從這個按鈕挑，選完再依 MIME 分流
+            '<input type="file" id="tg-image-input" style="display:none">' +
+            toolButton('btn-tg-image', 'fa-paperclip', T.i18n.btn_attachment || '檔案') +
             toolButton('btn-tg-shared-file', 'fa-file-alt', T.i18n.btn_file || '文件') +
             toolButton('btn-tg-quick-reply', 'fa-bolt', T.i18n.btn_quick_reply || '快速回覆') +
             '</div>' +
@@ -82,7 +88,7 @@
         imageBtn.addEventListener('click', function () { imageInput.click(); });
         imageInput.addEventListener('change', function () {
             if (imageInput.files.length > 0) {
-                sendImage(imageInput.files[0]);
+                sendAttachment(imageInput.files[0]);
                 imageInput.value = '';
             }
         });
@@ -128,7 +134,8 @@
             textarea.style.height = '';
         });
 
-        renderPendingImages();
+        renderPendingFiles();
+        hideUploadProgress();
     };
 
     // ===== 貼上截圖 =====
@@ -162,7 +169,7 @@
         if (!images.length) { return; }
 
         e.preventDefault();
-        images.forEach(addPendingImage);
+        images.forEach(addPendingFile);
     });
 
     // ===== 拖曳截圖進聊天視窗 =====
@@ -255,21 +262,9 @@
         var files = e.dataTransfer.files;
         if (!files || !files.length) { return; }
 
-        var images = [];
-        var rejected = 0;
+        // 圖片與一般檔案都收，圖片補檔名是因為拖進來的截圖常叫 blob
         for (var i = 0; i < files.length; i++) {
-            if (files[i].type.indexOf('image/') === 0) {
-                images.push(namedImage(files[i]));
-            } else {
-                rejected++;
-            }
-        }
-
-        images.forEach(addPendingImage);
-
-        // 有圖片就先讓圖片進待送區，只有全部都不是圖片時才提示
-        if (rejected && !images.length) {
-            showInputError(T.i18n.msg.drop_invalid || '只能拖入圖片檔');
+            addPendingFile(isImageFile(files[i]) ? namedImage(files[i]) : files[i]);
         }
     });
 
@@ -295,7 +290,7 @@
                 'align-items:center;justify-content:center;pointer-events:none;' +
                 'background:rgba(212,175,55,0.12);border:2px dashed #d4af37;border-radius:0.5rem';
             overlay.innerHTML = '<div class="fw-bold" style="color:#a67c00;font-size:1.0625rem">' +
-                '<i class="fas fa-image me-2"></i>' + (T.i18n.drop_hint || '放開以加入截圖') +
+                '<i class="fas fa-paperclip me-2"></i>' + (T.i18n.drop_hint || '放開以加入附件') +
                 '</div>';
             content.appendChild(overlay);
         }
@@ -326,37 +321,114 @@
      * 上傳失敗時的訊息：後端回的 JSON 才採用它的 message，
      * 其他（例如 PHP upload_max_filesize 擋下、回傳非 JSON）一律用預設文案
      *
-     * @param {*} error
+     * @param {*}      error
+     * @param {string} [fallback] 沒帶時用圖片的失敗文案
      * @returns {string}
      */
-    function errorMessage(error) {
+    function errorMessage(error, fallback) {
         if (error && typeof error === 'object' && !(error instanceof Error) && error.message) {
             return error.message;
         }
 
-        return T.i18n.msg.image_send_failed || '圖片傳送失敗';
+        return fallback || T.i18n.msg.image_send_failed || '圖片傳送失敗';
     }
 
-    function addPendingImage(file) {
-        if (file.type.indexOf('image/') !== 0) {
-            showInputError(T.i18n.msg.image_invalid || '只能貼上圖片');
-            return;
-        }
-        if (file.size > MAX_IMAGE_BYTES) {
-            showInputError(T.i18n.msg.image_too_large || '圖片超過 5MB，無法傳送');
+    /**
+     * @param {File} file
+     * @returns {boolean}
+     */
+    function isImageFile(file) {
+        return (file.type || '').indexOf('image/') === 0;
+    }
+
+    /**
+     * 加入待送區。圖片與一般檔案的大小上限不同，先在前端擋掉超標的，
+     * 不必等整個檔案上傳完才收到 422
+     *
+     * @param {File} file
+     */
+    function addPendingFile(file) {
+        if (isImageFile(file)) {
+            if (file.size > MAX_IMAGE_BYTES) {
+                showInputError(T.i18n.msg.image_too_large || '圖片超過 5MB，無法傳送');
+                return;
+            }
+        } else if (file.size > MAX_FILE_BYTES) {
+            showInputError(fileTooLargeMessage());
             return;
         }
 
-        pendingImages.push(file);
+        pendingFiles.push(file);
         showInputError('');
-        renderPendingImages();
+        renderPendingFiles();
     }
 
-    function renderPendingImages() {
+    /**
+     * 檔案大小顯示成 KB / MB
+     *
+     * @param {number} bytes
+     * @returns {string}
+     */
+    function formatSize(bytes) {
+        if (bytes < 1024 * 1024) { return Math.max(1, Math.round(bytes / 1024)) + ' KB'; }
+
+        return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+    }
+
+    /**
+     * 待送區的圖片縮圖
+     *
+     * @param {File} file
+     * @returns {HTMLElement}
+     */
+    function pendingImageNode(file) {
+        var img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        img.style.cssText = 'width:56px;height:56px;object-fit:cover;border-radius:0.375rem;border:1px solid rgba(0,0,0,0.1)';
+        img.onload = function () { URL.revokeObjectURL(img.src); };
+
+        return img;
+    }
+
+    /**
+     * 待送區的檔案卡片：非圖片沒有縮圖可看，改顯示圖示 + 檔名 + 大小
+     *
+     * @param {File} file
+     * @returns {HTMLElement}
+     */
+    function pendingFileNode(file) {
+        var card = document.createElement('div');
+        card.className = 'd-flex align-items-center gap-2 px-2';
+        card.style.cssText = 'height:56px;max-width:220px;border-radius:0.375rem;border:1px solid rgba(0,0,0,0.1);background:rgba(0,0,0,0.03)';
+
+        var icon = document.createElement('i');
+        icon.className = 'fas fa-file-alt text-muted';
+
+        var text = document.createElement('div');
+        text.style.cssText = 'min-width:0;font-size:0.75rem;line-height:1.3';
+
+        var name = document.createElement('div');
+        name.className = 'text-truncate';
+        name.textContent = file.name;
+        name.title = file.name;
+
+        var size = document.createElement('div');
+        size.className = 'text-muted';
+        size.textContent = formatSize(file.size);
+
+        text.appendChild(name);
+        text.appendChild(size);
+        card.appendChild(icon);
+        card.appendChild(text);
+
+        return card;
+    }
+
+    function renderPendingFiles() {
         var container = document.getElementById('tg-pending-images');
         if (!container) { return; }
 
-        if (!pendingImages.length) {
+        if (!pendingFiles.length) {
             container.style.display = 'none';
             container.innerHTML = '';
             return;
@@ -364,16 +436,11 @@
 
         container.style.display = 'flex';
         container.innerHTML = '';
-        pendingImages.forEach(function (file, index) {
+        pendingFiles.forEach(function (file, index) {
             var wrapper = document.createElement('div');
             wrapper.className = 'position-relative';
-            wrapper.style.width = '56px';
-            wrapper.style.height = '56px';
 
-            var img = document.createElement('img');
-            img.src = URL.createObjectURL(file);
-            img.style.cssText = 'width:56px;height:56px;object-fit:cover;border-radius:0.375rem;border:1px solid rgba(0,0,0,0.1)';
-            img.onload = function () { URL.revokeObjectURL(img.src); };
+            wrapper.appendChild(isImageFile(file) ? pendingImageNode(file) : pendingFileNode(file));
 
             var removeBtn = document.createElement('button');
             removeBtn.type = 'button';
@@ -381,14 +448,61 @@
             removeBtn.style.cssText = 'font-size:0.5rem;padding:0.2rem';
             removeBtn.title = T.i18n.btn_remove_image || '移除';
             removeBtn.addEventListener('click', function () {
-                pendingImages.splice(index, 1);
-                renderPendingImages();
+                pendingFiles.splice(index, 1);
+                renderPendingFiles();
             });
 
-            wrapper.appendChild(img);
             wrapper.appendChild(removeBtn);
             container.appendChild(wrapper);
         });
+    }
+
+    /**
+     * 傳送中的狀態列：檔名 + 第幾筆 + 進度條
+     *
+     * 大檔案上傳要好幾秒，沒有回饋使用者會以為當掉而重複點發送。
+     *
+     * @param {string} filename
+     * @param {number} index 從 1 起算
+     * @param {number} total
+     */
+    function showUploadProgress(filename, index, total) {
+        var box = document.getElementById('tg-upload-progress');
+        if (!box) { return; }
+
+        var label = T.i18n.msg.file_sending || '傳送中';
+        var counter = total > 1 ? ' (' + index + '/' + total + ')' : '';
+
+        box.style.display = 'block';
+        box.innerHTML =
+            '<div class="d-flex align-items-center gap-2 mb-1" style="font-size:0.75rem">' +
+            '<i class="fas fa-spinner fa-spin text-muted"></i>' +
+            '<span class="text-truncate" style="min-width:0">' + T.escapeHtml(label + counter + '：' + filename) + '</span>' +
+            '<span class="ms-auto text-muted flex-shrink-0" id="tg-upload-percent">0%</span>' +
+            '</div>' +
+            '<div class="progress" style="height:4px">' +
+            '<div class="progress-bar" id="tg-upload-bar" role="progressbar" style="width:0%"></div>' +
+            '</div>';
+    }
+
+    /**
+     * @param {number} percent 0–100
+     */
+    function updateUploadProgress(percent) {
+        var bar = document.getElementById('tg-upload-bar');
+        var text = document.getElementById('tg-upload-percent');
+        var value = Math.max(0, Math.min(100, Math.round(percent)));
+
+        if (bar) { bar.style.width = value + '%'; }
+        if (text) { text.textContent = value + '%'; }
+    }
+
+    function hideUploadProgress() {
+        var box = document.getElementById('tg-upload-progress');
+        if (!box) { return; }
+
+        box.style.display = 'none';
+        box.innerHTML = '';
     }
 
     function showInputError(message) {
@@ -408,9 +522,9 @@
     function sendReply() {
         if (!T.selectedGroupId) { return; }
 
-        // 有待傳送的截圖時，改走圖片流程（文字會當成第一張的 caption）
-        if (pendingImages.length) {
-            sendPendingImages();
+        // 有待傳送的附件時，改走附件流程（文字會當成第一個的 caption）
+        if (pendingFiles.length) {
+            sendPendingFiles();
             return;
         }
 
@@ -442,56 +556,120 @@
             });
     }
 
-    function sendImage(file) {
+    /**
+     * 從按鈕選檔後直接送出。走與待送區同一條上傳流程，
+     * 才會有相同的傳送中標示與進度條
+     *
+     * @param {File} file
+     */
+    function sendAttachment(file) {
         if (!T.selectedGroupId) { return; }
 
-        var caption = document.getElementById('tg-reply-text').value.trim();
+        // 超過上限先擋下來，不必等整個檔案上傳完才收到 422
+        if (isImageFile(file)) {
+            if (file.size > MAX_IMAGE_BYTES) {
+                showInputError(T.i18n.msg.image_too_large || '圖片超過 5MB，無法傳送');
+                return;
+            }
+        } else if (file.size > MAX_FILE_BYTES) {
+            showInputError(fileTooLargeMessage());
+            return;
+        }
 
-        uploadImage(file, caption)
+        var textarea = document.getElementById('tg-reply-text');
+        var caption = textarea ? textarea.value.trim() : '';
+
+        showInputError('');
+        showUploadProgress(file.name, 1, 1);
+
+        uploadAttachment(file, caption, updateUploadProgress)
             .then(function () {
-                var textarea = document.getElementById('tg-reply-text');
+                hideUploadProgress();
                 if (textarea) { textarea.value = ''; textarea.focus(); }
                 T.loadMessages(T.selectedGroupId);
             })
             .catch(function (error) {
-                showInputError(errorMessage(error));
+                hideUploadProgress();
+                showInputError(errorMessage(error, sendFailedMessage(file)));
             });
     }
 
     /**
-     * 上傳單張圖片並透過 Bot API 送出
+     * 檔案過大的提示（後端訊息帶 :value，前端自己組同一句）
      *
-     * @param {File}   file
-     * @param {string} caption
+     * @returns {string}
+     */
+    function fileTooLargeMessage() {
+        var template = T.i18n.msg.file_too_large;
+        if (!template) { return '檔案不可超過 ' + MAX_FILE_MB + ' MB'; }
+
+        return template.replace(':value', MAX_FILE_MB);
+    }
+
+    /**
+     * 上傳附件並透過 Bot API 送出
+     *
+     * 用 XMLHttpRequest 而非 fetch —— fetch 沒有上傳進度事件，
+     * 而大檔案要好幾秒，沒有進度條使用者會以為卡住
+     *
+     * @param {File}     file
+     * @param {string}   caption
+     * @param {Function} [onProgress] 收到 0–100 的百分比
      * @returns {Promise}
      */
-    function uploadImage(file, caption) {
+    function uploadAttachment(file, caption, onProgress) {
+        var isImage = isImageFile(file);
+        var url = isImage
+            ? '/admin/telegram-chat/ajax-send-image'
+            : '/admin/telegram-chat/ajax-send-file';
+
         var formData = new FormData();
         formData.append('group_id', T.selectedGroupId);
-        formData.append('image', file);
+        formData.append(isImage ? 'image' : 'file', file);
         if (caption) { formData.append('caption', caption); }
 
-        return fetch('/admin/telegram-chat/ajax-send-image', {
-            method: 'POST',
-            headers: { 'X-CSRF-TOKEN': T.csrfToken, Accept: 'application/json' },
-            body: formData,
-        }).then(function (response) {
-            return response.json().then(function (body) {
-                if (!response.ok) { throw body; }
-                return body;
+        return new Promise(function (resolve, reject) {
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', url, true);
+            xhr.setRequestHeader('X-CSRF-TOKEN', T.csrfToken);
+            xhr.setRequestHeader('Accept', 'application/json');
+
+            if (onProgress && xhr.upload) {
+                xhr.upload.addEventListener('progress', function (e) {
+                    // 來源不明長度時（例如壓縮傳輸）就不更新，維持上一個百分比
+                    if (e.lengthComputable) { onProgress(e.loaded / e.total * 100); }
+                });
+            }
+
+            xhr.addEventListener('load', function () {
+                var body = null;
+                try { body = JSON.parse(xhr.responseText); } catch (err) { body = null; }
+
+                // 非 JSON 回應（PHP upload_max_filesize 擋下時會回 HTML）交給 errorMessage 用預設文案
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve(body);
+                    return;
+                }
+
+                reject(body);
             });
+
+            xhr.addEventListener('error', function () { reject(null); });
+            xhr.addEventListener('abort', function () { reject(null); });
+
+            xhr.send(formData);
         });
     }
 
     /**
-     * 依序送出待傳送的截圖，文字只掛在第一張當 caption。
-     * 逐張序列送出而非平行，確保客戶端看到的順序與貼上的順序一致。
+     * 依序送出待傳送的附件，文字只掛在第一個當 caption。
+     * 逐個序列送出而非平行，確保客戶端看到的順序與加入的順序一致。
      */
-    function sendPendingImages() {
+    function sendPendingFiles() {
         var textarea = document.getElementById('tg-reply-text');
         var sendBtn = document.getElementById('btn-tg-send');
         var caption = textarea ? textarea.value.trim() : '';
-        var queue = pendingImages.slice();
+        var queue = pendingFiles.slice();
 
         setSending(true);
         showInputError('');
@@ -500,7 +678,9 @@
         var chain = Promise.resolve();
         queue.forEach(function (file, index) {
             chain = chain.then(function () {
-                return uploadImage(file, index === 0 ? caption : '').then(function (result) {
+                showUploadProgress(file.name, index + 1, queue.length);
+
+                return uploadAttachment(file, index === 0 ? caption : '', updateUploadProgress).then(function (result) {
                     sentCount = index + 1;
 
                     return result;
@@ -510,22 +690,24 @@
 
         chain
             .then(function () {
-                pendingImages = [];
-                renderPendingImages();
+                pendingFiles = [];
+                renderPendingFiles();
                 if (textarea) {
                     textarea.value = '';
                     textarea.style.height = '';
                 }
+                hideUploadProgress();
                 setSending(false);
                 if (textarea) { textarea.focus(); }
                 T.loadMessages(T.selectedGroupId);
             })
             .catch(function (error) {
+                hideUploadProgress();
                 setSending(false);
-                showInputError(errorMessage(error));
-                // 已成功送出的不重送，保留失敗那張與其後未送的，讓使用者可再按一次
-                pendingImages = queue.slice(sentCount);
-                renderPendingImages();
+                showInputError(errorMessage(error, sendFailedMessage(queue[sentCount])));
+                // 已成功送出的不重送，保留失敗那筆與其後未送的，讓使用者可再按一次
+                pendingFiles = queue.slice(sentCount);
+                renderPendingFiles();
                 T.loadMessages(T.selectedGroupId);
             });
 
@@ -537,6 +719,20 @@
                 ? '<i class="fas fa-spinner fa-spin" style="font-size:0.875rem"></i>'
                 : '<i class="fas fa-paper-plane" style="font-size:0.875rem"></i>';
         }
+    }
+
+    /**
+     * 依失敗的是圖片還是檔案選預設文案
+     *
+     * @param {File} [file]
+     * @returns {string}
+     */
+    function sendFailedMessage(file) {
+        if (file && !isImageFile(file)) {
+            return T.i18n.msg.file_send_failed || '檔案傳送失敗';
+        }
+
+        return T.i18n.msg.image_send_failed || '圖片傳送失敗';
     }
 
     // ===== 文件區 Modal =====

@@ -19,17 +19,20 @@ class TelegramBroadcastService
     private $telegramRepository;
     private $stationRepository;
     private $botService;
+    private $imageUploadService;
 
     public function __construct(
         TelegramBroadcastRepository $broadcastRepository,
         TelegramRepository $telegramRepository,
         StationRepository $stationRepository,
-        TelegramBotService $botService
+        TelegramBotService $botService,
+        ImageUploadService $imageUploadService
     ) {
         $this->broadcastRepository = $broadcastRepository;
         $this->telegramRepository = $telegramRepository;
         $this->stationRepository = $stationRepository;
         $this->botService = $botService;
+        $this->imageUploadService = $imageUploadService;
     }
 
     /**
@@ -62,7 +65,107 @@ class TelegramBroadcastService
     }
 
     /**
-     * 發送群發公告
+     * 上傳公告圖片並回傳可對外存取的網址
+     *
+     * 預約公告要到排程時間才送出，網址必須先落地，屆時才拿得到圖。
+     *
+     * @param \Illuminate\Http\UploadedFile[] $files
+     * @return string[]
+     */
+    public function uploadImages($files)
+    {
+        $paths = $this->imageUploadService->uploadMultiple($files, 'broadcast');
+
+        return collect($paths)->map(function ($path) {
+            return asset("storage/{$path}");
+        })->all();
+    }
+
+    /**
+     * 建立預約公告
+     *
+     * 只寫紀錄不發送，實際送出由 telegram:send-scheduled 排程負責。
+     * 目標站台在**發送當下**才解析，預約期間站台被停用或解綁群組就不會誤送。
+     *
+     * @param array  $params      含 content, target_type, group_ids, image_urls, scheduled_at
+     * @param int    $senderId
+     * @return TelegramBroadcast
+     */
+    public function schedule($params, $senderId)
+    {
+        $targetType = (int) $params['target_type'];
+        $stationIds = $targetType === TelegramBroadcast::TARGET_SELECTED
+            ? ($params['group_ids'] ?? [])
+            : null;
+
+        return $this->broadcastRepository->create([
+            'content'          => $params['content'],
+            'target_type'      => $targetType,
+            'target_group_ids' => $stationIds,
+            'image_urls'       => $params['image_urls'] ?? null,
+            'status'           => TelegramBroadcast::STATUS_PENDING,
+            'scheduled_at'     => $params['scheduled_at'],
+            'total_count'      => 0,
+            'success_count'    => 0,
+            'fail_count'       => 0,
+            'sender_id'        => $senderId,
+            'sent_at'          => null,
+        ]);
+    }
+
+    /**
+     * 送出所有已到期的預約公告
+     *
+     * @return array 每筆的發送結果摘要
+     */
+    public function sendDue()
+    {
+        $due = $this->broadcastRepository->getDueScheduled(now());
+        if ($due->isEmpty()) {
+            return [];
+        }
+
+        $summary = [];
+        foreach ($due as $broadcast) {
+            try {
+                $sent = $this->dispatch($broadcast);
+                $summary[] = [
+                    'id'      => $sent->id,
+                    'total'   => $sent->total_count,
+                    'success' => $sent->success_count,
+                    'fail'    => $sent->fail_count,
+                ];
+            } catch (\Exception $e) {
+                // 一筆失敗不能讓其餘的預約跟著卡住
+                Log::error('預約公告發送失敗', [
+                    'broadcast_id' => $broadcast->id,
+                    'error'        => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $summary;
+    }
+
+    /**
+     * 取消預約公告
+     *
+     * @param TelegramBroadcast $broadcast
+     * @return bool 已送出或已取消的回 false
+     */
+    public function cancelSchedule(TelegramBroadcast $broadcast)
+    {
+        if (!$broadcast->isCancelable()) {
+            return false;
+        }
+
+        $this->broadcastRepository->update($broadcast, ['status' => TelegramBroadcast::STATUS_CANCELED]);
+
+        return true;
+    }
+
+    /**
+     * 發送群發公告（立即）
      *
      * 從站台列表取得目標（僅啟用且有 Telegram 群組的站台）。
      * group_ids 在這裡是 station.id，不是 telegram_group.id。
@@ -74,35 +177,49 @@ class TelegramBroadcastService
     public function send($params, $senderId)
     {
         $targetType = (int) $params['target_type'];
-        $content = $params['content'];
 
-        // 從站台列表取得目標（僅啟用且有 Telegram 群組的）
-        $allStations = $this->stationRepository->getActiveWithTelegram();
-
-        if ($targetType === TelegramBroadcast::TARGET_ALL) {
-            $stations = $allStations;
-            $stationIds = $stations->pluck('id')->all();
-        } else {
-            $stationIds = $params['group_ids'] ?? [];
-            $stations = $allStations->whereIn('id', $stationIds);
-        }
-
-        // 取得對應的 Telegram 群組（透過站台的 telegramGroup 關聯）
-        $groups = $stations->map(function ($station) {
-            return $station->telegramGroup;
-        })->filter();
-
-        // 建立紀錄
         $broadcast = $this->broadcastRepository->create([
-            'content'          => $content,
+            'content'          => $params['content'],
             'target_type'      => $targetType,
-            'target_group_ids' => $targetType === TelegramBroadcast::TARGET_SELECTED ? $stationIds : null,
-            'total_count'      => $groups->count(),
+            'target_group_ids' => $targetType === TelegramBroadcast::TARGET_SELECTED ? ($params['group_ids'] ?? []) : null,
+            'image_urls'       => $params['image_urls'] ?? null,
+            'status'           => TelegramBroadcast::STATUS_SENT,
+            'scheduled_at'     => null,
+            'total_count'      => 0,
             'success_count'    => 0,
             'fail_count'       => 0,
             'sender_id'        => $senderId,
             'sent_at'          => now(),
         ]);
+
+        return $this->dispatch($broadcast);
+    }
+
+    /**
+     * 實際把公告送到各站台群組並回寫結果
+     *
+     * 立即發送與預約發送共用這支，兩條路徑的行為才不會分岔。
+     *
+     * @param TelegramBroadcast $broadcast
+     * @return TelegramBroadcast
+     */
+    private function dispatch(TelegramBroadcast $broadcast)
+    {
+        $content = $broadcast->content;
+        $imageUrls = $broadcast->image_urls ?? [];
+        $senderId = $broadcast->sender_id;
+
+        // 從站台列表取得目標（僅啟用且有 Telegram 群組的）
+        $allStations = $this->stationRepository->getActiveWithTelegram();
+
+        $stations = (int) $broadcast->target_type === TelegramBroadcast::TARGET_ALL
+            ? $allStations
+            : $allStations->whereIn('id', $broadcast->target_group_ids ?? []);
+
+        // 取得對應的 Telegram 群組（透過站台的 telegramGroup 關聯）
+        $groups = $stations->map(function ($station) {
+            return $station->telegramGroup;
+        })->filter();
 
         // 查發送者暱稱
         $sender = \App\Models\User::query()->select(['id', 'nickname'])->find($senderId);
@@ -125,7 +242,6 @@ class TelegramBroadcastService
                 $this->botService->setToken($station->system->bot_token);
             }
 
-            $imageUrls = $params['image_urls'] ?? [];
             $chatId = $station->telegramGroup->chat_id;
 
             if (count($imageUrls) > 1) {
@@ -168,11 +284,14 @@ class TelegramBroadcastService
             }
         }
 
-        // 更新結果
+        // 更新結果。預約公告到這裡才轉成已發送並補上 sent_at
         $this->broadcastRepository->update($broadcast, [
+            'total_count'   => $groups->count(),
             'success_count' => $success,
             'fail_count'    => $fail,
             'send_results'  => $sendResults,
+            'status'        => TelegramBroadcast::STATUS_SENT,
+            'sent_at'       => $broadcast->sent_at ?: now(),
         ]);
 
         return $broadcast->fresh();

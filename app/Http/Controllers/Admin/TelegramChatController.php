@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Events\TelegramTyping;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\TelegramChat\ReplyRequest;
+use App\Http\Requests\TelegramChat\SendFileRequest;
 use App\Http\Resources\TelegramMessageResource;
+use App\Services\ImageUploadService;
 use App\Services\QuickReplyService;
 use App\Services\SharedFileService;
 use App\Services\TelegramChatService;
@@ -24,15 +26,18 @@ class TelegramChatController extends Controller
     private $chatService;
     private $sharedFileService;
     private $quickReplyService;
+    private $imageUploadService;
 
     public function __construct(
         TelegramChatService $chatService,
         SharedFileService $sharedFileService,
-        QuickReplyService $quickReplyService
+        QuickReplyService $quickReplyService,
+        ImageUploadService $imageUploadService
     ) {
         $this->chatService = $chatService;
         $this->sharedFileService = $sharedFileService;
         $this->quickReplyService = $quickReplyService;
+        $this->imageUploadService = $imageUploadService;
     }
 
     /**
@@ -141,6 +146,44 @@ class TelegramChatController extends Controller
             return new TelegramMessageResource($message);
         } catch (\Exception $e) {
             Log::error('Telegram 圖片發送失敗', [
+                'error'   => $e->getMessage(),
+                'trace'   => $e->getTraceAsString(),
+                'user_id' => Auth::id(),
+            ]);
+
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Ajax 發送檔案訊息（圖片以外）
+     *
+     * @param SendFileRequest $request
+     * @return \Illuminate\Http\JsonResponse|TelegramMessageResource
+     */
+    public function ajaxSendFile(SendFileRequest $request)
+    {
+        $params = $request->validated();
+
+        try {
+            $file = $request->file('file');
+            $originalName = $file->getClientOriginalName();
+
+            // 檔名要能看出是什麼檔案，用 uploadKeepName 而非 uniqid 命名
+            $filePath = $this->imageUploadService->uploadKeepName($file, 'telegram');
+
+            $message = $this->chatService->sendFileReply(
+                (int) $params['group_id'],
+                $filePath,
+                $originalName,
+                $params['caption'] ?? null,
+                Auth::id(),
+                Auth::user()->nickname
+            );
+
+            return new TelegramMessageResource($message);
+        } catch (\Exception $e) {
+            Log::error('Telegram 檔案發送失敗', [
                 'error'   => $e->getMessage(),
                 'trace'   => $e->getTraceAsString(),
                 'user_id' => Auth::id(),

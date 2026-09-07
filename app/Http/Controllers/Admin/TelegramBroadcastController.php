@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\TelegramBroadcast\SendBroadcastRequest;
+use App\Models\TelegramBroadcast;
 use App\Services\StationService;
 use App\Services\TelegramBroadcastService;
 use App\Services\TelegramChatService;
@@ -60,34 +62,32 @@ class TelegramBroadcastController extends Controller
     }
 
     /**
-     * Ajax 發送群發公告
+     * Ajax 發送群發公告（帶 scheduled_at 則轉為預約）
      *
-     * @param Request $request
+     * @param SendBroadcastRequest $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function ajaxSend(Request $request)
+    public function ajaxSend(SendBroadcastRequest $request)
     {
-        $params = $request->validate([
-            'content'     => 'required|string|max:4096',
-            'target_type' => 'required|integer|in:1,2',
-            'group_ids'   => 'nullable|array',
-            'group_ids.*' => 'integer',
-            'images'      => 'nullable|array|max:10',
-            'images.*'    => 'image|max:5120',
-        ]);
+        $params = $request->validated();
 
-        // 圖片上傳
+        // 預約的公告到了時間才送，圖片必須先存起來並落庫，否則屆時找不到圖
         if ($request->hasFile('images')) {
-            $imageUrls = [];
-            foreach ($request->file('images') as $idx => $file) {
-                $filename = time() . '_' . $idx . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
-                \Illuminate\Support\Facades\Storage::disk('public')->putFileAs('uploads/broadcast', $file, $filename);
-                $imageUrls[] = \Illuminate\Support\Facades\Storage::disk('public')->url("uploads/broadcast/{$filename}");
-            }
-            $params['image_urls'] = $imageUrls;
+            $params['image_urls'] = $this->broadcastService->uploadImages($request->file('images'));
         }
 
         try {
+            if (filled($params['scheduled_at'] ?? null)) {
+                $broadcast = $this->broadcastService->schedule($params, Auth::id());
+
+                return response()->json([
+                    'message'   => trans('broadcast.msg.schedule_success', [
+                        'time' => $broadcast->scheduled_at->format('Y-m-d H:i'),
+                    ]),
+                    'scheduled' => true,
+                ]);
+            }
+
             $broadcast = $this->broadcastService->send($params, Auth::id());
 
             return response()->json([
@@ -104,6 +104,22 @@ class TelegramBroadcastController extends Controller
 
             return response()->json(['message' => trans('broadcast.msg.send_failed')], 500);
         }
+    }
+
+    /**
+     * Ajax 取消預約公告
+     *
+     * @param TelegramBroadcast $broadcast
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxCancelSchedule(TelegramBroadcast $broadcast)
+    {
+        // 已送出或已取消的不能再取消，避免歷史紀錄被改動
+        if (!$this->broadcastService->cancelSchedule($broadcast)) {
+            return response()->json(['message' => trans('broadcast.msg.cancel_not_pending')], 422);
+        }
+
+        return response()->json(['message' => trans('broadcast.msg.cancel_success')]);
     }
 
     /**

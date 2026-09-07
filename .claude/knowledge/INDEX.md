@@ -19,11 +19,12 @@
 |------|------|------|
 | [features/rbac.md](features/rbac.md) | 分帳號、權限管理（含最小登入/登出） | 已完成 |
 | [features/scheduling.md](features/scheduling.md) | 排班（報班/換班/三班制） | 已完成 |
-| [features/telegram-chat.md](features/telegram-chat.md) | 客服對話窗（Telegram 整合） | 已完成 |
+| [features/telegram-chat.md](features/telegram-chat.md) | 客服對話窗（Telegram 整合、快速回覆、傳送圖片／檔案含進度條） | 已完成 |
 | [features/attendance.md](features/attendance.md) | 打卡出勤 | 已完成（持續迭代） |
 | [features/changelog.md](features/changelog.md) | 版本紀錄（左下角變更日誌） | 規劃中 |
 | [features/login-log.md](features/login-log.md) | 登入紀錄（每帳號登入時間/IP/裝置/成敗） | 已完成 |
 | [features/task-board.md](features/task-board.md) | 任務看板（Kanban 五欄、封存系統、活動紀錄、多人指派、留言編輯、描述勾選清單、附件上傳） | 已完成（持續迭代） |
+| [features/broadcast.md](features/broadcast.md) | 群發公告（多站台 Telegram 群發、附圖、預約傳送） | 已完成（持續迭代） |
 
 ## Bug 修復紀錄（bugfix/）
 

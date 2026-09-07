@@ -702,6 +702,86 @@ class TelegramChatService
     }
 
     /**
+     * 客服直接從輸入區上傳的檔案送到 Telegram 群組
+     *
+     * 與 sendDocumentFromSharedFile() 的差別：那支是從文件區挑既有檔案，
+     * 這支收的是當下上傳、只為了這次對話存下來的檔案。
+     *
+     * @param int         $groupId
+     * @param string      $filePath     storage/app/public 底下的相對路徑
+     * @param string      $originalName 客戶端看到的檔名
+     * @param string|null $caption
+     * @param int         $userId
+     * @param string      $nickname
+     * @return \App\Models\TelegramMessage
+     */
+    public function sendFileReply($groupId, $filePath, $originalName, $caption, $userId, $nickname)
+    {
+        $group = $this->telegramRepository->findGroup($groupId);
+
+        $this->switchBotToken($group);
+
+        $diskPath = Storage::disk('public')->path($filePath);
+        if (!file_exists($diskPath)) {
+            Log::error('Telegram 檔案發送失敗：上傳後找不到檔案', [
+                'group_id' => $groupId,
+                'path'     => $diskPath,
+            ]);
+
+            throw new \RuntimeException(trans('telegram_chat.msg.file_send_failed'));
+        }
+
+        $result = $this->botService->sendDocument($group->chat_id, $diskPath, $originalName, $caption);
+
+        // Telegram 沒收到就不要留下「已送出」的紀錄，否則客服會以為傳送成功
+        if (!$result || empty($result['ok'])) {
+            Log::error('Telegram 檔案發送失敗，不寫入訊息紀錄', [
+                'group_id' => $group->id,
+                'chat_id'  => $group->chat_id,
+                'filename' => $originalName,
+            ]);
+
+            throw new \RuntimeException(trans('telegram_chat.msg.file_send_failed'));
+        }
+
+        $msg = $this->telegramRepository->createMessage([
+            'telegram_group_id'   => $group->id,
+            'direction'           => config('constants.TELEGRAM.DIRECTION.OUTBOUND'),
+            'telegram_message_id' => $result['result']['message_id'] ?? null,
+            'sender_name'         => $nickname,
+            'sender_user_id'      => $userId,
+            'content'             => $caption ?: '',
+            'media_type'          => 'document',
+            'media_url'           => asset("storage/{$filePath}"),
+            'replied'             => true,
+        ]);
+
+        $this->telegramRepository->markMessagesReplied($group->id);
+
+        // 廣播失敗不影響已送出的訊息，前端還有輪詢可以補上
+        try {
+            event(new \App\Events\TelegramMessageReceived($group->id, [
+                'id'          => $msg->id,
+                'direction'   => $msg->direction,
+                'sender_name' => $msg->sender_name,
+                'content'     => $msg->content,
+                'media_type'  => $msg->media_type,
+                'media_url'   => $msg->media_url,
+                'created_at'  => $msg->created_at->toDateTimeString(),
+                'group_id'    => $group->id,
+                'group_title' => $group->title,
+            ]));
+        } catch (\Exception $e) {
+            Log::error('Telegram 檔案訊息廣播失敗', [
+                'group_id' => $group->id,
+                'error'    => $e->getMessage(),
+            ]);
+        }
+
+        return $msg;
+    }
+
+    /**
      * 刪除群組對話紀錄
      *
      * @param int $groupId

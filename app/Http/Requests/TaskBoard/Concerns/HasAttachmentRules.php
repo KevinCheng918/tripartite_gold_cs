@@ -14,22 +14,6 @@ trait HasAttachmentRules
     public static $attachmentMaxKb = 20480;
 
     /**
-     * 禁止的副檔名
-     *
-     * 上傳目的地在 storage/app/public 底下、對外可直接存取，
-     * 若讓可執行或腳本類檔案進來，等於開了一條執行任意程式碼的路。
-     *
-     * @var array
-     */
-    public static $blockedExtensions = [
-        'php', 'phtml', 'php3', 'php4', 'php5', 'php7', 'phps', 'phar',
-        'exe', 'com', 'bat', 'cmd', 'msi', 'scr',
-        'sh', 'bash', 'zsh', 'ps1',
-        'jsp', 'jspx', 'asp', 'aspx', 'cgi', 'pl',
-        'htaccess', 'htpasswd',
-    ];
-
-    /**
      * 單一附件的驗證規則：不限類型但擋掉可執行／腳本檔
      *
      * @return array
@@ -54,7 +38,7 @@ trait HasAttachmentRules
             }
 
             $ext = strtolower((string) $value->getClientOriginalExtension());
-            if (in_array($ext, self::$blockedExtensions, true)) {
+            if (in_array($ext, config('rules.UPLOAD_BLOCKED_EXTENSIONS'), true)) {
                 $fail(trans('task_board.msg.file_type_blocked'));
             }
         };

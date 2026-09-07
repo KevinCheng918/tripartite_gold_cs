@@ -116,6 +116,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-messages', [TelegramChatController::class, 'ajaxMessages'])->name('ajax-messages');
         Route::post('/ajax-reply', [TelegramChatController::class, 'ajaxReply'])->middleware('can:telegram_chat.reply')->name('ajax-reply');
         Route::post('/ajax-send-image', [TelegramChatController::class, 'ajaxSendImage'])->middleware('can:telegram_chat.reply')->name('ajax-send-image');
+        Route::post('/ajax-send-file', [TelegramChatController::class, 'ajaxSendFile'])->middleware('can:telegram_chat.reply')->name('ajax-send-file');
         Route::post('/ajax-react', [TelegramChatController::class, 'ajaxReact'])->middleware('can:telegram_chat.reply')->name('ajax-react');
         Route::post('/ajax-typing', [TelegramChatController::class, 'ajaxTyping'])->middleware('can:telegram_chat.reply')->name('ajax-typing');
         Route::delete('/ajax-delete-conversation/{group}', [TelegramChatController::class, 'ajaxDeleteConversation'])->middleware('can:telegram_chat.delete')->name('ajax-delete-conversation');
@@ -147,6 +148,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-groups', [TelegramBroadcastController::class, 'ajaxGroups'])->middleware('can:telegram_chat.broadcast')->name('ajax-groups');
         Route::post('/ajax-send', [TelegramBroadcastController::class, 'ajaxSend'])->middleware('can:telegram_chat.broadcast')->name('ajax-send');
         Route::get('/ajax-history', [TelegramBroadcastController::class, 'ajaxHistory'])->middleware('can:telegram_chat.broadcast')->name('ajax-history');
+        Route::put('/ajax-cancel-schedule/{broadcast}', [TelegramBroadcastController::class, 'ajaxCancelSchedule'])->middleware('can:telegram_chat.broadcast')->name('ajax-cancel-schedule');
     });
 
     // 虛擬機管理

@@ -24,6 +24,9 @@ class Kernel extends ConsoleKernel
         // 每分鐘檢查 Telegram 未回覆訊息告警
         $schedule->command('telegram:alert')->everyMinute();
 
+        // 每分鐘送出已到期的預約群發公告（withoutOverlapping 避免上一輪還在送就再跑一次）
+        $schedule->command('telegram:send-scheduled')->everyMinute()->withoutOverlapping();
+
         // 每月 1 號凌晨 0 點產生 VM 帳單
         $schedule->command('vm:generate-billing')->monthlyOn(1, '00:00');
     }

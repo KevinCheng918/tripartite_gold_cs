@@ -150,6 +150,10 @@ $this->telegramChatService->sendReply($groupId, $message, $userId, $name, null, 
 - 通知在 **`DB::transaction` 之外**執行 —— Telegram 是外部呼叫，不該把交易撐在那裡等
 - 站台沒綁 Telegram 群組、或主站沒回 `msg` 就略過
 - 通知失敗只記 log 不往外拋：**點數已經加扣完成了**，不能因為通知失敗而讓補點紀錄看起來失敗
+- 訊息結尾會補一句提醒（`config('constants.STATION.TOPUP_NOTIFY_FOOTER')`）。
+  這句**刻意不放語系檔** —— 語系會跟著客服後台的語言跑，
+  客服切成英文時客戶就會收到英文結尾，但主站回的 `msg` 一直是中文。
+  放 config 也讓它清成空字串就能關掉，不必改程式
 
 > ⚠️ **關聯上的 `select()` 是個陷阱**：`CreditTopup::station()` 為了符合「SELECT 指定欄位」
 > 的規範，只撈固定幾個欄位。第一版漏了 `telegram_group_id`，
@@ -170,14 +174,40 @@ $this->telegramChatService->sendReply($groupId, $message, $userId, $name, null, 
 輸入區是**兩列**結構（`showInput()` 產生）：
 
 ```
-#tg-pending-images   ← 待傳送截圖縮圖
+#tg-pending-images   ← 待傳送附件（圖片縮圖／檔案卡片）
+#tg-upload-progress  ← 傳送中標示 + 進度條
 #tg-input-error      ← 行內錯誤提示
-#tg-input-tools      ← 圖片／文件／快速回覆，圖示 + 文字說明
+#tg-input-tools      ← 檔案／文件／快速回覆，圖示 + 文字說明
 .d-flex              ← textarea + 圓形送出鈕
 ```
 
 功能鈕原本是同列的純圖示圓鈕，手機版會把輸入框擠到只剩一小截；
 改成獨立一列後輸入框可佔滿整列，文字說明在手機版也看得到（純圖示沒有 hover 可用）。
+
+### 傳送一般檔案（2026-09-07）
+
+- 迴紋針按鈕拿掉 `accept="image/*"`，圖片與一般檔案都從這裡選，選完依 MIME 分流：
+  圖片走 `ajax-send-image`（`sendPhoto`，客戶端看得到縮圖），其他走 `ajax-send-file`（`sendDocument`）
+- 拖曳也收一般檔案；待送區 `pendingFiles` 同時裝兩種，
+  圖片顯示縮圖、檔案顯示「圖示 + 檔名 + 大小」卡片
+- 上限不同：圖片 5MB（`MAX_IMAGE_BYTES`）、檔案 50MB（Telegram Bot API 的上傳天花板）。
+  **前端先擋一次**，否則得等整個檔案傳完才收到 422
+- `TelegramChatService::sendFileReply()` 與 `sendDocumentFromSharedFile()` 是兩支：
+  後者從文件區挑既有檔案，前者收的是當下上傳的。兩支都要檢查 Bot API 的 `ok`
+- 副檔名黑名單移到 `config('rules.UPLOAD_BLOCKED_EXTENSIONS')`，
+  與任務看板附件共用同一份 —— 原本各存一份，改一邊漏一邊就會一鬆一緊
+
+### 上傳進度條
+
+`uploadAttachment()` 用 **XMLHttpRequest 而非 fetch** —— fetch 沒有上傳進度事件，
+拿不到百分比。大檔案要傳好幾秒，沒有回饋客服會以為當掉而重複按送出。
+
+三個入口（按鈕選檔、貼上、拖曳）共用同一支 `uploadAttachment()`，進度顯示才會一致。
+
+`fileNameFromUrl()`（messages.js）**必須去掉 `時間戳_uniqid_` 前綴**：
+`ImageUploadService::uploadKeepName()` 存檔會加這段前綴，
+沒有 caption 的檔案訊息會 fallback 用網址取檔名，不去前綴就會顯示成
+`1757212345_66dd4f8e2a1b3_報表.xlsx`。任務看板的 `attachmentName()` 用同一套正則。
 
 ### 其他注意事項
 

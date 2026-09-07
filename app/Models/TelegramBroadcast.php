@@ -16,6 +16,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int         $success_count    成功數
  * @property int         $fail_count       失敗數
  * @property int         $sender_id        發送者
+ * @property int         $status           1=已發送, 2=待發送, 3=已取消
+ * @property string|null $scheduled_at     預約發送時間，null 表示立即發送
+ * @property array|null  $image_urls       附帶圖片網址陣列
  * @property string|null $sent_at          發送時間
  */
 class TelegramBroadcast extends Model
@@ -26,6 +29,15 @@ class TelegramBroadcast extends Model
     /** @var int 指定群組 */
     public const TARGET_SELECTED = 2;
 
+    /** @var int 已發送 */
+    public const STATUS_SENT = 1;
+
+    /** @var int 待發送（預約中） */
+    public const STATUS_PENDING = 2;
+
+    /** @var int 已取消 */
+    public const STATUS_CANCELED = 3;
+
     protected $table = 'telegram_broadcast';
     protected $guarded = ['id'];
 
@@ -33,11 +45,24 @@ class TelegramBroadcast extends Model
         'target_type'      => 'integer',
         'target_group_ids' => 'array',
         'send_results'     => 'array',
+        'image_urls'       => 'array',
+        'status'           => 'integer',
         'total_count'      => 'integer',
         'success_count'    => 'integer',
         'fail_count'       => 'integer',
+        'scheduled_at'     => 'datetime',
         'sent_at'          => 'datetime',
     ];
+
+    /**
+     * 預約中且尚未取消，才可以取消
+     *
+     * @return bool
+     */
+    public function isCancelable()
+    {
+        return $this->status === self::STATUS_PENDING;
+    }
 
     /**
      * 發送者

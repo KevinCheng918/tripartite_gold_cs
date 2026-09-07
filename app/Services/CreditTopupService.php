@@ -168,11 +168,15 @@ class CreditTopupService
             return;
         }
 
+        // 主站回的是點數異動結果，補一句提醒讓客戶知道要去確認
+        $footer = config('constants.STATION.TOPUP_NOTIFY_FOOTER');
+        $content = filled($footer) ? "{$message}\n\n{$footer}" : $message;
+
         try {
             // 最後一個參數 false：這是系統通知，不該把客戶還在等的提問標記成已回覆
             $this->telegramChatService->sendReply(
                 (int) $station->telegram_group_id,
-                $message,
+                $content,
                 $reviewerId,
                 $reviewerName ?: '',
                 null,

@@ -14,11 +14,10 @@
     function fileNameFromUrl(url) {
         var name = String(url).split('?')[0].split('/').pop();
 
-        try {
-            return decodeURIComponent(name);
-        } catch (err) {
-            return name;
-        }
+        try { name = decodeURIComponent(name); } catch (err) { /* 保留原字串 */ }
+
+        // 上傳時檔名格式是「時間戳_uniqid_原始檔名」，顯示時把前綴去掉
+        return name.replace(/^\d+_[a-z0-9]+_/i, '');
     }
 
     /**
