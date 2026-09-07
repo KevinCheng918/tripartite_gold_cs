@@ -217,6 +217,50 @@ $this->telegramChatService->sendReply($groupId, $message, $userId, $name, null, 
 - 副檔名黑名單移到 `config('rules.UPLOAD_BLOCKED_EXTENSIONS')`，
   與任務看板附件共用同一份 —— 原本各存一份，改一邊漏一邊就會一鬆一緊
 
+### webhook 支援的媒體類型（2026-09-07）
+
+> ⚠️ **沒列到的類型會讓整則訊息消失**：`handleMessage()` 判斷完媒體後有一行
+> `if (!filled($text) && !filled($mediaType)) return;` ——
+> 客人只傳影片沒打字時，`mediaType` 是 null 就直接 return，
+> **連訊息紀錄都不會留**。第一版只處理 photo / sticker / document，
+> 客人傳影片就完全收不到。
+
+目前支援（`parseOtherMedia()`）：
+
+| Telegram key | 內部 media_type |
+|---|---|
+| `photo` / `sticker` / `document` | 同名（各自獨立分支） |
+| `video` / `animation` / `video_note` | `video` |
+| `voice` / `audio` | `audio` |
+
+> `voice` **只用於按住錄音的訊息**（固定 ogg/opus）。
+> 使用者當附件傳的 `.wav`、`.mp4` 會走 `document`，
+> 因此 document 分支再依 `mime_type` 用 `documentMediaType()` 判斷 ——
+> 是可播放的音訊／影片就改成 audio / video，讓它能在對話裡直接播。
+>
+> 白名單只收 `<audio>` / `<video>` 普遍支援的格式。
+> flac、wmv 這類**故意留在 document**：給一個永遠播不出聲音的空播放器，
+> 比直接給下載連結更糟。
+
+日後要再擴充（如 `location`、`contact`、`poll`）記得**同時**確認：
+Repository 的 select、`TelegramMessageResource`、Pusher payload、
+前端 `messages.js` 的渲染分支、`MEDIA_LABELS`。
+
+### 20MB 下載上限
+
+Bot API 的 `getFile` 只能抓 20MB 以內。超過時 `downloadTelegramFile()` 回 null，
+但**訊息仍會寫進資料庫**（`media_url` 為 null、content 是 `[影片]` 這類標籤）——
+客服至少要知道客人傳了東西。
+
+`downloadTelegramFile()` 的副檔名 fallback **不能一律用 jpg**，
+那會讓影片存成 `.jpg` 而播不出來；依前綴給 mp4 / oga / mp3 / bin。
+
+### 媒體替代文字放 config 不放語系
+
+`config('constants.TELEGRAM.MEDIA_LABELS')`。這些字串會**寫進 `content` 欄位**
+成為訊息紀錄的一部分，跟著客服當下的語系跑會讓同一筆訊息在不同人眼中不一樣。
+（同 [[broadcast]] 補點通知結尾的理由）
+
 ### 附件下載要還原原始檔名（2026-09-07）
 
 > ⚠️ **原始檔名無法從網址反推**：`uploadKeepName()` 存檔時會加時間戳前綴，

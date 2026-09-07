@@ -30,6 +30,7 @@ return [
 
     'preview_unsupported'   => '此檔案類型無法預覽，請下載後開啟',
     'preview_open_new_tab'  => '在新分頁開啟',
+    'preview_pdf_hint'      => '若上方顯示不完整或無法捲動，請改用此方式開啟',
 
     'select_folder' => '請選擇資料夾',
     'no_folders'    => '尚無資料夾',

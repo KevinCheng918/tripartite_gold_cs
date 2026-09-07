@@ -30,6 +30,7 @@ return [
 
     'preview_unsupported'   => 'This file type cannot be previewed. Please download it instead',
     'preview_open_new_tab'  => 'Open in new tab',
+    'preview_pdf_hint'      => 'If the preview above is incomplete or will not scroll, open it this way instead',
 
     'select_folder' => 'Select a folder',
     'no_folders'    => 'No folders yet',

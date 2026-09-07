@@ -21,6 +21,20 @@
     }
 
     /**
+     * 媒體下方的小型下載連結
+     *
+     * @param {Object} m 訊息
+     * @returns {string}
+     */
+    function downloadLink(m) {
+        var name = m.media_name || fileNameFromUrl(m.media_url);
+
+        return '<a href="' + m.media_url + '" target="_blank" download="' + T.escapeHtml(name || '') +
+            '" class="text-muted text-decoration-none" style="font-size:0.75rem">' +
+            '<i class="fas fa-download me-1"></i>' + T.escapeHtml(T.i18n.download_file) + '</a>';
+    }
+
+    /**
      * 組合單則訊息 HTML
      */
     function buildMessageHtml(m) {
@@ -33,6 +47,13 @@
             mediaHtml = '<div class="mb-1"><img src="' + m.media_url + '" alt="photo" loading="lazy" class="tg-photo-preview" style="max-width:100%;max-height:240px;border-radius:8px;cursor:pointer;display:block;object-fit:contain"></div>';
         } else if (m.media_type === 'sticker' && m.media_url) {
             mediaHtml = '<div class="mb-1"><img src="' + m.media_url + '" alt="sticker" loading="lazy" style="max-width:120px;max-height:120px;display:block"></div>';
+        } else if ((m.media_type === 'video' || m.media_type === 'audio') && m.media_url) {
+            var player = m.media_type === 'video'
+                ? '<video src="' + m.media_url + '" controls preload="metadata" style="max-width:100%;max-height:240px;border-radius:8px;display:block"></video>'
+                : '<audio src="' + m.media_url + '" controls preload="metadata" style="max-width:100%"></audio>';
+            // 播放器取代了原本的下載連結，補一個小的在下面
+            // （Safari 的原生控制項沒有下載選項）
+            mediaHtml = '<div class="mb-1">' + player + downloadLink(m) + '</div>';
         } else if (m.media_type === 'document' && m.media_url) {
             // media_name 是上傳當下留下的原始檔名。存檔時中文會被換成底線，
             // 從網址反推救不回來，所以優先用它；舊資料沒有這欄才退回推網址

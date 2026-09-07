@@ -30,6 +30,7 @@ return [
 
     'preview_unsupported'   => '此档案类型无法预览，请下载后开启',
     'preview_open_new_tab'  => '在新分页开启',
+    'preview_pdf_hint'      => '若上方显示不完整或无法卷动，请改用此方式开启',
 
     'select_folder' => '请选择资料夹',
     'no_folders'    => '尚无资料夹',

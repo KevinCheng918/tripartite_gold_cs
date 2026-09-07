@@ -167,10 +167,13 @@ class TelegramChatService
                 $mediaUrl = $this->downloadTelegramFile($fileId, 'sticker');
             }
         } elseif (isset($message['document'])) {
-            $mediaType = 'document';
             $doc = $message['document'];
             $fileId = $doc['file_id'] ?? null;
             $fileName = $doc['file_name'] ?? 'file';
+
+            // wav、mp4 這類會被 Telegram 當成 document 送來（voice 只用於按住錄音的訊息）。
+            // 依 MIME 判斷才能讓它們在對話裡直接播，而不是只給一個下載連結
+            $mediaType = $this->documentMediaType($doc['mime_type'] ?? null);
 
             if (filled($fileId)) {
                 $mediaUrl = $this->downloadTelegramFile($fileId, 'document');
@@ -183,6 +186,20 @@ class TelegramChatService
             // 檔名放到 text 前面方便顯示
             if (!filled($text)) {
                 $text = $fileName;
+            }
+        } else {
+            // 影片、語音、音訊等。沒有這段的話 mediaType 會是 null，
+            // 客人只傳影片不打字時整則訊息會被下面的「無文字也無媒體」直接丟掉
+            $parsed = $this->parseOtherMedia($message);
+
+            if (filled($parsed)) {
+                $mediaType = $parsed['type'];
+                $mediaUrl = $parsed['url'];
+                $mediaName = $parsed['name'];
+
+                if (!filled($text)) {
+                    $text = $parsed['fallback_text'];
+                }
             }
         }
 
@@ -261,7 +278,8 @@ class TelegramChatService
         }
 
         // Web Push 推播通知（通知所有已訂閱的客服）
-        $pushBody = filled($text) ? $text : ($mediaType === 'photo' ? '[圖片]' : '[貼圖]');
+        // 無文字時依媒體類型給替代文案，否則影片／語音都會被顯示成「[貼圖]」
+        $pushBody = filled($text) ? $text : $this->mediaLabel($mediaType);
         $this->webPushService->sendToAll(
             "{$group->title} — {$senderName}",
             mb_substr($pushBody, 0, 100),
@@ -547,18 +565,114 @@ class TelegramChatService
      * @param string $prefix 檔名前綴（photo / sticker）
      * @return string|null 本地公開 URL
      */
+    /**
+     * 解析影片／語音／音訊等 photo・sticker・document 以外的媒體
+     *
+     * Bot API 的 getFile 只能下載 20MB 以內的檔案，超過就抓不下來。
+     * 抓不到時仍回傳結果（url 為 null），讓訊息本身還是進得了資料庫 ——
+     * 客服至少要知道「客人傳了一段影片」，而不是整則訊息憑空消失。
+     *
+     * @param array $message Telegram message payload
+     * @return array|null {type, url, name, fallback_text}
+     */
+    private function parseOtherMedia($message)
+    {
+        // Telegram 的 key => 內部 media_type。
+        // 下載檔名前綴沿用 Telegram 的 key，替代文字統一查 MEDIA_LABELS
+        $map = [
+            'video'      => 'video',
+            'animation'  => 'video',
+            'video_note' => 'video',
+            'voice'      => 'audio',
+            'audio'      => 'audio',
+        ];
+
+        foreach ($map as $key => $type) {
+            if (!isset($message[$key])) {
+                continue;
+            }
+
+            $media = $message[$key];
+            $fileId = $media['file_id'] ?? null;
+
+            return [
+                'type'          => $type,
+                'url'           => filled($fileId) ? $this->downloadTelegramFile($fileId, $key) : null,
+                'name'          => $media['file_name'] ?? null,
+                'fallback_text' => $this->mediaLabel($key),
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * 依 MIME 決定 document 要用哪種 media_type
+     *
+     * 瀏覽器不是每種音訊／影片格式都放得出來（例如 wmv、flac），
+     * 只挑常見且 <audio> / <video> 普遍支援的，其餘維持 document 走下載。
+     *
+     * @param string|null $mimeType
+     * @return string audio / video / document
+     */
+    private function documentMediaType($mimeType)
+    {
+        $playable = [
+            'audio/wav', 'audio/x-wav', 'audio/wave',
+            'audio/mpeg', 'audio/mp3',
+            'audio/ogg', 'audio/opus',
+            'audio/mp4', 'audio/aac', 'audio/webm',
+            'video/mp4', 'video/webm', 'video/ogg',
+        ];
+
+        if (!filled($mimeType) || !in_array(strtolower($mimeType), $playable, true)) {
+            return 'document';
+        }
+
+        return strpos(strtolower($mimeType), 'video/') === 0 ? 'video' : 'audio';
+    }
+
+    /**
+     * 取媒體類型的替代文字
+     *
+     * @param string $key Telegram 的媒體 key 或內部 media_type
+     * @return string
+     */
+    private function mediaLabel($key)
+    {
+        $labels = config('constants.TELEGRAM.MEDIA_LABELS');
+
+        return $labels[$key] ?? $labels['default'];
+    }
+
     private function downloadTelegramFile($fileId, $prefix)
     {
         $remoteUrl = $this->botService->getFileUrl($fileId);
 
         if (!filled($remoteUrl)) {
+            // getFile 失敗最常見的原因是超過 Bot API 的 20MB 下載上限
+            Log::warning('Telegram 取檔案位址失敗，可能超過 20MB 下載上限', [
+                'file_id' => $fileId,
+                'prefix'  => $prefix,
+            ]);
+
             return null;
         }
 
         try {
-            // 取得副檔名
+            // 取得副檔名。Telegram 的 file_path 通常帶副檔名，沒有時依類型給預設值 ——
+            // 一律 fallback 成 jpg 會讓影片／語音存成 .jpg 而播不出來
+            $defaultExt = [
+                'video'      => 'mp4',
+                'animation'  => 'mp4',
+                'video_note' => 'mp4',
+                'voice'      => 'oga',
+                'audio'      => 'mp3',
+                'document'   => 'bin',
+            ];
+
             $pathInfo = pathinfo(parse_url($remoteUrl, PHP_URL_PATH));
-            $ext = $pathInfo['extension'] ?? 'jpg';
+            $ext = $pathInfo['extension'] ?? ($defaultExt[$prefix] ?? 'jpg');
             $filename = "{$prefix}_" . time() . '_' . mt_rand(1000, 9999) . ".{$ext}";
 
             $content = file_get_contents($remoteUrl);

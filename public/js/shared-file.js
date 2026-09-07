@@ -382,23 +382,28 @@ $(function () {
     /**
      * PDF 預覽
      *
-     * iOS Safari 的 iframe 內嵌 PDF 只會顯示第一頁且無法捲動，
-     * 手機一律改用「在新分頁開啟」交給系統的檢視器。
+     * 一律先試內嵌。手機額外附一個「在新分頁開啟」的退路 ——
+     * 內嵌 PDF 在行動瀏覽器的支援度不一（iOS Safari 常只顯示第一頁且不能捲、
+     * Android Chrome 多半不內嵌），但不是每台裝置都這樣，
+     * 所以不預先剝奪內嵌，只是把逃生門放在旁邊。
      *
      * @param {string} url
      */
     function renderPdfPreview(url) {
-        var $body = $('#sf-preview-body');
+        var $body = $('#sf-preview-body').empty();
+        var isMobile = window.innerWidth < 768;
 
-        if (window.innerWidth < 768) {
-            $body.html('<div class="text-center text-muted py-5">' +
-                '<i class="fas fa-file-pdf fa-3x mb-3 d-block"></i>' +
-                '<a href="' + url + '" target="_blank" rel="noopener" class="btn btn-primary btn-sm">' +
-                '<i class="fas fa-external-link-alt me-1"></i>' + escapeHtml(i18n.preview_open_new_tab) + '</a></div>');
-            return;
-        }
+        $body.append($('<iframe style="width:100%;border:0;display:block">')
+            .css('height', isMobile ? '60vh' : '75vh')
+            .attr('src', url));
 
-        $body.html($('<iframe style="width:100%;height:75vh;border:0;display:block">').attr('src', url));
+        if (!isMobile) { return; }
+
+        $body.append('<div class="text-center py-3">' +
+            '<a href="' + url + '" target="_blank" rel="noopener" class="btn btn-outline-secondary btn-sm">' +
+            '<i class="fas fa-external-link-alt me-1"></i>' + escapeHtml(i18n.preview_open_new_tab) + '</a>' +
+            '<div class="text-muted mt-2" style="font-size:0.75rem">' +
+            escapeHtml(i18n.preview_pdf_hint) + '</div></div>');
     }
 
     /**
