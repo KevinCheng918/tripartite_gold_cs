@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\SharedFile\MoveFileRequest;
 use App\Http\Requests\SharedFile\UploadFileRequest;
 use App\Models\SharedFile;
 use App\Models\SharedFolder;
@@ -128,11 +129,7 @@ class SharedFileController extends Controller
             return response()->json(['message' => trans('shared_file.msg.folder_not_found')], 404);
         }
 
-        // 共用文件夾需要上傳權限，個人文件夾需要是自己的
-        if ($folder->type === 'shared' && !$user->isAdmin() && !$user->hasPermission('shared_file.upload')) {
-            return response()->json(['message' => trans('shared_file.msg.no_permission')], 403);
-        }
-        if ($folder->type === 'personal' && !$user->isAdmin() && (int) $folder->user_id !== $user->id) {
+        if (!$this->canAccessFolder($user, $folder, 'shared_file.upload')) {
             return response()->json(['message' => trans('shared_file.msg.no_permission')], 403);
         }
 
@@ -153,16 +150,79 @@ class SharedFileController extends Controller
      * @param SharedFile $file
      * @return \Illuminate\Http\JsonResponse
      */
+    /**
+     * Ajax 搬移檔案到其他資料夾
+     *
+     * @param MoveFileRequest $request
+     * @param SharedFile      $file
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxMoveFile(MoveFileRequest $request, SharedFile $file)
+    {
+        $params = $request->validated();
+        $user = Auth::user();
+        $target = $this->sharedFileService->findFolder((int) $params['folder_id']);
+
+        if (!filled($target)) {
+            return response()->json(['message' => trans('shared_file.msg.folder_not_found')], 404);
+        }
+
+        // 來源與目標都要有權限。只檢查其中一邊的話，
+        // 可以把別人的個人檔案搬到自己的資料夾，或把私人檔案丟進共用區
+        if (!$this->canAccessFolder($user, $file->folder, 'shared_file.upload')
+            || !$this->canAccessFolder($user, $target, 'shared_file.upload')) {
+            return response()->json(['message' => trans('shared_file.msg.no_permission')], 403);
+        }
+
+        try {
+            if (!$this->sharedFileService->moveFile($file->id, $target->id)) {
+                return response()->json(['message' => trans('shared_file.msg.folder_not_found')], 404);
+            }
+
+            return response()->json(['message' => trans('shared_file.msg.file_moved')]);
+        } catch (\Exception $e) {
+            Log::error('檔案搬移失敗', ['error' => $e->getMessage(), 'file_id' => $file->id]);
+
+            return response()->json(['message' => trans('shared_file.msg.move_failed')], 500);
+        }
+    }
+
+    /**
+     * 判斷使用者能不能對該資料夾做某個動作
+     *
+     * 共用區看權限、個人區看是不是自己的、管理者一律放行 ——
+     * 上傳、搬移、刪除三處原本各寫一份幾乎相同的判斷，改一處會漏掉其他兩處。
+     *
+     * @param \App\Models\User              $user
+     * @param \App\Models\SharedFolder|null $folder
+     * @param string                        $permission 共用區所需的權限 keyword
+     * @return bool
+     */
+    private function canAccessFolder($user, $folder, $permission)
+    {
+        if (!filled($folder)) {
+            return false;
+        }
+
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        if ($folder->type === 'shared') {
+            return $user->hasPermission($permission);
+        }
+
+        return (int) $folder->user_id === $user->id;
+    }
+
     public function ajaxDeleteFile(SharedFile $file)
     {
         $user = Auth::user();
         $folder = $file->folder;
 
-        // 共用：需 delete 權限；個人：自己的或管理者
-        if ($folder && $folder->type === 'shared' && !$user->isAdmin() && !$user->hasPermission('shared_file.delete')) {
-            return response()->json(['message' => trans('shared_file.msg.no_permission')], 403);
-        }
-        if ($folder && $folder->type === 'personal' && !$user->isAdmin() && (int) $folder->user_id !== $user->id) {
+        // 原本寫成 `$folder && ...`，資料夾取不到時反而會直接放行；
+        // folder_id 是 NOT NULL + FK，正常不會發生，但要擋而不是放
+        if (!$this->canAccessFolder($user, $folder, 'shared_file.delete')) {
             return response()->json(['message' => trans('shared_file.msg.no_permission')], 403);
         }
 
@@ -187,11 +247,7 @@ class SharedFileController extends Controller
     {
         $user = Auth::user();
 
-        // 共用：需 delete 權限；個人：自己的或管理者
-        if ($folder->type === 'shared' && !$user->isAdmin() && !$user->hasPermission('shared_file.delete')) {
-            return response()->json(['message' => trans('shared_file.msg.no_permission')], 403);
-        }
-        if ($folder->type === 'personal' && !$user->isAdmin() && (int) $folder->user_id !== $user->id) {
+        if (!$this->canAccessFolder($user, $folder, 'shared_file.delete')) {
             return response()->json(['message' => trans('shared_file.msg.no_permission')], 403);
         }
 

@@ -63,7 +63,7 @@
                             </div>
                             <div class="card-body p-0">
                                 <div class="table-responsive">
-                                    <table class="table table-sm table-hover align-middle mb-0">
+                                    <table class="table table-sm table-hover align-middle mb-0 sf-file-table">
                                         <thead class="thead-gold">
                                             <tr>
                                                 <th>{{ trans('shared_file.field_filename') }}</th>
@@ -119,7 +119,7 @@
                             </div>
                             <div class="card-body p-0">
                                 <div class="table-responsive">
-                                    <table class="table table-sm table-hover align-middle mb-0">
+                                    <table class="table table-sm table-hover align-middle mb-0 sf-file-table">
                                         <thead class="thead-gold">
                                             <tr>
                                                 <th>{{ trans('shared_file.field_filename') }}</th>
@@ -164,6 +164,27 @@
                             <button type="submit" class="btn btn-primary">{{ trans('shared_file.action_confirm') }}</button>
                         </div>
                     </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- 搬移檔案 Modal --}}
+    <div class="modal fade" id="modal-sf-move" tabindex="-1">
+        <div class="modal-dialog modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h5 class="modal-title" style="font-size:0.9375rem">{{ trans('shared_file.action_move') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-1 text-truncate fw-bold" id="sf-move-filename" style="font-size:0.875rem"></div>
+                    <div class="text-muted mb-3 text-truncate" id="sf-move-origin" style="font-size:0.8125rem"></div>
+                    <input type="hidden" id="sf-move-file-id">
+                    <div id="sf-move-folders" class="border rounded"></div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-primary w-100 js-move-target" id="sf-move-confirm" disabled></button>
                 </div>
             </div>
         </div>

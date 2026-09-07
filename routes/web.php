@@ -236,6 +236,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-list', [SharedFileController::class, 'ajaxList'])->name('ajax-list');
         Route::post('/ajax-store-folder', [SharedFileController::class, 'ajaxStoreFolder'])->name('ajax-store-folder');
         Route::post('/ajax-upload', [SharedFileController::class, 'ajaxUpload'])->name('ajax-upload');
+        Route::put('/ajax-move-file/{file}', [SharedFileController::class, 'ajaxMoveFile'])->name('ajax-move-file');
         Route::delete('/ajax-delete-file/{file}', [SharedFileController::class, 'ajaxDeleteFile'])->name('ajax-delete-file');
         Route::delete('/ajax-delete-folder/{folder}', [SharedFileController::class, 'ajaxDeleteFolder'])->name('ajax-delete-folder');
     });

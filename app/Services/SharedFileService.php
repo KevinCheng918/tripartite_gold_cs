@@ -122,6 +122,30 @@ class SharedFileService
     }
 
     /**
+     * 把檔案搬到另一個資料夾
+     *
+     * 只改 folder_id，實體檔不動 —— 檔案是以亂數檔名存在同一個目錄下，
+     * 路徑本來就不帶資料夾資訊，沒有搬動的必要。
+     *
+     * @param int $fileId
+     * @param int $folderId
+     * @return bool 檔案或目標資料夾不存在時回 false
+     */
+    public function moveFile($fileId, $folderId)
+    {
+        $file = $this->repository->findFile($fileId);
+        $folder = $this->repository->findFolder($folderId);
+
+        if (!filled($file) || !filled($folder)) {
+            return false;
+        }
+
+        $this->repository->updateFile($file, ['folder_id' => $folder->id]);
+
+        return true;
+    }
+
+    /**
      * 刪除檔案
      *
      * @param int $fileId

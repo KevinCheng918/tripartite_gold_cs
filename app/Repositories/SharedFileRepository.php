@@ -202,6 +202,18 @@ class SharedFileRepository
     }
 
     /**
+     * 更新檔案
+     *
+     * @param SharedFile $file
+     * @param array      $attributes
+     * @return void
+     */
+    public function updateFile(SharedFile $file, $attributes)
+    {
+        $file->update($attributes);
+    }
+
+    /**
      * 刪除檔案
      *
      * @param SharedFile $file

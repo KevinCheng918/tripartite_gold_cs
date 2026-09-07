@@ -51,6 +51,52 @@
     background: rgba(212, 175, 55, 0.15);
 }
 
+/* 檔案列表
+   長檔名會把操作鈕擠到換行（「下載」被拆成兩行），
+   所以操作欄固定不換行，剩下的寬度才留給檔名 */
+.sf-file-table .sf-file-actions {
+    white-space: nowrap;
+    width: 1%;
+}
+
+.sf-file-table .sf-file-meta {
+    white-space: nowrap;
+    width: 1%;
+}
+
+/* 檔名允許換行，但不要把單字撐破表格 */
+.sf-file-table .sf-file-name {
+    word-break: break-word;
+    min-width: 12rem;
+}
+
+/* 搬移檔案的資料夾瀏覽器
+   麵包屑用灰底與下方清單區隔，讓人一眼看出哪一列是導覽、哪些是可點的資料夾 */
+.sf-move-crumb {
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+#sf-move-folders {
+    max-height: 45vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* 檔案原本所在的資料夾 */
+.sf-move-current {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="dark"] .sf-move-crumb {
+    background: #2d2d2d;
+    border-bottom-color: #444;
+}
+
+[data-theme="dark"] .sf-move-current {
+    background: rgba(255, 255, 255, 0.05);
+}
+
 /* 檔案預覽 Modal
    modal-body 是唯一的捲動容器，內容元素不要再自帶 overflow */
 #sf-preview-body {

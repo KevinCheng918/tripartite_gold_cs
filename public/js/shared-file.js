@@ -228,14 +228,19 @@ $(function () {
                 (type === 'personal' && (f.uploaded_by === currentUserId || isAdmin));
 
             html += '<tr>';
-            html += '<td><a href="javascript:void(0)" class="js-preview-file text-decoration-none"' +
+            html += '<td class="sf-file-name"><a href="javascript:void(0)" class="js-preview-file text-decoration-none"' +
                 ' data-path="' + escapeHtml(f.file_path) + '" data-name="' + escapeHtml(f.original_name) + '">' +
                 '<i class="fas ' + fileIcon(f.original_name) + ' me-1 text-muted"></i>' +
                 escapeHtml(f.original_name) + '</a></td>';
-            html += '<td>' + fmtSize(f.file_size) + '</td>';
-            html += '<td>' + escapeHtml(f.uploader ? f.uploader.nickname : '-') + '</td>';
-            html += '<td>' + (f.created_at ? f.created_at.substring(0, 16).replace('T', ' ') : '-') + '</td>';
-            html += '<td><div class="d-flex gap-1">';
+            html += '<td class="sf-file-meta">' + fmtSize(f.file_size) + '</td>';
+            html += '<td class="sf-file-meta">' + escapeHtml(f.uploader ? f.uploader.nickname : '-') + '</td>';
+            html += '<td class="sf-file-meta">' + (f.created_at ? f.created_at.substring(0, 16).replace('T', ' ') : '-') + '</td>';
+            html += '<td class="sf-file-actions"><div class="d-flex gap-1">';
+            if (canAddFolder(type)) {
+                html += '<button class="btn btn-sm btn-outline-secondary js-move-file" data-id="' + f.id +
+                    '" data-name="' + escapeHtml(f.original_name) + '">' +
+                    '<i class="fas fa-folder-open me-1"></i>' + escapeHtml(i18n.action_move) + '</button>';
+            }
             html += '<a href="/storage/' + f.file_path + '" target="_blank" class="btn btn-sm btn-outline-secondary">' +
                 '<i class="fas fa-download me-1"></i>' + escapeHtml(i18n.action_download) + '</a>';
             if (canDel) {
@@ -276,6 +281,226 @@ $(function () {
 
         $actions.html(html).css('display', html ? '' : 'none');
     }
+
+    // ===== 搬移檔案 =====
+
+    /**
+     * 目前所在的資料夾（用來把它從可選清單裡排除）
+     *
+     * @param {string} type
+     * @returns {number|null}
+     */
+    function currentFolderId(type) {
+        return type === 'shared' ? selectedSharedFolder : selectedPersonalFolder;
+    }
+
+    // 搬移選擇器的位置：type 為 null 表示還在最外層（選共用或個人）
+    var movePicker = { type: null, parentId: null, excludeId: null };
+
+    /**
+     * 渲染搬移選擇器
+     *
+     * 做法比照檔案總管：清單只負責「瀏覽」，
+     * 真正的動作固定在底部那一顆按鈕（目標永遠是目前所在的層）。
+     * 讓清單同時兼具選取與導覽兩種語意，使用者會分不清點下去會發生什麼。
+     */
+    function renderMovePicker() {
+        var $box = $('#sf-move-folders');
+
+        $box.html(movePicker.type
+            ? moveBreadcrumbHtml() + moveCurrentLevelHtml()
+            : moveRootHtml());
+
+        renderMoveConfirm();
+    }
+
+    /**
+     * 底部的確認鈕。依目前所在的層決定文字與能不能按
+     */
+    function renderMoveConfirm() {
+        var $btn = $('#sf-move-confirm');
+
+        // 還在「共用／個人」這層：檔案不能掛在分類底下
+        if (!movePicker.parentId) {
+            $btn.prop('disabled', true).removeData('id')
+                .html('<i class="fas fa-hand-pointer me-1"></i>' + escapeHtml(i18n.move_pick_folder));
+
+            return;
+        }
+
+        var name = folderName(movePicker.type, movePicker.parentId);
+
+        if (movePicker.parentId === movePicker.excludeId) {
+            $btn.prop('disabled', true).removeData('id')
+                .html('<i class="fas fa-info-circle me-1"></i>' + escapeHtml(i18n.already_in_folder));
+
+            return;
+        }
+
+        $btn.prop('disabled', false).data('id', movePicker.parentId)
+            .html('<i class="fas fa-arrow-right me-1"></i>' +
+                escapeHtml(trans(i18n.move_to_folder, { name: name })));
+    }
+
+    /**
+     * @param {string} type
+     * @param {number} folderId
+     * @returns {string}
+     */
+    function folderName(type, folderId) {
+        var folder = (folderCache[type] || []).filter(function (f) {
+            return f.id === folderId;
+        })[0];
+
+        return folder ? folder.name : '';
+    }
+
+    /**
+     * 最外層：選共用文件或個人文件
+     *
+     * @returns {string}
+     */
+    function moveRootHtml() {
+        var html = '';
+
+        ['shared', 'personal'].forEach(function (type) {
+            if (!canAddFolder(type) || !(folderCache[type] || []).length) { return; }
+
+            html += '<a href="javascript:void(0)" class="list-group-item list-group-item-action js-move-enter-type"' +
+                ' data-type="' + type + '" style="font-size:0.875rem">' +
+                '<i class="fas ' + (type === 'shared' ? 'fa-globe' : 'fa-user') + ' me-2 text-muted"></i>' +
+                escapeHtml(type === 'shared' ? i18n.tab_shared : i18n.tab_personal) +
+                '<i class="fas fa-chevron-right float-end text-muted" style="font-size:0.75rem;margin-top:0.25rem"></i></a>';
+        });
+
+        return html || '<div class="text-center text-muted py-4">' + escapeHtml(i18n.no_move_target) + '</div>';
+    }
+
+    /**
+     * 麵包屑導覽列（灰底，與底下的資料夾清單區隔開）
+     *
+     * @returns {string}
+     */
+    function moveBreadcrumbHtml() {
+        var typeLabel = movePicker.type === 'shared' ? i18n.tab_shared : i18n.tab_personal;
+        var path = movePicker.parentId
+            ? typeLabel + ' / ' + folderPath(movePicker.type, movePicker.parentId)
+            : typeLabel;
+
+        return '<div class="sf-move-crumb px-2 py-2 d-flex align-items-center gap-2">' +
+            '<button type="button" class="btn btn-sm btn-link text-muted p-0 px-1 js-move-back">' +
+            '<i class="fas fa-arrow-left"></i></button>' +
+            '<span class="text-truncate" style="font-size:0.8125rem">' + escapeHtml(path) + '</span></div>';
+    }
+
+    /**
+     * 目前這一層的子資料夾。點整列＝進入該資料夾
+     *
+     * @returns {string}
+     */
+    function moveCurrentLevelHtml() {
+        var byParent = groupByParent(folderCache[movePicker.type] || []);
+        var list = byParent[movePicker.parentId ? String(movePicker.parentId) : 'root'] || [];
+        var html = '';
+
+        list.forEach(function (f) {
+            var isCurrent = f.id === movePicker.excludeId;
+
+            html += '<a href="javascript:void(0)" class="list-group-item list-group-item-action js-move-enter-folder' +
+                (isCurrent ? ' sf-move-current' : '') + '"' +
+                ' data-id="' + f.id + '" style="font-size:0.875rem">' +
+                '<i class="fas fa-folder me-2 text-warning"></i>' + escapeHtml(f.name) +
+                // 目前所在的資料夾標記出來，使用者才知道自己原本在哪
+                (isCurrent ? '<span class="badge bg-secondary ms-2" style="font-size:0.6875rem">' +
+                    escapeHtml(i18n.move_current_badge) + '</span>' : '') +
+                '<i class="fas fa-chevron-right float-end text-muted" style="font-size:0.75rem;margin-top:0.25rem"></i>' +
+                '</a>';
+        });
+
+        return html || '<div class="text-center text-muted py-3" style="font-size:0.8125rem">' +
+            escapeHtml(i18n.no_subfolder) + '</div>';
+    }
+
+    $(document).on('click', '.js-move-file', function () {
+        var $row = $(this);
+        var type = $row.closest('#personal-file-body').length ? 'personal' : 'shared';
+
+        var fromId = currentFolderId(type);
+        var typeLabel = type === 'shared' ? i18n.tab_shared : i18n.tab_personal;
+
+        $('#sf-move-file-id').val($row.data('id'));
+        $('#sf-move-filename').text($row.data('name'));
+        // 一開始就講清楚檔案現在在哪，否則瀏覽到一半會忘記起點
+        $('#sf-move-origin').text(trans(i18n.move_from, {
+            path: typeLabel + ' / ' + folderPath(type, fromId)
+        }));
+
+        // 直接進到檔案所在的那一區，少一次點擊
+        movePicker = { type: type, parentId: null, excludeId: fromId };
+        renderMovePicker();
+        showBsModal('modal-sf-move');
+    });
+
+    // 進入共用／個人
+    $(document).on('click', '.js-move-enter-type', function () {
+        movePicker.type = $(this).data('type');
+        movePicker.parentId = null;
+        renderMovePicker();
+    });
+
+    // 點資料夾往下一層
+    $(document).on('click', '.js-move-enter-folder', function () {
+        movePicker.parentId = parseInt($(this).data('id'), 10);
+        renderMovePicker();
+    });
+
+    // 返回上一層
+    $(document).on('click', '.js-move-back', function () {
+        if (!movePicker.parentId) {
+            movePicker.type = null;
+            renderMovePicker();
+
+            return;
+        }
+
+        var folder = (folderCache[movePicker.type] || []).filter(function (f) {
+            return f.id === movePicker.parentId;
+        })[0];
+
+        movePicker.parentId = folder && folder.parent_id ? folder.parent_id : null;
+        renderMovePicker();
+    });
+
+    $(document).on('click', '.js-move-target', function () {
+        var fileId = $('#sf-move-file-id').val();
+        // 目標永遠是目前瀏覽到的那一層，renderMoveConfirm() 已寫進 data-id
+        var targetId = movePicker.parentId;
+        if (!targetId) { return; }
+
+        $.ajax({
+            url: '/admin/shared-file/ajax-move-file/' + fileId,
+            method: 'PUT',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            contentType: 'application/json',
+            data: JSON.stringify({ folder_id: targetId }),
+            success: function (body) {
+                hideBsModal(document.getElementById('modal-sf-move'));
+
+                // 等前一個 modal 收完再開提示，否則 backdrop 會疊在一起
+                setTimeout(function () {
+                    if (selectedSharedFolder) { loadFiles('shared', selectedSharedFolder); }
+                    if (selectedPersonalFolder) { loadFiles('personal', selectedPersonalFolder); }
+                    showMsg((body && body.message) || i18n.msg.file_moved);
+                }, 400);
+            },
+            error: function (xhr) {
+                hideBsModal(document.getElementById('modal-sf-move'));
+                setTimeout(function () {
+                    showMsg((xhr.responseJSON && xhr.responseJSON.message) || i18n.msg.move_failed);
+                }, 400);
+            }
+        });
+    });
 
     // ===== 檔案預覽 =====
 
