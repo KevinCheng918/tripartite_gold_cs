@@ -844,7 +844,10 @@ $(function () {
                     $('#comment-emoji-picker').toggle();
                 });
 
-                $(document).on('click', '.js-emoji-item', function () {
+                // 委派在 #emoji-grid 而非 document：loadPanel 每次都重建面板 DOM，
+                // 綁在 document 上的 handler 不會跟著消失，開幾次任務就累積幾個，
+                // 結果按一次表情符號會插入好幾個。#emoji-grid 每次都是新的，不會殘留。
+                $('#emoji-grid').on('click', '.js-emoji-item', function () {
                     var emoji = $(this).data('emoji');
                     var $input = $('#panel-comment-input');
                     var pos = $input[0].selectionStart || $input.val().length;
@@ -854,7 +857,8 @@ $(function () {
                     $('#comment-emoji-picker').hide();
                 });
 
-                $(document).on('click', function (e) {
+                // 點外面關閉：這個非綁 document 不可，改用命名空間，重綁前先解除舊的
+                $(document).off('click.taskCommentEmoji').on('click.taskCommentEmoji', function (e) {
                     if (!$(e.target).closest('#comment-emoji-picker, #btn-comment-emoji').length) {
                         $('#comment-emoji-picker').hide();
                     }
