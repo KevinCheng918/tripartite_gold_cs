@@ -18,6 +18,26 @@
 - **繳款通知**：把帳單資訊送到站台的 Telegram 群組（見 [[telegram-chat]]）
 - 帳單有匯率欄位（`add_exchange_rate_to_vm_billing_table`）
 
+## 帳務紀錄的操作按鈕依 `paid` 分支
+
+`resources/views/admin/vm/index.blade.php` 依 `b.paid` 決定顯示哪些按鈕：
+
+| `paid` | 狀態 | 按鈕 |
+|--------|------|------|
+| 0 | 未收款 | 複製文案／發送通知、上傳證明、標記已收 |
+| 2 | 待審核 | **查看證明**、重新上傳、審核通過 |
+| 1 | 已收款 | **查看證明**（2026-09-09 補上，先前完全沒有這個分支） |
+
+關機的主機（`vm_server.power_status === 0`）一律不顯示任何操作按鈕，
+每個分支都要帶 `!vmPowerOff`。
+
+> **`paid = 1` 原本沒有任何分支**，一旦標記已收，繳款證明就再也沒有入口，
+> 事後對帳查不到憑證。資料一直都在 —— `proof_image` 在 `VmRepository`
+> 的查詢欄位裡、`VmBillingResource` 有回傳，而 `markPaid()` / `approvePaid()`
+> 只更新 `paid` 與 `paid_at`，不會清掉證明。純粹是介面少了按鈕。
+>
+> 新增狀態分支時記得檢查：**這個狀態下該看得到的東西是不是也跟著消失了**。
+
 ## 站台可搜尋（2026-09-07）
 
 新增／編輯 modal 的站台從 `<select>` 改為「文字輸入 + 隱藏 id + 可篩選清單」。

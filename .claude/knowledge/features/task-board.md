@@ -75,6 +75,25 @@ Kanban 風格任務看板，五欄分組：待處理、進行中、測試中、�
 若照 `FileReader.onload` 的順序 `append`，載入快的小圖會插到前面，
 畫面順序就跟 `commentImageFiles` 的索引對不上，使用者會刪錯檔案。
 
+### 長內容的溢出處理（2026-09-09）
+
+註冊表路徑、網址這類**沒有空白可斷的長字串**會把整塊內容撐寬，
+手機上就超出卡片範圍、內容被推到畫面外。四處都要處理：
+
+| 位置 | 處理 |
+|------|------|
+| `.tb-content`（描述，`public/css/task-content.css`） | `overflow-wrap` + `word-break` |
+| `.comment-text`（留言內文） | 同上；`pre-wrap` 只保留換行，**不會**斷長字串 |
+| `.kanban-card`（看板卡片） | 同上，長標題會撐出欄外 |
+| `#task-side-panel` | `overflow-x: hidden` 作為保險 |
+
+**`<pre>` 程式碼區塊刻意不斷字**，改成 `overflow-x: auto` 自己橫向捲動 ——
+在任意位置折行會改變程式碼的意思，複製出去可能是壞的。
+表格同理（`display: block` + 自身捲動），圖片則是 `max-width: 100%`。
+
+`task-content.css` 由詳情面板與 TinyMCE 編輯器共用（`content_css`），
+改一次兩邊同時生效，不要在 blade 裡另寫一份。
+
 ### 附件的 dark mode
 
 樣式在頁面 `<style>` 的 `.attachment-item` / `.attachment-thumb` /

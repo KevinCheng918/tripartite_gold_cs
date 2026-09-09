@@ -991,6 +991,11 @@ $(function () {
                         '<i class="fas fa-check me-1"></i>{{ trans("vm.action_mark_paid") }}</button>';
                 }
             }
+            // 已收款：不再有操作，但繳款證明要留著能查，事後對帳才查得到憑證
+            if (!vmPowerOff && b.paid === 1 && b.proof_image) {
+                actions += '<button class="btn btn-sm btn-outline-secondary js-view-proof" data-img="' + b.proof_image + '">' +
+                    '<i class="fas fa-image me-1"></i>{{ trans("vm.action_view_proof") }}</button> ';
+            }
             // 待審核：可查看證明、重新上傳，有審核權限可審核（關機不顯示）
             if (!vmPowerOff && b.paid === 2) {
                 if (b.proof_image) {

@@ -2,6 +2,47 @@
    同時給兩個地方用：任務詳情面板、以及 TinyMCE 編輯器內（透過 content_css 載入），
    兩邊共用這一份才不會改了一處另一處沒跟上。 */
 
+/* ---- 溢出處理 ---- */
+/* 註冊表路徑、網址這類沒有空白可斷的長字串，預設會把整塊內容撐寬，
+   在手機上就會超出卡片範圍、內容被推到畫面外看不到。 */
+.tb-content,
+.mce-content-body {
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+/* 程式碼區塊不硬斷 —— 在任意位置折行會改變程式碼的意思，
+   複製出去也可能是壞的。改成自己橫向捲動，內容維持原樣。 */
+.tb-content pre,
+.mce-content-body pre {
+    overflow-x: auto;
+    max-width: 100%;
+    white-space: pre;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* 行內程式碼可以斷，長度通常不足以構成語意問題 */
+.tb-content code,
+.mce-content-body code {
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+/* 表格與圖片同樣不能把版面撐開 */
+.tb-content table,
+.mce-content-body table {
+    display: block;
+    overflow-x: auto;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+}
+
+.tb-content img,
+.mce-content-body img {
+    max-width: 100%;
+    height: auto;
+}
+
 /* ---- 編號清單分級 ---- */
 /* 巢狀編號如果每層都是 1. 2. 3. 根本看不出層級，逐層換成英文字母、羅馬數字 */
 .tb-content ol,

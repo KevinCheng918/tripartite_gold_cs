@@ -25,6 +25,8 @@
         /* forceFallback 模式跟著游標走的複製元素 */
         .kanban-card.sortable-fallback { opacity: 0.9; box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.25); cursor: grabbing; }
         .kanban-card .card-project { font-size: 0.75rem; color: #6c757d; margin-bottom: 0.25rem; }
+        /* 標題可能是一長串沒有空白的網址或路徑，不斷字會把卡片撐出欄外 */
+        .kanban-card { overflow-wrap: break-word; word-break: break-word; }
         .kanban-card .card-title-text { font-weight: 600; font-size: 0.9375rem; margin-bottom: 0.5rem; }
         .kanban-card .card-meta { display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem; }
         .priority-low    { border-left-color: #6c757d !important; }
@@ -53,7 +55,9 @@
         /* 側邊面板 */
         #task-side-panel.open { transform: translateX(0) !important; }
         #side-panel-resize:hover { background: rgba(0,123,255,0.3); }
-        #side-panel-inner { background: #fff; }
+        /* 面板整體保險：任何漏網的長內容都不該把面板橫向撐開 */
+        #task-side-panel { overflow-x: hidden; }
+        #side-panel-inner { background: #fff; overflow-wrap: break-word; word-break: break-word; }
         [data-theme="dark"] #side-panel-inner { background: #1e1e1e; color: #e0e0e0; }
         [data-theme="dark"] #side-panel-inner .form-control,
         [data-theme="dark"] #side-panel-inner .form-select { background: #2d2d2d; color: #e0e0e0; border-color: #444; }
@@ -75,6 +79,14 @@
         [data-theme="dark"] .btn-check:checked + .btn-outline-info { background: #0aa2c0 !important; color: #fff !important; border-color: #0aa2c0 !important; box-shadow: 0 0 0 3px rgba(10,162,192,0.4) !important; }
         [data-theme="dark"] .btn-check:checked + .btn-outline-warning { background: #b8860b !important; color: #fff !important; border-color: #b8860b !important; box-shadow: 0 0 0 3px rgba(184,134,11,0.4) !important; }
         [data-theme="dark"] .btn-check:checked + .btn-outline-danger { background: #c62828 !important; color: #fff !important; border-color: #c62828 !important; box-shadow: 0 0 0 3px rgba(198,40,40,0.4) !important; }
+        /* 留言內文：pre-wrap 保留換行，但長網址／路徑仍需可斷，否則會撐破卡片 */
+        .comment-text {
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+            white-space: pre-wrap;
+            overflow-wrap: break-word;
+            word-break: break-word;
+        }
         /* 附件 */
         .comment-thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 0.25rem; }
         .comment-preview-thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 0.25rem; }
@@ -1487,7 +1499,7 @@ $(function () {
                         html += '<button class="btn btn-sm btn-outline-secondary js-delete-comment" data-id="' + c.id + '" title="刪除留言"><i class="fas fa-trash text-danger"></i></button>';
                     }
                     html += '</div></div>';
-                    html += '<div class="js-comment-content" style="font-size:0.875rem;white-space:pre-wrap;margin-top:0.25rem">' + escapeHtml(c.content) + '</div>';
+                    html += '<div class="js-comment-content comment-text">' + escapeHtml(c.content) + '</div>';
                     // 編輯區（預設隱藏，圖片不可異動）
                     html += '<div class="js-comment-edit d-none mt-1">';
                     html += '<textarea class="form-control form-control-sm js-comment-edit-input" rows="3" maxlength="2000" style="font-size:0.875rem">' + escapeHtml(c.content) + '</textarea>';
