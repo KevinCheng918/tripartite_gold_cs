@@ -184,6 +184,8 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-task/{task}', [TaskBoardController::class, 'ajaxTaskDetail'])->middleware('can:task_board.view')->name('ajax-task-detail');
         Route::post('/ajax-store-task', [TaskBoardController::class, 'ajaxStoreTask'])->middleware('can:task_board.create')->name('ajax-store-task');
         Route::put('/ajax-update-task/{task}', [TaskBoardController::class, 'ajaxUpdateTask'])->middleware('can:task_board.update')->name('ajax-update-task');
+        // 權限沿用 update：能上傳附件的人就能刪除自己上傳的附件
+        Route::delete('/ajax-delete-attachment/{task}', [TaskBoardController::class, 'ajaxDeleteAttachment'])->middleware('can:task_board.update')->name('ajax-delete-attachment');
         Route::put('/ajax-archive-task/{task}', [TaskBoardController::class, 'ajaxArchiveTask'])->middleware('can:task_board.delete')->name('ajax-archive-task');
         Route::get('/ajax-archived-list', [TaskBoardController::class, 'ajaxArchivedList'])->middleware('can:task_board.view')->name('ajax-archived-list');
         Route::put('/ajax-restore-task/{task}', [TaskBoardController::class, 'ajaxRestoreTask'])->middleware('can:task_board.delete')->name('ajax-restore-task');

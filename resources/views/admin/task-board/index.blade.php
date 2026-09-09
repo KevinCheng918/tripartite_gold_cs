@@ -75,6 +75,41 @@
         [data-theme="dark"] .btn-check:checked + .btn-outline-info { background: #0aa2c0 !important; color: #fff !important; border-color: #0aa2c0 !important; box-shadow: 0 0 0 3px rgba(10,162,192,0.4) !important; }
         [data-theme="dark"] .btn-check:checked + .btn-outline-warning { background: #b8860b !important; color: #fff !important; border-color: #b8860b !important; box-shadow: 0 0 0 3px rgba(184,134,11,0.4) !important; }
         [data-theme="dark"] .btn-check:checked + .btn-outline-danger { background: #c62828 !important; color: #fff !important; border-color: #c62828 !important; box-shadow: 0 0 0 3px rgba(198,40,40,0.4) !important; }
+        /* 附件 */
+        .comment-thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 0.25rem; }
+        .comment-preview-thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 0.25rem; }
+        /* 送出前的非圖片附件：只需看得出檔名，做小一點不佔輸入區版面 */
+        .comment-file-chip {
+            display: inline-flex; align-items: center; gap: 0.25rem;
+            max-width: 140px; height: 40px; padding: 0 0.5rem;
+            font-size: 0.75rem; border: 1px solid #dee2e6; border-radius: 0.25rem;
+        }
+        [data-theme="dark"] .comment-file-chip { color: #e0e0e0; background: #2d2d2d; border-color: #444; }
+        .attachment-item { position: relative; display: inline-block; }
+        .attachment-thumb { width: 80px; height: 80px; object-fit: cover; border-radius: 0.375rem; border: 1px solid #dee2e6; }
+        [data-theme="dark"] .attachment-thumb { border-color: #444; }
+        .attachment-file { font-size: 0.8125rem; max-width: 180px; }
+        [data-theme="dark"] .attachment-file { color: #e0e0e0 !important; background: #2d2d2d; border-color: #444 !important; }
+        [data-theme="dark"] .attachment-file:hover { background: #3a3a3a; }
+        /* 刪除鈕的外框要跟卡片底色一致才像「挖」在上面，dark mode 用白框會很突兀 */
+        .attachment-del {
+            position: absolute; top: -6px; right: -6px;
+            width: 20px; height: 20px; padding: 0; line-height: 1;
+            border-radius: 50%; font-size: 0.6875rem;
+            background: #dc3545; color: #fff; border: 2px solid #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            opacity: 0; transition: opacity 0.15s, background 0.15s;
+        }
+        .attachment-item:hover .attachment-del,
+        .attachment-del:focus { opacity: 1; }
+        .attachment-del:hover { background: #bb2d3b; color: #fff; }
+        /* 外框取 #side-panel-inner 的深色底 #1e1e1e，才不會像白框那樣浮在上面 */
+        [data-theme="dark"] .attachment-del { background: #c62828; border-color: #1e1e1e; box-shadow: 0 1px 4px rgba(0,0,0,0.6); }
+        [data-theme="dark"] .attachment-del:hover { background: #e53935; }
+        /* 觸控裝置沒有 hover，刪除鈕必須常駐否則按不到 */
+        @media (hover: none) {
+            .attachment-del { opacity: 1; }
+        }
         /* emoji picker */
         .js-emoji-item:hover { background: rgba(0,0,0,0.08); }
         [data-theme="dark"] #comment-emoji-picker { background: #2d2d2d !important; border-color: #444 !important; }
@@ -401,6 +436,24 @@
                     <div class="d-flex justify-content-center gap-2">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                         <button type="button" class="btn btn-danger" id="btn-delete-comment-confirm-ok">確定封存</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- 刪除附件確認 Modal --}}
+    <div class="modal fade" id="modal-delete-attachment-confirm" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-body text-center py-4">
+                    <p class="mb-1">確定刪除此附件？</p>
+                    <p class="text-muted mb-3" style="font-size:0.8125rem;word-break:break-all" id="delete-attachment-name"></p>
+                    <input type="hidden" id="delete-attachment-url">
+                    <input type="hidden" id="delete-attachment-task-id">
+                    <div class="d-flex justify-content-center gap-2">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="button" class="btn btn-danger" id="btn-delete-attachment-confirm-ok">確定刪除</button>
                     </div>
                 </div>
             </div>
@@ -762,7 +815,7 @@ $(function () {
                     if (t.images && t.images.length > 0) {
                         html += '<div class="d-flex flex-wrap gap-2 mb-2 align-items-start">';
                         t.images.forEach(function (url) {
-                            html += isImageUrl(url) ? attachmentThumbHtml(url) : attachmentFileHtml(url);
+                            html += isImageUrl(url) ? attachmentThumbHtml(url, canUpdate) : attachmentFileHtml(url, canUpdate);
                         });
                         html += '</div>';
                     }
@@ -780,8 +833,9 @@ $(function () {
                 html += '<div class="position-relative"><button class="btn btn-sm btn-outline-secondary" id="btn-comment-emoji" type="button"><i class="fas fa-smile"></i></button>';
                 html += '<div id="comment-emoji-picker" style="display:none;position:absolute;bottom:100%;left:0;z-index:1060;background:#fff;border:1px solid #dee2e6;border-radius:0.5rem;padding:0.5rem;width:280px;box-shadow:0 4px 12px rgba(0,0,0,0.15);margin-bottom:0.25rem">';
                 html += '<div style="display:flex;flex-wrap:wrap;gap:4px;max-height:200px;overflow-y:auto" id="emoji-grid"></div></div></div>';
-                html += '<label class="btn btn-sm btn-outline-secondary mb-0" for="panel-comment-images"><i class="fas fa-image me-1"></i>附圖</label>';
-                html += '<input type="file" class="d-none" id="panel-comment-images" accept="image/*" multiple>';
+                // 不限圖片：accept 不設限，後端用 HasAttachmentRules 擋可執行檔
+                html += '<label class="btn btn-sm btn-outline-secondary mb-0" for="panel-comment-images"><i class="fas fa-paperclip me-1"></i>附件</label>';
+                html += '<input type="file" class="d-none" id="panel-comment-images" multiple>';
                 html += '<div id="panel-comment-image-previews" class="d-flex gap-1 flex-wrap"></div>';
                 html += '<button class="btn btn-sm btn-primary ms-auto" id="btn-send-comment">送出</button>';
                 html += '</div></div>';
@@ -812,6 +866,15 @@ $(function () {
                 commentImageFiles = [];
 
                 // 側邊面板圖片上傳
+                // 附件在 #side-panel-body 內、每次 loadPanel 都重建，直接綁不會累積
+                $('.js-delete-attachment').on('click', function () {
+                    var url = $(this).data('url');
+                    $('#delete-attachment-url').val(url);
+                    $('#delete-attachment-task-id').val(taskId);
+                    $('#delete-attachment-name').text(attachmentName(url));
+                    showBsModal('modal-delete-attachment-confirm');
+                });
+
                 $('#panel-upload-images').on('change', function () {
                     if (!this.files.length) return;
                     var formData = new FormData();
@@ -905,26 +968,49 @@ $(function () {
     }
 
     /**
-     * @param {string} url
+     * 附件的刪除鈕
+     *
+     * 沒有編輯權限時回空字串，不是把鈕 disable —— 看得到卻按不動更擾人。
+     *
+     * @param {string}  url
+     * @param {boolean} canDelete
      * @returns {string}
      */
-    function attachmentThumbHtml(url) {
-        return '<a href="' + url + '" target="_blank" rel="noopener">'
-            + '<img src="' + url + '" style="width:80px;height:80px;object-fit:cover;border-radius:0.375rem;border:1px solid #dee2e6"></a>';
+    function attachmentDeleteBtnHtml(url, canDelete) {
+        if (!canDelete) { return ''; }
+
+        return '<button type="button" class="btn btn-sm attachment-del js-delete-attachment" '
+            + 'data-url="' + $('<span>').text(url).html() + '" title="刪除附件">&times;</button>';
+    }
+
+    /**
+     * @param {string}  url
+     * @param {boolean} canDelete
+     * @returns {string}
+     */
+    function attachmentThumbHtml(url, canDelete) {
+        return '<div class="attachment-item">'
+            + '<a href="' + url + '" target="_blank" rel="noopener">'
+            + '<img src="' + url + '" class="attachment-thumb"></a>'
+            + attachmentDeleteBtnHtml(url, canDelete)
+            + '</div>';
     }
 
     /**
      * 非圖片附件顯示成可下載的檔案卡片
      *
-     * @param {string} url
+     * @param {string}  url
+     * @param {boolean} canDelete
      * @returns {string}
      */
-    function attachmentFileHtml(url) {
-        return '<a href="' + url + '" target="_blank" rel="noopener" download '
-            + 'class="d-inline-flex align-items-center gap-1 text-decoration-none border rounded px-2 py-1" '
-            + 'style="font-size:0.8125rem;max-width:180px">'
+    function attachmentFileHtml(url, canDelete) {
+        return '<div class="attachment-item">'
+            + '<a href="' + url + '" target="_blank" rel="noopener" download '
+            + 'class="attachment-file d-inline-flex align-items-center gap-1 text-decoration-none border rounded px-2 py-1">'
             + '<i class="fas fa-paperclip text-muted"></i>'
-            + '<span class="text-truncate">' + $('<span>').text(attachmentName(url)).html() + '</span></a>';
+            + '<span class="text-truncate">' + $('<span>').text(attachmentName(url)).html() + '</span></a>'
+            + attachmentDeleteBtnHtml(url, canDelete)
+            + '</div>';
     }
 
     /**
@@ -1362,7 +1448,7 @@ $(function () {
     /**
      * 留言相關 ajax 的錯誤訊息：優先取後端 message，其次取驗證錯誤
      */
-    function getCommentErrorMsg(xhr) {
+    function getCommentErrorMsg(xhr, fallback) {
         var body = xhr.responseJSON || {};
         if (body.errors) {
             var first = Object.keys(body.errors)[0];
@@ -1371,7 +1457,7 @@ $(function () {
             }
         }
 
-        return body.message || @json(trans('task_board.msg.comment_update_failed'));
+        return body.message || fallback || @json(trans('task_board.msg.comment_update_failed'));
     }
 
     function loadComments(taskId) {
@@ -1412,10 +1498,14 @@ $(function () {
                     html += '<button type="button" class="btn btn-sm btn-secondary js-comment-edit-cancel">' + @json(trans('task_board.action_cancel')) + '</button>';
                     html += '<button type="button" class="btn btn-sm btn-primary js-comment-edit-save" data-id="' + c.id + '">' + @json(trans('task_board.action_save')) + '</button>';
                     html += '</div></div>';
+                    // 留言附件不限圖片，非圖片顯示成可下載的檔案卡片
+                    // canDelete 傳 false：留言附件只能連同整則留言刪除
                     if (c.images && c.images.length > 0) {
-                        html += '<div class="d-flex flex-wrap gap-1 mt-1">';
+                        html += '<div class="d-flex flex-wrap gap-1 mt-1 align-items-start">';
                         c.images.forEach(function (url) {
-                            html += '<a href="' + url + '" target="_blank"><img src="' + url + '" style="width:60px;height:60px;object-fit:cover;border-radius:0.25rem"></a>';
+                            html += isImageUrl(url)
+                                ? '<a href="' + url + '" target="_blank" rel="noopener"><img src="' + url + '" class="comment-thumb"></a>'
+                                : attachmentFileHtml(url, false);
                         });
                         html += '</div>';
                     }
@@ -1488,13 +1578,40 @@ $(function () {
         renderCommentImagePreviews();
     });
 
+    /**
+     * 送出前的附件預覽
+     *
+     * 先同步把所有卡片依序放好，圖片的縮圖再非同步塞進去。
+     * 若照 FileReader.onload 的順序 append，載入快的小圖會插到前面，
+     * 畫面順序就跟 commentImageFiles 的索引對不上。
+     */
     function renderCommentImagePreviews() {
         var $container = $('#panel-comment-image-previews');
         $container.empty();
+
         commentImageFiles.forEach(function (file, idx) {
+            var isImage = file.type && file.type.indexOf('image/') === 0;
+            var removeBtn = '<button type="button" class="btn-close position-absolute top-0 end-0" '
+                + 'style="font-size:0.4rem;padding:0.15rem;background:#fff;border-radius:50%" '
+                + 'data-rm-comment-img="' + idx + '"></button>';
+
+            if (!isImage) {
+                $container.append('<div class="comment-file-chip position-relative" title="'
+                    + $('<span>').text(file.name).html() + '">'
+                    + '<i class="fas fa-paperclip text-muted"></i>'
+                    + '<span class="text-truncate">' + $('<span>').text(file.name).html() + '</span>'
+                    + removeBtn + '</div>');
+
+                return;
+            }
+
+            var $item = $('<div class="position-relative" style="width:40px;height:40px">'
+                + '<img class="comment-preview-thumb">' + removeBtn + '</div>');
+            $container.append($item);
+
             var reader = new FileReader();
             reader.onload = function (e) {
-                $container.append('<div class="position-relative" style="width:40px;height:40px"><img src="' + e.target.result + '" style="width:40px;height:40px;object-fit:cover;border-radius:0.25rem"><button type="button" class="btn-close position-absolute top-0 end-0" style="font-size:0.4rem;padding:0.15rem;background:#fff;border-radius:50%" data-rm-comment-img="' + idx + '"></button></div>');
+                $item.find('img').attr('src', e.target.result);
             };
             reader.readAsDataURL(file);
         });
@@ -1510,7 +1627,8 @@ $(function () {
         if (!content && commentImageFiles.length === 0) return;
 
         var formData = new FormData();
-        formData.append('content', content || '(圖片)');
+        // content 是必填，只附檔案不打字時給個佔位文字
+        formData.append('content', content || '(附件)');
         commentImageFiles.forEach(function (file) { formData.append('images[]', file); });
 
         $.ajax({
@@ -1527,7 +1645,9 @@ $(function () {
                 loadComments(taskId);
             },
             error: function (xhr) {
-                showMsg((xhr.responseJSON && xhr.responseJSON.message) || '留言失敗');
+                // 用 getCommentErrorMsg 取出驗證訊息，否則檔案過大或副檔名被擋
+                // 只會看到籠統的「留言失敗」，使用者不知道要改什麼
+                showMsg(getCommentErrorMsg(xhr, @json(trans('task_board.msg.comment_create_failed'))));
             }
         });
     }
@@ -1597,7 +1717,34 @@ $(function () {
         });
     }
 
-    // 刪除確認
+    // 刪除附件確認
+    $('#btn-delete-attachment-confirm-ok').on('click', function () {
+        var url = $('#delete-attachment-url').val();
+        var taskId = parseInt($('#delete-attachment-task-id').val(), 10);
+        var $btn = $(this);
+        $btn.prop('disabled', true);
+        $.ajax({
+            url: '/admin/task-board/ajax-delete-attachment/' + taskId,
+            method: 'DELETE',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            data: { url: url },
+            success: function (body) {
+                hideBsModal(document.getElementById('modal-delete-attachment-confirm'));
+                setTimeout(function () {
+                    showMsg((body && body.message) || '附件已刪除');
+                    loadPanel(taskId);
+                    loadBoard();
+                }, 400);
+                $btn.prop('disabled', false);
+            },
+            error: function (xhr) {
+                hideBsModal(document.getElementById('modal-delete-attachment-confirm'));
+                setTimeout(function () { showMsg((xhr.responseJSON && xhr.responseJSON.message) || '刪除失敗'); }, 400);
+                $btn.prop('disabled', false);
+            }
+        });
+    });
+
     // 刪除留言確認
     $('#btn-delete-comment-confirm-ok').on('click', function () {
         var commentId = $('#delete-comment-confirm-id').val();

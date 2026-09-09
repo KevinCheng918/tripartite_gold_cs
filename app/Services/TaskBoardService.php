@@ -8,6 +8,8 @@ use App\Repositories\StationRepository;
 use App\Repositories\TaskRepository;
 use App\Repositories\UserRepository;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * 任務看板 Service
@@ -128,6 +130,56 @@ class TaskBoardService
         }
 
         return $result;
+    }
+
+    /**
+     * 刪除任務的單一附件
+     *
+     * 前端拿到的是 Resource 產出的完整 URL，這裡用同樣的方式把每個相對路徑
+     * 轉成 URL 來比對，而不是去剝 URL 前綴 —— APP_URL 或子目錄部署變動時
+     * 剝前綴會對不上，用同一套產生規則比對才不會有落差。
+     *
+     * 實體檔案刪除失敗不影響流程（可能已被手動清掉），只記 log；
+     * 資料庫的參照移除才是使用者看得到的結果。
+     *
+     * @param Task        $task
+     * @param string      $url    附件的完整 URL
+     * @param int|null    $userId 操作者，用於活動紀錄
+     * @return bool 找不到該附件時回 false
+     */
+    public function deleteAttachment(Task $task, $url, $userId = null)
+    {
+        $images = $task->images ?? [];
+
+        $index = null;
+        foreach ($images as $i => $path) {
+            if (asset("storage/{$path}") === $url) {
+                $index = $i;
+                break;
+            }
+        }
+
+        if ($index === null) {
+            return false;
+        }
+
+        $removed = $images[$index];
+        unset($images[$index]);
+
+        $this->taskRepository->update($task, ['images' => array_values($images)]);
+
+        if (!Storage::disk('public')->delete($removed)) {
+            Log::warning('任務附件實體檔案刪除失敗', [
+                'task_id' => $task->id,
+                'path'    => $removed,
+            ]);
+        }
+
+        $this->logActivity($task->id, $userId, 'updated', [
+            '附件' => ['from' => basename($removed), 'to' => '已刪除'],
+        ]);
+
+        return true;
     }
 
     /**

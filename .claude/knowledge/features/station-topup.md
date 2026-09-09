@@ -74,6 +74,24 @@
 `CreditTopupService::approve()` 送主站 API 時只用 `credit_amount`，兩種輸入方式走同一條路。
 Telegram 通知也是直接轉發主站回傳的 `msg`。
 
+### 重試按鈕已移除（2026-09-09）
+
+`status = 3`（API 失敗）原本會顯示「重試」按鈕再送一次 `approve()`，
+**需求方要求移除**，桌機表格與手機卡片兩處都已拿掉。
+
+刻意**只移除前端顯示**，後端保留原樣：
+
+- `approve()` 仍同時接受 `STATUS_PENDING` 與 `STATUS_FAILED`
+- `STATUS_FAILED` 常數、狀態徽章、篩選都還在用
+
+所以 API 失敗的紀錄仍會正常標示狀態，只是不能再從介面重送。
+若日後要恢復，前端加回按鈕即可，後端不必動。
+
+> 連帶修正：桌機版顯示 `-` 的條件原本是
+> `!t.note && status !== 0 && status !== 3`，那個 `status !== 3` 是為了把
+> 版位讓給重試按鈕。移除後條件簡化為 `!t.note && status !== 0`，
+> 否則 API 失敗又沒備註的紀錄操作欄會變成空白。
+
 ## 前端注意事項
 
 - 切換輸入方式時，**`required` 必須跟著隱藏一起移除**（`switchTopupInputType()`），

@@ -1396,10 +1396,8 @@ $(function () {
             if (parseInt(t.status, 10) === 0 && hasTopupApprove) {
                 html += '<button class="btn btn-sm btn-outline-secondary js-topup-approve" data-id="' + t.id + '" data-station="' + t.station + '" data-amount="' + t.credit_amount + '" data-action="' + t.action_type + '"><i class="fas fa-check text-success me-1"></i>通過</button>';
                 html += '<button class="btn btn-sm btn-outline-secondary js-topup-reject" data-id="' + t.id + '"><i class="fas fa-times text-danger me-1"></i>拒絕</button>';
-            } else if (parseInt(t.status, 10) === 3 && hasTopupApprove) {
-                html += '<button class="btn btn-sm btn-outline-secondary js-topup-approve" data-id="' + t.id + '" data-station="' + t.station + '" data-amount="' + t.credit_amount + '" data-action="' + t.action_type + '"><i class="fas fa-redo text-warning me-1"></i>重試</button>';
             }
-            if (!t.note && parseInt(t.status, 10) !== 0 && parseInt(t.status, 10) !== 3) { html += '-'; }
+            if (!t.note && parseInt(t.status, 10) !== 0) { html += '-'; }
             html += '</div></td>';
             html += '</tr>';
         });
@@ -1439,9 +1437,6 @@ $(function () {
                 html += '<button class="btn btn-sm btn-outline-secondary js-topup-approve" data-id="' + t.id + '" data-station="' + t.station + '" data-amount="' + t.credit_amount + '" data-action="' + t.action_type + '"><i class="fas fa-check text-success me-1"></i>通過</button>';
                 html += '<button class="btn btn-sm btn-outline-secondary js-topup-reject" data-id="' + t.id + '"><i class="fas fa-times text-danger me-1"></i>拒絕</button>';
                 html += '</div>';
-            }
-            if (parseInt(t.status, 10) === 3 && hasTopupApprove) {
-                html += '<button class="btn btn-sm btn-outline-secondary js-topup-approve" data-id="' + t.id + '" data-station="' + t.station + '" data-amount="' + t.credit_amount + '" data-action="' + t.action_type + '"><i class="fas fa-redo text-warning me-1"></i>重試</button>';
             }
             html += '</div></div>';
         });

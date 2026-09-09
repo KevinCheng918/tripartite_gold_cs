@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\TaskBoard\DeleteAttachmentRequest;
 use App\Http\Requests\TaskBoard\MoveTaskRequest;
 use App\Http\Requests\TaskBoard\ReorderTaskRequest;
 use App\Http\Requests\TaskBoard\StoreCommentRequest;
@@ -165,6 +166,32 @@ class TaskBoardController extends Controller
             Log::error('任務更新失敗', ['error' => $e->getMessage(), 'task_id' => $task->id]);
 
             return response()->json(['message' => trans('task_board.msg.task_update_failed')], 500);
+        }
+    }
+
+    /**
+     * Ajax 刪除任務單一附件
+     *
+     * @param DeleteAttachmentRequest $request
+     * @param Task                    $task
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxDeleteAttachment(DeleteAttachmentRequest $request, Task $task)
+    {
+        $params = $request->validated();
+
+        try {
+            $deleted = $this->taskBoardService->deleteAttachment($task, $params['url'], Auth::id());
+
+            if (!$deleted) {
+                return response()->json(['message' => trans('task_board.msg.attachment_not_found')], 404);
+            }
+
+            return response()->json(['message' => trans('task_board.msg.attachment_deleted')]);
+        } catch (\Exception $e) {
+            Log::error('任務附件刪除失敗', ['error' => $e->getMessage(), 'task_id' => $task->id]);
+
+            return response()->json(['message' => trans('task_board.msg.attachment_delete_failed')], 500);
         }
     }
 
@@ -360,8 +387,10 @@ class TaskBoardController extends Controller
     public function ajaxStoreComment(StoreCommentRequest $request, Task $task)
     {
         $params = $request->validated();
+        // 用 KeepName 而非 uploadMultiple：留言附件不限圖片，
+        // uniqid 命名會讓下載下來的檔案完全看不出是什麼
         $images = $request->hasFile('images')
-            ? $this->imageUploadService->uploadMultiple($request->file('images'), 'task-comment')
+            ? $this->imageUploadService->uploadMultipleKeepName($request->file('images'), 'task-comment')
             : [];
 
         $comment = $this->taskBoardService->addComment($task->id, Auth::id(), $params['content'], $images);

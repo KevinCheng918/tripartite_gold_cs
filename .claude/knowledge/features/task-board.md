@@ -38,11 +38,54 @@ Kanban 風格任務看板，五欄分組：待處理、進行中、測試中、�
 
 ### 附件上傳（2026-09-04）
 - 任務附件不限圖片；`images` 欄位名稱沿用舊名，實際收各類檔案
-- 三處共用 `app/Http/Requests/TaskBoard/Concerns/HasAttachmentRules.php`：
+- **四處**共用 `app/Http/Requests/TaskBoard/Concerns/HasAttachmentRules.php`：
+  新增任務、更新任務、描述編輯器上傳、**留言**。
   上限 20MB + 26 種可執行／腳本副檔名黑名單。**不要各寫各的**，否則會一鬆一緊
 - 黑名單是必要的：檔案落在 `storage/app/public` 底下且對外可直接存取
 - 非圖片附件用 `ImageUploadService::uploadKeepName()` 儲存（`upload()` 的 uniqid 命名會讓人看不出檔名）
 - 前端 `attachmentName()` 會去掉 `時間戳_uniqid_` 前綴才顯示
+
+### 附件刪除（2026-09-09）
+
+縮圖／檔案卡片右上角的紅色 `×`，確認彈窗會顯示檔名避免刪錯。
+`TaskBoardService::deleteAttachment()` 同時移除 `images` 的參照與實體檔案。
+
+| 決定 | 原因 |
+|------|------|
+| **傳 URL 而非陣列索引** | 索引在多人同時操作時會錯位 —— 你要刪第 2 個，別人剛上傳新檔案，就會刪到別人的 |
+| **後端用 `asset("storage/{$path}")` 產 URL 來比對**，不剝 URL 前綴 | `APP_URL` 或子目錄部署變動時剝前綴會對不上；用同一套產生規則比對才不會有落差 |
+| 權限沿用 `task_board.update` | 與上傳同一個，能上傳就能刪。無權限時**不顯示**按鈕而非 disable |
+| 實體檔案刪除失敗只記 log 不擋流程 | 檔案可能早被手動清掉；DB 參照移除才是使用者看得到的結果 |
+| 會寫活動紀錄（附件 → 已刪除） | 與其他操作一致，可追溯 |
+
+**尚未支援**：留言的附件只能連同整則留言刪除，無法單獨刪某一個
+（渲染時 `attachmentFileHtml(url, false)` 刻意傳 `canDelete = false`）。
+
+### 留言附件不限圖片（2026-09-09）
+
+留言原本只收圖片（`image|max:5120` + `accept="image/*"`），已改為與任務附件一致：
+
+- `StoreCommentRequest` 改用 `HasAttachmentRules`，20MB + 副檔名黑名單
+- 上傳改用 `uploadMultipleKeepName()`。原本的 `uploadMultiple()` 是 uniqid 命名，
+  圖片沒差，但**檔案下載後會完全看不出是什麼**
+- 顯示沿用 `isImageUrl()` 分流：圖片縮圖、非圖片走 `attachmentFileHtml()`
+
+送出前的預覽（`renderCommentImagePreviews()`）有個容易改壞的地方：
+**必須先同步依序放好卡片，縮圖再非同步塞進 `<img>`**。
+若照 `FileReader.onload` 的順序 `append`，載入快的小圖會插到前面，
+畫面順序就跟 `commentImageFiles` 的索引對不上，使用者會刪錯檔案。
+
+### 附件的 dark mode
+
+樣式在頁面 `<style>` 的 `.attachment-item` / `.attachment-thumb` /
+`.attachment-file` / `.attachment-del`，**不要寫回 inline style** ——
+inline 無法表達 `[data-theme="dark"]` 選擇器。
+
+- 刪除鈕外框在 light 是 `#fff`，dark 必須改成 `#1e1e1e`（`#side-panel-inner`
+  的實際底色）。沿用白框會在深色底上浮成一圈亮邊
+- 檔案卡片在 dark 要自己給底色與文字色，否則是白底白字幾乎看不見
+- 刪除鈕平常 `opacity: 0`，hover 附件才浮現；但**必須有
+  `@media (hover: none) { opacity: 1 }`**，否則觸控裝置沒有 hover 會完全按不到
 
 ### 封存系統
 - 任務封存（status = 6），不直接刪除
@@ -76,11 +119,12 @@ Kanban 風格任務看板，五欄分組：待處理、進行中、測試中、�
 - `app/Http/Requests/TaskBoard/MoveTaskRequest.php`
 - `app/Http/Requests/TaskBoard/ReorderTaskRequest.php`
 - `app/Http/Requests/TaskBoard/StoreProjectRequest.php`
-- `app/Http/Requests/TaskBoard/StoreCommentRequest.php`
+- `app/Http/Requests/TaskBoard/StoreCommentRequest.php` — 留言附件不限圖片，共用 HasAttachmentRules
 - `app/Http/Requests/TaskBoard/UpdateCommentRequest.php` — 只驗證 content（圖片不可異動）
 - `app/Http/Requests/TaskBoard/UpdateChecklistRequest.php` — 只驗證 description
 - `app/Http/Requests/TaskBoard/UploadEditorImageRequest.php` — 編輯器圖片（上限 5MB）
 - `app/Http/Requests/TaskBoard/UploadEditorFileRequest.php` — 編輯器附件（上限 20MB）
+- `app/Http/Requests/TaskBoard/DeleteAttachmentRequest.php` — 只驗證 url（刻意不用陣列索引）
 - `app/Http/Requests/TaskBoard/Concerns/HasAttachmentRules.php` — 附件共用規則 trait
 - `app/Http/Resources/TaskResource.php` — 含 preloadUsers 靜態快取、previous_status（從 latestArchivedActivity 取得）
 - `app/Http/Resources/TaskCommentResource.php` — 含 `is_mine`（本人才顯示編輯鈕）、`is_edited`
