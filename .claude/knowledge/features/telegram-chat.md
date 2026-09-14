@@ -330,7 +330,7 @@ Telegram 在 iOS 與 Android 的方向不一致，限定單向反而違背既有
 > **連訊息紀錄都不會留**。第一版只處理 photo / sticker / document，
 > 客人傳影片就完全收不到。
 
-目前支援（`parseOtherMedia()`）：
+目前支援（解析入口 `parseMedia()`，photo / sticker / document 以外轉給 `parseOtherMedia()`）：
 
 | Telegram key | 內部 media_type |
 |---|---|
@@ -351,6 +351,34 @@ Telegram 在 iOS 與 Android 的方向不一致，限定單向反而違背既有
 Repository 的 select、`TelegramMessageResource`、Pusher payload、
 前端 `messages.js` 的渲染分支、`MEDIA_LABELS`。
 
+### 多 Bot：下載媒體前一定要先切 token（2026-09-14）
+
+> ⚠️ **`file_id` 是綁定 Bot 的**：拿 A Bot 的 token 呼叫 `getFile` 去取 B Bot 收到的
+> `file_id`，Telegram 回 400。多 Bot 環境下媒體下載**必須**排在
+> `switchBotToken()` 之後，否則永遠用 `.env` 的預設 token，
+> 非預設 Bot 的群組圖片會全數變成空氣泡。
+
+因此 `handleIncomingMessage()` 的順序是死的：
+
+```
+parseMedia()（只取 file_id，不下載）
+  → early return 檢查（無文字也無媒體就跳過）
+  → 找／建群組
+  → switchBotToken()
+  → downloadTelegramFile()
+```
+
+解析與下載刻意拆開就是為了這個順序。所有 Bot 的 webhook 都指向同一個
+`/api/telegram/webhook`，payload 裡沒有 Bot 身分，只能靠
+`chat_id → group → station → system.bot_token` 還原。
+
+連帶前提：群組要綁站台、站台要有 `system_id`、系統要填 `bot_token`，
+任一環沒接上就 fallback 回預設 token。新群組的第一則訊息還沒綁站台，
+媒體仍抓不到 —— 這是已知限制。
+
+**新增任何會呼叫 `botService` 的流程時，第一件事是確認 `switchBotToken()` 已經跑過。**
+詳見 [[../bugfix/2026-09-14-multi-bot-media-download]]。
+
 ### 20MB 下載上限
 
 Bot API 的 `getFile` 只能抓 20MB 以內。超過時 `downloadTelegramFile()` 回 null，
@@ -359,6 +387,10 @@ Bot API 的 `getFile` 只能抓 20MB 以內。超過時 `downloadTelegramFile()`
 
 `downloadTelegramFile()` 的副檔名 fallback **不能一律用 jpg**，
 那會讓影片存成 `.jpg` 而播不出來；依前綴給 mp4 / oga / mp3 / bin。
+
+> 失敗 log 不要寫死「超過 20MB」—— 上面的 token 用錯也會走到同一行，
+> 一句話咬定原因會讓下次排查跑錯方向。現在的 log 兩種原因都列，
+> 並附 `botService->getBotId()`（token 冒號前的數字，token 本身不入 log）供分辨。
 
 ### 媒體替代文字放 config 不放語系
 

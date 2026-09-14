@@ -205,71 +205,14 @@ class TelegramChatService
         $senderName = $this->buildSenderName($message['from'] ?? []);
         $telegramMessageId = $message['message_id'] ?? null;
 
-        // 解析媒體（圖片）
-        $mediaType = null;
+        // 解析媒體（此處只取出 file_id，實際下載必須等切換 Bot Token 之後）
+        $media = $this->parseMedia($message);
+        $mediaType = $media['type'] ?? null;
+        $mediaName = $media['name'] ?? null;
         $mediaUrl = null;
-        $mediaName = null;
 
-        if (isset($message['photo'])) {
-            $mediaType = 'photo';
-            $photos = $message['photo'];
-            $largest = end($photos);
-            $fileId = $largest['file_id'] ?? null;
-
-            if (filled($fileId)) {
-                $mediaUrl = $this->downloadTelegramFile($fileId, 'photo');
-            }
-        } elseif (isset($message['sticker'])) {
-            $mediaType = 'sticker';
-            $sticker = $message['sticker'];
-            $isAnimated = $sticker['is_animated'] ?? false;
-            $isVideo = $sticker['is_video'] ?? false;
-
-            // 動態 / 影片貼圖原始檔為 .tgs / .webm，<img> 無法顯示，改用縮圖
-            if (($isAnimated || $isVideo) && isset($sticker['thumbnail']['file_id'])) {
-                $fileId = $sticker['thumbnail']['file_id'];
-            } else {
-                $fileId = $sticker['file_id'] ?? null;
-            }
-
-            if (filled($fileId)) {
-                $mediaUrl = $this->downloadTelegramFile($fileId, 'sticker');
-            }
-        } elseif (isset($message['document'])) {
-            $doc = $message['document'];
-            $fileId = $doc['file_id'] ?? null;
-            $fileName = $doc['file_name'] ?? 'file';
-
-            // wav、mp4 這類會被 Telegram 當成 document 送來（voice 只用於按住錄音的訊息）。
-            // 依 MIME 判斷才能讓它們在對話裡直接播，而不是只給一個下載連結
-            $mediaType = $this->documentMediaType($doc['mime_type'] ?? null);
-
-            if (filled($fileId)) {
-                $mediaUrl = $this->downloadTelegramFile($fileId, 'document');
-            }
-
-            // 本地存檔名是 document_時間戳_亂數，原始檔名只有這裡拿得到，
-            // 不留下來的話下載時就還原不了
-            $mediaName = $fileName;
-
-            // 檔名放到 text 前面方便顯示
-            if (!filled($text)) {
-                $text = $fileName;
-            }
-        } else {
-            // 影片、語音、音訊等。沒有這段的話 mediaType 會是 null，
-            // 客人只傳影片不打字時整則訊息會被下面的「無文字也無媒體」直接丟掉
-            $parsed = $this->parseOtherMedia($message);
-
-            if (filled($parsed)) {
-                $mediaType = $parsed['type'];
-                $mediaUrl = $parsed['url'];
-                $mediaName = $parsed['name'];
-
-                if (!filled($text)) {
-                    $text = $parsed['fallback_text'];
-                }
-            }
+        if (filled($media) && !filled($text) && filled($media['fallback_text'])) {
+            $text = $media['fallback_text'];
         }
 
         // 無文字也無媒體則跳過
@@ -290,6 +233,13 @@ class TelegramChatService
 
         // 根據站台系統切換 Bot Token（用於下載圖片等）
         $this->switchBotToken($group);
+
+        // file_id 綁定收到該訊息的 Bot，必須用同一個 Bot 的 token 呼叫 getFile，
+        // 否則 Telegram 會回 400 —— 非預設 Bot 的群組媒體會全部抓不下來，
+        // 所以下載一定要排在 switchBotToken 後面
+        if (filled($media['file_id'] ?? null)) {
+            $mediaUrl = $this->downloadTelegramFile($media['file_id'], $media['prefix']);
+        }
 
         // 群組名稱可能變更，同步更新
         if ($group->title !== $chatTitle) {
@@ -666,14 +616,79 @@ class TelegramChatService
      * @return string|null 本地公開 URL
      */
     /**
+     * 解析訊息中的媒體，只取出 file_id 不下載
+     *
+     * 下載得等 switchBotToken 之後才能做（file_id 綁定收訊的 Bot），
+     * 所以解析與下載必須拆開。
+     *
+     * @param array $message Telegram message payload
+     * @return array|null {type, file_id, prefix, name, fallback_text}
+     */
+    private function parseMedia($message)
+    {
+        if (isset($message['photo'])) {
+            $photos = $message['photo'];
+            $largest = end($photos);
+
+            return [
+                'type'          => 'photo',
+                'file_id'       => $largest['file_id'] ?? null,
+                'prefix'        => 'photo',
+                'name'          => null,
+                'fallback_text' => null,
+            ];
+        }
+
+        if (isset($message['sticker'])) {
+            $sticker = $message['sticker'];
+            $isAnimated = $sticker['is_animated'] ?? false;
+            $isVideo = $sticker['is_video'] ?? false;
+
+            // 動態 / 影片貼圖原始檔為 .tgs / .webm，<img> 無法顯示，改用縮圖
+            $fileId = ($isAnimated || $isVideo) && isset($sticker['thumbnail']['file_id'])
+                ? $sticker['thumbnail']['file_id']
+                : ($sticker['file_id'] ?? null);
+
+            return [
+                'type'          => 'sticker',
+                'file_id'       => $fileId,
+                'prefix'        => 'sticker',
+                'name'          => null,
+                'fallback_text' => null,
+            ];
+        }
+
+        if (isset($message['document'])) {
+            $doc = $message['document'];
+
+            return [
+                // wav、mp4 這類會被 Telegram 當成 document 送來（voice 只用於按住錄音的訊息）。
+                // 依 MIME 判斷才能讓它們在對話裡直接播，而不是只給一個下載連結
+                'type'    => $this->documentMediaType($doc['mime_type'] ?? null),
+                'file_id' => $doc['file_id'] ?? null,
+                'prefix'  => 'document',
+                // 本地存檔名是 document_時間戳_亂數，原始檔名只有這裡拿得到，
+                // 不留下來的話下載時就還原不了
+                'name'          => $doc['file_name'] ?? 'file',
+                // 沒有文字時用檔名當內容顯示
+                'fallback_text' => $doc['file_name'] ?? 'file',
+            ];
+        }
+
+        // 影片、語音、音訊等。沒有這段的話 mediaType 會是 null，
+        // 客人只傳影片不打字時整則訊息會被「無文字也無媒體」直接丟掉
+        return $this->parseOtherMedia($message);
+    }
+
+    /**
      * 解析影片／語音／音訊等 photo・sticker・document 以外的媒體
      *
      * Bot API 的 getFile 只能下載 20MB 以內的檔案，超過就抓不下來。
-     * 抓不到時仍回傳結果（url 為 null），讓訊息本身還是進得了資料庫 ——
+     * 抓不到時 url 仍為 null，但訊息本身還是進得了資料庫 ——
      * 客服至少要知道「客人傳了一段影片」，而不是整則訊息憑空消失。
      *
      * @param array $message Telegram message payload
-     * @return array|null {type, url, name, fallback_text}
+     * @return array|null {type, file_id, prefix, name, fallback_text}
      */
     private function parseOtherMedia($message)
     {
@@ -697,7 +712,9 @@ class TelegramChatService
 
             return [
                 'type'          => $type,
-                'url'           => filled($fileId) ? $this->downloadTelegramFile($fileId, $key) : null,
+                'file_id'       => $fileId,
+                // 下載檔名前綴沿用 Telegram 的 key，才能挑到對的副檔名
+                'prefix'        => $key,
                 'name'          => $media['file_name'] ?? null,
                 'fallback_text' => $this->mediaLabel($key),
             ];
@@ -777,10 +794,13 @@ class TelegramChatService
         $remoteUrl = $this->botService->getFileUrl($fileId);
 
         if (!filled($remoteUrl)) {
-            // getFile 失敗最常見的原因是超過 Bot API 的 20MB 下載上限
-            Log::warning('Telegram 取檔案位址失敗，可能超過 20MB 下載上限', [
+            // 兩種常見原因：超過 Bot API 的 20MB 下載上限，
+            // 或多 Bot 環境下用錯 token（file_id 綁定收訊的 Bot）——
+            // 附上目前使用的 bot_id 才分得出是哪一種
+            Log::warning('Telegram 取檔案位址失敗（超過 20MB 上限，或 token 與 file_id 不屬同一個 Bot）', [
                 'file_id' => $fileId,
                 'prefix'  => $prefix,
+                'bot_id'  => $this->botService->getBotId(),
             ]);
 
             return null;

@@ -47,6 +47,22 @@ class TelegramBotService
     }
 
     /**
+     * 取得目前使用中的 Bot ID（token 冒號前的數字）
+     *
+     * 供 log 判斷「這次呼叫是用哪支 Bot」，token 本身不可寫入 log。
+     *
+     * @return string|null
+     */
+    public function getBotId()
+    {
+        if (!filled($this->defaultToken)) {
+            return null;
+        }
+
+        return strtok($this->defaultToken, ':') ?: null;
+    }
+
+    /**
      * 轉義 HTML 特殊字元，保留 Telegram 允許的標籤
      *
      * @param string $text
