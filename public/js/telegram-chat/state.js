@@ -16,6 +16,12 @@ window.TgChat = (function () {
         nickname: root.dataset.userNickname,
         canReply: root.dataset.canReply === '1',
         canDelete: root.dataset.canDelete === '1',
+        canIgnore: root.dataset.canIgnore === '1',
+
+        // 被設為不自動回覆的成員顯示名稱，跟著訊息一起回來。
+        // 訊息本身沒有存發話者 id（不動大表），標籤只能用名字比對 ——
+        // 對方改名後會不準，但那只是視覺提示，要不要自動回是收訊當下用 id 判的
+        ignoredNames: [],
 
         // 後台是否已設定 Claude 憑證。沒設定就不讓開自動回覆 ——
         // 開了也只會讓客人一直收到「稍等」

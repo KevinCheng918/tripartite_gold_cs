@@ -7,13 +7,17 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\TelegramChat\ReplyRequest;
 use App\Http\Requests\TelegramChat\SendFileRequest;
 use App\Http\Requests\TelegramChat\ToggleAutoReplyRequest;
+use App\Http\Requests\TelegramChat\ToggleIgnoreMemberRequest;
+use App\Http\Resources\GroupMemberResource;
 use App\Http\Resources\TelegramMessageResource;
 use App\Services\AutoReplyService;
 use App\Services\ImageUploadService;
 use App\Services\QuickReplyService;
 use App\Services\SharedFileService;
 use App\Services\TelegramChatService;
+use App\Services\TelegramGroupMemberService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -30,19 +34,22 @@ class TelegramChatController extends Controller
     private $quickReplyService;
     private $imageUploadService;
     private $autoReplyService;
+    private $memberService;
 
     public function __construct(
         TelegramChatService $chatService,
         SharedFileService $sharedFileService,
         QuickReplyService $quickReplyService,
         ImageUploadService $imageUploadService,
-        AutoReplyService $autoReplyService
+        AutoReplyService $autoReplyService,
+        TelegramGroupMemberService $memberService
     ) {
         $this->chatService = $chatService;
         $this->sharedFileService = $sharedFileService;
         $this->quickReplyService = $quickReplyService;
         $this->imageUploadService = $imageUploadService;
         $this->autoReplyService = $autoReplyService;
+        $this->memberService = $memberService;
     }
 
     /**
@@ -90,6 +97,75 @@ class TelegramChatController extends Controller
     }
 
     /**
+     * Ajax 取得對話的「不自動回覆」名單與發言過的人
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxIgnoreMembers(Request $request)
+    {
+        $params = ['group_id' => (int) $request->input('group_id')];
+
+        $panel = $this->memberService->getPanel($params['group_id']);
+
+        return response()->json([
+            'ignored' => GroupMemberResource::collection($panel['ignored']),
+            'recent'  => GroupMemberResource::collection($panel['recent']),
+            // 清單標題要寫「近 N 天」，天數是後端設定的，不讓前端自己寫死一份
+            'recent_days' => (int) config('constants.TELEGRAM.IGNORE.RECENT_DAYS'),
+        ]);
+    }
+
+    /**
+     * Ajax 切換成員的「不自動回覆」狀態
+     *
+     * @param ToggleIgnoreMemberRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxToggleIgnore(ToggleIgnoreMemberRequest $request)
+    {
+        $params = $request->validated();
+        $actions = config('constants.TELEGRAM.IGNORE.ACTION');
+        $groupId = (int) Arr::get($params, 'group_id', 0);
+        $action = Arr::get($params, 'action');
+
+        try {
+            if ($action === $actions['RESTORE']) {
+                $this->memberService->restore($groupId, (int) Arr::get($params, 'member_id', 0));
+
+                return response()->json(['message' => trans('telegram_chat.msg.ignore_restored')]);
+            }
+
+            if ($action === $actions['ADD']) {
+                $this->memberService->ignoreByUsername(
+                    $groupId,
+                    Arr::get($params, 'username'),
+                    Arr::get($params, 'note'),
+                    (int) Auth::id()
+                );
+
+                return response()->json(['message' => trans('telegram_chat.msg.ignore_added')]);
+            }
+
+            $this->memberService->ignore($groupId, (int) Arr::get($params, 'member_id', 0), (int) Auth::id());
+
+            return response()->json(['message' => trans('telegram_chat.msg.ignore_added')]);
+        } catch (\RuntimeException $e) {
+            // 找不到成員、username 不合法、或已經在名單裡
+            return response()->json(['message' => $e->getMessage()], 422);
+        } catch (\Exception $e) {
+            Log::error('忽略名單更新失敗', [
+                'group_id' => $groupId,
+                'action'   => $action,
+                'error'    => $e->getMessage(),
+                'user_id'  => Auth::id(),
+            ]);
+
+            return response()->json(['message' => trans('telegram_chat.msg.ignore_failed')], 500);
+        }
+    }
+
+    /**
      * Ajax 取得對話列表（群組）
      *
      * @return \Illuminate\Http\JsonResponse
@@ -117,7 +193,10 @@ class TelegramChatController extends Controller
         // 點進對話自動標為已讀
         $this->chatService->markAsRead($groupId);
 
-        return TelegramMessageResource::collection($messages);
+        // 被設為不自動回覆的人，訊息上要標出來讓客服知道這則要自己回。
+        // 跟著訊息一起回，不另開路由 —— 標籤是狀態揭露，沒有管理權限的人也該看得到
+        return TelegramMessageResource::collection($messages)
+            ->additional(['ignored_names' => $this->memberService->getIgnoredNames($groupId)]);
     }
 
     /**

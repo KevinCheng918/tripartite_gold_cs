@@ -130,7 +130,14 @@
         var date = m.created_at ? m.created_at.substring(5, 10) : '';
         var timeLabel = date + ' ' + time;
 
-        var senderLabel = '<div style="font-size:0.8125rem;font-weight:600;margin-bottom:2px;color:' + (isOutbound ? '#a67c00' : '#495057') + '">' + T.escapeHtml(m.sender_name || '') + '</div>';
+        // 這個人被設為不自動回覆時標出來，客服才知道這則要自己回、不用等系統
+        var ignoredBadge = '';
+        if (!isOutbound && m.sender_name && T.ignoredNames.indexOf(m.sender_name) !== -1) {
+            ignoredBadge = '<span class="badge bg-light text-muted border ms-1" style="font-size:0.6875rem;font-weight:400">' +
+                T.escapeHtml(T.i18n.ignore_badge) + '</span>';
+        }
+
+        var senderLabel = '<div style="font-size:0.8125rem;font-weight:600;margin-bottom:2px;color:' + (isOutbound ? '#a67c00' : '#495057') + '">' + T.escapeHtml(m.sender_name || '') + ignoredBadge + '</div>';
         var timeHtml = '<small class="text-muted">' + timeLabel + '</small>';
         var bubbleBg = isOutbound ? 'background:#e8f5e9' : 'background:#f5f5f5';
         var darkBubbleBg = isOutbound ? 'tg-bubble-out' : 'tg-bubble-in';
@@ -173,6 +180,7 @@
 
         T.apiFetch('/admin/telegram-chat/ajax-messages?group_id=' + groupId + '&per_page=100')
             .then(function (body) {
+                T.ignoredNames = body.ignored_names || [];
                 var messages = (body.data || []).reverse();
                 T.renderMessages(messages);
                 if (callback) { callback(); }

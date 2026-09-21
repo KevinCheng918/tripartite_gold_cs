@@ -77,6 +77,7 @@ return [
     'telegram_chat' => [
         'template_view'   => 'View reply templates',
         'template_manage' => 'Modify reply templates',
+        'ignore_manage'   => 'Manage auto-reply exclusions',
         'reply'     => 'Reply messages',
         'assign'    => 'Assign duty staff',
         'broadcast' => 'Broadcast announcement',

@@ -13,6 +13,7 @@
          data-user-nickname="{{ Auth::user()->nickname }}"
          data-can-reply="{{ Auth::user()->hasPermission('telegram_chat.reply') ? '1' : '0' }}"
          data-can-delete="{{ Auth::user()->hasPermission('telegram_chat.delete') ? '1' : '0' }}"
+         data-can-ignore="{{ Auth::user()->hasPermission('telegram_chat.ignore_manage') ? '1' : '0' }}"
          data-auto-reply-available="{{ $autoReplyAvailable ? '1' : '0' }}"
          data-ws-key="{{ config('broadcasting.connections.pusher.key') }}"
          data-ws-host="{{ config('broadcasting.connections.pusher.options.host') }}"
@@ -33,6 +34,8 @@
     <script src="{{ asset('js/telegram-chat/emoji.js') }}?v={{ filemtime(public_path('js/telegram-chat/emoji.js')) }}"></script>
     <script src="{{ asset('js/telegram-chat/input.js') }}?v={{ filemtime(public_path('js/telegram-chat/input.js')) }}"></script>
     <script src="{{ asset('js/telegram-chat/quick-reply.js') }}?v={{ filemtime(public_path('js/telegram-chat/quick-reply.js')) }}"></script>
+    {{-- 必須排在 main.js 之前：renderHeader 實際執行時要看得到 T.openIgnorePanel --}}
+    <script src="{{ asset('js/telegram-chat/ignore-member.js') }}?v={{ filemtime(public_path('js/telegram-chat/ignore-member.js')) }}"></script>
     <script src="{{ asset('js/telegram-chat/alert.js') }}?v={{ filemtime(public_path('js/telegram-chat/alert.js')) }}"></script>
     <script src="{{ asset('js/telegram-chat/main.js') }}?v={{ filemtime(public_path('js/telegram-chat/main.js')) }}"></script>
 @endsection

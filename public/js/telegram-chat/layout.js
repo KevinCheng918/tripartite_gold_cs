@@ -112,13 +112,32 @@
             ? '<button class="btn btn-sm btn-outline-secondary ms-auto" id="btn-tg-delete-conv" data-id="' + group.id + '" title="刪除對話紀錄" style="white-space:nowrap;flex-shrink:0"><i class="fas fa-trash-alt me-1"></i>刪除對話</button>'
             : '';
 
+        // 忽略名單只有在這個對話開了自動回覆時才有意義，沒開就不佔標題列的位置
+        var ignoreBtn = (T.canIgnore && group.auto_reply)
+            ? '<button class="btn btn-sm btn-outline-secondary ms-auto me-2" id="btn-tg-ignore" data-id="' + group.id + '" title="' + T.escapeHtml(T.i18n.ignore_btn) + '" style="white-space:nowrap;flex-shrink:0"><i class="fas fa-bell-slash"></i></button>'
+            : '';
+
+        // 兩顆都在時，只讓第一顆把自己推到最右邊，否則會被擠開
+        if (ignoreBtn && deleteBtn) {
+            deleteBtn = deleteBtn.replace(' ms-auto', '');
+        }
+
         header.innerHTML =
             '<div class="px-3 py-2 d-flex align-items-center">' +
             '<button class="btn btn-link text-muted p-0 me-2 d-md-none" id="btn-tg-back"><i class="fas fa-arrow-left"></i></button>' +
             '<div class="rounded-circle text-white d-flex align-items-center justify-content-center me-2" style="width:36px;height:36px;background:#6c757d;font-size:0.9rem;font-weight:700">' + initial + '</div>' +
             '<div class="flex-fill" style="min-width:0"><span class="fw-bold text-truncate" style="font-size:1.0625rem">' + group.title + '</span></div>' +
+            ignoreBtn +
             deleteBtn +
             '</div>';
+
+        // 忽略名單按鈕
+        var ignoreButton = document.getElementById('btn-tg-ignore');
+        if (ignoreButton && T.openIgnorePanel) {
+            ignoreButton.addEventListener('click', function () {
+                T.openIgnorePanel(parseInt(ignoreButton.dataset.id, 10));
+            });
+        }
 
         // 手機版返回按鈕
         var backBtn = document.getElementById('btn-tg-back');

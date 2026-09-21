@@ -173,6 +173,10 @@
                 toggle.checked = T.autoReplyOn;
                 syncGroupCache();
                 applyAutoReplyLock();
+
+                // 忽略名單按鈕只在自動回覆開著時出現，標題列要跟著重畫，
+                // 否則剛打開開關的人要切走再切回來才看得到那顆按鈕
+                if (T.renderHeader) { T.renderHeader(T.selectedGroupId); }
             })
             .catch(function (body) {
                 toggle.checked = !enabled;

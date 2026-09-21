@@ -9,6 +9,7 @@ use App\Repositories\SharedFileRepository;
 use App\Repositories\ShiftAssignmentRepository;
 use App\Repositories\TelegramRepository;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -26,6 +27,7 @@ class TelegramChatService
     private $webPushService;
     private $sharedFileRepository;
     private $ticketRepository;
+    private $memberService;
 
     public function __construct(
         TelegramRepository $telegramRepository,
@@ -33,7 +35,8 @@ class TelegramChatService
         ShiftAssignmentRepository $assignmentRepository,
         WebPushService $webPushService,
         SharedFileRepository $sharedFileRepository,
-        AutoReplyTicketRepository $ticketRepository
+        AutoReplyTicketRepository $ticketRepository,
+        TelegramGroupMemberService $memberService
     ) {
         $this->telegramRepository = $telegramRepository;
         $this->botService = $botService;
@@ -41,6 +44,7 @@ class TelegramChatService
         $this->webPushService = $webPushService;
         $this->sharedFileRepository = $sharedFileRepository;
         $this->ticketRepository = $ticketRepository;
+        $this->memberService = $memberService;
     }
 
     /**
@@ -314,9 +318,16 @@ class TelegramChatService
             '/admin/telegram-chat'
         );
 
+        // 群組成員名冊：誰在這個對話講過話。忽略名單就掛在這份名冊上
+        $from = Arr::get($message, 'from', []);
+        $this->memberService->touch($group->id, $from);
+
         // 自動回覆丟佇列處理：Claude Code CLI 要跑數秒到數十秒，
         // webhook 同步等下去會逾時，Telegram 會重送而造成重複回覆
-        if ($group->isAutoReplyOn() && filled($rawText)) {
+        //
+        // isAutoReplyOn() 是欄位判斷，排在忽略名單查詢前面 ——
+        // 沒開自動回覆的對話完全不會去讀名單
+        if ($group->isAutoReplyOn() && filled($rawText) && !$this->memberService->isIgnored($group->id, $from)) {
             AutoReplyJob::dispatch($group->id, $rawText, $msg->id);
         }
     }

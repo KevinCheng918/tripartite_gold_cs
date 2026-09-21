@@ -103,6 +103,12 @@ return [
              */
             'telegram_chat.template_view'   => 'permission.telegram_chat.template_view',
             'telegram_chat.template_manage' => 'permission.telegram_chat.template_manage',
+
+            /*
+             * 不跟 reply 綁一起：設定誰不自動回覆會改變系統對客人的自動行為，
+             * 影響範圍比「回一則訊息」大，該由管理者單獨指派。
+             */
+            'telegram_chat.ignore_manage' => 'permission.telegram_chat.ignore_manage',
         ],
     ],
 
