@@ -34,6 +34,11 @@
 
             channel.bind('telegram.alert', function (data) { T.showAlert(data); });
 
+            // AI 正在回覆 —— 有明確的開始與結束，不像 typing 那樣自動消失
+            channel.bind('auto-reply.progress', function (data) {
+                T.setAutoReplyRunning(data.groupId, data.running);
+            });
+
             // 正在輸入
             var typingTimeout = null;
             channel.bind('telegram.typing', function (data) {

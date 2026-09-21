@@ -47,6 +47,7 @@ return [
     'auto_reply_placeholder' => 'Auto reply is on. Uncheck it to type manually.',
     'auto_reply_unavailable' => 'Claude is not configured yet. Set it up in Global Settings first.',
     'badge_auto'             => 'Auto',
+    'auto_reply_running'     => 'AI is searching the knowledge base and replying to the customer...',
 
     // Members excluded from auto-reply
     'ignore_title'          => 'Members excluded from auto-reply',

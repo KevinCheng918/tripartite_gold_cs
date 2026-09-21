@@ -60,6 +60,18 @@ return [
     'prompt_cache_seconds' => 300,
 
     /*
+     * 「AI 回覆中」狀態的快取。
+     *
+     * 一個群組一個 key —— 用單一 key 存整包 group id 會在兩個 Job 同時改時互相覆蓋。
+     *
+     * TTL 必須比 Job 的 timeout（120 秒）長：worker 被砍掉、機器重開這種
+     * 連 failed() 都來不及觸發的情況，只能靠 TTL 自己收掉，
+     * 否則對話會一直卡在「AI 回覆中」而沒有人收得掉。
+     */
+    'progress_cache_prefix'  => 'auto_reply.running.',
+    'progress_cache_seconds' => 180,
+
+    /*
      * 備援 API 的單價（USD / 每百萬 token），用來估算備援花了多少錢。
      *
      * 訂閱那邊沒有金額可算，只看呼叫次數。

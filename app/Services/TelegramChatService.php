@@ -28,6 +28,7 @@ class TelegramChatService
     private $sharedFileRepository;
     private $ticketRepository;
     private $memberService;
+    private $progressService;
 
     public function __construct(
         TelegramRepository $telegramRepository,
@@ -36,7 +37,8 @@ class TelegramChatService
         WebPushService $webPushService,
         SharedFileRepository $sharedFileRepository,
         AutoReplyTicketRepository $ticketRepository,
-        TelegramGroupMemberService $memberService
+        TelegramGroupMemberService $memberService,
+        AutoReplyProgressService $progressService
     ) {
         $this->telegramRepository = $telegramRepository;
         $this->botService = $botService;
@@ -45,6 +47,7 @@ class TelegramChatService
         $this->sharedFileRepository = $sharedFileRepository;
         $this->ticketRepository = $ticketRepository;
         $this->memberService = $memberService;
+        $this->progressService = $progressService;
     }
 
     /**
@@ -80,13 +83,18 @@ class TelegramChatService
         $groups = $this->telegramRepository->getActiveGroups();
         $onDutyUsers = $this->getOnDutyUsers();
 
-        return $groups->map(function ($group) use ($onDutyUsers) {
+        // 哪些對話的 AI 正在回覆 —— 一次取回整批，不要在下面的 map 裡逐一查快取
+        $runningIds = $this->progressService->filterRunning($groups->pluck('id')->all());
+
+        return $groups->map(function ($group) use ($onDutyUsers, $runningIds) {
             return [
                 'id'              => $group->id,
                 'chat_id'         => $group->chat_id,
                 'title'           => $group->title,
                 'on_duty_users'   => $onDutyUsers,
                 'auto_reply'      => $group->isAutoReplyOn(),
+                // 重新整理或切對話時，Pusher 事件早就發完了，靠這個值還原畫面
+                'auto_reply_running' => in_array($group->id, $runningIds, true),
                 'last_message_at' => $group->last_message_at ? $group->last_message_at->toDateTimeString() : null,
                 'unread_count'    => $this->telegramRepository->getUnrepliedCount($group->id),
             ];

@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Services\AutoReplyProgressService;
 use App\Services\AutoReplyService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -52,12 +53,21 @@ class AutoReplyJob implements ShouldQueue
     }
 
     /**
-     * @param AutoReplyService $autoReplyService
+     * @param AutoReplyService         $autoReplyService
+     * @param AutoReplyProgressService $progressService
      * @return void
      */
-    public function handle(AutoReplyService $autoReplyService)
+    public function handle(AutoReplyService $autoReplyService, AutoReplyProgressService $progressService)
     {
-        $autoReplyService->handle($this->groupId, $this->text, $this->messageId);
+        $progressService->start($this->groupId);
+
+        try {
+            $autoReplyService->handle($this->groupId, $this->text, $this->messageId);
+        } finally {
+            // 不管成功、失敗、丟例外都要收掉 —— 少了 finally，
+            // Claude 一失敗畫面就會卡在「AI 回覆中」直到 TTL 過期
+            $progressService->finish($this->groupId);
+        }
     }
 
     /**
@@ -72,5 +82,9 @@ class AutoReplyJob implements ShouldQueue
             'group_id' => $this->groupId,
             'error'    => $exception->getMessage(),
         ]);
+
+        // 逾時是直接被 kill，上面的 finally 不保證跑得到，所以這裡要再收一次。
+        // 重複呼叫是安全的
+        app(AutoReplyProgressService::class)->finish($this->groupId);
     }
 }

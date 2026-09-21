@@ -30,12 +30,69 @@
             '<div class="text-center text-muted py-5">' + T.i18n.select_group + '</div>' +
             '</div>' +
             '<div id="tg-typing-indicator" style="display:none;padding:0.25rem 1rem;font-size:0.8125rem;color:#6c757d;font-style:italic"></div>' +
+            // 不與 typing 共用同一個元素：typing 收到就顯示、4 秒後自動隱藏，
+            // 會把還在跑的 AI 提示一起關掉
+            '<div id="tg-auto-reply-indicator" style="display:none;padding:0.25rem 1rem;font-size:0.8125rem;color:#6c757d"></div>' +
             '<div class="app-inner-layout__bottom-pane border-top" id="tg-input" style="display:none"></div>' +
             '</div>' +
 
             '</div>' +
             '</div>' +
             '<div class="tg-alert-bar" id="tg-alert-bar" style="display:none"></div>';
+    };
+
+    // 安全逾時：broadcast 可能丟失（Pusher 斷線、worker 在送出結束事件前就被砍），
+    // 少了這道，提示會一直掛在畫面上，客服會以為系統壞了
+    var runningTimeout = null;
+
+    /**
+     * 套用「AI 正在回覆」提示
+     *
+     * @param {boolean} running
+     */
+    function applyRunningIndicator(running) {
+        var el = document.getElementById('tg-auto-reply-indicator');
+        if (!el) { return; }
+
+        clearTimeout(runningTimeout);
+
+        if (!running) {
+            el.style.display = 'none';
+            return;
+        }
+
+        el.innerHTML = '<i class="fas fa-robot me-1"></i>' + T.escapeHtml(T.i18n.auto_reply_running);
+        el.style.display = 'block';
+
+        runningTimeout = setTimeout(function () { el.style.display = 'none'; }, 180000);
+    }
+
+    /**
+     * 收到後端的進行中／結束事件
+     *
+     * @param {number}  groupId
+     * @param {boolean} running
+     */
+    T.setAutoReplyRunning = function (groupId, running) {
+        (T.groupsData || []).forEach(function (g) {
+            if (g.id === groupId) { g.auto_reply_running = running; }
+        });
+
+        renderGroupList(T.groupsData || []);
+
+        // 提示只在目前開著的那個對話顯示，其他對話看左側列表的機器人圖示
+        if (groupId === T.selectedGroupId) { applyRunningIndicator(running); }
+    };
+
+    /**
+     * 依目前選到的對話還原提示
+     *
+     * 切換對話或重新整理時，Pusher 事件早就發完了，要靠列表帶回來的狀態補畫面。
+     */
+    T.syncAutoReplyIndicator = function () {
+        var current = (T.groupsData || []).filter(function (g) { return g.id === T.selectedGroupId; })[0];
+
+        applyRunningIndicator(!!(current && current.auto_reply_running));
     };
 
     /**
@@ -46,6 +103,9 @@
             .then(function (body) {
                 T.groupsData = body;
                 renderGroupList(body);
+                // 列表每 30 秒重載一次，順便讓提示自我修正 ——
+                // 萬一 broadcast 丟了，最多 30 秒畫面就會跟後端一致
+                T.syncAutoReplyIndicator();
             });
     };
 
@@ -69,6 +129,11 @@
                 ? '<span class="badge bg-danger rounded-pill ms-auto">' + g.unread_count + '</span>'
                 : '';
 
+            // AI 正在回覆這個對話 —— 客服在看別的對話時也要看得出來
+            var runningIcon = g.auto_reply_running
+                ? '<i class="fas fa-robot text-muted ms-2" title="' + T.escapeHtml(T.i18n.auto_reply_running) + '"></i>'
+                : '';
+
             return (
                 '<div class="p-3 border-bottom d-flex align-items-center tg-group-item' + activeCls + '" data-id="' + g.id + '" style="cursor:pointer">' +
                 '<div class="widget-content-left me-3">' +
@@ -78,6 +143,7 @@
                 '<div class="fw-bold text-truncate">' + g.title + '</div>' +
                 '<small class="text-muted">' + time + '</small>' +
                 '</div>' +
+                runningIcon +
                 unreadBadge +
                 '</div>'
             );
@@ -90,6 +156,7 @@
                 T.loadMessages(T.selectedGroupId);
                 T.renderHeader(T.selectedGroupId);
                 T.showInput();
+                T.syncAutoReplyIndicator();
 
                 // 手機版切到聊天
                 var chatLayout = document.querySelector('.chat-layout');
