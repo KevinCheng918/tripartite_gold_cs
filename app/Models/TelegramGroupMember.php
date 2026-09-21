@@ -43,7 +43,7 @@ class TelegramGroupMember extends Model
      */
     public function isManual()
     {
-        return !filled($this->last_seen_at);
+        return blank($this->last_seen_at);
     }
 
     /**

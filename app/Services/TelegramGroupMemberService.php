@@ -56,7 +56,7 @@ class TelegramGroupMemberService
 
             // 之前用 username 手動加進來的那筆，這次要把 ID 補上去 ——
             // 直接以 ID 新增的話，同一個人會在名單裡出現兩次
-            if (!filled($member) && filled($username)) {
+            if (blank($member) && filled($username)) {
                 $member = $this->memberRepository->findManualByUsername($groupId, $username);
             }
 
@@ -102,7 +102,7 @@ class TelegramGroupMemberService
         $ignored = $this->getIgnoredKeys($groupId);
 
         // 名單是空的就不必再比 —— 絕大多數對話都是這個情況
-        if (!filled($ignored['ids']) && !filled($ignored['usernames'])) {
+        if (blank($ignored['ids']) && blank($ignored['usernames'])) {
             return false;
         }
 
@@ -147,7 +147,7 @@ class TelegramGroupMemberService
     {
         $member = $this->memberRepository->findInGroup($groupId, $memberId);
 
-        if (!filled($member)) {
+        if (blank($member)) {
             throw new \RuntimeException(trans('telegram_chat.msg.member_not_found'));
         }
 
@@ -179,7 +179,7 @@ class TelegramGroupMemberService
     {
         $normalized = $this->normalizeUsername($username);
 
-        if (!filled($normalized)) {
+        if (blank($normalized)) {
             throw new \RuntimeException(trans('telegram_chat.msg.username_invalid'));
         }
 
@@ -229,7 +229,7 @@ class TelegramGroupMemberService
     {
         $member = $this->memberRepository->findInGroup($groupId, $memberId);
 
-        if (!filled($member)) {
+        if (blank($member)) {
             throw new \RuntimeException(trans('telegram_chat.msg.member_not_found'));
         }
 
@@ -277,7 +277,7 @@ class TelegramGroupMemberService
      */
     public function normalizeUsername($username)
     {
-        if (!filled($username)) {
+        if (blank($username)) {
             return null;
         }
 
