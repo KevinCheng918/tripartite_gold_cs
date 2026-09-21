@@ -6,7 +6,9 @@ use App\Events\TelegramTyping;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\TelegramChat\ReplyRequest;
 use App\Http\Requests\TelegramChat\SendFileRequest;
+use App\Http\Requests\TelegramChat\ToggleAutoReplyRequest;
 use App\Http\Resources\TelegramMessageResource;
+use App\Services\AutoReplyService;
 use App\Services\ImageUploadService;
 use App\Services\QuickReplyService;
 use App\Services\SharedFileService;
@@ -27,17 +29,20 @@ class TelegramChatController extends Controller
     private $sharedFileService;
     private $quickReplyService;
     private $imageUploadService;
+    private $autoReplyService;
 
     public function __construct(
         TelegramChatService $chatService,
         SharedFileService $sharedFileService,
         QuickReplyService $quickReplyService,
-        ImageUploadService $imageUploadService
+        ImageUploadService $imageUploadService,
+        AutoReplyService $autoReplyService
     ) {
         $this->chatService = $chatService;
         $this->sharedFileService = $sharedFileService;
         $this->quickReplyService = $quickReplyService;
         $this->imageUploadService = $imageUploadService;
+        $this->autoReplyService = $autoReplyService;
     }
 
     /**
@@ -54,7 +59,34 @@ class TelegramChatController extends Controller
             abort(403);
         }
 
-        return view('admin.telegram-chat.index');
+        return view('admin.telegram-chat.index', [
+            // 沒設定 Claude 憑證時，前端要把自動回覆勾選框停用並提示去全域設定
+            'autoReplyAvailable' => $this->autoReplyService->isAvailable(),
+        ]);
+    }
+
+    /**
+     * Ajax 切換對話的自動回覆開關
+     *
+     * @param ToggleAutoReplyRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxToggleAutoReply(ToggleAutoReplyRequest $request)
+    {
+        $params = $request->validated();
+
+        try {
+            $group = $this->autoReplyService->toggle((int) $params['group_id'], (bool) $params['enabled']);
+
+            return response()->json(['auto_reply' => (bool) $group->auto_reply]);
+        } catch (\RuntimeException $e) {
+            // 群組不存在、或還沒設定 Claude 憑證
+            return response()->json(['message' => $e->getMessage()], 422);
+        } catch (\Exception $e) {
+            Log::error('自動回覆開關切換失敗', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
+
+            return response()->json(['message' => trans('telegram_chat.msg.auto_reply_failed')], 500);
+        }
     }
 
     /**

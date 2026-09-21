@@ -117,6 +117,13 @@ class AccountService
             $attributes['telegram_nickname'] = $params['telegram_nickname'] ?: null;
         }
 
+        // 同上，清空代表不再被內部群組的求助提醒 tag 到。
+        // 存的時候把 @ 去掉，顯示與組 mention 時才不會變成 @@name
+        if (array_key_exists('telegram_username', $params)) {
+            $username = ltrim((string) $params['telegram_username'], '@');
+            $attributes['telegram_username'] = filled($username) ? $username : null;
+        }
+
         return DB::transaction(function () use ($user, $attributes) {
             return $this->userRepository->update($user, $attributes);
         });

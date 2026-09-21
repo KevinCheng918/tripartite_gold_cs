@@ -23,12 +23,13 @@
         #leave-duration-hint:empty { display: none; }
     </style>
     <div id="shift-app"
-         data-i18n='@json(trans('shift'))'
+         {{-- JSON_HEX_APOS：屬性用單引號包，JSON 內的單引號（英文縮寫如 don't）會提早結束屬性 --}}
+         data-i18n='@json(trans("shift"), JSON_HEX_APOS | JSON_HEX_QUOT)'
          data-user-id="{{ Auth::id() }}"
          data-is-admin="{{ Auth::user()->isAdmin() ? '1' : '0' }}"
-         data-cover-i18n='@json(trans("cover"))'
-         data-leave-i18n='@json(trans("leave"))'
-         data-permissions='@json(Auth::user()->isAdmin() ? ["all"] : Auth::user()->permissions()->pluck("permission_keyword")->all())'>
+         data-cover-i18n='@json(trans("cover"), JSON_HEX_APOS | JSON_HEX_QUOT)'
+         data-leave-i18n='@json(trans("leave"), JSON_HEX_APOS | JSON_HEX_QUOT)'
+         data-permissions='@json(Auth::user()->isAdmin() ? ["all"] : Auth::user()->permissions()->pluck("permission_keyword")->all(), JSON_HEX_APOS | JSON_HEX_QUOT)'>
         <p>Loading…</p>
     </div>
 

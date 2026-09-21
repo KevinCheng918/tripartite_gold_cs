@@ -164,6 +164,7 @@
                                             data-id="{{ $account->id }}"
                                             data-nickname="{{ $account->nickname }}"
                                             data-telegram-nickname="{{ $account->telegram_nickname }}"
+                                            data-telegram-username="{{ $account->telegram_username }}"
                                             data-level="{{ $account->level }}"
                                             data-project-ids="{{ json_encode($account->project_ids ?? []) }}">
                                         <i class="fas fa-edit me-1"></i>{{ trans('account.action_edit') }}
@@ -232,6 +233,7 @@
                                 data-id="{{ $account->id }}"
                                 data-nickname="{{ $account->nickname }}"
                                 data-telegram-nickname="{{ $account->telegram_nickname }}"
+                                data-telegram-username="{{ $account->telegram_username }}"
                                 data-level="{{ $account->level }}"
                                 data-project-ids="{{ json_encode($account->project_ids ?? []) }}">
                             <i class="fas fa-edit me-1"></i>{{ trans('account.action_edit') }}
@@ -313,6 +315,12 @@
                             <input id="edit-telegram-nickname" type="text" class="form-control" maxlength="30"
                                    placeholder="{{ trans('account.telegram_nickname_ph') }}">
                             <div class="form-text">{{ trans('account.telegram_nickname_hint') }}</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{{ trans('account.field_telegram_username') }}</label>
+                            <input id="edit-telegram-username" type="text" class="form-control" maxlength="50"
+                                   placeholder="{{ trans('account.telegram_username_ph') }}">
+                            <div class="form-text">{{ trans('account.telegram_username_hint') }}</div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('account.field_password') }}（{{ trans('account.password_hint') }}）</label>
@@ -470,6 +478,7 @@ $(function () {
         $('#edit-account-id').val($btn.data('id'));
         $('#edit-nickname').val($btn.data('nickname'));
         $('#edit-telegram-nickname').val($btn.data('telegram-nickname') || '');
+        $('#edit-telegram-username').val($btn.data('telegram-username') || '');
         $('#edit-level').val($btn.data('level'));
         $('#edit-password').val('');
         // 帶入參與專案
@@ -529,6 +538,7 @@ $(function () {
             level: parseInt($('#edit-level').val(), 10),
             // 送 null 代表清空署名，後端用 array_key_exists 判斷所以一定要帶這個 key
             telegram_nickname: $('#edit-telegram-nickname').val().trim() || null,
+            telegram_username: $('#edit-telegram-username').val().trim() || null,
         };
         var pw = $('#edit-password').val();
         if (pw && hasFullWidth(pw)) {

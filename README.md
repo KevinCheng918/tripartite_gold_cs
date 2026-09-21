@@ -19,3 +19,5 @@ node : 10.16.*
 9. php artisan db:seed --class=CreateAdminSeeder
 10. php artisan db:seed --class=SetPermissionSeeder
 11. php artisan db:seed --class=ShiftSeeder
+12. php artisan db:seed --class=AppSettingSeeder
+13. php artisan db:seed --class=AutoReplyCategorySeeder

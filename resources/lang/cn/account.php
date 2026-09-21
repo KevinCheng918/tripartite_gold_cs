@@ -13,6 +13,9 @@ return [
     'label_telegram_nickname' => 'TG 署名',
     'telegram_nickname_hint'  => '设定后，该帐号在 Telegram 对话送出的讯息结尾会附上「-昵称」；留空则不附加。',
     'telegram_nickname_ph'    => '例：小美',
+    'field_telegram_username' => 'Telegram 帐号',
+    'telegram_username_hint'  => '自动回复的求助单超时时，系统会在内部群组 @ 这个帐号。留空则不会被 tag。',
+    'telegram_username_ph'    => '例：amy_chen（不含 @）',
     'not_set'                 => '未设定',
     'no_data'                 => '暂无资料',
     'no_log'                  => '暂无记录',
@@ -56,6 +59,7 @@ return [
 
     'msg' => [
         'telegram_nickname_max' => 'Telegram 对话昵称不可超过 :value 字元',
+        'telegram_username_invalid' => 'Telegram 帐号格式不正确（5-32 字元，限英数与下划线）',
         'required'             => '此栏位为必填',
         'unique'               => '此账号已存在',
         'regex_account'        => '账号仅允许半角英文、数字、底线，4~20 字元',

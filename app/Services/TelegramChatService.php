@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Jobs\AutoReplyJob;
 use App\Models\TelegramGroup;
+use App\Repositories\AutoReplyTicketRepository;
 use App\Repositories\SharedFileRepository;
 use App\Repositories\ShiftAssignmentRepository;
 use App\Repositories\TelegramRepository;
@@ -23,19 +25,22 @@ class TelegramChatService
     private $assignmentRepository;
     private $webPushService;
     private $sharedFileRepository;
+    private $ticketRepository;
 
     public function __construct(
         TelegramRepository $telegramRepository,
         TelegramBotService $botService,
         ShiftAssignmentRepository $assignmentRepository,
         WebPushService $webPushService,
-        SharedFileRepository $sharedFileRepository
+        SharedFileRepository $sharedFileRepository,
+        AutoReplyTicketRepository $ticketRepository
     ) {
         $this->telegramRepository = $telegramRepository;
         $this->botService = $botService;
         $this->assignmentRepository = $assignmentRepository;
         $this->webPushService = $webPushService;
         $this->sharedFileRepository = $sharedFileRepository;
+        $this->ticketRepository = $ticketRepository;
     }
 
     /**
@@ -77,6 +82,7 @@ class TelegramChatService
                 'chat_id'         => $group->chat_id,
                 'title'           => $group->title,
                 'on_duty_users'   => $onDutyUsers,
+                'auto_reply'      => $group->isAutoReplyOn(),
                 'last_message_at' => $group->last_message_at ? $group->last_message_at->toDateTimeString() : null,
                 'unread_count'    => $this->telegramRepository->getUnrepliedCount($group->id),
             ];
@@ -202,6 +208,9 @@ class TelegramChatService
         $chatTitle = $message['chat']['title'] ?? "Chat {$chatId}";
 
         $text = $message['text'] ?? ($message['caption'] ?? '');
+        // 自動回覆只看客人真正打的字：純圖片／影片一律走人工，
+        // 不要拿下面補上的「[圖片]」這種替代文字去比對題庫
+        $rawText = $text;
         $senderName = $this->buildSenderName($message['from'] ?? []);
         $telegramMessageId = $message['message_id'] ?? null;
 
@@ -304,6 +313,12 @@ class TelegramChatService
             mb_substr($pushBody, 0, 100),
             '/admin/telegram-chat'
         );
+
+        // 自動回覆丟佇列處理：Claude Code CLI 要跑數秒到數十秒，
+        // webhook 同步等下去會逾時，Telegram 會重送而造成重複回覆
+        if ($group->isAutoReplyOn() && filled($rawText)) {
+            AutoReplyJob::dispatch($group->id, $rawText, $msg->id);
+        }
     }
 
     // ---------------------------------------------------------------
@@ -422,14 +437,19 @@ class TelegramChatService
         $imageUrl = $options['image_url'] ?? null;
         $markReplied = $options['mark_replied'] ?? true;
         $replyToId = $options['reply_to_id'] ?? null;
+        $signature = $options['signature'] ?? null;
+        $isAuto = $options['is_auto'] ?? false;
 
         $group = $this->telegramRepository->findGroup($groupId);
 
         // 根據站台系統切換 Bot Token
         $this->switchBotToken($group);
 
-        // 署名在送出前加上，寫進紀錄的內容才會與客戶看到的一致
-        $content = $this->appendSignature($content, $userId);
+        // 署名在送出前加上，寫進紀錄的內容才會與客戶看到的一致。
+        // 自動回覆傳固定署名（-A），人工回覆才查該帳號設定的暱稱
+        $content = filled($signature)
+            ? $this->appendFixedSignature($content, $signature)
+            : $this->appendSignature($content, $userId);
 
         // 引用的是後台的訊息 id，要換成 Telegram 那邊的 message_id 才送得出去。
         // 沒有 telegram_message_id 就當作沒引用 —— 否則後台會留下一筆
@@ -475,6 +495,7 @@ class TelegramChatService
             'telegram_message_id' => $result['result']['message_id'] ?? null,
             'sender_name'       => $nickname,
             'sender_user_id'    => $userId,
+            'is_auto'           => $isAuto,
             'content'           => $content ?: '',
             'media_type'        => $mediaType,
             'media_url'         => $imageUrl,
@@ -487,6 +508,12 @@ class TelegramChatService
         // 標記該群組所有未回覆 inbound 訊息為已回覆
         if ($markReplied) {
             $this->telegramRepository->markMessagesReplied($group->id);
+        }
+
+        // 客服自己人工回覆了，就不該再把同一個問題轉到內部支援群組。
+        // 自動回覆自己送出的訊息不算 —— 否則會把它剛開的那張單關掉
+        if (!$isAuto) {
+            $this->ticketRepository->ignoreOpenByGroup($group->id);
         }
 
         // Broadcasting
@@ -521,6 +548,48 @@ class TelegramChatService
      */
     private function getOnDutyUsers()
     {
+        $users = [];
+
+        foreach ($this->getOnDutyAssignments() as $assignment) {
+            $nickname = $assignment->user->nickname;
+
+            if (!in_array($nickname, $users, true)) {
+                $users[] = $nickname;
+            }
+        }
+
+        return $users;
+    }
+
+    /**
+     * 取得當前時段所有值班中的客服 id
+     *
+     * 自動回覆的求助單超時時，第一階段要 tag 當下排班的人，用這個取名單。
+     *
+     * @return array user id 陣列，無人值班時回傳空陣列
+     */
+    public function getOnDutyUserIds()
+    {
+        $ids = [];
+
+        foreach ($this->getOnDutyAssignments() as $assignment) {
+            if (!in_array($assignment->user->id, $ids, true)) {
+                $ids[] = $assignment->user->id;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * 當前時段正在值班的排班紀錄
+     *
+     * 暱稱版與 id 版共用同一套時間判斷，避免兩邊各寫一次而漂移。
+     *
+     * @return array ShiftAssignment 陣列
+     */
+    private function getOnDutyAssignments()
+    {
         $today = now()->format('Y-m-d');
         $nowMinutes = now()->hour * 60 + now()->minute;
 
@@ -530,21 +599,18 @@ class TelegramChatService
             return [];
         }
 
-        $users = [];
+        $matched = [];
         foreach ($assignments as $assignment) {
             if (!$assignment->shift || !$assignment->user) {
                 continue;
             }
 
             if ($this->isTimeInShiftRange($assignment->shift, $nowMinutes)) {
-                $nickname = $assignment->user->nickname;
-                if (!in_array($nickname, $users, true)) {
-                    $users[] = $nickname;
-                }
+                $matched[] = $assignment;
             }
         }
 
-        return $users;
+        return $matched;
     }
 
     /**
@@ -748,6 +814,21 @@ class TelegramChatService
 
         // 空內容（例如只傳圖片）也要署名，否則客戶不知道是誰傳的
         return filled($content) ? "{$content} -{$nickname}" : "-{$nickname}";
+    }
+
+    /**
+     * 附上固定署名（自動回覆用）
+     *
+     * 自動回覆不查帳號暱稱 —— 客人看到的永遠是同一個署名，
+     * 才分得出哪些訊息是系統回的。
+     *
+     * @param string $content
+     * @param string $signature 已含前綴的署名，如 -A
+     * @return string
+     */
+    private function appendFixedSignature($content, $signature)
+    {
+        return filled($content) ? "{$content} {$signature}" : $signature;
     }
 
     /**

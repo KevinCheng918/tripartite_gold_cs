@@ -16,6 +16,8 @@ use App\Http\Controllers\Admin\LeaveRequestController;
 use App\Http\Controllers\Admin\StaffManageController;
 use App\Http\Controllers\Admin\ProjectController;
 use App\Http\Controllers\Admin\QuickReplyController;
+use App\Http\Controllers\Admin\ReplyTemplateController;
+use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\FinanceController;
 use App\Http\Controllers\Admin\SharedFileController;
 use App\Http\Controllers\Admin\TaskBoardController;
@@ -123,6 +125,24 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-shared-files', [TelegramChatController::class, 'ajaxSharedFiles'])->name('ajax-shared-files');
         Route::post('/ajax-send-document', [TelegramChatController::class, 'ajaxSendDocument'])->middleware('can:telegram_chat.reply')->name('ajax-send-document');
         Route::get('/ajax-quick-replies', [TelegramChatController::class, 'ajaxQuickReplies'])->middleware('can:telegram_chat.reply')->name('ajax-quick-replies');
+        Route::post('/ajax-toggle-auto-reply', [TelegramChatController::class, 'ajaxToggleAutoReply'])->middleware('can:telegram_chat.reply')->name('ajax-toggle-auto-reply');
+    });
+
+    // 全域設定（Claude 憑證、內部支援群組、對客話術、用量流量）
+    Route::prefix('setting')->name('setting.')->group(function () {
+        Route::get('/', [SettingController::class, 'index'])->middleware('can:setting.view')->name('index');
+        Route::get('/ajax-settings', [SettingController::class, 'ajaxSettings'])->middleware('can:setting.view')->name('ajax-settings');
+        Route::put('/ajax-update-claude', [SettingController::class, 'ajaxUpdateClaude'])->middleware('can:setting.manage')->name('ajax-update-claude');
+        Route::put('/ajax-update-fallback', [SettingController::class, 'ajaxUpdateFallback'])->middleware('can:setting.manage')->name('ajax-update-fallback');
+        Route::put('/ajax-update-support', [SettingController::class, 'ajaxUpdateSupport'])->middleware('can:setting.manage')->name('ajax-update-support');
+        Route::post('/ajax-test-support', [SettingController::class, 'ajaxTestSupport'])->middleware('can:setting.manage')->name('ajax-test-support');
+    });
+
+    // 對客話術（與憑證分開授權：客服要能自己調語氣，但不該碰得到 token）
+    Route::prefix('reply-template')->name('reply-template.')->group(function () {
+        Route::get('/', [ReplyTemplateController::class, 'index'])->middleware('can:telegram_chat.template_view')->name('index');
+        Route::get('/ajax-templates', [ReplyTemplateController::class, 'ajaxTemplates'])->middleware('can:telegram_chat.template_view')->name('ajax-templates');
+        Route::put('/ajax-update', [ReplyTemplateController::class, 'ajaxUpdate'])->middleware('can:telegram_chat.template_manage')->name('ajax-update');
     });
 
     // 站台管理

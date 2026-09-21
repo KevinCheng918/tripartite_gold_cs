@@ -97,6 +97,20 @@ return [
             'telegram_chat.assign'    => 'permission.telegram_chat.assign',
             'telegram_chat.broadcast' => 'permission.telegram_chat.broadcast',
             'telegram_chat.delete'    => 'permission.telegram_chat.delete',
+            /*
+             * 對客話術跟著客服功能走，但與 Claude 憑證（setting.*）分開授權：
+             * 客服要能自己調語氣，不該連 token 頁一起開放。
+             */
+            'telegram_chat.template_view'   => 'permission.telegram_chat.template_view',
+            'telegram_chat.template_manage' => 'permission.telegram_chat.template_manage',
+        ],
+    ],
+
+    'setting' => [
+        'label' => 'permission.group.setting',
+        'keywords' => [
+            'setting.view'   => 'permission.setting.view',
+            'setting.manage' => 'permission.setting.manage',
         ],
     ],
 

@@ -7,10 +7,11 @@
 @section('content')
 
     <div id="attendance-app"
-         data-i18n='@json(trans("attendance"))'
+         {{-- JSON_HEX_APOS：屬性用單引號包，JSON 內的單引號（英文縮寫如 don't）會提早結束屬性 --}}
+         data-i18n='@json(trans("attendance"), JSON_HEX_APOS | JSON_HEX_QUOT)'
          data-user-id="{{ Auth::id() }}"
          data-is-admin="{{ Auth::user()->isAdmin() ? '1' : '0' }}"
-         data-permissions='@json(Auth::user()->isAdmin() ? ["all"] : Auth::user()->permissions()->pluck("permission_keyword")->all())'>
+         data-permissions='@json(Auth::user()->isAdmin() ? ["all"] : Auth::user()->permissions()->pluck("permission_keyword")->all(), JSON_HEX_APOS | JSON_HEX_QUOT)'>
         <p>Loading…</p>
     </div>
 

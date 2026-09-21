@@ -103,6 +103,97 @@
         return T.i18n.input_placeholder_wide || T.i18n.input_placeholder;
     }
 
+    /**
+     * 自動回覆勾選框
+     *
+     * 未設定 Claude 憑證時停用並附上提示 —— 勾了也不會生效，
+     * 不如一開始就讓人知道要去全域設定。
+     *
+     * @returns {string}
+     */
+    function autoReplyToggleHtml() {
+        var available = T.autoReplyAvailable;
+        var title = available ? '' : ' title="' + T.escapeHtml(T.i18n.auto_reply_unavailable || '') + '"';
+
+        return '<div class="form-check form-switch ms-auto d-flex align-items-center gap-2 mb-0"' + title + '>' +
+            '<input class="form-check-input mt-0" type="checkbox" id="tg-auto-reply"' +
+            (T.autoReplyOn ? ' checked' : '') + (available ? '' : ' disabled') +
+            ' style="cursor:pointer">' +
+            '<label class="form-check-label" for="tg-auto-reply" style="font-size:' + INPUT_FONT_SIZE + ';white-space:nowrap">' +
+            T.escapeHtml(T.i18n.auto_reply || '自動回覆') + '</label>' +
+            '</div>';
+    }
+
+    /**
+     * 自動回覆開啟時鎖住所有人工操作
+     *
+     * 這是刻意的：同一個對話不該同時有機器人和人在回，
+     * 客人會收到兩套說法。
+     */
+    function applyAutoReplyLock() {
+        var locked = T.autoReplyOn;
+        var textarea = document.getElementById('tg-reply-text');
+
+        if (textarea) {
+            textarea.disabled = locked;
+            textarea.placeholder = locked ? (T.i18n.auto_reply_placeholder || '') : placeholder();
+        }
+
+        ['btn-tg-send', 'btn-tg-image', 'btn-tg-shared-file', 'btn-tg-quick-reply', 'btn-tg-emoji'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) { el.disabled = locked; }
+        });
+
+        // 鎖住時把待傳附件清掉，否則解鎖後可能送出早就過時的截圖
+        if (locked && pendingFiles.length > 0) {
+            pendingFiles = [];
+            renderPendingFiles();
+        }
+
+        if (locked && T.closeEmojiPicker) { T.closeEmojiPicker(); }
+    }
+
+    /**
+     * 切換自動回覆
+     *
+     * **存檔成功才鎖 UI** —— 失敗要把勾勾彈回去，畫面不能跟資料庫說不一樣。
+     *
+     * @param {HTMLInputElement} toggle
+     */
+    function toggleAutoReply(toggle) {
+        var enabled = toggle.checked;
+        toggle.disabled = true;
+
+        T.apiFetch('/admin/telegram-chat/ajax-toggle-auto-reply', {
+            method: 'POST',
+            body: JSON.stringify({ group_id: T.selectedGroupId, enabled: enabled }),
+        })
+            .then(function (body) {
+                T.autoReplyOn = !!body.auto_reply;
+                toggle.checked = T.autoReplyOn;
+                syncGroupCache();
+                applyAutoReplyLock();
+            })
+            .catch(function (body) {
+                toggle.checked = !enabled;
+                showInputError((body && body.message) || T.i18n.msg.auto_reply_failed);
+            })
+            .then(function () {
+                toggle.disabled = !T.autoReplyAvailable;
+            });
+    }
+
+    /**
+     * 把開關狀態寫回群組快取
+     *
+     * 不同步的話，切走再切回來會看到舊狀態。
+     */
+    function syncGroupCache() {
+        (T.groupsData || []).forEach(function (g) {
+            if (g.id === T.selectedGroupId) { g.auto_reply = T.autoReplyOn; }
+        });
+    }
+
     T.showInput = function () {
         var inputArea = document.getElementById('tg-input');
         if (!inputArea) { return; }
@@ -110,6 +201,10 @@
         // 切換群組時清空，避免附件或引用誤帶到別的對話
         pendingFiles = [];
         quotedId = null;
+
+        // 自動回覆是每個對話各自獨立的，切群組要重新套用
+        var current = (T.groupsData || []).filter(function (g) { return g.id === T.selectedGroupId; })[0];
+        T.autoReplyOn = !!(current && current.auto_reply);
 
         // 輸入區會整個重建，殘留的表情選單會指向已消失的按鈕
         if (T.closeEmojiPicker) { T.closeEmojiPicker(); }
@@ -132,6 +227,7 @@
             toolButton('btn-tg-image', 'fa-paperclip', T.i18n.btn_attachment || '檔案') +
             toolButton('btn-tg-shared-file', 'fa-file-alt', T.i18n.btn_file || '文件') +
             toolButton('btn-tg-quick-reply', 'fa-bolt', T.i18n.btn_quick_reply || '快速回覆') +
+            autoReplyToggleHtml() +
             '</div>' +
             '<div class="d-flex align-items-center gap-1 px-3 py-2">' +
             // 表情鈕嵌在輸入框內側右邊（Telegram / LINE 的做法），送出鈕留在框外
@@ -208,8 +304,15 @@
             textarea.style.height = '';
         });
 
+        // 自動回覆勾選框
+        var autoToggle = document.getElementById('tg-auto-reply');
+        if (autoToggle) {
+            autoToggle.addEventListener('change', function () { toggleAutoReply(autoToggle); });
+        }
+
         renderPendingFiles();
         hideUploadProgress();
+        applyAutoReplyLock();
     };
 
     // ===== 貼上截圖 =====
@@ -218,7 +321,8 @@
      * 綁在 document 上，截圖後不必先點輸入框就能直接 Ctrl+V
      */
     document.addEventListener('paste', function (e) {
-        if (!T.canReply || !T.selectedGroupId) { return; }
+        // 自動回覆中不接受任何人工輸入，貼上截圖也一樣
+        if (!T.canReply || !T.selectedGroupId || T.autoReplyOn) { return; }
         if (!document.getElementById('tg-reply-text')) { return; }
 
         // 在別的輸入框（搜尋框等）貼上時不攔截
@@ -282,7 +386,8 @@
      * @returns {boolean}
      */
     function canDropHere(e) {
-        if (!T.canReply || !T.selectedGroupId) { return false; }
+        // 同貼上：自動回覆中不接受拖進來的檔案
+        if (!T.canReply || !T.selectedGroupId || T.autoReplyOn) { return false; }
         if (!isFileDrag(e) || !inChatPage(e)) { return false; }
 
         return !!e.target.closest('.app-inner-layout__content');
@@ -595,6 +700,9 @@
 
     function sendReply() {
         if (!T.selectedGroupId) { return; }
+
+        // 最後一道防線：按鈕與輸入框雖然已被停用，快速回覆選單等路徑仍可能呼叫到這裡
+        if (T.autoReplyOn) { return; }
 
         // 有待傳送的附件時，改走附件流程（文字會當成第一個的 caption）
         if (pendingFiles.length) {

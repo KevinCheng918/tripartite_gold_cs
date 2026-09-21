@@ -18,6 +18,7 @@ return [
         'leave_request' => 'Leave Management',
         'task_board' => 'Task Board',
         'login_log' => 'Login Log',
+        'setting' => 'Global Settings',
     ],
     'dashboard' => [
         'usdt_rate' => 'View USDT rate',
@@ -69,7 +70,13 @@ return [
         'view' => 'View quick reply library',
         'edit' => 'Edit quick reply library',
     ],
+    'setting' => [
+        'view'   => 'View global settings',
+        'manage' => 'Modify global settings (incl. Claude credentials)',
+    ],
     'telegram_chat' => [
+        'template_view'   => 'View reply templates',
+        'template_manage' => 'Modify reply templates',
         'reply'     => 'Reply messages',
         'assign'    => 'Assign duty staff',
         'broadcast' => 'Broadcast announcement',

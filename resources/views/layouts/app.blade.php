@@ -232,6 +232,22 @@
                                 </a>
                             </li>
                             @endif
+                            @if(Auth::user()->hasPermission('telegram_chat.template_view'))
+                            <li>
+                                <a href="{{ route('admin.reply-template.index') }}" class="{{ request()->routeIs('admin.reply-template.*') ? 'mm-active' : '' }}">
+                                    <i class="metismenu-icon fas fa-comment-dots"></i>
+                                    {{ trans('reply_template.nav_label') }}
+                                </a>
+                            </li>
+                            @endif
+                            @if(Auth::user()->hasPermission('setting.view'))
+                            <li>
+                                <a href="{{ route('admin.setting.index') }}" class="{{ request()->routeIs('admin.setting.*') ? 'mm-active' : '' }}">
+                                    <i class="metismenu-icon fas fa-cog"></i>
+                                    {{ trans('setting.nav_label') }}
+                                </a>
+                            </li>
+                            @endif
                             @if(Auth::check())
                             <li class="app-sidebar__heading">內務管理</li>
                             @if(Auth::user()->hasPermission('staff_manage.view'))
@@ -386,6 +402,12 @@
                         <div class="mb-3">
                             <label class="form-label" for="profile-nickname">{{ trans('profile.field_nickname') }}</label>
                             <input id="profile-nickname" type="text" class="form-control" name="nickname" value="{{ Auth::user()->nickname }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="profile-telegram-username">{{ trans('profile.field_telegram_username') }}</label>
+                            <input id="profile-telegram-username" type="text" class="form-control" maxlength="50"
+                                   value="{{ Auth::user()->telegram_username }}" placeholder="{{ trans('profile.telegram_username_ph') }}">
+                            <div class="form-text">{{ trans('profile.telegram_username_hint') }}</div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label" for="profile-password">{{ trans('profile.field_password') }}（{{ trans('profile.password_hint') }}）</label>
@@ -598,6 +620,8 @@
             }
             if (nickname) { data.nickname = nickname; }
             if (password) { data.password = password; }
+            // 一律送出（含空字串）：要能把帳號清掉，清掉就是不再被 tag
+            data.telegram_username = $('#profile-telegram-username').val().trim();
 
             $.ajax({
                 url: '/admin/profile/ajax-update',

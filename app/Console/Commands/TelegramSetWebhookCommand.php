@@ -96,8 +96,10 @@ class TelegramSetWebhookCommand extends Command
                 'url' => $webhookUrl,
                 // 明確宣告要收哪些事件。不指定時 Telegram 用預設清單，
                 // 而預設**不含 message_reaction**，表情回應功能就收不到事件。
+                // callback_query 是自動回覆的支援群組按鈕用的，沒列的話
+                // 按鈕按下去完全沒反應，而且不會有任何錯誤訊息。
                 // edited_message 雖在預設內，一併列出來讓需求一目了然
-                'allowed_updates' => json_encode(['message', 'edited_message', 'message_reaction']),
+                'allowed_updates' => json_encode(['message', 'edited_message', 'message_reaction', 'callback_query']),
             ];
 
             if (filled($secret)) {

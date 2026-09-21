@@ -95,11 +95,13 @@ class TelegramBotService
     /**
      * 發送訊息到 Telegram 群組
      *
-     * @param int    $chatId Telegram chat_id
-     * @param string $text   訊息內容
+     * @param int        $chatId            Telegram chat_id
+     * @param string     $text              訊息內容
+     * @param int|null   $replyToMessageId  引用的訊息
+     * @param array|null $keyboard          inline keyboard 按鈕列（見 buildInlineKeyboard）
      * @return array|null API 回傳
      */
-    public function sendMessage($chatId, $text, $replyToMessageId = null)
+    public function sendMessage($chatId, $text, $replyToMessageId = null, $keyboard = null)
     {
         try {
             $params = [
@@ -115,6 +117,10 @@ class TelegramBotService
                 $params['allow_sending_without_reply'] = true;
             }
 
+            if (filled($keyboard)) {
+                $params['reply_markup'] = ['inline_keyboard' => $keyboard];
+            }
+
             $response = $this->client->post("{$this->getBaseUrl()}/sendMessage", [
                 'json' => $params,
             ]);
@@ -124,6 +130,81 @@ class TelegramBotService
             Log::error('Telegram sendMessage 失敗', [
                 'chat_id' => $chatId,
                 'error'   => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * 編輯既有訊息的內容與按鈕
+     *
+     * 支援群組的按鈕按完要就地改成結果並移除按鈕 ——
+     * 避免同一張單被按兩次，群組裡也一眼看得出哪些處理完了。
+     *
+     * @param int        $chatId
+     * @param int        $messageId
+     * @param string     $text
+     * @param array|null $keyboard 傳 null 代表移除按鈕
+     * @return array|null
+     */
+    public function editMessageText($chatId, $messageId, $text, $keyboard = null)
+    {
+        try {
+            $params = [
+                'chat_id'    => $chatId,
+                'message_id' => (int) $messageId,
+                'text'       => $this->escapeHtml($text),
+                'parse_mode' => 'HTML',
+            ];
+
+            if (filled($keyboard)) {
+                $params['reply_markup'] = ['inline_keyboard' => $keyboard];
+            }
+
+            $response = $this->client->post("{$this->getBaseUrl()}/editMessageText", [
+                'json' => $params,
+            ]);
+
+            return json_decode($response->getBody()->getContents(), true);
+        } catch (\Exception $e) {
+            Log::error('Telegram editMessageText 失敗', [
+                'chat_id'    => $chatId,
+                'message_id' => $messageId,
+                'error'      => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * 回應 callback_query
+     *
+     * 按下按鈕後一定要回這支，否則 Telegram 客戶端上的按鈕會一直轉圈。
+     *
+     * @param string      $callbackQueryId
+     * @param string|null $text 顯示在畫面上方的小提示
+     * @return array|null
+     */
+    public function answerCallbackQuery($callbackQueryId, $text = null)
+    {
+        try {
+            $params = ['callback_query_id' => $callbackQueryId];
+
+            if (filled($text)) {
+                $params['text'] = $text;
+            }
+
+            $response = $this->client->post("{$this->getBaseUrl()}/answerCallbackQuery", [
+                'json' => $params,
+            ]);
+
+            return json_decode($response->getBody()->getContents(), true);
+        } catch (\Exception $e) {
+            Log::error('Telegram answerCallbackQuery 失敗', [
+                'callback_query_id' => $callbackQueryId,
+                'error'             => $e->getMessage(),
             ]);
 
             return null;

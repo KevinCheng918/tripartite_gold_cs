@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\QuickReplyCategory;
 use App\Models\QuickReplyItem;
 use App\Repositories\QuickReplyRepository;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -74,11 +75,15 @@ class QuickReplyService
      */
     public function createCategory($params)
     {
-        return $this->quickReplyRepository->createCategory([
+        $category = $this->quickReplyRepository->createCategory([
             'label'  => $params['label'],
             'status' => $params['status'] ?? config('constants.QUICK_REPLY.STATUS.ACTIVE'),
             'sort'   => $this->quickReplyRepository->nextCategorySort(),
         ]);
+
+        $this->flushMatchPrompt();
+
+        return $category;
     }
 
     /**
@@ -88,7 +93,11 @@ class QuickReplyService
      */
     public function updateCategory(QuickReplyCategory $category, $params)
     {
-        return $this->quickReplyRepository->updateCategory($category, $params);
+        $updated = $this->quickReplyRepository->updateCategory($category, $params);
+
+        $this->flushMatchPrompt();
+
+        return $updated;
     }
 
     /**
@@ -105,6 +114,8 @@ class QuickReplyService
 
         $this->quickReplyRepository->deleteCategory($category);
 
+        $this->flushMatchPrompt();
+
         return true;
     }
 
@@ -114,13 +125,17 @@ class QuickReplyService
      */
     public function createItem($params)
     {
-        return $this->quickReplyRepository->createItem([
+        $item = $this->quickReplyRepository->createItem([
             'category_id' => $params['category_id'],
             'label'       => $params['label'],
             'answer'      => $params['answer'],
             'status'      => $params['status'] ?? config('constants.QUICK_REPLY.STATUS.ACTIVE'),
             'sort'        => $this->quickReplyRepository->nextItemSort($params['category_id']),
         ]);
+
+        $this->flushMatchPrompt();
+
+        return $item;
     }
 
     /**
@@ -130,7 +145,11 @@ class QuickReplyService
      */
     public function updateItem(QuickReplyItem $item, $params)
     {
-        return $this->quickReplyRepository->updateItem($item, $params);
+        $updated = $this->quickReplyRepository->updateItem($item, $params);
+
+        $this->flushMatchPrompt();
+
+        return $updated;
     }
 
     /**
@@ -140,6 +159,8 @@ class QuickReplyService
     public function deleteItem(QuickReplyItem $item)
     {
         $this->quickReplyRepository->deleteItem($item);
+
+        $this->flushMatchPrompt();
     }
 
     /**
@@ -190,6 +211,20 @@ class QuickReplyService
                 $sort++;
             }
         });
+
+        $this->flushMatchPrompt();
     }
 
+    /**
+     * 清掉自動回覆的題庫 prompt 快取
+     *
+     * 題庫是整份塞進 Claude 的 system prompt 的，任何異動（含類別啟停用）
+     * 都會改變比對範圍 —— 不清的話新題目最多要等快取過期才生效，而且很難察覺。
+     *
+     * @return void
+     */
+    private function flushMatchPrompt()
+    {
+        Cache::forget(config('auto_reply.prompt_cache_key'));
+    }
 }

@@ -23,16 +23,19 @@ class UpdateProfileRequest extends FormRequest
     public function rules()
     {
         return [
-            'nickname' => 'sometimes|string|max:100',
-            'password' => ['sometimes', 'nullable', config('rules.USER_PASSWORD_REGEX')],
+            'nickname'          => 'sometimes|string|max:100',
+            'password'          => ['sometimes', 'nullable', config('rules.USER_PASSWORD_REGEX')],
+            'telegram_username' => ['sometimes', 'nullable', 'string', 'max:50', config('rules.TELEGRAM_USERNAME_REGEX')],
         ];
     }
 
     public function messages()
     {
         return [
-            'nickname.max'   => trans('account.msg.max_string', ['value' => '100']),
-            'password.regex' => trans('account.msg.regex_password'),
+            'nickname.max'            => trans('account.msg.max_string', ['value' => '100']),
+            'password.regex'          => trans('account.msg.regex_password'),
+            'telegram_username.regex' => trans('account.msg.telegram_username_invalid'),
+            'telegram_username.max'   => trans('account.msg.max_string', ['value' => '50']),
         ];
     }
 }

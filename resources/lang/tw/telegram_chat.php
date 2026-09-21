@@ -44,6 +44,11 @@ return [
     'select_group'       => '請選擇左側對話',
     'alert_unreplied'    => '有未回覆訊息超過 :minutes 分鐘',
 
+    'auto_reply'             => '自動回覆',
+    'auto_reply_placeholder' => '自動回覆中，取消勾選才能人工輸入',
+    'auto_reply_unavailable' => '尚未設定 Claude，請先到「全域設定」完成設定',
+    'badge_auto'             => '自動',
+
     'msg' => [
         'required'         => '此欄位為必填',
         'group_not_found'  => '群組不存在',
@@ -62,5 +67,7 @@ return [
         'file_too_large'    => '檔案不可超過 :value MB',
         'file_type_blocked' => '不支援此檔案類型',
         'file_send_failed'  => '檔案傳送失敗',
+        'auto_reply_unavailable' => '尚未設定 Claude，無法開啟自動回覆',
+        'auto_reply_failed'      => '自動回覆開關切換失敗',
     ],
 ];

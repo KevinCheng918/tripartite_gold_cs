@@ -16,6 +16,13 @@ window.TgChat = (function () {
         nickname: root.dataset.userNickname,
         canReply: root.dataset.canReply === '1',
         canDelete: root.dataset.canDelete === '1',
+
+        // 後台是否已設定 Claude 憑證。沒設定就不讓開自動回覆 ——
+        // 開了也只會讓客人一直收到「稍等」
+        autoReplyAvailable: root.dataset.autoReplyAvailable === '1',
+
+        // 目前這個對話的自動回覆是否開啟。開著時整個輸入區要鎖住
+        autoReplyOn: false,
         wsKey: root.dataset.wsKey,
         wsHost: root.dataset.wsHost || '127.0.0.1',
         wsPort: parseInt(root.dataset.wsPort || '6001', 10),

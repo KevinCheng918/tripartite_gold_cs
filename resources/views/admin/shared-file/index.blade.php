@@ -14,7 +14,8 @@
 
     {{-- 權限與語系由 data-* 帶給 public/js/shared-file.js --}}
     <div id="shared-file-app"
-         data-i18n='@json(trans("shared_file"))'
+         {{-- JSON_HEX_APOS：屬性用單引號包，JSON 內的單引號（英文縮寫如 don't）會提早結束屬性 --}}
+         data-i18n='@json(trans("shared_file"), JSON_HEX_APOS | JSON_HEX_QUOT)'
          data-can-upload="{{ Auth::user()->hasPermission('shared_file.upload') ? '1' : '0' }}"
          data-can-delete="{{ Auth::user()->hasPermission('shared_file.delete') ? '1' : '0' }}"
          data-is-admin="{{ Auth::user()->isAdmin() ? '1' : '0' }}"

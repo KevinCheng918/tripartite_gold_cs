@@ -18,6 +18,7 @@ return [
         'leave_request' => '請假管理',
         'task_board' => '任務看板',
         'login_log' => '登入紀錄',
+        'setting' => '全域設定',
     ],
     'dashboard' => [
         'usdt_rate' => '查看 USDT 匯率',
@@ -70,10 +71,16 @@ return [
         'edit' => '編輯快速回覆題庫',
     ],
     'telegram_chat' => [
-        'reply'     => '回覆訊息',
-        'broadcast' => '群發公告',
-        'assign'    => '指派值班',
-        'delete'    => '刪除對話紀錄',
+        'reply'           => '回覆訊息',
+        'broadcast'       => '群發公告',
+        'assign'          => '指派值班',
+        'delete'          => '刪除對話紀錄',
+        'template_view'   => '檢視對客話術',
+        'template_manage' => '修改對客話術',
+    ],
+    'setting' => [
+        'view'   => '檢視全域設定',
+        'manage' => '修改全域設定（含 Claude 憑證）',
     ],
     'staff_manage' => [
         'view' => '檢視內部管理',

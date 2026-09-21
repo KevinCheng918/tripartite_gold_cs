@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\DB;
 class UserRepository
 {
     /** @var array 列表查詢欄位 */
-    private const LIST_COLUMNS = ['id', 'account', 'nickname', 'telegram_nickname', 'status', 'level', 'project_ids', 'hired_at', 'equipments', 'created_at'];
+    private const LIST_COLUMNS = ['id', 'account', 'nickname', 'telegram_nickname', 'telegram_username', 'status', 'level', 'project_ids', 'hired_at', 'equipments', 'created_at'];
 
     /**
      * 依條件分頁查詢使用者
@@ -245,6 +245,53 @@ class UserRepository
             ->select(['id', 'nickname'])
             ->where('status', config('constants.USER.STATUS.NORMAL'))
             ->where('level', '!=', config('constants.USER.LEVEL.ADMIN'))
+            ->orderBy('nickname')
+            ->get();
+    }
+
+    /**
+     * 取得主管與老闆（自動回覆求助單第二階段提醒用）
+     *
+     * level <= LEADER 即管理者(0)、老闆(1)、主管(2)，
+     * 工程(3) 與客服(4) 都不在內 —— 求助單升級後不該去吵工程。
+     * 只取有填 Telegram 帳號的人，沒填的 tag 不到。
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getManagersForMention()
+    {
+        return User::query()
+            ->select(['id', 'nickname', 'telegram_username'])
+            ->where('level', '<=', config('constants.USER.LEVEL.LEADER'))
+            ->where('status', config('constants.USER.STATUS.NORMAL'))
+            ->whereNotNull('telegram_username')
+            ->where('telegram_username', '!=', '')
+            ->orderBy('level')
+            ->orderBy('nickname')
+            ->get();
+    }
+
+    /**
+     * 依 id 取得可 @ 的帳號（自動回覆求助單第一階段提醒用）
+     *
+     * 傳入當下排班的人員 id，濾掉工程與沒填 Telegram 帳號的人。
+     *
+     * @param array $ids
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getMentionableByIds($ids)
+    {
+        if (empty($ids)) {
+            return new \Illuminate\Database\Eloquent\Collection();
+        }
+
+        return User::query()
+            ->select(['id', 'nickname', 'telegram_username'])
+            ->whereIn('id', $ids)
+            ->where('level', '!=', config('constants.USER.LEVEL.ENGINEER'))
+            ->where('status', config('constants.USER.STATUS.NORMAL'))
+            ->whereNotNull('telegram_username')
+            ->where('telegram_username', '!=', '')
             ->orderBy('nickname')
             ->get();
     }

@@ -87,6 +87,12 @@
 
         var textHtml = m.content ? T.escapeHtml(m.content) : '';
 
+        // 機器回的訊息要標出來，事後翻對話才分得出哪些不是人回的
+        if (m.is_auto) {
+            textHtml = '<span class="badge bg-secondary me-1" style="font-size:0.6875rem;vertical-align:middle">' +
+                T.escapeHtml(T.i18n.badge_auto || '自動') + '</span>' + textHtml;
+        }
+
         // 客人改過內容就標示出來，提醒客服現在看到的不是最初那句
         if (m.is_edited) {
             textHtml += '<span class="text-muted ms-1" style="font-size:0.75rem">（' +

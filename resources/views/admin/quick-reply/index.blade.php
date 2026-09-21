@@ -7,7 +7,8 @@
 @section('content')
 
     <div id="quick-reply-app"
-         data-i18n='@json(trans("quick_reply"))'
+         {{-- JSON_HEX_APOS：屬性用單引號包，JSON 內的單引號（英文縮寫如 don't）會提早結束屬性 --}}
+         data-i18n='@json(trans("quick_reply"), JSON_HEX_APOS | JSON_HEX_QUOT)'
          data-can-edit="{{ Auth::user()->hasPermission('quick_reply.edit') ? '1' : '0' }}">
 
         <div class="alert alert-light border d-flex align-items-center mb-3" style="font-size:0.875rem">

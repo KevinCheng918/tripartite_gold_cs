@@ -43,6 +43,11 @@ return [
     'select_group'       => 'Select a conversation',
     'alert_unreplied'    => 'Unreplied message over :minutes minutes',
 
+    'auto_reply'             => 'Auto reply',
+    'auto_reply_placeholder' => 'Auto reply is on. Uncheck it to type manually.',
+    'auto_reply_unavailable' => 'Claude is not configured yet. Set it up in Global Settings first.',
+    'badge_auto'             => 'Auto',
+
     'msg' => [
         'required'         => 'Required',
         'group_not_found'  => 'Group not found',
@@ -61,5 +66,7 @@ return [
         'file_too_large'    => 'File must not exceed :value MB',
         'file_type_blocked' => 'This file type is not supported',
         'file_send_failed'  => 'Failed to send file',
+        'auto_reply_unavailable' => 'Claude is not configured, auto reply cannot be enabled',
+        'auto_reply_failed'      => 'Failed to toggle auto reply',
     ],
 ];

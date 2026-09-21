@@ -12,6 +12,18 @@ return [
     'USER_PASSWORD_REGEX' => 'regex:/^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{}|;:,.<>?\/?]{8,}$/',
 
     /*
+     * Telegram 帳號（不含 @）。用來在內部群組 tag 人。
+     */
+    'TELEGRAM_USERNAME_REGEX' => 'regex:/^@?[A-Za-z0-9_]{5,32}$/',
+
+    /*
+     * Telegram 群組的 chat_id。
+     *
+     * 群組是**負數**，所以不能用 integer 規則（會把負號擋掉），得用 regex。
+     */
+    'TELEGRAM_CHAT_ID_REGEX' => 'regex:/^-?\d{5,20}$/',
+
+    /*
      * 上傳檔案禁止的副檔名
      *
      * 上傳目的地在 storage/app/public 底下、對外可直接存取，

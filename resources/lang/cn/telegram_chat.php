@@ -43,6 +43,11 @@ return [
     'select_group'       => '请选择左侧对话',
     'alert_unreplied'    => '有未回复消息超过 :minutes 分钟',
 
+    'auto_reply'             => '自动回复',
+    'auto_reply_placeholder' => '自动回复中，取消勾选才能人工输入',
+    'auto_reply_unavailable' => '尚未设置 Claude，请先到「全局设置」完成设置',
+    'badge_auto'             => '自动',
+
     'msg' => [
         'required'         => '此栏位为必填',
         'group_not_found'  => '群组不存在',
@@ -61,5 +66,7 @@ return [
         'file_too_large'    => '档案不可超过 :value MB',
         'file_type_blocked' => '不支援此档案类型',
         'file_send_failed'  => '档案传送失败',
+        'auto_reply_unavailable' => '尚未设置 Claude，无法开启自动回复',
+        'auto_reply_failed'      => '自动回复开关切换失败',
     ],
 ];

@@ -7,11 +7,13 @@
 @section('content')
 
     <div id="telegram-chat-app"
-         data-i18n='@json(trans("telegram_chat"))'
+         {{-- JSON_HEX_APOS：語系若出現單引號（英文縮寫），會提早結束這個 data 屬性 --}}
+         data-i18n='@json(trans("telegram_chat"), JSON_HEX_APOS | JSON_HEX_QUOT)'
          data-user-id="{{ Auth::id() }}"
          data-user-nickname="{{ Auth::user()->nickname }}"
          data-can-reply="{{ Auth::user()->hasPermission('telegram_chat.reply') ? '1' : '0' }}"
          data-can-delete="{{ Auth::user()->hasPermission('telegram_chat.delete') ? '1' : '0' }}"
+         data-auto-reply-available="{{ $autoReplyAvailable ? '1' : '0' }}"
          data-ws-key="{{ config('broadcasting.connections.pusher.key') }}"
          data-ws-host="{{ config('broadcasting.connections.pusher.options.host') }}"
          data-ws-port="{{ config('broadcasting.connections.pusher.options.port') }}"

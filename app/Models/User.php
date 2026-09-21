@@ -17,12 +17,14 @@ use Laravel\Sanctum\HasApiTokens;
  * level 欄位區分身份（見 config/constants.php）。
  *
  * @property int         $id
- * @property string      $account    登入帳號
- * @property string      $nickname   顯示暱稱
- * @property string      $password   密碼（Crypt::encrypt 加密）
- * @property int         $status     狀態（見 constants.USER.STATUS）
- * @property int         $level      身份（見 constants.USER.LEVEL）
- * @property string|null $deleted_at 軟刪除時間
+ * @property string      $account           登入帳號
+ * @property string      $nickname          顯示暱稱
+ * @property string      $password          密碼（Crypt::encrypt 加密）
+ * @property int         $status            狀態（見 constants.USER.STATUS）
+ * @property int         $level             身份（見 constants.USER.LEVEL）
+ * @property string|null $telegram_nickname Telegram 對話署名，簽在客戶訊息結尾
+ * @property string|null $telegram_username Telegram 帳號（不含 @），內部群組提醒時用來 tag 本人
+ * @property string|null $deleted_at        軟刪除時間
  */
 class User extends Authenticatable
 {
