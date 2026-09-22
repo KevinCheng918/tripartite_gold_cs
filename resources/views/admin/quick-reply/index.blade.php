@@ -47,6 +47,19 @@
                         @endif
                     </div>
                     <div class="card-body p-0">
+                        {{-- 搜尋是跨類別的：題庫長到上百題之後，
+                             要找某一題還得先想它在哪個類別很不實際 --}}
+                        <div class="px-3 py-2 border-bottom">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                <input type="text" class="form-control" id="qr-search"
+                                       placeholder="{{ trans('quick_reply.search_placeholder') }}" autocomplete="off">
+                                <button class="btn btn-outline-secondary" type="button" id="qr-search-clear"
+                                        title="{{ trans('quick_reply.search_clear') }}">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
                         <div id="qr-item-list">
                             <div class="text-center text-muted py-4">{{ trans('quick_reply.select_category') }}</div>
                         </div>

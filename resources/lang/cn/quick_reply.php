@@ -24,6 +24,11 @@ return [
     'no_categories'    => '尚未建立任何类别',
     'no_items'         => '此类别尚无问答',
     'select_category'  => '请先选择左侧类别',
+
+    'search_placeholder' => '搜寻编号或关键字，例如 23 或 加签',
+    'search_clear'       => '清除搜寻',
+    'search_result'      => '搜寻结果（:count 题）',
+    'search_empty'       => '找不到符合的问答',
     'item_count'       => ':count 题',
     'confirm_delete_category' => '确定删除此类别？',
     'confirm_delete_item'     => '确定删除此问答？',

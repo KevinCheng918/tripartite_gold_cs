@@ -18,6 +18,9 @@
     var selectedCategoryId = null;
     var pendingDelete = null;
 
+    // 搜尋關鍵字。有值時右欄改成跨類別的搜尋結果，清空才回到類別瀏覽
+    var searchKeyword = '';
+
     // ===== 工具 =====
 
     function escapeHtml(text) {
@@ -83,6 +86,62 @@
 
     function findCategory(id) {
         return categories.filter(function (c) { return c.id === id; })[0] || null;
+    }
+
+    /**
+     * 跨所有類別找一題
+     *
+     * 搜尋結果裡的編輯按鈕不能只在目前選到的類別裡找，那會找不到。
+     *
+     * @param {number} id
+     * @returns {Object|null}
+     */
+    function findItem(id) {
+        for (var i = 0; i < categories.length; i++) {
+            var found = categories[i].items.filter(function (item) { return item.id === id; })[0];
+
+            if (found) {
+                return { category: categories[i], item: found };
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * 依關鍵字搜尋題目
+     *
+     * 編號與關鍵字用同一個輸入框：輸入純數字時，除了比對編號也會比對內容 ——
+     * 錯誤碼（10003、-4）本身就是數字，只比對編號的話反而找不到。
+     * 編號完全相符的排在最前面。
+     *
+     * @param {string} keyword
+     * @returns {Array} [{category, item}]
+     */
+    function searchItems(keyword) {
+        // 清單裡的編號習慣寫成 #23，貼進來時把井字號去掉
+        var text = keyword.replace(/^#/, '').toLowerCase();
+        var byId = [];
+        var byText = [];
+
+        categories.forEach(function (category) {
+            category.items.forEach(function (item) {
+                if (String(item.id) === text) {
+                    byId.push({ category: category, item: item });
+
+                    return;
+                }
+
+                var hit = item.label.toLowerCase().indexOf(text) !== -1
+                    || item.answer.toLowerCase().indexOf(text) !== -1;
+
+                if (hit) {
+                    byText.push({ category: category, item: item });
+                }
+            });
+        });
+
+        return byId.concat(byText);
     }
 
     // ===== 載入 =====
@@ -198,6 +257,13 @@
         var container = document.getElementById('qr-item-list');
         var title = document.getElementById('qr-item-title');
         var addBtn = document.getElementById('btn-add-item');
+
+        if (searchKeyword) {
+            renderSearchResults(container, title, addBtn);
+
+            return;
+        }
+
         var category = findCategory(selectedCategoryId);
 
         if (!category) {
@@ -228,7 +294,9 @@
                 '<div class="d-flex align-items-start">' +
                 (canEdit ? dragHandle() : '') +
                 '<div class="flex-fill" style="min-width:0">' +
-                '<div class="fw-bold" style="font-size:0.875rem">' + disabled + escapeHtml(item.label) + '</div>' +
+                '<div class="fw-bold" style="font-size:0.875rem">' +
+                '<span class="badge bg-light text-muted border me-1" style="font-weight:400">#' + item.id + '</span>' +
+                disabled + escapeHtml(item.label) + '</div>' +
                 '<div class="text-muted mt-1" style="font-size:0.8125rem;white-space:pre-wrap">' +
                 escapeHtml(item.answer) + '</div>' +
                 '</div></div>';
@@ -255,6 +323,68 @@
             confirmDelete(i18n.confirm_delete_item, '/admin/quick-reply/ajax-delete-item/' + btn.dataset.id);
         });
         bindSortable(container, '/admin/quick-reply/ajax-reorder-items', '.js-qr-item');
+    }
+
+    /**
+     * 搜尋結果（跨類別）
+     *
+     * 每一筆都標上編號與所屬類別 —— 搜尋時看不到左欄的類別，
+     * 不標的話不知道這題屬於哪裡。排序也不開放，那只在類別內有意義。
+     *
+     * @param {HTMLElement}      container
+     * @param {HTMLElement}      title
+     * @param {HTMLElement|null} addBtn
+     */
+    function renderSearchResults(container, title, addBtn) {
+        var results = searchItems(searchKeyword);
+
+        title.textContent = i18n.search_result.replace(':count', results.length);
+        if (addBtn) { addBtn.style.display = 'none'; }
+
+        if (!results.length) {
+            container.innerHTML = '<div class="text-center text-muted py-4">' +
+                escapeHtml(i18n.search_empty) + '</div>';
+
+            return;
+        }
+
+        var html = '';
+
+        results.forEach(function (row) {
+            var item = row.item;
+            var disabled = item.status ? '' :
+                '<span class="badge bg-secondary me-1">' + escapeHtml(i18n.status_disabled) + '</span>';
+
+            html += '<div class="px-3 py-2 border-bottom">' +
+                '<div class="d-flex align-items-center gap-2 mb-1" style="font-size:0.75rem">' +
+                '<span class="badge bg-light text-muted border">#' + item.id + '</span>' +
+                '<span class="text-muted">' + escapeHtml(row.category.label) + '</span>' +
+                '</div>' +
+                '<div class="fw-bold" style="font-size:0.875rem">' + disabled + escapeHtml(item.label) + '</div>' +
+                '<div class="text-muted mt-1" style="font-size:0.8125rem;white-space:pre-wrap">' +
+                escapeHtml(item.answer) + '</div>';
+
+            if (canEdit) {
+                html += '<div class="d-flex flex-wrap gap-1 mt-2">' +
+                    editButtons('item', item.id) +
+                    '</div>';
+            }
+
+            html += '</div>';
+        });
+
+        container.innerHTML = html;
+
+        if (!canEdit) { return; }
+
+        bindAll(container, '.js-qr-edit-item', function (btn) {
+            var found = findItem(parseInt(btn.dataset.id, 10));
+
+            if (found) { openItemModal(found.item); }
+        });
+        bindAll(container, '.js-qr-del-item', function (btn) {
+            confirmDelete(i18n.confirm_delete_item, '/admin/quick-reply/ajax-delete-item/' + btn.dataset.id);
+        });
     }
 
     function openItemModal(item) {
@@ -453,6 +583,24 @@
     var addItemBtn = document.getElementById('btn-add-item');
     if (addItemBtn) {
         addItemBtn.addEventListener('click', function () { openItemModal(null); });
+    }
+
+    var searchInput = document.getElementById('qr-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', function () {
+            searchKeyword = searchInput.value.trim();
+            renderItems();
+        });
+    }
+
+    var searchClear = document.getElementById('qr-search-clear');
+    if (searchClear) {
+        searchClear.addEventListener('click', function () {
+            searchInput.value = '';
+            searchKeyword = '';
+            searchInput.focus();
+            renderItems();
+        });
     }
 
     loadAll();

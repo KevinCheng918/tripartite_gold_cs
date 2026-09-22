@@ -25,6 +25,11 @@ return [
     'no_categories'    => '尚未建立任何類別',
     'no_items'         => '此類別尚無問答',
     'select_category'  => '請先選擇左側類別',
+
+    'search_placeholder' => '搜尋編號或關鍵字，例如 23 或 加簽',
+    'search_clear'       => '清除搜尋',
+    'search_result'      => '搜尋結果（:count 題）',
+    'search_empty'       => '找不到符合的問答',
     'item_count'       => ':count 題',
     'confirm_delete_category' => '確定刪除此類別？',
     'confirm_delete_item'     => '確定刪除此問答？',

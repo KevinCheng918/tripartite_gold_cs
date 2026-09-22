@@ -24,6 +24,11 @@ return [
     'no_categories'    => 'No categories yet',
     'no_items'         => 'No Q&A in this category',
     'select_category'  => 'Select a category first',
+
+    'search_placeholder' => 'Search by ID or keyword, e.g. 23 or sign',
+    'search_clear'       => 'Clear search',
+    'search_result'      => 'Search results (:count)',
+    'search_empty'       => 'No matching entries',
     'item_count'       => ':count items',
     'confirm_delete_category' => 'Delete this category?',
     'confirm_delete_item'     => 'Delete this Q&A?',
