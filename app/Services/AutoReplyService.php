@@ -355,11 +355,16 @@ class AutoReplyService
      */
     private function replyWait(TelegramGroup $group, $question, $opening, $messageId, array $result = [])
     {
-        // 才剛說過稍等就不要再說一次，顯得敷衍；求助單也已經開了
-        if ($this->isWaitOnCooldown($group)) {
-            return;
-        }
-
+        /*
+         * 這裡以前有「5 分鐘內剛說過稍等就不再回」的冷卻，已移除。
+         *
+         * 那個 return 擋在開求助單前面，造成客人在 5 分鐘內問的第二個問題
+         * 既沒有收到回應、也沒有進到支援群組 —— 同仁根本不知道有人問過。
+         *
+         * 冷卻原本是為了避免「稍等」一再重複顯得敷衍，但現在開頭那句是
+         * 依客人的話生成的承接句，每次都不一樣，這個理由已經不存在。
+         * 客人問一次就回一次，本來就是客服該做的事。
+         */
         $content = filled($opening) ? $opening : $this->renderTemplate(
             $group,
             AppSettingService::KEY_TPL_WAIT_FULL,
@@ -503,25 +508,6 @@ class AutoReplyService
         $minutes = (int) config('constants.AUTO_REPLY.GREETING_GAP_MINUTES');
 
         return $group->auto_reply_at->lt(now()->subMinutes($minutes));
-    }
-
-    /**
-     * 「稍等」是否還在冷卻中
-     *
-     * 只有「上次也是回稍等」才算 —— auto_reply_item_id 有值代表上次是真的答了。
-     *
-     * @param TelegramGroup $group
-     * @return bool
-     */
-    private function isWaitOnCooldown(TelegramGroup $group)
-    {
-        if (filled($group->auto_reply_item_id) || blank($group->auto_reply_at)) {
-            return false;
-        }
-
-        $minutes = (int) config('constants.AUTO_REPLY.WAIT_COOLDOWN_MINUTES');
-
-        return $group->auto_reply_at->gt(now()->subMinutes($minutes));
     }
 
 

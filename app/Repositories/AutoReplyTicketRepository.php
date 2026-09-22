@@ -61,25 +61,53 @@ class AutoReplyTicketRepository
     /**
      * 該群組最近一張還沒處理完的單
      *
-     * 用來判斷「這個群組已經開過單了，不要重複開」，
-     * 以及客服自己人工回覆時要把哪張單關掉。
+     * 客服自己人工回覆時，用來判斷要把哪張單關掉。
      *
      * @param int $groupId
      * @return AutoReplyTicket|null
      */
     public function findOpenByGroup($groupId)
     {
-        $open = [
-            config('constants.AUTO_REPLY.TICKET_STATUS.PENDING'),
-            config('constants.AUTO_REPLY.TICKET_STATUS.ANSWERED'),
-        ];
-
         return AutoReplyTicket::query()
             ->select(self::COLUMNS)
             ->where('telegram_group_id', $groupId)
-            ->whereIn('status', $open)
+            ->whereIn('status', $this->openStatuses())
             ->orderByDesc('id')
             ->first();
+    }
+
+    /**
+     * 同一個問題是不是已經有單在處理中
+     *
+     * 客人手滑重複貼、或等不及又問一次時，不必開第二張單洗版內部群組。
+     * 不同的問題仍然要各開一張 —— 漏掉客戶的問題比多幾則訊息嚴重得多。
+     *
+     * @param int    $groupId
+     * @param string $question 已 trim
+     * @return AutoReplyTicket|null
+     */
+    public function findOpenByQuestion($groupId, $question)
+    {
+        return AutoReplyTicket::query()
+            ->select(self::COLUMNS)
+            ->where('telegram_group_id', $groupId)
+            ->where('question', $question)
+            ->whereIn('status', $this->openStatuses())
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    /**
+     * 還沒處理完的狀態
+     *
+     * @return array
+     */
+    private function openStatuses()
+    {
+        return [
+            config('constants.AUTO_REPLY.TICKET_STATUS.PENDING'),
+            config('constants.AUTO_REPLY.TICKET_STATUS.ANSWERED'),
+        ];
     }
 
     /**

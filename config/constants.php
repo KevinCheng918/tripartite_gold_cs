@@ -248,8 +248,13 @@ return [
         // 距離上次自動回覆超過這個分鐘數，才用帶問候語的完整版模板
         'GREETING_GAP_MINUTES' => 30,
 
-        // 「稍等」的冷卻。命中題庫的答案不受此限制 —— 客人重複問就要重複答
-        'WAIT_COOLDOWN_MINUTES' => 5,
+        /*
+         * 這裡原本有 WAIT_COOLDOWN_MINUTES（「稍等」的冷卻），已移除。
+         *
+         * 它會讓客人在冷卻內問的第二個問題既沒有回應、也沒有進支援群組。
+         * 而冷卻原本要解決的「稍等一再重複顯得敷衍」，已經由每次都不同的
+         * 承接句解決掉了。
+         */
 
         /*
          * Telegram inline keyboard 的 callback_data 前綴。

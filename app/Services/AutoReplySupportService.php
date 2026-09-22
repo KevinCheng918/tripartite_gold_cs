@@ -96,8 +96,17 @@ class AutoReplySupportService
             return null;
         }
 
-        // 同一個群組還有單沒處理完就不重開，避免洗版內部群組
-        if (filled($this->ticketRepository->findOpenByGroup($group->id))) {
+        $question = trim((string) $question);
+
+        /*
+         * 以前是「同群組還有單沒處理完就不重開」，結果客人問的第二個問題會直接消失 ——
+         * 他收到「馬上請同仁確認」，同仁那邊卻只看得到第一個問題。
+         * 漏掉客戶的問題比內部群組多幾則訊息嚴重得多，所以改成每個問題各開一張。
+         *
+         * 只擋「一模一樣的問題」：客人手滑重複貼、或等不及又問一次，
+         * 這種開第二張單只是洗版，沒有新資訊。
+         */
+        if (filled($this->ticketRepository->findOpenByQuestion($group->id, $question))) {
             return null;
         }
 
