@@ -11,9 +11,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int    $id
  * @property int    $category_id
  * @property string $label
- * @property string $answer
- * @property int    $sort
- * @property int    $status
+ * @property string      $answer
+ * @property string|null $import_key seeder 建立的題目來源識別，人工新增的為 null
+ * @property int         $sort
+ * @property int         $status
  */
 class QuickReplyItem extends Model
 {

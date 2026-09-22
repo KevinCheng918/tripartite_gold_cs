@@ -18,6 +18,14 @@ class QuickReplyRepository
     private const ITEM_COLUMNS = ['id', 'category_id', 'label', 'answer', 'sort', 'status'];
 
     /**
+     * @var array seeder 用的欄位
+     *
+     * 需要 answer 才能比對「後台的內容是不是已經和 seeder 定義不同」，
+     * 但題庫每則訊息都要整份送進 prompt，所以不併進 ITEM_COLUMNS。
+     */
+    private const IMPORT_COLUMNS = ['id', 'category_id', 'label', 'answer', 'import_key'];
+
+    /**
      * 取得全部類別（含所有問答，管理頁用）
      *
      * @return Collection
@@ -98,22 +106,20 @@ class QuickReplyRepository
     }
 
     /**
-     * 依 id 批次取啟用中的問答（反問的候選題目用）
+     * 依來源識別查詢（QuickReplyKnowledgeSeeder 用）
      *
-     * @param array $ids
-     * @return Collection
+     * 判斷這題是不是已經建過了。**停用中的也要撈** ——
+     * 客服把某題停用是刻意的，重跑 seeder 不該又插一筆新的進去。
+     *
+     * @param string $importKey
+     * @return QuickReplyItem|null
      */
-    public function getActiveItemsByIds($ids)
+    public function findItemByImportKey($importKey)
     {
-        if (empty($ids)) {
-            return new Collection();
-        }
-
         return QuickReplyItem::query()
-            ->select(self::ITEM_COLUMNS)
-            ->whereIn('id', $ids)
-            ->where('status', config('constants.QUICK_REPLY.STATUS.ACTIVE'))
-            ->get();
+            ->select(self::IMPORT_COLUMNS)
+            ->where('import_key', $importKey)
+            ->first();
     }
 
     /**
