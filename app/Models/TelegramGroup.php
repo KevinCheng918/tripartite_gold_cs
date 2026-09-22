@@ -19,9 +19,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property int|null    $assigned_user_id    值班客服 ID
  * @property string|null $last_message_at     最後訊息時間
  * @property bool        $auto_reply          自動回覆開關（預設關）
- * @property string|null $auto_reply_at       最後一次自動回覆時間（問候語間隔、稍等冷卻、反問時限共用）
- * @property int|null    $auto_reply_item_id  最後命中的題庫 id，null=上次回的是稍等
- * @property string|null $auto_reply_pending  反問中的候選題目 id（逗號分隔）
+ * @property string|null $auto_reply_at       最後一次自動回覆時間（模板版本、稍等冷卻共用）
+ * @property int|null    $auto_reply_item_id  最後命中的題庫 id，null=上次沒有送題庫內容
+ * @property string|null $auto_reply_pending  已停用。反問編號選項移除後不再寫入，欄位留著沒有清掉
  */
 class TelegramGroup extends Model
 {

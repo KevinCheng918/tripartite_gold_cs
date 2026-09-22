@@ -123,36 +123,18 @@ class TelegramRepository
     /**
      * 記錄本次自動回覆的狀態
      *
-     * auto_reply_at 同時服務三件事：問候語要用完整版還是精簡版、
-     * 「稍等」的冷卻、以及反問後等客人回答的時限。
+     * auto_reply_at 服務兩件事：模板要用完整版還是精簡版、以及「稍等」的冷卻。
      *
      * @param TelegramGroup $group
-     * @param int|null      $itemId  命中的題庫 id；null 代表這次回的是「稍等」
-     * @param string|null   $pending 反問中的候選 id（逗號分隔）；null 代表沒有在等回答
+     * @param int|null      $itemId 命中的題庫 id；null 代表這次沒有送題庫內容
      * @return TelegramGroup
      */
-    public function updateAutoReplyState(TelegramGroup $group, $itemId, $pending = null)
+    public function updateAutoReplyState(TelegramGroup $group, $itemId)
     {
         $group->update([
             'auto_reply_at'      => now(),
             'auto_reply_item_id' => $itemId,
-            'auto_reply_pending' => $pending,
         ]);
-
-        return $group->refresh();
-    }
-
-    /**
-     * 清掉反問的等待狀態
-     *
-     * 客人答了、或超過時限當成全新問題時呼叫。
-     *
-     * @param TelegramGroup $group
-     * @return TelegramGroup
-     */
-    public function clearAutoReplyPending(TelegramGroup $group)
-    {
-        $group->update(['auto_reply_pending' => null]);
 
         return $group->refresh();
     }

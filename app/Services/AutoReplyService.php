@@ -6,15 +6,22 @@ use App\Contracts\AutoReplyMatcher;
 use App\Models\TelegramGroup;
 use App\Repositories\QuickReplyRepository;
 use App\Repositories\TelegramRepository;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
 /**
  * 自動回覆決策服務
  *
- * 拿比對器挑出來的題目，決定要「送答案」「反問」還是「說稍等並轉人工」，
- * 並負責把答案包進對客話術。
+ * 拿比對器的判斷，決定要送答案、只回一句、說稍等並轉人工，還是什麼都不回。
  *
- * 比對器只管挑題目，這一層管流程；實際送訊息仍走 TelegramChatService::sendReply()。
+ * 兩個原則：
+ *
+ * 1. **答案本體永遠是題庫原文**。模型只能寫「承接客人的那一兩句」（opening），
+ *    而且還要通過 sanitizeOpening() 才採用 —— 沒過就退回固定話術。
+ * 2. **拿不準就轉人工**。答錯的代價遠高於多轉一次人工，
+ *    而且每轉一次就是一次把題庫補起來的機會。
+ *
+ * 比對器只管判斷，這一層管流程；實際送訊息仍走 TelegramChatService::sendReply()。
  */
 class AutoReplyService
 {
@@ -57,27 +64,16 @@ class AutoReplyService
             return;
         }
 
-        $context = $this->buildContext($group);
-
-        // 客人回「1」這種編號，不必再問一次模型
-        $chosen = $this->matchNumericChoice($text, $context);
-
-        if (filled($chosen)) {
-            $this->replyWithItem($group, $chosen);
-
-            return;
-        }
-
-        $result = $this->matcher->resolve($text, $context + ['group_id' => $group->id]);
+        $result = $this->matcher->resolve($text, ['group_id' => $group->id]);
 
         // 比對器掛了（逾時、額度用盡、格式壞掉）—— 一律走人工，不要讓客人空等
-        if (!filled($result)) {
-            $this->replyWait($group, $text, $messageId);
+        if (blank($result)) {
+            $this->replyWait($group, $text, null, $messageId);
 
             return;
         }
 
-        $this->dispatchResult($group, $result, $context, $text, $messageId);
+        $this->dispatchResult($group, $result, $text, $messageId);
     }
 
     /**
@@ -92,7 +88,7 @@ class AutoReplyService
     {
         $group = $this->telegramRepository->findGroup($groupId);
 
-        if (!filled($group)) {
+        if (blank($group)) {
             throw new \RuntimeException(trans('telegram_chat.msg.group_not_found'));
         }
 
@@ -119,29 +115,37 @@ class AutoReplyService
      *
      * @param TelegramGroup $group
      * @param array         $result
-     * @param array         $context
      * @param string        $text
      * @param int|null      $messageId
      * @return void
      */
-    private function dispatchResult(TelegramGroup $group, array $result, array $context, $text, $messageId)
+    private function dispatchResult(TelegramGroup $group, array $result, $text, $messageId)
     {
-        $decision = $this->decide($result, $context);
+        $decision = $this->decide($result);
         $actions = config('constants.AUTO_REPLY.DECISION');
 
+        // 客人只說了「好」「收到」——再回一句才是打擾。
+        // 刻意不標記已回覆：萬一這是誤判（客人其實有問事情），
+        // 既有的未回覆告警仍會響，客服就會接手
+        if ($decision['action'] === $actions['SILENT']) {
+            Log::info('自動回覆判定不需回應', ['group_id' => $group->id, 'text' => $text]);
+
+            return;
+        }
+
         if ($decision['action'] === $actions['ANSWER']) {
-            $this->replyWithItem($group, $decision['item']);
+            $this->replyWithItem($group, $decision['item'], $decision['opening']);
 
             return;
         }
 
-        if ($decision['action'] === $actions['CLARIFY']) {
-            $this->replyClarify($group, $decision['candidates']);
+        if ($decision['action'] === $actions['REPLY']) {
+            $this->replyOpeningOnly($group, $decision['opening']);
 
             return;
         }
 
-        $this->replyWait($group, $text, $messageId);
+        $this->replyWait($group, $text, $decision['opening'], $messageId, $result);
     }
 
     /**
@@ -151,34 +155,84 @@ class AutoReplyService
      * 這樣 auto-reply:test 可以重用同一套判斷而不會有副作用，
      * 測出來的結果也才等於線上真正會做的事。
      *
-     * @param array $result  比對器的輸出
-     * @param array $context 反問脈絡；非空代表這已經是第二輪
-     * @return array action（見 constants.AUTO_REPLY.DECISION）／item／candidates
+     * @param array $result 比對器的輸出
+     * @return array action（見 constants.AUTO_REPLY.DECISION）／item／opening
      */
-    private function decide(array $result, array $context)
+    private function decide(array $result)
     {
         $actions = config('constants.AUTO_REPLY.DECISION');
-        $isHigh = $result['confidence'] === config('constants.AUTO_REPLY.CONFIDENCE.HIGH');
+        $intents = config('constants.AUTO_REPLY.INTENT');
+        $intent = Arr::get($result, 'intent');
+        $opening = $this->sanitizeOpening(Arr::get($result, 'opening'));
 
-        if ($isHigh && filled($result['item_id'])) {
-            $item = $this->quickReplyRepository->findActiveItem($result['item_id']);
+        // 寒暄：有話要回就回一句，沒有就閉嘴
+        if ($intent === $intents['CHAT']) {
+            $action = filled($opening) ? $actions['REPLY'] : $actions['SILENT'];
+
+            return ['action' => $action, 'item' => null, 'opening' => $opening];
+        }
+
+        // 需求不是題庫該回答的東西 —— 硬比對只會撈出不相干的答案，一律轉人工
+        if ($intent === $intents['REQUEST']) {
+            return ['action' => $actions['WAIT'], 'item' => null, 'opening' => $opening];
+        }
+
+        $isHigh = Arr::get($result, 'confidence') === config('constants.AUTO_REPLY.CONFIDENCE.HIGH');
+        $itemId = Arr::get($result, 'item_id');
+
+        if ($isHigh && filled($itemId)) {
+            $item = $this->quickReplyRepository->findActiveItem($itemId);
 
             if (filled($item)) {
-                return ['action' => $actions['ANSWER'], 'item' => $item, 'candidates' => []];
+                return ['action' => $actions['ANSWER'], 'item' => $item, 'opening' => $opening];
             }
 
             // 模型挑到的題目剛好被停用或刪掉，當作沒命中
-            Log::warning('自動回覆命中的題目已不存在或已停用', ['item_id' => $result['item_id']]);
+            Log::warning('自動回覆命中的題目已不存在或已停用', ['item_id' => $itemId]);
         }
 
-        // 已經反問過一次就不再反問 —— 跟客人來回鬼打牆比直接轉人工更失禮
-        $candidates = filled($context) ? [] : $this->takeCandidates($result);
+        // 沒把握就轉人工。答錯的代價遠高於多轉一次人工，
+        // 而且每轉一次就是一次把題庫補起來的機會
+        return ['action' => $actions['WAIT'], 'item' => null, 'opening' => $opening];
+    }
 
-        if (filled($candidates)) {
-            return ['action' => $actions['CLARIFY'], 'item' => null, 'candidates' => $candidates];
+    /**
+     * 檢查承接句能不能用
+     *
+     * 這是模型唯一能自由生成的地方，所以 prompt 講過的限制這裡要再擋一次 ——
+     * prompt 是請求，不是保證。任何一條不過就退回固定話術，
+     * 最壞情況等於改版前，不會更糟。
+     *
+     * @param string|null $opening
+     * @return string|null 可用的承接句；不可用時為 null
+     */
+    private function sanitizeOpening($opening)
+    {
+        if (blank($opening)) {
+            return null;
         }
 
-        return ['action' => $actions['WAIT'], 'item' => null, 'candidates' => []];
+        $opening = trim($opening);
+        $maxLength = (int) config('constants.AUTO_REPLY.OPENING.MAX_LENGTH');
+
+        if (mb_strlen($opening) > $maxLength) {
+            Log::warning('承接句過長，退回固定話術', ['opening' => $opening]);
+
+            return null;
+        }
+
+        foreach ((array) config('constants.AUTO_REPLY.OPENING.BLACKLIST') as $word) {
+            if (mb_strpos($opening, $word) !== false) {
+                Log::warning('承接句含不該由系統說的話，退回固定話術', [
+                    'word'    => $word,
+                    'opening' => $opening,
+                ]);
+
+                return null;
+            }
+        }
+
+        return $opening;
     }
 
     /**
@@ -187,28 +241,29 @@ class AutoReplyService
      * 供 auto-reply:test 調 prompt 與話術用。
      *
      * @param string $text
-     * @param array  $candidateIds 模擬反問後的第二輪
-     * @return array action／content／result
+     * @return array action／content／hint／result
      */
-    public function preview($text, array $candidateIds = [])
+    public function preview($text)
     {
-        $context = filled($candidateIds) ? ['candidate_ids' => $candidateIds] : [];
-        $result = $this->matcher->resolve($text, $context);
+        $result = $this->matcher->resolve($text);
         $actions = config('constants.AUTO_REPLY.DECISION');
 
-        if (!filled($result)) {
+        if (blank($result)) {
             return [
                 'action'  => $actions['WAIT'],
-                'content' => $this->previewContent($actions['WAIT'], null, []),
+                'content' => $this->previewContent($actions['WAIT'], null, null),
+                'hint'    => null,
                 'result'  => null,
             ];
         }
 
-        $decision = $this->decide($result, $context);
+        $decision = $this->decide($result);
 
         return [
             'action'  => $decision['action'],
-            'content' => $this->previewContent($decision['action'], $decision['item'], $decision['candidates']),
+            'content' => $this->previewContent($decision['action'], $decision['item'], $decision['opening']),
+            // 轉人工時支援群組會多收到這段，測試時一併看得到
+            'hint'    => $decision['action'] === $actions['WAIT'] ? $this->buildHint($result) : null,
             'result'  => $result,
         ];
     }
@@ -220,29 +275,29 @@ class AutoReplyService
      *
      * @param string                          $action
      * @param \App\Models\QuickReplyItem|null $item
-     * @param array                           $candidates
+     * @param string|null                     $opening
      * @return string
      */
-    private function previewContent($action, $item, array $candidates)
+    private function previewContent($action, $item, $opening)
     {
         $actions = config('constants.AUTO_REPLY.DECISION');
         $signature = config('constants.AUTO_REPLY.SIGNATURE');
 
+        // 什麼都不送
+        if ($action === $actions['SILENT']) {
+            return '';
+        }
+
         if ($action === $actions['ANSWER']) {
             $template = $this->appSettingService->get(AppSettingService::KEY_TPL_ANSWER_FULL);
             $content = filled($template) ? strtr($template, ['{答案}' => $item->answer]) : '';
-        } elseif ($action === $actions['CLARIFY']) {
-            $options = [];
-            $index = 1;
-            foreach ($candidates as $candidate) {
-                $options[] = "{$index}. {$candidate->label}";
-                $index++;
-            }
-
-            $template = $this->appSettingService->get(AppSettingService::KEY_TPL_CLARIFY_FULL);
-            $content = filled($template) ? strtr($template, ['{選項}' => implode("\n", $options)]) : '';
+            $content = $this->joinOpening($opening, $content);
+        } elseif ($action === $actions['REPLY']) {
+            $content = (string) $opening;
         } else {
-            $content = (string) $this->appSettingService->get(AppSettingService::KEY_TPL_WAIT_FULL);
+            $content = filled($opening)
+                ? $opening
+                : (string) $this->appSettingService->get(AppSettingService::KEY_TPL_WAIT_FULL);
         }
 
         return filled($content) ? "{$content} {$signature}" : '';
@@ -251,11 +306,15 @@ class AutoReplyService
     /**
      * 送出題庫答案
      *
-     * @param TelegramGroup                $group
-     * @param \App\Models\QuickReplyItem   $item
+     * 承接句在前、題庫答案原文在後。答案一個字都不改 ——
+     * 客戶看到的說明內容永遠等於某個人寫過的內容，這樣才查得回去。
+     *
+     * @param TelegramGroup              $group
+     * @param \App\Models\QuickReplyItem $item
+     * @param string|null                $opening
      * @return void
      */
-    private function replyWithItem(TelegramGroup $group, $item)
+    private function replyWithItem(TelegramGroup $group, $item, $opening)
     {
         $content = $this->renderTemplate(
             $group,
@@ -265,39 +324,23 @@ class AutoReplyService
         );
 
         // 命中答案沒有冷卻 —— 客人重複問同一件事，就重複回答
-        $this->send($group, $content, true);
-        $this->telegramRepository->updateAutoReplyState($group, $item->id, null);
+        $this->send($group, $this->joinOpening($opening, $content), true);
+        $this->telegramRepository->updateAutoReplyState($group, $item->id);
     }
 
     /**
-     * 反問客人是哪一題
+     * 只回一句承接話，不帶任何題庫內容
+     *
+     * 客人是在寒暄或道謝，沒有東西要查。
      *
      * @param TelegramGroup $group
-     * @param array         $candidates QuickReplyItem 陣列
+     * @param string        $opening
      * @return void
      */
-    private function replyClarify(TelegramGroup $group, array $candidates)
+    private function replyOpeningOnly(TelegramGroup $group, $opening)
     {
-        $options = [];
-        $ids = [];
-        $index = 1;
-
-        foreach ($candidates as $item) {
-            $options[] = "{$index}. {$item->label}";
-            $ids[] = $item->id;
-            $index++;
-        }
-
-        $content = $this->renderTemplate(
-            $group,
-            AppSettingService::KEY_TPL_CLARIFY_FULL,
-            AppSettingService::KEY_TPL_CLARIFY_SHORT,
-            ['{選項}' => implode("\n", $options)]
-        );
-
-        // 反問不算回答，維持未回覆狀態讓既有的超時告警照常響
-        $this->send($group, $content, false);
-        $this->telegramRepository->updateAutoReplyState($group, null, implode(',', $ids));
+        $this->send($group, $opening, true);
+        $this->telegramRepository->updateAutoReplyState($group, null);
     }
 
     /**
@@ -305,19 +348,19 @@ class AutoReplyService
      *
      * @param TelegramGroup $group
      * @param string        $question
+     * @param string|null   $opening   承接句；沒有或被擋下時退回固定話術
      * @param int|null      $messageId
+     * @param array         $result    比對器的輸出，附在求助訊息裡給同仁參考
      * @return void
      */
-    private function replyWait(TelegramGroup $group, $question, $messageId)
+    private function replyWait(TelegramGroup $group, $question, $opening, $messageId, array $result = [])
     {
         // 才剛說過稍等就不要再說一次，顯得敷衍；求助單也已經開了
         if ($this->isWaitOnCooldown($group)) {
-            $this->telegramRepository->clearAutoReplyPending($group);
-
             return;
         }
 
-        $content = $this->renderTemplate(
+        $content = filled($opening) ? $opening : $this->renderTemplate(
             $group,
             AppSettingService::KEY_TPL_WAIT_FULL,
             AppSettingService::KEY_TPL_WAIT_SHORT,
@@ -325,8 +368,62 @@ class AutoReplyService
         );
 
         $this->send($group, $content, false);
-        $this->telegramRepository->updateAutoReplyState($group, null, null);
-        $this->supportService->openTicket($group, $question, $messageId);
+        $this->telegramRepository->updateAutoReplyState($group, null);
+        $this->supportService->openTicket($group, $question, $messageId, $this->buildHint($result));
+    }
+
+    /**
+     * 把承接句接在內容前面
+     *
+     * @param string|null $opening
+     * @param string      $content
+     * @return string
+     */
+    private function joinOpening($opening, $content)
+    {
+        if (blank($opening)) {
+            return $content;
+        }
+
+        return blank($content) ? $opening : "{$opening}\n\n{$content}";
+    }
+
+    /**
+     * 組給同仁看的 AI 判斷摘要
+     *
+     * 只出現在內部支援群組，客人看不到。用處是讓同仁不必從頭看就知道客人要什麼，
+     * 也一眼看得出題庫缺了哪一塊、值不值得回填。
+     *
+     * @param array $result 比對器的輸出
+     * @return string|null
+     */
+    private function buildHint(array $result)
+    {
+        if (blank($result)) {
+            return null;
+        }
+
+        $intents = config('constants.AUTO_REPLY.INTENT');
+        $labels = [
+            $intents['QUESTION'] => '提問',
+            $intents['REQUEST']  => '需求',
+            $intents['CHAT']     => '寒暄',
+        ];
+
+        $intent = Arr::get($result, 'intent');
+        $lines = ['🤖 AI 判斷：' . Arr::get($labels, $intent, '無法判斷')];
+
+        $itemId = Arr::get($result, 'item_id');
+
+        if (filled($itemId)) {
+            $item = $this->quickReplyRepository->findActiveItem($itemId);
+
+            if (filled($item)) {
+                $lines[] = "　 最接近的題庫：#{$item->id} {$item->label}（信心不足）";
+            }
+        }
+
+        return implode("\n", $lines);
     }
 
     /**
@@ -339,7 +436,7 @@ class AutoReplyService
      */
     private function send(TelegramGroup $group, $content, $markReplied)
     {
-        if (!filled($content)) {
+        if (blank($content)) {
             Log::warning('自動回覆話術模板為空，略過送出', ['group_id' => $group->id]);
 
             return;
@@ -380,11 +477,11 @@ class AutoReplyService
         $template = $this->appSettingService->get($key);
 
         // 精簡版沒設定就退回完整版，寧可囉唆也不要送出空訊息
-        if (!filled($template)) {
+        if (blank($template)) {
             $template = $this->appSettingService->get($fullKey);
         }
 
-        if (!filled($template)) {
+        if (blank($template)) {
             return '';
         }
 
@@ -399,7 +496,7 @@ class AutoReplyService
      */
     private function shouldGreet(TelegramGroup $group)
     {
-        if (!filled($group->auto_reply_at)) {
+        if (blank($group->auto_reply_at)) {
             return true;
         }
 
@@ -418,7 +515,7 @@ class AutoReplyService
      */
     private function isWaitOnCooldown(TelegramGroup $group)
     {
-        if (filled($group->auto_reply_item_id) || !filled($group->auto_reply_at)) {
+        if (filled($group->auto_reply_item_id) || blank($group->auto_reply_at)) {
             return false;
         }
 
@@ -427,94 +524,5 @@ class AutoReplyService
         return $group->auto_reply_at->gt(now()->subMinutes($minutes));
     }
 
-    /**
-     * 取出反問的脈絡（還在等客人回答哪一個選項）
-     *
-     * @param TelegramGroup $group
-     * @return array 有效時回 ['candidate_ids' => [...]]，否則空陣列
-     */
-    private function buildContext(TelegramGroup $group)
-    {
-        if (!filled($group->auto_reply_pending) || !filled($group->auto_reply_at)) {
-            return [];
-        }
 
-        $minutes = (int) config('constants.AUTO_REPLY.PENDING_MINUTES');
-
-        // 超過時限就當成全新問題
-        if ($group->auto_reply_at->lt(now()->subMinutes($minutes))) {
-            $this->telegramRepository->clearAutoReplyPending($group);
-
-            return [];
-        }
-
-        $ids = array_values(array_filter(array_map('intval', explode(',', $group->auto_reply_pending))));
-
-        return filled($ids) ? ['candidate_ids' => $ids] : [];
-    }
-
-    /**
-     * 客人是不是直接回了選項編號
-     *
-     * @param string $text
-     * @param array  $context
-     * @return \App\Models\QuickReplyItem|null
-     */
-    private function matchNumericChoice($text, array $context)
-    {
-        if (!isset($context['candidate_ids'])) {
-            return null;
-        }
-
-        $trimmed = trim($text);
-
-        if (!preg_match('/^[1-9]\d?$/', $trimmed)) {
-            return null;
-        }
-
-        $index = (int) $trimmed - 1;
-        $ids = $context['candidate_ids'];
-
-        if (!isset($ids[$index])) {
-            return null;
-        }
-
-        return $this->quickReplyRepository->findActiveItem($ids[$index]);
-    }
-
-    /**
-     * 取出候選題目（反問用）
-     *
-     * 只取還存在且啟用中的，數量以設定上限為準。
-     *
-     * @param array $result
-     * @return array QuickReplyItem 陣列
-     */
-    private function takeCandidates(array $result)
-    {
-        $ids = isset($result['candidate_ids']) ? $result['candidate_ids'] : [];
-
-        if (empty($ids)) {
-            return [];
-        }
-
-        $max = (int) config('constants.AUTO_REPLY.CLARIFY_MAX_OPTIONS');
-
-        // 一次撈完再依模型給的順序排 —— 最相符的要排在前面
-        $found = $this->quickReplyRepository->getActiveItemsByIds($ids)->keyBy('id');
-        $items = [];
-
-        foreach ($ids as $id) {
-            if (count($items) >= $max) {
-                break;
-            }
-
-            if ($found->has($id)) {
-                $items[] = $found->get($id);
-            }
-        }
-
-        // 只剩一個候選就沒什麼好問的，讓它走人工比較快
-        return count($items) >= 2 ? $items : [];
-    }
 }

@@ -6,6 +6,7 @@ use App\Contracts\AutoReplyMatcher;
 use App\Repositories\LlmUsageRepository;
 use App\Repositories\QuickReplyRepository;
 use App\Services\AppSettingService;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
@@ -49,7 +50,7 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
         $token = $this->appSettingService->get(AppSettingService::KEY_CLAUDE_TOKEN);
 
         // 連 token 都沒設定就不用往下走了，省一個 process
-        if (!filled($token)) {
+        if (blank($token)) {
             Log::warning('自動回覆未設定 Claude Token，略過比對');
 
             return null;
@@ -57,7 +58,7 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
 
         $prompt = $this->buildSystemPrompt();
 
-        if (!filled($prompt)) {
+        if (blank($prompt)) {
             Log::warning('題庫沒有啟用中的問答，自動回覆略過比對');
 
             return null;
@@ -97,7 +98,7 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
      */
     public function verifyCredential($credential, $isFallback = false)
     {
-        if (!filled($credential)) {
+        if (blank($credential)) {
             return false;
         }
 
@@ -155,7 +156,7 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
             return '';
         }
 
-        $message = isset($envelope['result']) ? $envelope['result'] : '';
+        $message = Arr::get($envelope, 'result', '');
 
         return is_string($message) ? $message : '';
     }
@@ -255,7 +256,7 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
         $output = $process->getOutput();
         $duration = (int) round((microtime(true) - $startedAt) * 1000);
         $envelope = json_decode($output, true);
-        $usage = is_array($envelope) && isset($envelope['usage']) ? $envelope['usage'] : [];
+        $usage = is_array($envelope) ? (array) Arr::get($envelope, 'usage', []) : [];
 
         // ⚠️ CLI 失敗時**不一定是非 0 結束**：未登入、額度用盡這類情況它會以 exit 0 結束，
         // 錯誤只寫在 JSON 的 is_error / result 欄位裡。只看 exit code 會把失敗當成功。
@@ -281,7 +282,7 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
 
         $parsed = $this->parseResult($envelope);
 
-        if (!filled($parsed)) {
+        if (blank($parsed)) {
             Log::error('Claude CLI 輸出無法解析', [
                 'source' => $options['source'],
                 'output' => mb_substr((string) $output, 0, 500),
@@ -313,7 +314,9 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
     {
         $command = [
             config('auto_reply.cli_path'),
-            '-p', $this->buildUserPrompt($text, $context),
+            // 客人的原話直接送進去。以前反問流程要在這裡補上一輪的候選題目，
+            // 反問移除後就沒有第二輪脈絡了
+            '-p', $text,
             '--model', $options['model'],
             '--effort', config('auto_reply.effort'),
             '--output-format', 'json',
@@ -338,7 +341,7 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
      * 依版本可能是物件也可能是 JSON 字串，兩種都吃。
      *
      * @param mixed $envelope
-     * @return array|null item_id / confidence / candidate_ids
+     * @return array|null intent / item_id / confidence / opening
      */
     private function parseResult($envelope)
     {
@@ -346,7 +349,7 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
             return null;
         }
 
-        $result = isset($envelope['result']) ? $envelope['result'] : null;
+        $result = Arr::get($envelope, 'result');
 
         if (is_string($result)) {
             $result = json_decode($result, true);
@@ -356,15 +359,23 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
             return null;
         }
 
-        $candidates = [];
-        if (isset($result['candidate_ids']) && is_array($result['candidate_ids'])) {
-            $candidates = array_values(array_filter(array_map('intval', $result['candidate_ids'])));
+        $intents = config('constants.AUTO_REPLY.INTENT');
+        $intent = (string) Arr::get($result, 'intent');
+
+        // 認不得的 intent 一律當成提問 —— 那條路徑會查題庫，
+        // 沒把握就轉人工，是三條裡面最安全的
+        if (!in_array($intent, array_values($intents), true)) {
+            $intent = $intents['QUESTION'];
         }
 
+        $itemId = Arr::get($result, 'item_id');
+        $opening = Arr::get($result, 'opening');
+
         return [
-            'item_id'       => filled($result['item_id']) ? (int) $result['item_id'] : null,
-            'confidence'    => isset($result['confidence']) ? (string) $result['confidence'] : config('constants.AUTO_REPLY.CONFIDENCE.LOW'),
-            'candidate_ids' => $candidates,
+            'intent'     => $intent,
+            'item_id'    => filled($itemId) ? (int) $itemId : null,
+            'confidence' => (string) Arr::get($result, 'confidence', config('constants.AUTO_REPLY.CONFIDENCE.LOW')),
+            'opening'    => filled($opening) ? (string) $opening : null,
         ];
     }
 
@@ -377,12 +388,19 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
      */
     private function buildSchema()
     {
+        $intents = config('constants.AUTO_REPLY.INTENT');
+
         $schema = [
             'type'       => 'object',
             'properties' => [
+                'intent' => [
+                    'type'        => 'string',
+                    'enum'        => array_values($intents),
+                    'description' => '客人這則訊息是哪一種：在問事情、提需求、還是純寒暄',
+                ],
                 'item_id' => [
                     'type'        => ['integer', 'null'],
-                    'description' => '最相符的題目 id；題庫裡沒有對應答案時為 null',
+                    'description' => '最相符的題目 id；只有 intent 是 question 時才需要，其餘一律 null',
                 ],
                 'confidence' => [
                     'type'        => 'string',
@@ -390,15 +408,14 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
                         config('constants.AUTO_REPLY.CONFIDENCE.HIGH'),
                         config('constants.AUTO_REPLY.CONFIDENCE.LOW'),
                     ],
-                    'description' => '有把握就 high；不確定是哪一題就 low',
+                    'description' => '題庫那則答案是不是真的在回答客人這句話；有一點點不確定就填 low',
                 ],
-                'candidate_ids' => [
-                    'type'        => 'array',
-                    'items'       => ['type' => 'integer'],
-                    'description' => 'confidence 為 low 時，列出 2-3 個可能的題目 id',
+                'opening' => [
+                    'type'        => ['string', 'null'],
+                    'description' => '回應客人的那一兩句話（最多 60 字）。不含任何規格、價格、承諾，也不要指示客人怎麼回覆。只是純寒暄且不需要回應時填 null',
                 ],
             ],
-            'required'             => ['item_id', 'confidence', 'candidate_ids'],
+            'required'             => ['intent', 'item_id', 'confidence', 'opening'],
             'additionalProperties' => false,
         ];
 
@@ -434,51 +451,61 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
 
             $knowledge = implode("\n", $lines);
 
+            $intents = config('constants.AUTO_REPLY.INTENT');
+            $maxLength = config('constants.AUTO_REPLY.OPENING.MAX_LENGTH');
+
             return implode("\n", [
-                '你是客服題庫的比對助手。下面是完整題庫，你的工作是判斷客人的問題對應到哪一則。',
+                '你是線上客服的助手。客人傳來一則訊息，你要做兩件事：',
+                '判斷這則訊息是什麼性質，並寫一兩句自然的話回應他。',
+                '',
+                '## 第一步：判斷性質（intent）',
+                '',
+                "- `{$intents['QUESTION']}`：客人在問一件事（多少錢、怎麼用、可不可以、為什麼）。",
+                "- `{$intents['REQUEST']}`：客人在提需求或描述他想要什麼（想加一台機器、希望改成…、要開通…）。",
+                "- `{$intents['CHAT']}`：寒暄、道謝、確認（你好、謝謝、好、收到、了解）。",
+                '',
+                '**客人不是只會問問題。** 他可能在描述需求、討論做法、反映狀況。',
+                '這些都不是題庫該回答的東西，不要硬去比對。',
+                '',
+                '## 第二步：挑題庫（只有 question 才做）',
+                '',
+                "1. intent 不是 {$intents['QUESTION']} 時，item_id 一律填 null，不要挑任何題目。",
+                '2. 判斷時要同時看「問題」與「答案」—— 答案裡常寫著問題標題沒提到的資訊。',
+                '3. **只有在那則答案真的能回答客人這句話時**，confidence 才填 high。',
+                '   有一點點不確定、客人一次問兩件事、或問題太模糊，一律填 low。',
+                '4. 題庫裡沒有對應的答案時，item_id 填 null，**絕對不要勉強挑一個相近的**。',
+                '',
+                '答錯的代價遠高於轉給真人處理，所以拿不準就填 low。',
+                '',
+                '## 第三步：寫承接句（opening）',
+                '',
+                "用客氣、自然、像真人客服的語氣，回應客人剛剛說的話。最多兩句、{$maxLength} 字以內。",
                 '',
                 '規則：',
-                '1. 你**只能**從題庫裡挑一則，回傳它的 id。絕對不要自己寫答案，也不要改寫題庫內容。',
-                '2. 判斷時要同時看「問題」與「答案」—— 答案裡常寫著問題標題沒提到的資訊。',
-                '3. 有把握時 confidence 填 high；不確定是哪一題時填 low，並在 candidate_ids 列出 2-3 個可能的 id。',
-                '4. 題庫裡真的沒有對應的答案時，item_id 填 null，不要勉強挑一個相近的。',
-                '5. 客人一次問兩件事、或問題太模糊時，一律算不確定（low）。',
-                '6. 只輸出符合 schema 的 JSON，不要有任何其他文字，也不要使用任何工具。',
                 '',
-                '題庫：',
+                '- **不要講任何具體內容**：規格、價格、數量、時間、期限一律不准出現。',
+                '  客人需要的答案會由系統接在你這句話後面，或由真人同仁處理。',
+                '- **不要做任何承諾或判斷**：不能說「可以」「沒問題」「我們有提供」「已完成」。',
+                '  能不能做、怎麼做，都是同仁才能決定的事。你只能表示「收到了、馬上請同仁處理」。',
+                '- **不要指示客人怎麼回覆**：不能說「請回覆編號」「請提供以下資訊」「麻煩告知」。',
+                '  客人想怎麼講就怎麼講。',
+                '- **不要改寫或重述題庫的答案**，答案原文會自己接在後面。',
+                '- **不要每次都用同一句開頭**，客人連著問會看出來是罐頭。',
+                '- 不用寫結尾問候（「還有問題歡迎再問」這類），講完就好。',
+                '',
+                '客人只是說「好」「收到」「謝謝」這種不需要回應的話時，opening 填 null。',
+                '',
+                '## 輸出',
+                '',
+                '只輸出符合 schema 的 JSON，不要有任何其他文字，也不要使用任何工具。',
+                '',
+                '## 題庫',
                 '',
                 $knowledge,
             ]);
         });
     }
 
-    /**
-     * 組 user prompt
-     *
-     * 反問之後的第二輪要把上一輪的候選帶進來，
-     * 否則客人回「比較像第一個」時模型沒有脈絡可判斷。
-     *
-     * @param string $text
-     * @param array  $context
-     * @return string
-     */
-    private function buildUserPrompt($text, array $context)
-    {
-        $candidates = isset($context['candidate_ids']) ? $context['candidate_ids'] : [];
-
-        if (empty($candidates)) {
-            return $text;
-        }
-
-        $ids = implode(', ', $candidates);
-
-        return implode("\n", [
-            "（上一輪已經反問過客人，當時提供的候選題目 id 是：{$ids}）",
-            '（以下是客人的回覆，請據此判斷他指的是哪一題）',
-            '',
-            $text,
-        ]);
-    }
 
     /**
      * 組出執行 CLI 用的環境變數
@@ -554,14 +581,14 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
         try {
             $this->llmUsageRepository->create([
                 'used_on'           => now()->format('Y-m-d'),
-                'telegram_group_id' => isset($context['group_id']) ? $context['group_id'] : null,
+                'telegram_group_id' => Arr::get($context, 'group_id'),
                 'source'            => $options['source'],
                 'model'             => $options['model'],
                 'duration_ms'       => (int) round((microtime(true) - $startedAt) * 1000),
                 'is_error'          => $isError,
                 'is_rate_limited'   => $isRateLimited,
-                'input_tokens'      => isset($usage['input_tokens']) ? (int) $usage['input_tokens'] : 0,
-                'output_tokens'     => isset($usage['output_tokens']) ? (int) $usage['output_tokens'] : 0,
+                'input_tokens'      => (int) Arr::get($usage, 'input_tokens', 0),
+                'output_tokens'     => (int) Arr::get($usage, 'output_tokens', 0),
                 'created_at'        => now(),
             ]);
         } catch (\Exception $e) {

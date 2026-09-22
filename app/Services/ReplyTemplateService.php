@@ -7,6 +7,10 @@ namespace App\Services;
  *
  * 自動回覆送給客人的訊息內容。答案取自題庫原文，這裡管的是包在外層的語氣。
  *
+ * ⚠️ 改版後開場白由 AI 的承接句負責，**這些模板預設只剩 `{答案}`**。
+ * 在這裡加固定的問候語或結尾語，客人連著問就會看到一模一樣的句子 ——
+ * 那正是改版前被嫌罐頭的原因。`wait_*` 是承接句被護欄擋下時的退路。
+ *
  * 與 Claude 憑證刻意拆成兩頁兩組權限：客服要能自己調語氣，但不該碰得到 token。
  */
 class ReplyTemplateService
@@ -23,8 +27,6 @@ class ReplyTemplateService
     const FIELDS = [
         'answer_full'   => '{答案}',
         'answer_short'  => '{答案}',
-        'clarify_full'  => '{選項}',
-        'clarify_short' => '{選項}',
         'wait_full'     => null,
         'wait_short'    => null,
         'support_full'  => '{答案}',
@@ -35,8 +37,6 @@ class ReplyTemplateService
     private const KEY_MAP = [
         'answer_full'   => AppSettingService::KEY_TPL_ANSWER_FULL,
         'answer_short'  => AppSettingService::KEY_TPL_ANSWER_SHORT,
-        'clarify_full'  => AppSettingService::KEY_TPL_CLARIFY_FULL,
-        'clarify_short' => AppSettingService::KEY_TPL_CLARIFY_SHORT,
         'wait_full'     => AppSettingService::KEY_TPL_WAIT_FULL,
         'wait_short'    => AppSettingService::KEY_TPL_WAIT_SHORT,
         'support_full'  => AppSettingService::KEY_TPL_SUPPORT_FULL,

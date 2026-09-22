@@ -10,18 +10,18 @@ return [
 
     'full'       => 'Full',
     'short'      => 'Short',
-    'full_hint'  => 'Used when the last auto reply was more than :minutes minutes ago. Includes a greeting.',
-    'short_hint' => 'Used during an ongoing conversation, dropping the greeting so it does not read as canned.',
+    'full_hint'  => 'Used when the last auto reply was more than :minutes minutes ago.',
+    'short_hint' => 'Used during an ongoing conversation.',
 
     'answer'  => 'Matched the knowledge base',
-    'clarify' => 'Unsure — ask the customer',
     'wait'    => 'Not in the knowledge base (please wait)',
     'support' => 'Forwarding the support group answer',
 
-    'answer_desc'  => 'Sent when an answer is found in the knowledge base.',
-    'clarify_desc' => 'Politely asks the customer which one they meant when several entries look alike.',
-    'wait_desc'    => 'Sent when the knowledge base has no answer; the question is forwarded to the support group at the same time.',
+    'answer_desc'  => 'Sent when an answer is found. The opening line is written by the AI based on what the customer said, so this template only frames the answer.',
+    'wait_desc'    => 'Fallback for when the AI opening line cannot be used. The question is forwarded to the support group at the same time.',
     'support_desc' => 'Sent when a colleague answers in the support group and presses "Reply to customer".',
+
+    'canned_warning' => '⚠️ A fixed greeting or sign-off here means customers see the exact same sentence every time they ask. The opening is already handled by the AI, so keeping only {答案} is recommended.',
 
     'var_required' => 'Must contain :value',
 

@@ -63,35 +63,13 @@ class AppSettingSeeder extends Seeder
             AppSettingService::KEY_REMIND_FIRST_MINUTES  => '10',
             AppSettingService::KEY_REMIND_SECOND_MINUTES => '10',
 
-            AppSettingService::KEY_TPL_ANSWER_FULL => implode("\n", [
-                '您好，感謝您的詢問 😊',
-                '',
-                '{答案}',
-                '',
-                '若還有任何不清楚的地方，都歡迎再告訴我們，很高興為您服務！',
-            ]),
-
-            AppSettingService::KEY_TPL_ANSWER_SHORT => implode("\n", [
-                '{答案}',
-                '',
-                '還有其他問題都歡迎再告訴我們！',
-            ]),
-
-            AppSettingService::KEY_TPL_CLARIFY_FULL => implode("\n", [
-                '您好，為了提供給您最準確的說明，想先跟您確認一下是哪一項呢？',
-                '',
-                '{選項}',
-                '',
-                '麻煩您回覆編號，或直接描述一下您遇到的狀況，我們立刻為您處理 🙏',
-            ]),
-
-            AppSettingService::KEY_TPL_CLARIFY_SHORT => implode("\n", [
-                '想再跟您確認一下是哪一項呢？',
-                '',
-                '{選項}',
-                '',
-                '麻煩您回覆編號，或直接描述您的狀況就可以囉 🙏',
-            ]),
+            /*
+             * 開場白與結尾語都不放在模板裡 —— 那些由 AI 的承接句負責，每次不同。
+             * 在這裡寫固定句子，客人連著問就會看到一模一樣的開頭與結尾，
+             * 那正是改版前被嫌罐頭的原因。
+             */
+            AppSettingService::KEY_TPL_ANSWER_FULL  => '{答案}',
+            AppSettingService::KEY_TPL_ANSWER_SHORT => '{答案}',
 
             AppSettingService::KEY_TPL_WAIT_FULL => implode("\n", [
                 '您好，感謝您的詢問 🙏',
@@ -104,20 +82,20 @@ class AppSettingSeeder extends Seeder
                 '這部分我再幫您確認一下，稍後馬上回覆您，感謝您的耐心等候 🙏',
             ]),
 
+            /*
+             * 同仁回答之後轉給客人的。這則前面沒有 AI 承接句，
+             * 所以保留一句「久等了」承接，但不加固定結尾語。
+             */
             AppSettingService::KEY_TPL_SUPPORT_FULL => implode("\n", [
-                '您好，久等了，已為您確認完畢 😊',
+                '久等了，已為您確認完畢 😊',
                 '',
                 '{答案}',
-                '',
-                '還有任何問題都歡迎再告訴我們，很樂意為您服務！',
             ]),
 
             AppSettingService::KEY_TPL_SUPPORT_SHORT => implode("\n", [
                 '久等了，已為您確認完畢 😊',
                 '',
                 '{答案}',
-                '',
-                '還有任何問題都歡迎再告訴我們！',
             ]),
         ];
     }

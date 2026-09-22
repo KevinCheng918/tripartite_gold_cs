@@ -9,6 +9,7 @@ use App\Repositories\QuickReplyRepository;
 use App\Repositories\StationRepository;
 use App\Repositories\TelegramRepository;
 use App\Repositories\UserRepository;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -68,7 +69,7 @@ class AutoReplySupportService
     {
         $supportChatId = $this->appSettingService->get(AppSettingService::KEY_SUPPORT_CHAT_ID);
 
-        if (!filled($supportChatId)) {
+        if (blank($supportChatId)) {
             return false;
         }
 
@@ -87,9 +88,9 @@ class AutoReplySupportService
      * @param int|null      $messageId 客人那則訊息的後台 id
      * @return AutoReplyTicket|null
      */
-    public function openTicket(TelegramGroup $group, $question, $messageId = null)
+    public function openTicket(TelegramGroup $group, $question, $messageId = null, $hint = null)
     {
-        if (!filled($this->appSettingService->get(AppSettingService::KEY_SUPPORT_CHAT_ID))) {
+        if (blank($this->appSettingService->get(AppSettingService::KEY_SUPPORT_CHAT_ID))) {
             Log::warning('未設定內部支援群組，答不出來的問題沒有轉出去', ['group_id' => $group->id]);
 
             return null;
@@ -107,10 +108,10 @@ class AutoReplySupportService
             'status'            => config('constants.AUTO_REPLY.TICKET_STATUS.PENDING'),
         ]);
 
-        $result = $this->sendToSupport($this->buildAskText($group, $question));
-        $askMessageId = isset($result['result']['message_id']) ? $result['result']['message_id'] : null;
+        $result = $this->sendToSupport($this->buildAskText($group, $question, $hint));
+        $askMessageId = Arr::get($result, 'result.message_id');
 
-        if (!filled($askMessageId)) {
+        if (blank($askMessageId)) {
             Log::error('求助訊息送出失敗，這張單將無法被回覆對應', ['ticket_id' => $ticket->id]);
 
             return $ticket;
@@ -126,17 +127,27 @@ class AutoReplySupportService
      * @param string        $question
      * @return string
      */
-    private function buildAskText(TelegramGroup $group, $question)
+    private function buildAskText(TelegramGroup $group, $question, $hint = null)
     {
-        return implode("\n", [
+        $lines = [
             '🔔 題庫裡找不到答案',
             '',
             "群組：{$group->title}",
             "問題：{$question}",
-            '',
-            '請「引用回覆」本則訊息提供答案。',
-            '⚠️ 回答內容會原文轉給客戶，請用可以直接給客戶看的語氣。',
-        ]);
+        ];
+
+        // AI 的判斷只給自己人看，客人不會收到。
+        // 用處是不必從頭看就知道客人要什麼，也一眼看得出題庫缺了哪一塊
+        if (filled($hint)) {
+            $lines[] = '';
+            $lines[] = $hint;
+        }
+
+        $lines[] = '';
+        $lines[] = '請「引用回覆」本則訊息提供答案。';
+        $lines[] = '⚠️ 回答內容會原文轉給客戶，請用可以直接給客戶看的語氣。';
+
+        return implode("\n", $lines);
     }
 
     // ---------------------------------------------------------------
@@ -153,21 +164,22 @@ class AutoReplySupportService
      */
     public function handleSupportMessage($payload)
     {
-        $message = isset($payload['message']) ? $payload['message'] : null;
+        $message = Arr::get($payload, 'message');
+        $quotedId = Arr::get($payload, 'message.reply_to_message.message_id');
 
-        if (!filled($message) || !isset($message['reply_to_message']['message_id'])) {
+        if (blank($message) || blank($quotedId)) {
             return;
         }
 
-        $answer = isset($message['text']) ? trim($message['text']) : '';
+        $answer = trim((string) Arr::get($message, 'text', ''));
 
-        if (!filled($answer)) {
+        if (blank($answer)) {
             return;
         }
 
-        $ticket = $this->ticketRepository->findByAskMessageId($message['reply_to_message']['message_id']);
+        $ticket = $this->ticketRepository->findByAskMessageId($quotedId);
 
-        if (!filled($ticket)) {
+        if (blank($ticket)) {
             return;
         }
 
@@ -199,13 +211,16 @@ class AutoReplySupportService
      */
     private function buildSenderName($message)
     {
-        $from = isset($message['from']) ? $message['from'] : [];
+        $from = (array) Arr::get($message, 'from', []);
+        $username = Arr::get($from, 'username');
 
-        if (isset($from['username']) && filled($from['username'])) {
-            return '@' . $from['username'];
+        if (filled($username)) {
+            return "@{$username}";
         }
 
-        $name = trim((isset($from['first_name']) ? $from['first_name'] : '') . ' ' . (isset($from['last_name']) ? $from['last_name'] : ''));
+        $firstName = Arr::get($from, 'first_name', '');
+        $lastName = Arr::get($from, 'last_name', '');
+        $name = trim("{$firstName} {$lastName}");
 
         return filled($name) ? $name : '同仁';
     }
@@ -222,15 +237,16 @@ class AutoReplySupportService
      */
     public function handleCallback($payload)
     {
-        $callback = isset($payload['callback_query']) ? $payload['callback_query'] : null;
+        $callback = Arr::get($payload, 'callback_query');
+        $data = Arr::get($payload, 'callback_query.data');
 
-        if (!filled($callback) || !isset($callback['data'])) {
+        if (blank($callback) || blank($data)) {
             return;
         }
 
-        $parts = explode(':', $callback['data']);
+        $parts = explode(':', $data);
         $prefix = array_shift($parts);
-        $messageId = isset($callback['message']['message_id']) ? $callback['message']['message_id'] : null;
+        $messageId = Arr::get($callback, 'message.message_id');
 
         $this->botService->answerCallbackQuery($callback['id']);
 
@@ -254,10 +270,10 @@ class AutoReplySupportService
      */
     private function handleAction(array $parts, $messageId)
     {
-        $action = isset($parts[0]) ? $parts[0] : '';
-        $ticket = $this->ticketRepository->find(isset($parts[1]) ? (int) $parts[1] : 0);
+        $action = (string) Arr::get($parts, 0, '');
+        $ticket = $this->ticketRepository->find((int) Arr::get($parts, 1, 0));
 
-        if (!filled($ticket) || $ticket->isClosed()) {
+        if (blank($ticket) || $ticket->isClosed()) {
             $this->editSupportMessage($messageId, '這張單已經處理過了。');
 
             return;
@@ -306,10 +322,10 @@ class AutoReplySupportService
      */
     private function handleCategoryChosen(array $parts, $messageId)
     {
-        $ticket = $this->ticketRepository->find(isset($parts[0]) ? (int) $parts[0] : 0);
-        $categoryId = isset($parts[1]) ? (int) $parts[1] : 0;
+        $ticket = $this->ticketRepository->find((int) Arr::get($parts, 0, 0));
+        $categoryId = (int) Arr::get($parts, 1, 0);
 
-        if (!filled($ticket)) {
+        if (blank($ticket)) {
             $this->editSupportMessage($messageId, '找不到這張單。');
 
             return;
@@ -324,7 +340,7 @@ class AutoReplySupportService
 
         $item = $this->saveToQuickReply($ticket, $categoryId);
 
-        if (!filled($item)) {
+        if (blank($item)) {
             $this->editSupportMessage($messageId, '⚠️ 加入題庫失敗，請到後台手動新增。');
 
             return;
@@ -406,7 +422,7 @@ class AutoReplySupportService
     {
         $template = $this->appSettingService->get(AppSettingService::KEY_TPL_SUPPORT_FULL);
 
-        if (!filled($template) || !filled($ticket->answer)) {
+        if (blank($template) || blank($ticket->answer)) {
             return false;
         }
 
@@ -496,7 +512,7 @@ class AutoReplySupportService
      */
     public function remindTimeoutTickets()
     {
-        if (!filled($this->appSettingService->get(AppSettingService::KEY_SUPPORT_CHAT_ID))) {
+        if (blank($this->appSettingService->get(AppSettingService::KEY_SUPPORT_CHAT_ID))) {
             return 0;
         }
 
@@ -599,7 +615,7 @@ class AutoReplySupportService
             '內部支援群組設定正確，自動回覆答不出來的問題會送到這裡。',
         ]));
 
-        return filled($result) && isset($result['result']['message_id']);
+        return filled($result) && filled(Arr::get($result, 'result.message_id'));
     }
 
     /**
@@ -631,7 +647,7 @@ class AutoReplySupportService
     {
         $chatId = $this->appSettingService->get(AppSettingService::KEY_SUPPORT_CHAT_ID);
 
-        if (!filled($chatId)) {
+        if (blank($chatId)) {
             return null;
         }
 
@@ -652,7 +668,7 @@ class AutoReplySupportService
     {
         $chatId = $this->appSettingService->get(AppSettingService::KEY_SUPPORT_CHAT_ID);
 
-        if (!filled($chatId) || !filled($messageId)) {
+        if (blank($chatId) || blank($messageId)) {
             return;
         }
 

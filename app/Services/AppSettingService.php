@@ -41,8 +41,8 @@ class AppSettingService
     // 對客話術模板（完整版 / 精簡版）
     const KEY_TPL_ANSWER_FULL   = 'auto_reply.tpl_answer_full';
     const KEY_TPL_ANSWER_SHORT  = 'auto_reply.tpl_answer_short';
-    const KEY_TPL_CLARIFY_FULL  = 'auto_reply.tpl_clarify_full';
-    const KEY_TPL_CLARIFY_SHORT = 'auto_reply.tpl_clarify_short';
+    // 反問編號選項已移除，tpl_clarify_* 不再讀取。
+    // 既有資料留在 app_setting 沒有影響，不為了這個跑一支 migration
     const KEY_TPL_WAIT_FULL     = 'auto_reply.tpl_wait_full';
     const KEY_TPL_WAIT_SHORT    = 'auto_reply.tpl_wait_short';
     const KEY_TPL_SUPPORT_FULL  = 'auto_reply.tpl_support_full';

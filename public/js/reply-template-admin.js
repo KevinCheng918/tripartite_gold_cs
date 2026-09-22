@@ -17,11 +17,12 @@
     var csrfToken = document.querySelector('meta[name="csrf-token"]').content;
 
     /**
-     * 四種情境。placeholder 是必須保留的變數，後端也會驗一次。
+     * 三種情境。placeholder 是必須保留的變數，後端也會驗一次。
+     *
+     * 反問（clarify）已移除 —— 不確定時改成說稍等並轉人工，不再丟編號選項給客人。
      */
     var SCENES = [
         { key: 'answer', placeholder: '{答案}' },
-        { key: 'clarify', placeholder: '{選項}' },
         { key: 'wait', placeholder: null },
         { key: 'support', placeholder: '{答案}' }
     ];
@@ -98,10 +99,17 @@
                     escapeHtml(i18n.var_required.replace(':value', scene.placeholder)) + '</span>'
                 : '';
 
+            // 命中題庫那則前面會接 AI 的承接句，在模板裡再加固定問候就變兩層罐頭
+            var warning = scene.key === 'answer'
+                ? '<div class="alert alert-light border py-2" style="font-size:0.8125rem">' +
+                    escapeHtml(i18n.canned_warning) + '</div>'
+                : '';
+
             html += '<div class="main-card mb-3 card">' +
                 '<div class="card-body">' +
                 '<h5 class="card-title">' + escapeHtml(i18n[scene.key]) + badge + '</h5>' +
                 '<p class="text-muted" style="font-size:0.875rem">' + escapeHtml(i18n[scene.key + '_desc']) + '</p>' +
+                warning +
                 '<div class="row">' +
                 field(scene.key + '_full', i18n.full, fullHint) +
                 field(scene.key + '_short', i18n.short, i18n.short_hint) +
