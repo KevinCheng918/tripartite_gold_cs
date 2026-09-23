@@ -135,6 +135,34 @@
         </div>
     </div>
 
+    {{-- 客人問過的說法。
+         刻意做成獨立 Modal 而不是塞進問答編輯視窗：塞進去的話刪一句就要再開一層
+         確認 Modal，Bootstrap 疊兩層 backdrop 會把捲動鎖在錯的那一層。
+         這裡的刪除改成就地確認（該列變成「確定刪除？」），不會再開新的 Modal。 --}}
+    <div class="modal fade" id="modal-qr-phrasing" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        {{ trans('quick_reply.phrasing_title') }}
+                        <span class="badge bg-light text-muted border ms-1" id="qr-phrasing-count" style="font-weight:400"></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="fw-bold mb-1" style="font-size:0.875rem" id="qr-phrasing-item"></div>
+                    <div class="text-muted mb-3" style="font-size:0.8125rem">
+                        {{ trans('quick_reply.phrasing_hint') }}
+                    </div>
+                    <div id="qr-phrasing-list"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('quick_reply.action_cancel') }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- 訊息 Modal（結構比照 payment-config：不用 modal-dialog-centered，
          它的 min-height 會把 dialog 撐成全高，看起來像上下多一個框） --}}
     <div class="modal fade" id="modal-qr-msg" tabindex="-1">

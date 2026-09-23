@@ -4,6 +4,7 @@ namespace App\Repositories;
 
 use App\Models\QuickReplyCategory;
 use App\Models\QuickReplyItem;
+use App\Models\QuickReplyPhrasing;
 use Illuminate\Database\Eloquent\Collection;
 
 /**
@@ -16,6 +17,9 @@ class QuickReplyRepository
 
     /** @var array 問答列表欄位 */
     private const ITEM_COLUMNS = ['id', 'category_id', 'label', 'answer', 'sort', 'status'];
+
+    /** @var array 問法樣本欄位 */
+    private const PHRASING_COLUMNS = ['id', 'quick_reply_item_id', 'text', 'source', 'created_at'];
 
     /**
      * @var array seeder 用的欄位
@@ -35,7 +39,9 @@ class QuickReplyRepository
         return QuickReplyCategory::query()
             ->select(self::CATEGORY_COLUMNS)
             ->with(['items' => function ($query) {
-                $query->select(self::ITEM_COLUMNS)->orderBy('sort')->orderBy('id');
+                // 樣本數要顯示在每題旁邊 —— 樣本沒有上限，
+                // 不顯示出來就沒有人會發現哪一題已經累積到該清了
+                $query->select(self::ITEM_COLUMNS)->withCount('phrasings')->orderBy('sort')->orderBy('id');
             }])
             ->orderBy('sort')
             ->orderBy('id')
@@ -82,6 +88,11 @@ class QuickReplyRepository
                 'quick_reply_category.label as category_label',
             ])
             ->join('quick_reply_category', 'quick_reply_category.id', '=', 'quick_reply_item.category_id')
+            // 客人問過的實際說法一起帶出來進 prompt。用 with 而不是再 join ——
+            // join 會讓一題有 N 筆樣本時變成 N 列，答案也跟著重複 N 次
+            ->with(['phrasings' => function ($query) {
+                $query->select(['id', 'quick_reply_item_id', 'text'])->orderBy('id');
+            }])
             ->where('quick_reply_item.status', config('constants.QUICK_REPLY.STATUS.ACTIVE'))
             ->where('quick_reply_category.status', config('constants.QUICK_REPLY.STATUS.ACTIVE'))
             ->orderBy('quick_reply_item.category_id')
@@ -269,5 +280,96 @@ class QuickReplyRepository
     public function deleteItem(QuickReplyItem $item)
     {
         $item->delete();
+    }
+
+    // ---------------------------------------------------------------
+    //  問法樣本
+    // ---------------------------------------------------------------
+
+    /**
+     * 記一筆客人的實際問法
+     *
+     * 同一題已經有一模一樣的句子就不再存 —— 客人手滑重複問、
+     * 或兩個人問了同一句話，存第二筆只是讓 prompt 變長。
+     *
+     * @param int         $itemId
+     * @param string      $text
+     * @param int|null    $groupId
+     * @param int         $source 見 constants.QUICK_REPLY.PHRASING_SOURCE
+     * @return QuickReplyPhrasing|null 重複時回 null
+     */
+    public function addPhrasing($itemId, $text, $groupId, $source)
+    {
+        $text = trim((string) $text);
+
+        if (blank($text)) {
+            return null;
+        }
+
+        $exists = QuickReplyPhrasing::query()
+            ->where('quick_reply_item_id', $itemId)
+            ->where('text', $text)
+            ->exists();
+
+        if ($exists) {
+            return null;
+        }
+
+        return QuickReplyPhrasing::query()->create([
+            'quick_reply_item_id' => $itemId,
+            'text'                => $text,
+            'telegram_group_id'   => $groupId,
+            'source'              => $source,
+        ]);
+    }
+
+    /**
+     * 取某一題的問法樣本
+     *
+     * @param int $itemId
+     * @return Collection
+     */
+    public function getPhrasingsByItem($itemId)
+    {
+        return QuickReplyPhrasing::query()
+            ->select(self::PHRASING_COLUMNS)
+            ->where('quick_reply_item_id', $itemId)
+            ->orderByDesc('id')
+            ->get();
+    }
+
+    /**
+     * @param int $id
+     * @return QuickReplyPhrasing|null
+     */
+    public function findPhrasing($id)
+    {
+        return QuickReplyPhrasing::query()->select(self::PHRASING_COLUMNS)->find($id);
+    }
+
+    /**
+     * @param QuickReplyPhrasing $phrasing
+     * @return void
+     */
+    public function deletePhrasing(QuickReplyPhrasing $phrasing)
+    {
+        $phrasing->delete();
+    }
+
+    /**
+     * 每一題各有幾筆問法樣本
+     *
+     * 題庫頁要在每題旁邊顯示數量 —— 樣本沒有上限，不顯示出來就沒有人會發現
+     * 哪一題已經累積到該清了。
+     *
+     * @return array<int, int> item_id => 筆數
+     */
+    public function countPhrasingsByItem()
+    {
+        return QuickReplyPhrasing::query()
+            ->selectRaw('quick_reply_item_id, count(*) as total')
+            ->groupBy('quick_reply_item_id')
+            ->pluck('total', 'quick_reply_item_id')
+            ->toArray();
     }
 }

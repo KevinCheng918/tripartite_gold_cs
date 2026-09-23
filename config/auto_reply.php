@@ -58,7 +58,7 @@ return [
      *
      * prompt 內容改版時要一起換 key（結尾的版號），否則舊的會留到 TTL 到期才換掉。
      */
-    'prompt_cache_key'     => 'auto_reply.prompt.v2',
+    'prompt_cache_key'     => 'auto_reply.prompt.v3',
     'prompt_cache_seconds' => 300,
 
     /*

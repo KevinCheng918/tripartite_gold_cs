@@ -296,6 +296,7 @@
                 '<div class="flex-fill" style="min-width:0">' +
                 '<div class="fw-bold" style="font-size:0.875rem">' +
                 '<span class="badge bg-light text-muted border me-1" style="font-weight:400">#' + item.id + '</span>' +
+                phrasingBadge(item) +
                 disabled + escapeHtml(item.label) + '</div>' +
                 '<div class="text-muted mt-1" style="font-size:0.8125rem;white-space:pre-wrap">' +
                 escapeHtml(item.answer) + '</div>' +
@@ -311,6 +312,9 @@
         });
 
         container.innerHTML = html;
+
+        // 句數標記不綁在 canEdit 底下：只有檢視權限的人也該看得到累積了哪些說法
+        bindPhrasingBadges(container);
 
         if (!canEdit) { return; }
 
@@ -360,7 +364,8 @@
                 '<span class="badge bg-light text-muted border">#' + item.id + '</span>' +
                 '<span class="text-muted">' + escapeHtml(row.category.label) + '</span>' +
                 '</div>' +
-                '<div class="fw-bold" style="font-size:0.875rem">' + disabled + escapeHtml(item.label) + '</div>' +
+                '<div class="fw-bold" style="font-size:0.875rem">' +
+                phrasingBadge(item) + disabled + escapeHtml(item.label) + '</div>' +
                 '<div class="text-muted mt-1" style="font-size:0.8125rem;white-space:pre-wrap">' +
                 escapeHtml(item.answer) + '</div>';
 
@@ -374,6 +379,8 @@
         });
 
         container.innerHTML = html;
+
+        bindPhrasingBadges(container);
 
         if (!canEdit) { return; }
 
@@ -402,6 +409,183 @@
         select.value = item ? item.category_id : (selectedCategoryId || '');
 
         showBsModal('modal-qr-item');
+    }
+
+    // ===== 客人問過的說法 =====
+
+    /**
+     * 列表上的句數標記
+     *
+     * 樣本沒有上限，不顯示出來就沒有人會發現哪一題已經累積到該清了。
+     * 一句都沒有時不顯示 —— 大部分題目都是 0，每題掛一個空標記只是雜訊。
+     *
+     * @param {Object} item
+     * @return {string}
+     */
+    function phrasingBadge(item) {
+        if (!item.phrasing_count) { return ''; }
+
+        return '<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle me-1 js-qr-phrasing-badge" ' +
+            'data-id="' + item.id + '" role="button" style="font-weight:400" title="' +
+            escapeHtml(i18n.phrasing_title) + '">💬 ' + item.phrasing_count + '</span>';
+    }
+
+    /**
+     * 綁定句數標記的點擊（兩種列表模式共用）
+     *
+     * @param {HTMLElement} container
+     */
+    function bindPhrasingBadges(container) {
+        bindAll(container, '.js-qr-phrasing-badge', function (badge) {
+            var found = findItem(parseInt(badge.dataset.id, 10));
+
+            if (found) { openPhrasingModal(found.item); }
+        });
+    }
+
+    /**
+     * 打開某一題的問法樣本
+     *
+     * @param {Object} item
+     */
+    function openPhrasingModal(item) {
+        var list = document.getElementById('qr-phrasing-list');
+
+        document.getElementById('qr-phrasing-item').textContent = '#' + item.id + ' ' + item.label;
+        document.getElementById('qr-phrasing-count').textContent =
+            i18n.phrasing_count.replace(':count', item.phrasing_count || 0);
+        list.innerHTML = '';
+
+        showBsModal('modal-qr-phrasing');
+
+        // 一句都沒有就不用打後端
+        if (!item.phrasing_count) {
+            list.innerHTML = emptyPhrasingHtml();
+
+            return;
+        }
+
+        apiFetch('/admin/quick-reply/ajax-phrasings/' + item.id)
+            .then(function (body) {
+                renderPhrasings(list, body.data || []);
+            })
+            .catch(function (error) {
+                list.innerHTML = '<div class="text-danger" style="font-size:0.8125rem">' +
+                    escapeHtml(errorMessage(error, i18n.msg.phrasing_load_failed)) + '</div>';
+            });
+    }
+
+    /**
+     * @return {string}
+     */
+    function emptyPhrasingHtml() {
+        return '<div class="text-muted" style="font-size:0.8125rem">' +
+            escapeHtml(i18n.phrasing_empty) + '</div>';
+    }
+
+    /**
+     * @param {HTMLElement} list
+     * @param {Array}       rows
+     */
+    function renderPhrasings(list, rows) {
+        if (!rows.length) {
+            list.innerHTML = emptyPhrasingHtml();
+
+            return;
+        }
+
+        var html = '';
+
+        rows.forEach(function (row) {
+            var source = i18n['phrasing_source_' + row.source] || '';
+
+            html += '<div class="py-2 border-bottom js-qr-phrasing" data-id="' + row.id + '">' +
+                '<div class="d-flex align-items-start gap-2">' +
+                '<div class="flex-fill" style="min-width:0;font-size:0.8125rem;white-space:pre-wrap">' +
+                escapeHtml(row.text) +
+                '<span class="text-muted ms-2" style="font-size:0.75rem">' +
+                escapeHtml(source) + '</span>' +
+                '</div>';
+
+            if (canEdit) {
+                html += '<button type="button" class="btn btn-sm btn-link text-danger p-0 js-qr-ask-del-phrasing" ' +
+                    'style="font-size:0.75rem;white-space:nowrap">' +
+                    escapeHtml(i18n.action_delete) + '</button>';
+            }
+
+            html += '</div><div class="js-qr-phrasing-confirm mt-1" style="display:none">' +
+                '<span class="text-danger me-2" style="font-size:0.75rem">' +
+                escapeHtml(i18n.confirm_delete_phrasing) + '</span>' +
+                '<button type="button" class="btn btn-sm btn-danger py-0 js-qr-do-del-phrasing" style="font-size:0.75rem">' +
+                escapeHtml(i18n.action_delete) + '</button> ' +
+                '<button type="button" class="btn btn-sm btn-secondary py-0 js-qr-cancel-del-phrasing" style="font-size:0.75rem">' +
+                escapeHtml(i18n.action_cancel) + '</button>' +
+                '</div></div>';
+        });
+
+        list.innerHTML = html;
+
+        if (!canEdit) { return; }
+
+        bindPhrasingDelete(list);
+    }
+
+    /**
+     * 就地刪除確認
+     *
+     * 不用確認 Modal —— 這裡已經在 Modal 裡面了，再開一層會疊兩個 backdrop，
+     * 捲動會被鎖在錯的那一層。
+     *
+     * @param {HTMLElement} list
+     */
+    function bindPhrasingDelete(list) {
+        bindAll(list, '.js-qr-ask-del-phrasing', function (btn) {
+            togglePhrasingConfirm(btn, true);
+        });
+
+        bindAll(list, '.js-qr-cancel-del-phrasing', function (btn) {
+            togglePhrasingConfirm(btn, false);
+        });
+
+        bindAll(list, '.js-qr-do-del-phrasing', function (btn) {
+            var row = btn.closest('.js-qr-phrasing');
+
+            apiFetch('/admin/quick-reply/ajax-delete-phrasing/' + row.dataset.id, { method: 'DELETE' })
+                .then(function (body) {
+                    row.parentNode.removeChild(row);
+
+                    if (!list.querySelector('.js-qr-phrasing')) {
+                        list.innerHTML = emptyPhrasingHtml();
+                    }
+
+                    refreshPhrasingCount(list);
+                    // 列表上的句數也要跟著變，否則關掉視窗還是舊數字
+                    loadAll();
+                    showMsg(body.message);
+                })
+                .catch(function (error) {
+                    showMsg(errorMessage(error, i18n.msg.phrasing_delete_failed));
+                });
+        });
+    }
+
+    /**
+     * @param {HTMLElement} btn
+     * @param {boolean}     show
+     */
+    function togglePhrasingConfirm(btn, show) {
+        var row = btn.closest('.js-qr-phrasing');
+
+        row.querySelector('.js-qr-phrasing-confirm').style.display = show ? '' : 'none';
+        row.querySelector('.js-qr-ask-del-phrasing').style.display = show ? 'none' : '';
+    }
+
+    /**
+     * @param {HTMLElement} list
+     */
+    function refreshPhrasingCount(list) {
+        document.getElementById('qr-phrasing-count').textContent =
+            i18n.phrasing_count.replace(':count', list.querySelectorAll('.js-qr-phrasing').length);
     }
 
     document.getElementById('form-qr-item').addEventListener('submit', function (e) {

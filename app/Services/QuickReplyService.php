@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\QuickReplyCategory;
 use App\Models\QuickReplyItem;
+use App\Models\QuickReplyPhrasing;
 use App\Repositories\QuickReplyRepository;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -67,6 +68,32 @@ class QuickReplyService
     public function getForManage()
     {
         return $this->quickReplyRepository->getAllWithItems();
+    }
+
+    /**
+     * 取某一題的問法樣本
+     *
+     * @param int $itemId
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getPhrasings($itemId)
+    {
+        return $this->quickReplyRepository->getPhrasingsByItem($itemId);
+    }
+
+    /**
+     * 刪掉一筆問法樣本
+     *
+     * 刪完要清 prompt 快取 —— 樣本是 system prompt 的一部分，
+     * 不清的話刪掉的說法還會繼續影響比對到快取過期為止。
+     *
+     * @param QuickReplyPhrasing $phrasing
+     * @return void
+     */
+    public function deletePhrasing(QuickReplyPhrasing $phrasing)
+    {
+        $this->quickReplyRepository->deletePhrasing($phrasing);
+        $this->flushMatchPrompt();
     }
 
     /**
@@ -218,12 +245,16 @@ class QuickReplyService
     /**
      * 清掉自動回覆的題庫 prompt 快取
      *
-     * 題庫是整份塞進 Claude 的 system prompt 的，任何異動（含類別啟停用）
-     * 都會改變比對範圍 —— 不清的話新題目最多要等快取過期才生效，而且很難察覺。
+     * 題庫是整份塞進 Claude 的 system prompt 的，任何異動（含類別啟停用、
+     * 新增問法樣本）都會改變比對範圍 —— 不清的話新題目最多要等快取過期才生效，
+     * 而且很難察覺。
+     *
+     * public 是因為求助單那邊記下新問法之後也要清（見
+     * `AutoReplySupportService::handleCandidatePicked()`）。
      *
      * @return void
      */
-    private function flushMatchPrompt()
+    public function flushMatchPrompt()
     {
         Cache::forget(config('auto_reply.prompt_cache_key'));
     }

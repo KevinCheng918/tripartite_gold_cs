@@ -139,6 +139,12 @@ return [
             'ACTIVE'   => 1,
             'DISABLED' => 0,
         ],
+
+        // 問法樣本是怎麼來的
+        'PHRASING_SOURCE' => [
+            'SUPPORT' => 1, // 同仁在求助單按了「用這題回覆」
+            'MANUAL'  => 2, // 後台手動新增
+        ],
     ],
 
     /*
@@ -264,7 +270,15 @@ return [
         'CALLBACK' => [
             'ACTION'   => 'ar',  // ar:{action}:{ticket_id}
             'CATEGORY' => 'arc', // arc:{ticket_id}:{category_id}
+            'PICK'     => 'arp', // arp:{ticket_id}:{item_id} —— 直接用某一題的題庫原文回覆
         ],
+
+        /*
+         * 求助訊息上最多列幾個候選題目按鈕。
+         *
+         * 超過三個同仁要一個一個讀標題，反而比自己去後台找還慢。
+         */
+        'CANDIDATE_LIMIT' => 3,
 
         // 支援群組按鈕的動作
         'ACTION' => [

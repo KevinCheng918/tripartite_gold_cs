@@ -405,7 +405,45 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
             'item_id'    => filled($itemId) ? (int) $itemId : null,
             'confidence' => (string) Arr::get($result, 'confidence', config('constants.AUTO_REPLY.CONFIDENCE.LOW')),
             'opening'    => filled($opening) ? (string) $opening : null,
+            'candidates' => $this->parseCandidates($result, $itemId),
         ];
+    }
+
+    /**
+     * 整理候選題目
+     *
+     * 模型挑中的那一題要排在最前面 —— 它是「最像但信心不足」的那個，
+     * 同仁多半會直接按它。
+     *
+     * @param array    $result
+     * @param mixed    $itemId 模型挑中的題目
+     * @return array<int, int>
+     */
+    private function parseCandidates(array $result, $itemId)
+    {
+        $candidates = Arr::get($result, 'candidates', []);
+
+        if (!is_array($candidates)) {
+            $candidates = [];
+        }
+
+        $ids = [];
+
+        if (filled($itemId)) {
+            $ids[] = (int) $itemId;
+        }
+
+        foreach ($candidates as $candidate) {
+            if (!is_numeric($candidate)) {
+                continue;
+            }
+
+            $ids[] = (int) $candidate;
+        }
+
+        // array_values 是必要的：array_unique 會留下原本的 key，
+        // 之後 json_encode 會變成物件而不是陣列
+        return array_values(array_unique($ids));
     }
 
     /**
@@ -443,8 +481,17 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
                     'type'        => ['string', 'null'],
                     'description' => '回應客人的那一兩句話（最多 60 字）。不含任何規格、價格、承諾，也不要指示客人怎麼回覆。只是純寒暄且不需要回應時填 null',
                 ],
+                // 轉人工時附在求助訊息上，讓同仁一鍵用題庫原文回覆。
+                // 模型已經看過整份題庫，順手多回兩個候選幾乎沒有成本，
+                // 卻能讓「題庫其實有答案卻沒命中」這種情況不必重打一次答案
+                'candidates' => [
+                    'type'        => 'array',
+                    'items'       => ['type' => 'integer'],
+                    'maxItems'    => (int) config('constants.AUTO_REPLY.CANDIDATE_LIMIT'),
+                    'description' => '可能沾得上邊的題目 id，最相近的排前面。就算沒把握也要列出來，這是給同仁參考的，不會直接送給客人。真的完全無關才給空陣列',
+                ],
             ],
-            'required'             => ['intent', 'item_id', 'confidence', 'opening'],
+            'required'             => ['intent', 'item_id', 'confidence', 'opening', 'candidates'],
             'additionalProperties' => false,
         ];
 
@@ -474,6 +521,21 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
             foreach ($items as $item) {
                 $lines[] = "[id:{$item->id}]（{$item->category_label}）";
                 $lines[] = "問題：{$item->label}";
+
+                /*
+                 * 客人實際問過的說法。
+                 *
+                 * 這些是同仁在求助單按「用這題回覆」時累積下來的 ——
+                 * 題庫寫「回調」，客人說「錢沒進來」；題庫寫「10001」，
+                 * 客人說「簽名一直錯」。那些字在 label 與 answer 裡都不會出現，
+                 * 只能靠這裡補上。
+                 */
+                $phrasings = $item->phrasings->pluck('text')->all();
+
+                if (filled($phrasings)) {
+                    $lines[] = '客人也這樣問過：' . implode('／', $phrasings);
+                }
+
                 $lines[] = "答案：{$item->answer}";
                 $lines[] = '';
             }
@@ -533,6 +595,23 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
                 '4. 題庫裡沒有對應的答案時，item_id 填 null，**絕對不要勉強挑一個相近的**。',
                 '',
                 '答錯的代價遠高於轉給真人處理，所以拿不準就填 low。',
+                '',
+                '「客人也這樣問過」那幾句是同仁確認過、確實該對到那一題的說法。',
+                '客人這次講的跟其中一句意思相同，就是命中。',
+                '',
+                '## 候選題目（candidates）',
+                '',
+                '這跟 item_id 是兩回事，判斷標準也完全不同。',
+                '',
+                "- `item_id` + `confidence: {$intents['QUESTION']}` 的 high：**要送給客人的**，所以必須很確定。",
+                '- `candidates`：**只給同仁看的**，客人永遠不會收到。同仁按一下就能用那題的原文回覆。',
+                '',
+                '所以 candidates 要**放寬標準**：沾得上邊就列進去，最相近的排前面。',
+                '寧可多列一個讓同仁略過，也不要漏掉 —— 漏掉的話他得自己回後台翻一百多題，',
+                '或乾脆重打一次答案，題庫就會多出一題重複的。',
+                '',
+                '填 null 給 item_id 的時候尤其要給 candidates：那正是同仁最需要線索的時候。',
+                '真的完全無關才給空陣列。',
                 '',
                 '## 第三步：寫承接句（opening）',
                 '',

@@ -9,6 +9,7 @@ use App\Repositories\QuickReplyRepository;
 use App\Repositories\StationRepository;
 use App\Repositories\TelegramRepository;
 use App\Repositories\UserRepository;
+use App\Services\AutoReply\AnswerSplitter;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -35,6 +36,9 @@ class AutoReplySupportService
     /** @var int config 讀不到時的備用前情則數，理由同 AutoReplyService::contextSetting() */
     private const FALLBACK_TICKET_LINES = 2;
 
+    /** @var int 候選按鈕上標題的字數上限，超過 Telegram 會自己截掉 */
+    private const BUTTON_LABEL_CHARS = 24;
+
     private $ticketRepository;
     private $telegramRepository;
     private $quickReplyRepository;
@@ -44,6 +48,7 @@ class AutoReplySupportService
     private $chatService;
     private $quickReplyService;
     private $appSettingService;
+    private $splitter;
 
     public function __construct(
         AutoReplyTicketRepository $ticketRepository,
@@ -54,7 +59,8 @@ class AutoReplySupportService
         TelegramBotService $botService,
         TelegramChatService $chatService,
         QuickReplyService $quickReplyService,
-        AppSettingService $appSettingService
+        AppSettingService $appSettingService,
+        AnswerSplitter $splitter
     ) {
         $this->ticketRepository = $ticketRepository;
         $this->telegramRepository = $telegramRepository;
@@ -65,6 +71,7 @@ class AutoReplySupportService
         $this->chatService = $chatService;
         $this->quickReplyService = $quickReplyService;
         $this->appSettingService = $appSettingService;
+        $this->splitter = $splitter;
     }
 
     /**
@@ -97,11 +104,12 @@ class AutoReplySupportService
      * @param TelegramGroup $group
      * @param string        $question  客人問題原文
      * @param int|null      $messageId 客人那則訊息的後台 id
-     * @param string|null   $hint      AI 判斷摘要
-     * @param array         $history   近期對話，一行一則、舊的在前
+     * @param string|null   $hint       AI 判斷摘要
+     * @param array         $history    近期對話，一行一則、舊的在前
+     * @param array         $candidates 沾得上邊的題目 id，最相近的在前
      * @return AutoReplyTicket|null
      */
-    public function openTicket(TelegramGroup $group, $question, $messageId = null, $hint = null, array $history = [])
+    public function openTicket(TelegramGroup $group, $question, $messageId = null, $hint = null, array $history = [], array $candidates = [])
     {
         if (blank($this->appSettingService->get(AppSettingService::KEY_SUPPORT_CHAT_ID))) {
             Log::warning('未設定內部支援群組，答不出來的問題沒有轉出去', ['group_id' => $group->id]);
@@ -130,7 +138,11 @@ class AutoReplySupportService
             'status'            => config('constants.AUTO_REPLY.TICKET_STATUS.PENDING'),
         ]);
 
-        $result = $this->sendToSupport($this->buildAskText($group, $question, $hint, $history));
+        // 候選按鈕要等 ticket 建好才組得出來（callback_data 需要 ticket id）
+        $result = $this->sendToSupport(
+            $this->buildAskText($group, $question, $hint, $history),
+            $this->buildCandidateKeyboard($ticket->id, $candidates)
+        );
         $askMessageId = Arr::get($result, 'result.message_id');
 
         if (blank($askMessageId)) {
@@ -329,7 +341,140 @@ class AutoReplySupportService
 
         if ($prefix === config('constants.AUTO_REPLY.CALLBACK.CATEGORY')) {
             $this->handleCategoryChosen($parts, $messageId);
+
+            return;
         }
+
+        if ($prefix === config('constants.AUTO_REPLY.CALLBACK.PICK')) {
+            $this->handleCandidatePicked($parts, $messageId);
+        }
+    }
+
+    /**
+     * 同仁按了「用 #111 回覆」
+     *
+     * 兩件事一起做：
+     *
+     * 1. **當下**：用題庫原文回客人，不用同仁打字，也不會新增重複題目。
+     * 2. **下一次**：把客人那句原話記成這一題的問法樣本。那些字（「錢沒進來」
+     *    之於「回調」）在題目的標題與答案裡都不會出現，只能從這裡補上。
+     *    累積起來進 system prompt，同樣的問法下次就直接命中。
+     *
+     * @param array    $parts     [ticket_id, item_id]
+     * @param int|null $messageId 按鈕所在的訊息
+     * @return void
+     */
+    private function handleCandidatePicked(array $parts, $messageId)
+    {
+        $ticket = $this->ticketRepository->find((int) Arr::get($parts, 0, 0));
+
+        if (blank($ticket) || $ticket->isClosed()) {
+            $this->editSupportMessage($messageId, '這張單已經處理過了。');
+
+            return;
+        }
+
+        $item = $this->quickReplyRepository->findActiveItem((int) Arr::get($parts, 1, 0));
+
+        if (blank($item)) {
+            $this->editSupportMessage($messageId, '⚠️ 這題已經被停用或刪除了，請改用引用回覆作答。');
+
+            return;
+        }
+
+        $sent = $this->replyWithItem($ticket, $item);
+
+        if (!$sent) {
+            $this->editSupportMessage($messageId, '⚠️ 回覆客人失敗，請到後台手動處理。');
+
+            return;
+        }
+
+        $statuses = config('constants.AUTO_REPLY.TICKET_STATUS');
+
+        $this->ticketRepository->update($ticket, [
+            'status'              => $statuses['REPLIED'],
+            'answer'              => $item->answer,
+            'quick_reply_item_id' => $item->id,
+            'answered_at'         => now(),
+        ]);
+
+        // 記問法樣本。重複的句子不會再存一筆
+        $learned = $this->quickReplyRepository->addPhrasing(
+            $item->id,
+            $ticket->question,
+            $ticket->telegram_group_id,
+            config('constants.QUICK_REPLY.PHRASING_SOURCE.SUPPORT')
+        );
+
+        // 題庫內容變了就要清 prompt 快取，否則模型要等 TTL 過了才看得到新問法
+        if (filled($learned)) {
+            $this->quickReplyService->flushMatchPrompt();
+        }
+
+        $lines = ["✅ 已用 #{$item->id} {$item->label} 回覆客人。"];
+
+        if (filled($learned)) {
+            $lines[] = '';
+            $lines[] = '📝 已記住客人這次的問法，之後同樣問法會自動回答。';
+        }
+
+        $this->editSupportMessage($messageId, implode("\n", $lines));
+    }
+
+    /**
+     * 用題庫原文回覆客人
+     *
+     * 走的是自動回覆命中時的同一套話術模板與分則邏輯 ——
+     * 同一份答案不該因為是誰送的而排版不同。
+     *
+     * @param AutoReplyTicket $ticket
+     * @param object          $item
+     * @return bool
+     */
+    private function replyWithItem(AutoReplyTicket $ticket, $item)
+    {
+        $template = $this->appSettingService->get(AppSettingService::KEY_TPL_ANSWER_FULL);
+
+        if (blank($template)) {
+            Log::error('答案話術模板為空，無法用題庫原文回覆', ['ticket_id' => $ticket->id]);
+
+            return false;
+        }
+
+        $chunks = $this->splitter->split(strtr($template, ['{答案}' => $item->answer]));
+        $lastIndex = count($chunks) - 1;
+
+        foreach ($chunks as $index => $chunk) {
+            $isLast = $index === $lastIndex;
+
+            try {
+                $this->chatService->sendReply(
+                    $ticket->telegram_group_id,
+                    $chunk,
+                    null,
+                    config('constants.AUTO_REPLY.SENDER_NAME'),
+                    [
+                        'mark_replied' => $isLast,
+                        'signature'    => $isLast ? config('constants.AUTO_REPLY.SIGNATURE') : null,
+                        'is_auto'      => true,
+                    ]
+                );
+            } catch (\Exception $e) {
+                Log::error('用題庫原文回覆客人失敗', [
+                    'ticket_id' => $ticket->id,
+                    'item_id'   => $item->id,
+                    'chunk'     => $index + 1,
+                    'error'     => $e->getMessage(),
+                ]);
+
+                // 第一則就失敗才算完全沒送出去；中間失敗客人已經看到一部分，
+                // 這時回報失敗會讓同仁重送一次而變成重複訊息
+                return $index > 0;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -553,6 +698,51 @@ class AutoReplySupportService
      * @param int $ticketId
      * @return array
      */
+    /**
+     * 候選題目按鈕（開單當下就出現）
+     *
+     * 客人問的其實題庫有答案、模型卻沒比對出來 —— 這種情況以前同仁只能
+     * 自己回後台翻一百多題，或乾脆重打一次答案然後按「加入題庫」，
+     * 結果題庫就多出一題重複的。
+     *
+     * 按鈕上要帶題號與標題：同仁得先看得出那是哪一題，才敢按下去。
+     *
+     * @param int   $ticketId
+     * @param array $candidates 題目 id，最相近的在前
+     * @return array|null 沒有候選時回 null（Telegram 不接受空的 keyboard）
+     */
+    private function buildCandidateKeyboard($ticketId, array $candidates)
+    {
+        if (blank($candidates)) {
+            return null;
+        }
+
+        $prefix = config('constants.AUTO_REPLY.CALLBACK.PICK');
+        $limit = (int) config('constants.AUTO_REPLY.CANDIDATE_LIMIT');
+        $rows = [];
+
+        foreach (array_slice($candidates, 0, $limit) as $itemId) {
+            // 模型可能挑到剛被停用或刪掉的題目，那種不該讓同仁按下去才發現
+            $item = $this->quickReplyRepository->findActiveItem($itemId);
+
+            if (blank($item)) {
+                continue;
+            }
+
+            // Telegram 按鈕文字過長會被截掉，先自己截並補省略號
+            $label = mb_strlen($item->label) > self::BUTTON_LABEL_CHARS
+                ? mb_substr($item->label, 0, self::BUTTON_LABEL_CHARS) . '…'
+                : $item->label;
+
+            $rows[] = [[
+                'text'          => "📋 用 #{$item->id} {$label}",
+                'callback_data' => "{$prefix}:{$ticketId}:{$item->id}",
+            ]];
+        }
+
+        return blank($rows) ? null : $rows;
+    }
+
     private function buildCategoryKeyboard($ticketId)
     {
         $prefix = config('constants.AUTO_REPLY.CALLBACK.CATEGORY');

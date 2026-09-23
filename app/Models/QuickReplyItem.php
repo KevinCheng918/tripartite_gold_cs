@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * 快速回覆問答 Model
@@ -34,5 +35,17 @@ class QuickReplyItem extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(QuickReplyCategory::class, 'category_id');
+    }
+
+    /**
+     * 客人問過的實際說法
+     *
+     * 這些會進 system prompt，是讓同樣的問法下次直接命中的關鍵。
+     *
+     * @return HasMany
+     */
+    public function phrasings(): HasMany
+    {
+        return $this->hasMany(QuickReplyPhrasing::class, 'quick_reply_item_id');
     }
 }

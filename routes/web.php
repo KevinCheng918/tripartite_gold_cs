@@ -244,6 +244,9 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::delete('/ajax-delete-item/{item}', [QuickReplyController::class, 'ajaxDeleteItem'])->middleware('can:quick_reply.edit')->name('ajax-delete-item');
         Route::post('/ajax-reorder-categories', [QuickReplyController::class, 'ajaxReorderCategories'])->middleware('can:quick_reply.edit')->name('ajax-reorder-categories');
         Route::post('/ajax-reorder-items', [QuickReplyController::class, 'ajaxReorderItems'])->middleware('can:quick_reply.edit')->name('ajax-reorder-items');
+        // 問法樣本：客人實際問過、同仁確認該對到這一題的說法
+        Route::get('/ajax-phrasings/{item}', [QuickReplyController::class, 'ajaxPhrasings'])->middleware('can:quick_reply.view')->name('ajax-phrasings');
+        Route::delete('/ajax-delete-phrasing/{phrasing}', [QuickReplyController::class, 'ajaxDeletePhrasing'])->middleware('can:quick_reply.edit')->name('ajax-delete-phrasing');
     });
 
     // 專案管理

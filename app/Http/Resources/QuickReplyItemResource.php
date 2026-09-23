@@ -24,6 +24,9 @@ class QuickReplyItemResource extends JsonResource
             'answer'      => $this->answer,
             'sort'        => $this->sort,
             'status'      => $this->status,
+            // 客人問過的說法有幾筆。只在管理列表帶出來（whenCounted），
+            // 聊天視窗的選單不需要這個數字
+            'phrasing_count' => $this->whenCounted('phrasings'),
         ];
     }
 }

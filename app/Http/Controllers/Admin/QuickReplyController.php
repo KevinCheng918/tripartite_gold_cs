@@ -10,8 +10,10 @@ use App\Http\Requests\QuickReply\UpdateCategoryRequest;
 use App\Http\Requests\QuickReply\UpdateItemRequest;
 use App\Http\Resources\QuickReplyCategoryResource;
 use App\Http\Resources\QuickReplyItemResource;
+use App\Http\Resources\QuickReplyPhrasingResource;
 use App\Models\QuickReplyCategory;
 use App\Models\QuickReplyItem;
+use App\Models\QuickReplyPhrasing;
 use App\Services\QuickReplyService;
 use Illuminate\Support\Facades\Log;
 
@@ -186,6 +188,39 @@ class QuickReplyController extends Controller
             Log::error('快速回覆問答刪除失敗', ['error' => $e->getMessage(), 'item_id' => $item->id]);
 
             return response()->json(['message' => trans('quick_reply.msg.item_delete_failed')], 500);
+        }
+    }
+
+    /**
+     * Ajax 取得某一題的問法樣本
+     *
+     * 客人實際問過、同仁在求助單確認該對到這一題的說法。
+     * 這些會進自動回覆的 system prompt。
+     *
+     * @param QuickReplyItem $item
+     * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection
+     */
+    public function ajaxPhrasings(QuickReplyItem $item)
+    {
+        return QuickReplyPhrasingResource::collection($this->quickReplyService->getPhrasings($item->id));
+    }
+
+    /**
+     * Ajax 刪除一筆問法樣本
+     *
+     * @param QuickReplyPhrasing $phrasing
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxDeletePhrasing(QuickReplyPhrasing $phrasing)
+    {
+        try {
+            $this->quickReplyService->deletePhrasing($phrasing);
+
+            return response()->json(['message' => trans('quick_reply.msg.phrasing_deleted')]);
+        } catch (\Exception $e) {
+            Log::error('問法樣本刪除失敗', ['error' => $e->getMessage(), 'phrasing_id' => $phrasing->id]);
+
+            return response()->json(['message' => trans('quick_reply.msg.phrasing_delete_failed')], 500);
         }
     }
 

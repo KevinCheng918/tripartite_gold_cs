@@ -6,6 +6,7 @@ use App\Contracts\AutoReplyMatcher;
 use App\Models\TelegramGroup;
 use App\Repositories\QuickReplyRepository;
 use App\Repositories\TelegramRepository;
+use App\Services\AutoReply\AnswerSplitter;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
@@ -37,25 +38,13 @@ class AutoReplyService
         'total'     => 3000,
     ];
 
-    /**
-     * config 讀不到時的備用分則設定，理由見 answerSetting()。
-     *
-     * @var array
-     */
-    private const FALLBACK_ANSWER = [
-        'chunk_chars' => 300,
-        'min_tail'    => 80,
-    ];
-
-    /** @var int 超過這個字數就不算標題行，理由見 looksLikeHeading() */
-    private const HEADING_MAX_CHARS = 30;
-
     private $matcher;
     private $telegramRepository;
     private $quickReplyRepository;
     private $chatService;
     private $supportService;
     private $appSettingService;
+    private $splitter;
 
     public function __construct(
         AutoReplyMatcher $matcher,
@@ -63,7 +52,8 @@ class AutoReplyService
         QuickReplyRepository $quickReplyRepository,
         TelegramChatService $chatService,
         AutoReplySupportService $supportService,
-        AppSettingService $appSettingService
+        AppSettingService $appSettingService,
+        AnswerSplitter $splitter
     ) {
         $this->matcher = $matcher;
         $this->telegramRepository = $telegramRepository;
@@ -71,6 +61,7 @@ class AutoReplyService
         $this->chatService = $chatService;
         $this->supportService = $supportService;
         $this->appSettingService = $appSettingService;
+        $this->splitter = $splitter;
     }
 
     /**
@@ -505,7 +496,15 @@ class AutoReplyService
 
         $this->send($group, $content, false);
         $this->telegramRepository->updateAutoReplyState($group, null);
-        $this->supportService->openTicket($group, $question, $messageId, $this->buildHint($result), $history);
+
+        $this->supportService->openTicket(
+            $group,
+            $question,
+            $messageId,
+            $this->buildHint($result),
+            $history,
+            (array) Arr::get($result, 'candidates', [])
+        );
     }
 
     /**
@@ -578,7 +577,7 @@ class AutoReplyService
             return;
         }
 
-        $chunks = $this->splitContent($content);
+        $chunks = $this->splitter->split($content);
         $lastIndex = count($chunks) - 1;
 
         foreach ($chunks as $index => $chunk) {
@@ -613,161 +612,6 @@ class AutoReplyService
         }
     }
 
-    /**
-     * 長答案切成多則
-     *
-     * 題庫裡有十幾題是三、四百字的完整說明。一整塊丟過去，客人會跳著看，
-     * 最後那段「麻煩提供代理帳號與訂單號」常常整個被略過 ——
-     * 而那才是我們真正需要他做的事。
-     *
-     * **只在段落邊界（空行）切**。寧可某一則長一點，也不要把一句話砍成兩半 ——
-     * 切在句子中間比不切還糟。所以單一段落本身就超過上限時，那一則就是會比較長。
-     *
-     * @param string $content
-     * @return array<int, string> 至少一則
-     */
-    private function splitContent($content)
-    {
-        $chunkChars = $this->answerSetting('chunk_chars');
-
-        if ($chunkChars < 1 || mb_strlen($content) <= $chunkChars) {
-            return [$content];
-        }
-
-        $paragraphs = preg_split('/\n\s*\n/u', trim($content));
-        $chunks = [];
-        $buffer = '';
-
-        foreach ($paragraphs as $paragraph) {
-            $paragraph = trim($paragraph);
-
-            if (blank($paragraph)) {
-                continue;
-            }
-
-            $candidate = blank($buffer) ? $paragraph : "{$buffer}\n\n{$paragraph}";
-
-            // buffer 是空的時候不能斷 —— 否則會產生一則空訊息
-            if (filled($buffer) && mb_strlen($candidate) > $chunkChars) {
-                list($keep, $heading) = $this->carryHeading($buffer);
-
-                $chunks[] = $keep;
-                $buffer = blank($heading) ? $paragraph : "{$heading}\n\n{$paragraph}";
-
-                continue;
-            }
-
-            $buffer = $candidate;
-        }
-
-        if (filled($buffer)) {
-            $chunks[] = $buffer;
-        }
-
-        return $this->mergeShortTail($chunks);
-    }
-
-    /**
-     * 把結尾的標題行帶到下一則去
-     *
-     * 斷點剛好落在標題後面時會變成這樣：
-     *
-     *     （第 1 則）…只有在使用第三方通道時才會多出 L2 與 L3。
-     *               判斷卡在哪一段：        ← 標題孤零零留在這裡
-     *     （第 2 則）• 商戶開單當下就收到錯誤碼…
-     *
-     * 標題跟它的清單被拆開，比不分則還難讀。
-     *
-     * @param string $buffer
-     * @return array [留在這一則的內容, 要帶去下一則的標題；沒有就是空字串]
-     */
-    private function carryHeading($buffer)
-    {
-        $parts = preg_split('/\n\s*\n/u', $buffer);
-
-        // 只有一個段落就不能帶走 —— 帶走了這一則會變成空的
-        if (count($parts) < 2) {
-            return [$buffer, ''];
-        }
-
-        $last = trim(end($parts));
-
-        if (!$this->looksLikeHeading($last)) {
-            return [$buffer, ''];
-        }
-
-        array_pop($parts);
-
-        return [implode("\n\n", $parts), $last];
-    }
-
-    /**
-     * 這一段看起來是不是標題行
-     *
-     * 題庫的寫法有兩種：冒號結尾（「判斷卡在哪一段：」）
-     * 與方括號包住（「【方法一：由會員自行填寫地址】」）。
-     *
-     * 長度也要看 —— 一整段說明文字剛好以冒號結尾的情況是有的，
-     * 那種不該被當成標題搬走。
-     *
-     * @param string $text
-     * @return bool
-     */
-    private function looksLikeHeading($text)
-    {
-        if (mb_strlen($text) > self::HEADING_MAX_CHARS || mb_strpos($text, "\n") !== false) {
-            return false;
-        }
-
-        if (mb_substr($text, 0, 1) === '【') {
-            return true;
-        }
-
-        return in_array(mb_substr($text, -1), ['：', ':'], true);
-    }
-
-    /**
-     * 把過短的最後一則併回前一則
-     *
-     * 不做的話，結尾的「若還有不清楚的地方歡迎再告訴我們」會自己佔一則，
-     * 看起來像系統多送了一句廢話。
-     *
-     * @param array<int, string> $chunks
-     * @return array<int, string>
-     */
-    private function mergeShortTail(array $chunks)
-    {
-        $minTail = $this->answerSetting('min_tail');
-
-        if (count($chunks) < 2 || mb_strlen(end($chunks)) >= $minTail) {
-            return $chunks;
-        }
-
-        $tail = array_pop($chunks);
-        $chunks[count($chunks) - 1] .= "\n\n{$tail}";
-
-        return $chunks;
-    }
-
-    /**
-     * 讀分則設定，config 讀不到就用備用值
-     *
-     * 理由同 contextSetting()：config 快取沒更新時會整個變成 0，
-     * 差別是這裡失效只是退回「一則送完」，不像脈絡那樣難以察覺。
-     *
-     * @param string $key chunk_chars / min_tail
-     * @return int
-     */
-    private function answerSetting($key)
-    {
-        $value = config("auto_reply.answer.{$key}");
-
-        if (blank($value)) {
-            return (int) Arr::get(self::FALLBACK_ANSWER, $key);
-        }
-
-        return (int) $value;
-    }
 
     /**
      * 套用話術模板

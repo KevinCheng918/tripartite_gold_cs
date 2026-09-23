@@ -28,6 +28,7 @@
 | [features/auto-reply-natural.md](features/auto-reply-natural.md) | 自動回覆改版：intent 判斷（提問／需求／寒暄）、AI 承接句、移除反問選項 | **已完成，上線後要清話術** |
 | [features/knowledge-import.md](features/knowledge-import.md) | 主系統知識題庫 seeder（41 題：錯誤碼、加簽、回調、必填欄位、測試餘額沖正；已建過的不覆蓋） | **已完成，待跑 migration 與 seeder** |
 | [features/auto-reply-context.md](features/auto-reply-context.md) | 自動回覆帶對話脈絡（追問「這是什麼錯誤呢」時看得到前一則，求助單附前情） | 已完成 |
+| [features/auto-reply-learning.md](features/auto-reply-learning.md) | 假陰性回收（求助單候選按鈕一鍵用題庫原文回覆、自動累積客人的實際問法） | **已完成，待跑 migration** |
 | [features/login-log.md](features/login-log.md) | 登入紀錄（每帳號登入時間/IP/裝置/成敗） | 已完成 |
 | [features/task-board.md](features/task-board.md) | 任務看板（Kanban 五欄、封存系統、活動紀錄、多人指派、留言編輯、描述勾選清單、附件上傳） | 已完成（持續迭代） |
 | [features/broadcast.md](features/broadcast.md) | 群發公告（多站台 Telegram 群發、附圖、預約傳送） | 已完成（持續迭代） |
