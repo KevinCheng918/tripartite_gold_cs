@@ -55,8 +55,10 @@ return [
      *
      * 題庫異動（含支援群組回填）時會主動清掉，TTL 只是保險。
      * key 放這裡讓 Matcher 與 QuickReplyService 共用，不必互相 import。
+     *
+     * prompt 內容改版時要一起換 key（結尾的版號），否則舊的會留到 TTL 到期才換掉。
      */
-    'prompt_cache_key'     => 'auto_reply.prompt',
+    'prompt_cache_key'     => 'auto_reply.prompt.v2',
     'prompt_cache_seconds' => 300,
 
     /*
@@ -70,6 +72,25 @@ return [
      */
     'progress_cache_prefix'  => 'auto_reply.running.',
     'progress_cache_seconds' => 180,
+
+    /*
+     * 比對時要一起送進去的對話脈絡。
+     *
+     * 客人常常分兩則講一件事：先貼一長串系統異常訊息，再問「這是什麼錯誤呢」。
+     * 只送後面那一句進去，模型看不到任何可比對的內容，必然轉人工。
+     *
+     * ⚠ 時間窗是必要的：隔了半小時再問的那一句通常是新問題，
+     * 把舊對話帶進去只會讓模型往錯的方向找。
+     *
+     * 題庫走 prompt cache、脈絡放在 user message 這一側，所以不會讓快取失效。
+     */
+    'context' => [
+        'limit'     => 6,    // 往前幾則（不含客人現在這一則）
+        'minutes'   => 15,   // 只看這段時間內的
+        'max_chars' => 600,  // 單則截斷。系統異常訊息約 400 字，要能完整帶到
+        'total'     => 3000, // 整段脈絡上限，超過從最舊的開始丟
+        'ticket'    => 2,    // 求助單附的前情則數（送進 Telegram，太長會洗版）
+    ],
 
     /*
      * 備援 API 的單價（USD / 每百萬 token），用來估算備援花了多少錢。

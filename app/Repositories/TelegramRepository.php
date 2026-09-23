@@ -373,6 +373,41 @@ class TelegramRepository
     }
 
     /**
+     * 取得某個對話的近期訊息（自動回覆的脈絡用）
+     *
+     * 客人常常分兩則講一件事：先貼系統異常訊息，再問「這是什麼錯誤呢」。
+     * 只看後面那一句，模型沒有任何可比對的內容。
+     *
+     * 收、發都撈：客人也常在追問客服或 AI 剛說的話。
+     *
+     * 這裡是**倒著取再翻正** —— 直接正序取前 N 筆會拿到對話最開頭那幾則，
+     * 那是幾個月前的事。
+     *
+     * @param int      $groupId
+     * @param int|null $excludeId 客人現在這一則的 id，它自己不算脈絡
+     * @param int      $limit
+     * @param int      $minutes   只看這段時間內的；更早的多半是別的問題
+     * @return Collection 依時間正序（舊 → 新）
+     */
+    public function getRecentMessages($groupId, $excludeId, $limit, $minutes)
+    {
+        $query = TelegramMessage::query()
+            ->select(['id', 'direction', 'sender_name', 'content', 'media_type', 'created_at'])
+            ->where('telegram_group_id', $groupId)
+            ->where('created_at', '>=', now()->subMinutes($minutes));
+
+        // ⚠️ 一定要判斷有沒有值：`id <> NULL` 在 SQL 裡恆為 NULL，
+        // 整個 WHERE 會變成 false，一則都撈不到而且不會報錯
+        if (filled($excludeId)) {
+            $query->where('id', '<>', $excludeId);
+        }
+
+        $messages = $query->orderByDesc('id')->limit($limit)->get();
+
+        return $messages->reverse()->values();
+    }
+
+    /**
      * 取得群組內未回覆 inbound 訊息數量
      *
      * @param int $groupId

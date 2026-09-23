@@ -25,6 +25,18 @@ use Illuminate\Support\Facades\Log;
  */
 class AutoReplyService
 {
+    /**
+     * config 讀不到時的備用脈絡設定，理由見 contextSetting()。
+     *
+     * @var array
+     */
+    private const FALLBACK_CONTEXT = [
+        'limit'     => 6,
+        'minutes'   => 15,
+        'max_chars' => 600,
+        'total'     => 3000,
+    ];
+
     private $matcher;
     private $telegramRepository;
     private $quickReplyRepository;
@@ -64,16 +76,120 @@ class AutoReplyService
             return;
         }
 
-        $result = $this->matcher->resolve($text, ['group_id' => $group->id]);
+        // 脈絡要在比對之前取：客人常常分兩則講一件事（先貼錯誤訊息、再問
+        // 「這是什麼錯誤呢」），只送後面那一句進去必然比不到
+        $history = $this->buildHistory($group->id, $messageId);
+
+        $result = $this->matcher->resolve($text, [
+            'group_id' => $group->id,
+            'history'  => $history,
+        ]);
 
         // 比對器掛了（逾時、額度用盡、格式壞掉）—— 一律走人工，不要讓客人空等
         if (blank($result)) {
-            $this->replyWait($group, $text, null, $messageId);
+            $this->replyWait($group, $text, null, $messageId, [], $history);
 
             return;
         }
 
-        $this->dispatchResult($group, $result, $text, $messageId);
+        $this->dispatchResult($group, $result, $text, $messageId, $history);
+    }
+
+    /**
+     * 取這個對話的近期訊息，轉成一行一則的文字
+     *
+     * 格式化只做這一次 —— 送進模型的脈絡與求助單的前情用的是同一份，
+     * 同仁在支援群組看到的就等於模型看到的。
+     *
+     * @param int      $groupId
+     * @param int|null $messageId 客人現在這一則，它自己不算脈絡
+     * @return array<int, string> 依時間正序，舊的在前
+     */
+    private function buildHistory($groupId, $messageId)
+    {
+        $limit = $this->contextSetting('limit');
+
+        // 設定關掉（填 0）就整個不撈，省一趟查詢
+        if ($limit < 1) {
+            return [];
+        }
+
+        $messages = $this->telegramRepository->getRecentMessages(
+            $groupId,
+            $messageId,
+            $limit,
+            $this->contextSetting('minutes')
+        );
+
+        $inbound = config('constants.TELEGRAM.DIRECTION.INBOUND');
+        $maxChars = $this->contextSetting('max_chars');
+        $lines = [];
+
+        foreach ($messages as $message) {
+            $content = trim((string) $message->content);
+
+            // 圖片、檔案、語音沒有文字，但要讓模型知道上一則真的有東西 ——
+            // 整則跳過的話，客人問「這張圖是什麼意思」就會變成沒頭沒尾
+            if (blank($content)) {
+                $labels = config('constants.TELEGRAM.MEDIA_LABELS');
+                $content = Arr::get($labels, $message->media_type, Arr::get($labels, 'default'));
+            }
+
+            if (mb_strlen($content) > $maxChars) {
+                $content = mb_substr($content, 0, $maxChars) . '…（略）';
+            }
+
+            // 換行全部壓成空白：一則佔一行，模型才分得出哪裡是一則的開始
+            $content = preg_replace('/\s+/u', ' ', $content);
+
+            $lines[] = $message->direction === $inbound
+                ? "客人 {$message->sender_name}：{$content}"
+                : "客服：{$content}";
+        }
+
+        return $this->trimHistory($lines);
+    }
+
+    /**
+     * 砍到總長度上限內
+     *
+     * **從最舊的開始丟** —— 離客人這句話越近的越可能是他在指的東西。
+     *
+     * @param array<int, string> $lines
+     * @return array<int, string>
+     */
+    private function trimHistory(array $lines)
+    {
+        $total = $this->contextSetting('total');
+
+        while (count($lines) > 0 && mb_strlen(implode("\n", $lines)) > $total) {
+            array_shift($lines);
+        }
+
+        return $lines;
+    }
+
+    /**
+     * 讀脈絡設定，config 讀不到就用備用值
+     *
+     * ⚠️ 這個備用值是必要的：只要 config 快取沒跟著部署更新，
+     * `auto_reply.context.*` 全部會是 null，limit 變成 0 —— 功能**整個靜默關閉**，
+     * 不會報錯、不會寫 log，只是客人的追問又開始轉人工，很難察覺。
+     *
+     * 刻意填 0 關掉脈絡不會被蓋掉：blank(0) 是 false。
+     *
+     * @param string $key limit / minutes / max_chars / total
+     * @return int
+     */
+    private function contextSetting($key)
+    {
+        $value = config("auto_reply.context.{$key}");
+
+        if (blank($value)) {
+            return (int) Arr::get(self::FALLBACK_CONTEXT, $key);
+        }
+
+        return (int) $value;
     }
 
     /**
@@ -117,9 +233,10 @@ class AutoReplyService
      * @param array         $result
      * @param string        $text
      * @param int|null      $messageId
+     * @param array         $history   近期對話，轉人工時一起附進求助訊息
      * @return void
      */
-    private function dispatchResult(TelegramGroup $group, array $result, $text, $messageId)
+    private function dispatchResult(TelegramGroup $group, array $result, $text, $messageId, array $history = [])
     {
         $decision = $this->decide($result);
         $actions = config('constants.AUTO_REPLY.DECISION');
@@ -145,7 +262,7 @@ class AutoReplyService
             return;
         }
 
-        $this->replyWait($group, $text, $decision['opening'], $messageId, $result);
+        $this->replyWait($group, $text, $decision['opening'], $messageId, $result, $history);
     }
 
     /**
@@ -351,9 +468,10 @@ class AutoReplyService
      * @param string|null   $opening   承接句；沒有或被擋下時退回固定話術
      * @param int|null      $messageId
      * @param array         $result    比對器的輸出，附在求助訊息裡給同仁參考
+     * @param array         $history   近期對話，附在求助訊息裡讓同仁不用切視窗
      * @return void
      */
-    private function replyWait(TelegramGroup $group, $question, $opening, $messageId, array $result = [])
+    private function replyWait(TelegramGroup $group, $question, $opening, $messageId, array $result = [], array $history = [])
     {
         /*
          * 這裡以前有「5 分鐘內剛說過稍等就不再回」的冷卻，已移除。
@@ -374,7 +492,7 @@ class AutoReplyService
 
         $this->send($group, $content, false);
         $this->telegramRepository->updateAutoReplyState($group, null);
-        $this->supportService->openTicket($group, $question, $messageId, $this->buildHint($result));
+        $this->supportService->openTicket($group, $question, $messageId, $this->buildHint($result), $history);
     }
 
     /**

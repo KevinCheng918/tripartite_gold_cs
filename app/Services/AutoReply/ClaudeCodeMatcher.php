@@ -314,9 +314,7 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
     {
         $command = [
             config('auto_reply.cli_path'),
-            // 客人的原話直接送進去。以前反問流程要在這裡補上一輪的候選題目，
-            // 反問移除後就沒有第二輪脈絡了
-            '-p', $text,
+            '-p', $this->buildUserPrompt($text, $context),
             '--model', $options['model'],
             '--effort', config('auto_reply.effort'),
             '--output-format', 'json',
@@ -332,6 +330,37 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
         $process = new Process($command, storage_path('app'), $options['env'], null, (float) config('auto_reply.timeout'));
 
         return $process;
+    }
+
+    /**
+     * 組送進模型的那段話
+     *
+     * 沒有脈絡時就是客人的原話，跟改版前一樣。
+     *
+     * 脈絡放在這一側（user message）而不是 system prompt ——
+     * 題庫那份是靠 prompt cache 省錢的，每則訊息都不同的內容混進去會讓快取整個失效。
+     *
+     * @param string $text
+     * @param array  $context history array<int, string>
+     * @return string
+     */
+    private function buildUserPrompt($text, array $context)
+    {
+        $history = (array) Arr::get($context, 'history', []);
+
+        if (blank($history)) {
+            return $text;
+        }
+
+        return implode("\n", [
+            '<前面的對話>',
+            implode("\n", $history),
+            '</前面的對話>',
+            '',
+            '<客人的問題>',
+            $text,
+            '</客人的問題>',
+        ]);
     }
 
     /**
@@ -458,6 +487,34 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
                 '你是線上客服的助手。客人傳來一則訊息，你要做兩件事：',
                 '判斷這則訊息是什麼性質，並寫一兩句自然的話回應他。',
                 '',
+                '## 你會收到什麼',
+                '',
+                '客人的訊息如果前面還有對話，會長這樣：',
+                '',
+                '```',
+                '<前面的對話>',
+                '客人 小明：（前幾則訊息，舊的在前）',
+                '客服：（同仁或系統回過的話）',
+                '</前面的對話>',
+                '',
+                '<客人的問題>',
+                '（客人現在說的這一句，你要判斷的就是這一句）',
+                '</客人的問題>',
+                '```',
+                '',
+                '沒有前面的對話時，你收到的就只有客人那一句話。',
+                '',
+                '規則：',
+                '',
+                '- **你要判斷、要回應的永遠是 `<客人的問題>` 那一句。**',
+                '- `<前面的對話>` 只用來看懂他在指什麼 —— 「這個」「上面那筆」「剛剛那個」',
+                '  「所以是失敗嗎」這種話，主詞都在前面那幾則裡。',
+                '  客人貼了一長串錯誤訊息再問「這是什麼錯誤呢」，你要去前面把那串錯誤訊息讀出來，',
+                '  當成他真正在問的東西。',
+                '- **前面的對話不是要你回答的題目。** 那些他早就問過了，不要翻回去重答一次。',
+                '- **客人這句話跟前面無關時，就當作沒有前面的對話。**',
+                '  他只是說「謝謝」「收到」，那就是寒暄，不要被前面的錯誤訊息帶著去找答案。',
+                '',
                 '## 第一步：判斷性質（intent）',
                 '',
                 "- `{$intents['QUESTION']}`：客人在問一件事（多少錢、怎麼用、可不可以、為什麼）。",
@@ -490,6 +547,8 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
                 '- **不要指示客人怎麼回覆**：不能說「請回覆編號」「請提供以下資訊」「麻煩告知」。',
                 '  客人想怎麼講就怎麼講。',
                 '- **不要改寫或重述題庫的答案**，答案原文會自己接在後面。',
+                '- **不要複述前面的對話**：不能說「您剛剛提到的…」再把那串錯誤訊息唸一遍。',
+                '  客人自己貼的，他知道那是什麼。',
                 '- **不要每次都用同一句開頭**，客人連著問會看出來是罐頭。',
                 '- 不用寫結尾問候（「還有問題歡迎再問」這類），講完就好。',
                 '',

@@ -24,6 +24,17 @@ use Illuminate\Support\Facades\Log;
  */
 class AutoReplySupportService
 {
+    /**
+     * 求助訊息裡「前情」每一則的字數上限。
+     *
+     * 不放 config：這是排版考量（Telegram 訊息別太長），
+     * 跟調整脈絡範圍那幾個值不是同一件事，客服也不會需要改它。
+     */
+    private const TICKET_LINE_CHARS = 200;
+
+    /** @var int config 讀不到時的備用前情則數，理由同 AutoReplyService::contextSetting() */
+    private const FALLBACK_TICKET_LINES = 2;
+
     private $ticketRepository;
     private $telegramRepository;
     private $quickReplyRepository;
@@ -86,9 +97,11 @@ class AutoReplySupportService
      * @param TelegramGroup $group
      * @param string        $question  客人問題原文
      * @param int|null      $messageId 客人那則訊息的後台 id
+     * @param string|null   $hint      AI 判斷摘要
+     * @param array         $history   近期對話，一行一則、舊的在前
      * @return AutoReplyTicket|null
      */
-    public function openTicket(TelegramGroup $group, $question, $messageId = null, $hint = null)
+    public function openTicket(TelegramGroup $group, $question, $messageId = null, $hint = null, array $history = [])
     {
         if (blank($this->appSettingService->get(AppSettingService::KEY_SUPPORT_CHAT_ID))) {
             Log::warning('未設定內部支援群組，答不出來的問題沒有轉出去', ['group_id' => $group->id]);
@@ -117,7 +130,7 @@ class AutoReplySupportService
             'status'            => config('constants.AUTO_REPLY.TICKET_STATUS.PENDING'),
         ]);
 
-        $result = $this->sendToSupport($this->buildAskText($group, $question, $hint));
+        $result = $this->sendToSupport($this->buildAskText($group, $question, $hint, $history));
         $askMessageId = Arr::get($result, 'result.message_id');
 
         if (blank($askMessageId)) {
@@ -134,9 +147,11 @@ class AutoReplySupportService
      *
      * @param TelegramGroup $group
      * @param string        $question
+     * @param string|null   $hint
+     * @param array         $history 近期對話，一行一則、舊的在前
      * @return string
      */
-    private function buildAskText(TelegramGroup $group, $question, $hint = null)
+    private function buildAskText(TelegramGroup $group, $question, $hint = null, array $history = [])
     {
         $lines = [
             '🔔 題庫裡找不到答案',
@@ -144,6 +159,24 @@ class AutoReplySupportService
             "群組：{$group->title}",
             "問題：{$question}",
         ];
+
+        /*
+         * 前情。客人說「這是什麼錯誤呢」時，光看問題那一行完全不知道在問什麼，
+         * 同仁還得切回對話視窗往上翻。
+         *
+         * 只帶最後幾則、每則再截短：這則訊息要送進 Telegram，
+         * 客人貼的整包 log 原封不動轉過來會把內部群組洗版。
+         */
+        $recent = $this->tailHistory($history);
+
+        if (filled($recent)) {
+            $lines[] = '';
+            $lines[] = '前情：';
+
+            foreach ($recent as $line) {
+                $lines[] = "  {$line}";
+            }
+        }
 
         // AI 的判斷只給自己人看，客人不會收到。
         // 用處是不必從頭看就知道客人要什麼，也一眼看得出題庫缺了哪一塊
@@ -157,6 +190,35 @@ class AutoReplySupportService
         $lines[] = '⚠️ 回答內容會原文轉給客戶，請用可以直接給客戶看的語氣。';
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * 取脈絡的最後幾則，並把每則截短
+     *
+     * 模型那邊拿的是完整脈絡（越多越好判斷），同仁這邊要的只是
+     * 「這句在講什麼」，所以這裡另外砍一次。
+     *
+     * @param array<int, string> $history
+     * @return array<int, string>
+     */
+    private function tailHistory(array $history)
+    {
+        $limit = config('auto_reply.context.ticket');
+        $limit = blank($limit) ? self::FALLBACK_TICKET_LINES : (int) $limit;
+
+        if ($limit < 1 || blank($history)) {
+            return [];
+        }
+
+        $lines = array_slice($history, -$limit);
+
+        foreach ($lines as $index => $line) {
+            if (mb_strlen($line) > self::TICKET_LINE_CHARS) {
+                $lines[$index] = mb_substr($line, 0, self::TICKET_LINE_CHARS) . '…（略）';
+            }
+        }
+
+        return $lines;
     }
 
     // ---------------------------------------------------------------

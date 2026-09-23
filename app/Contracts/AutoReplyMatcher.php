@@ -24,7 +24,10 @@ interface AutoReplyMatcher
      *
      * @param string $text    客人的話
      * @param array  $context 額外脈絡，目前支援：
-     *                        group_id int 觸發的對話（記錄用量用）
+     *                        group_id int                觸發的對話（記錄用量用）
+     *                        history  array<int, string>  近期對話，一行一則、舊的在前。
+     *                                                     客人說「這是什麼錯誤呢」時，
+     *                                                     他指的東西在前一則裡
      * @return array|null 比對結果，失敗（逾時、額度用盡、格式錯誤）時回 null：
      *                    intent     string      question / request / chat
      *                    item_id    int|null    命中的題庫 id；非 question 時為 null
