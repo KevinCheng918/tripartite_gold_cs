@@ -390,24 +390,10 @@ class AutoReplySupportService
             return;
         }
 
-        $statuses = config('constants.AUTO_REPLY.TICKET_STATUS');
+        $learned = $this->closeTicketWithItem($ticket, $item);
 
-        $this->ticketRepository->update($ticket, [
-            'status'              => $statuses['REPLIED'],
-            'answer'              => $item->answer,
-            'quick_reply_item_id' => $item->id,
-            'answered_at'         => now(),
-        ]);
-
-        // 記問法樣本。重複的句子不會再存一筆
-        $learned = $this->quickReplyRepository->addPhrasing(
-            $item->id,
-            $ticket->question,
-            $ticket->telegram_group_id,
-            config('constants.QUICK_REPLY.PHRASING_SOURCE.SUPPORT')
-        );
-
-        // 題庫內容變了就要清 prompt 快取，否則模型要等 TTL 過了才看得到新問法
+        // 題庫內容變了就要清 prompt 快取，否則模型要等 TTL 過了才看得到新問法。
+        // 放在交易外：清快取不是 DB 操作，rollback 也收不回來
         if (filled($learned)) {
             $this->quickReplyService->flushMatchPrompt();
         }
@@ -420,6 +406,49 @@ class AutoReplySupportService
         }
 
         $this->editSupportMessage($messageId, implode("\n", $lines));
+    }
+
+    /**
+     * 結掉求助單並記下問法樣本
+     *
+     * 兩張表要同生共死：單子標成已回覆、樣本卻沒寫進去的話，這次沒命中就
+     * 完全白費了（客人下次同樣問法還是會轉人工），而且不會有任何跡象。
+     *
+     * ⚠️ **送訊息給客人刻意排在交易外面**（呼叫端已經送完才進來）——
+     * 把 Telegram API 包進交易裡，網路一慢就是整個交易掛在那裡等。
+     *
+     * @param AutoReplyTicket $ticket
+     * @param object          $item
+     * @return \App\Models\QuickReplyPhrasing|null 新記下的樣本；重複或失敗時為 null
+     */
+    private function closeTicketWithItem(AutoReplyTicket $ticket, $item)
+    {
+        try {
+            return DB::transaction(function () use ($ticket, $item) {
+                $this->ticketRepository->update($ticket, [
+                    'status'              => config('constants.AUTO_REPLY.TICKET_STATUS.REPLIED'),
+                    'answer'              => $item->answer,
+                    'quick_reply_item_id' => $item->id,
+                    'answered_at'         => now(),
+                ]);
+
+                // 同一題已經有一模一樣的句子時回 null，那不是失敗
+                return $this->quickReplyRepository->addPhrasing(
+                    $item->id,
+                    $ticket->question,
+                    $ticket->telegram_group_id,
+                    config('constants.QUICK_REPLY.PHRASING_SOURCE.SUPPORT')
+                );
+            });
+        } catch (\Exception $e) {
+            Log::error('求助單結案與記錄問法失敗', [
+                'ticket_id' => $ticket->id,
+                'item_id'   => $item->id,
+                'error'     => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 
     /**

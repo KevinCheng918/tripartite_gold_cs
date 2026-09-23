@@ -24,9 +24,16 @@ class QuickReplyItemResource extends JsonResource
             'answer'      => $this->answer,
             'sort'        => $this->sort,
             'status'      => $this->status,
-            // 客人問過的說法有幾筆。只在管理列表帶出來（whenCounted），
-            // 聊天視窗的選單不需要這個數字
-            'phrasing_count' => $this->whenCounted('phrasings'),
+            /*
+             * 客人問過的說法有幾筆。只在管理列表帶出來（那邊才有 withCount），
+             * 聊天視窗的選單不需要這個數字。
+             *
+             * ⚠ 不能用 whenCounted() —— 那是 Laravel 9 才有的，本專案是 8。
+             *
+             * 這裡 filled() 剛好是對的判斷：沒 withCount 時取到 null（不輸出），
+             * 真的是 0 筆時 filled(0) 為 true 會輸出 0。
+             */
+            'phrasing_count' => $this->when(filled($this->phrasings_count), $this->phrasings_count),
         ];
     }
 }
