@@ -225,11 +225,29 @@ inline 無法表達 `[data-theme="dark"]` 選擇器。
 
 ## 首屏載入（2026-09-29）
 
-進頁面會「卡一下」卡片才出現 —— 卡片是進頁面後才用 ajax 撈的，在那之前
-五欄完全空白，看起來像當掉。後端不是瓶頸（`getBoard()` 實測 12ms、6 次查詢，
-eager loading 都有做），問題純粹在前端流程。
+進頁面會「卡一下」卡片才出現。後端不是瓶頸 —— `getBoard()` 實測 12ms、
+6 次查詢，eager loading 都有做。**延遲全部來自前端的載入順序。**
 
-兩件事：
+### 首屏資料內嵌（最有效的一項）
+
+第一版只加了骨架，結果回報「還是會等，而且原本不覺得、現在反而明顯」——
+骨架只是把等待變得**可見**，沒有把它變短。
+
+真正的解法是**不要等那趟 ajax**：`index()` 直接把五欄資料傳給 view，
+blade 內嵌成 `window.__boardData`，`loadBoard()` 首次就拿它來畫。
+
+- 後端的 `buildBoard()` 由 `index()` 與 `ajaxBoard()` 共用，
+  **格式必須一致** —— 前端兩種來源都走同一支 `renderBoard()`
+- 內嵌那份是**預設條件**（無篩選、`created_desc`）產生的。
+  `takeInlineBoard()` 會檢查 localStorage 記的排序與篩選欄位，
+  只要跟預設不同就丟掉它、乖乖發 ajax
+- 內嵌資料**只用一次**，之後的重載一定要拿最新的
+
+> 取捨：任務很多時內嵌的 JSON 會讓 HTML 變大。但同樣的資料走 ajax 也一樣大，
+> 而 HTML 有 gzip、又省掉一趟往返，所以仍然划算。
+> 真的多到卡頓時，瓶頸會變成前端渲染，那要另外處理（虛擬捲動或分頁）。
+
+### 剩下兩件
 
 ### 骨架卡
 
@@ -244,17 +262,24 @@ eager loading 都有做），問題純粹在前端流程。
 > 原本只有 `success`，加了骨架之後請求一失敗，骨架就會永遠閃在那裡，
 > 看起來像永遠載不完。
 
-### TinyMCE 改成 defer
+### TinyMCE 用 async（**不能用 defer**）
 
 `tinymce.min.js` 有 **422KB**，但只有開「新增任務」或編輯描述時才用得到。
-原本是同步載入，瀏覽器會停下來等它下載完才繼續解析與繪製，
-看板卡片也跟著晚一步，而且它還跟看板的 ajax 搶頻寬。
 
-> ⚠️ **defer 的執行順序是「HTML 解析完之後」，所以後面那支 inline script
-> 反而會先跑。** 這裡之所以安全，是因為所有 `tinymce.*` 都寫在函式或事件
-> 回呼裡，沒有一處在頂層立即執行 —— 真要在頂層用到就得把 defer 拿掉。
-> 使用者也不會「太早」點到：defer 保證在 `DOMContentLoaded` 之前執行完，
-> 而按鈕要等頁面可互動才按得到。
+> ⚠️ **這裡用 defer 是沒有用的。**
+> defer 雖然不阻塞解析，但 **`DOMContentLoaded` 必須等所有 defer script 執行完**
+> —— 而看板掛在 jQuery ready（就是 `DOMContentLoaded`）上，
+> 等於卡片還是要等這 422KB 下載完才畫得出來。第一版就是栽在這裡。
+> `async` 完全不參與 `DOMContentLoaded`，看板才真的不受它影響。
+
+代價是 async 不保證何時載完，所以**每一處 `tinymce.*` 都要防護**：
+
+- 初始化一律走 `whenTinyReady()`（輪詢，10 秒放棄，不無止境空轉）
+- 讀內容的地方退回讀 `textarea` 的原值，至少不會存成空字串
+- `hidden.bs.modal` 的清理先判斷 `window.tinymce`，沒載好就沒東西要收
+
+> 所有 `tinymce.*` 都寫在函式或事件回呼裡，沒有一處在頂層立即執行 ——
+> 真要在頂層用到就得改回同步載入。
 
 ## 注意事項
 - `assignee_ids` JSON 欄位可能存整數或字串，查詢時需同時用 `whereJsonContains` 比對 int 和 string

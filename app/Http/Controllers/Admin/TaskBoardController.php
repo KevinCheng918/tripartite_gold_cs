@@ -61,7 +61,50 @@ class TaskBoardController extends Controller
             'assignees' => $assignees,
             'stations'  => $stations,
             'systems'   => $systems,
+            // 首屏的卡片直接跟著頁面送出去，前端就不必再等一趟 ajax。
+            // 用預設條件（無篩選、created_desc）—— 前端若記著別的排序會自己重載
+            'board'     => $this->buildBoard([]),
         ]);
+    }
+
+    /**
+     * 組五欄的看板資料
+     *
+     * 頁面首屏與 ajax 共用同一份，格式必須一致 ——
+     * 前端拿到哪一種都是走同一支 render。
+     *
+     * @param array $params project_id / assignee_id / priority / keyword / sort
+     * @return array<string, \Illuminate\Http\Resources\Json\AnonymousResourceCollection>
+     */
+    private function buildBoard(array $params)
+    {
+        $user = Auth::user();
+        $isAdmin = (int) $user->level === config('constants.USER.LEVEL.ADMIN');
+        $params['user_project_ids'] = $isAdmin ? [] : ($user->project_ids ?? [-1]);
+        $board = $this->taskBoardService->getBoard($params);
+
+        // 預載所有 assignee 使用者（避免 N+1）
+        $allIds = [];
+
+        foreach ($board as $tasks) {
+            foreach ($tasks as $task) {
+                $ids = $task->assignee_ids ?? [];
+
+                foreach ($ids as $id) {
+                    $allIds[] = (int) $id;
+                }
+            }
+        }
+
+        TaskResource::preloadUsers(array_unique($allIds));
+
+        return [
+            'pending'     => TaskResource::collection($board['pending']),
+            'in_progress' => TaskResource::collection($board['in_progress']),
+            'testing'     => TaskResource::collection($board['testing']),
+            'in_review'   => TaskResource::collection($board['in_review']),
+            'resolved'    => TaskResource::collection($board['resolved']),
+        ];
     }
 
     /**
@@ -73,28 +116,8 @@ class TaskBoardController extends Controller
     public function ajaxBoard(Request $request)
     {
         $params = $request->only(['project_id', 'assignee_id', 'priority', 'keyword', 'sort']);
-        $user = Auth::user();
-        $isAdmin = (int) $user->level === config('constants.USER.LEVEL.ADMIN');
-        $params['user_project_ids'] = $isAdmin ? [] : ($user->project_ids ?? [-1]);
-        $board = $this->taskBoardService->getBoard($params);
 
-        // 預載所有 assignee 使用者（避免 N+1）
-        $allIds = [];
-        foreach ($board as $tasks) {
-            foreach ($tasks as $task) {
-                $ids = $task->assignee_ids ?? [];
-                foreach ($ids as $id) { $allIds[] = (int) $id; }
-            }
-        }
-        TaskResource::preloadUsers(array_unique($allIds));
-
-        return response()->json([
-            'pending'     => TaskResource::collection($board['pending']),
-            'in_progress' => TaskResource::collection($board['in_progress']),
-            'testing'     => TaskResource::collection($board['testing']),
-            'in_review'   => TaskResource::collection($board['in_review']),
-            'resolved'    => TaskResource::collection($board['resolved']),
-        ]);
+        return response()->json($this->buildBoard($params));
     }
 
     /**

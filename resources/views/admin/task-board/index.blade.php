@@ -13,6 +13,13 @@
          載入順序跟原本的 inline <style> 一樣，特異性不會變 --}}
     <link rel="stylesheet" href="{{ asset('css/task-board.css') }}?v={{ filemtime(public_path('css/task-board.css')) }}">
 
+    {{-- 首屏的卡片跟著頁面一起送出來，前端就不必再等一趟 ajax。
+         進頁面會「空一下」的主因就是那趟往返 —— 後端查詢本身只要十幾毫秒。
+         內容是預設條件（無篩選、created_desc）；前端若記著別的排序會自己重載。 --}}
+    <script>
+        window.__boardData = @json($board);
+    </script>
+
     {{-- 篩選列 --}}
     <div class="mb-3 p-3 rounded shadow-sm taskboard-toolbar">
         <div class="d-flex gap-2 align-items-center mb-2">
@@ -508,7 +515,82 @@ $(function () {
         });
     }
 
+    /**
+     * 把五欄的資料畫出來
+     *
+     * 首屏內嵌的資料與 ajax 回來的資料格式相同（後端共用 buildBoard()），
+     * 所以兩邊都走這一支。
+     *
+     * @param {Object} data pending / in_progress / testing / in_review / resolved
+     */
+    function renderBoard(data) {
+        var columns = {
+            pending: data.pending || [],
+            in_progress: data.in_progress || [],
+            testing: data.testing || [],
+            in_review: data.in_review || [],
+            resolved: data.resolved || []
+        };
+
+        var statusKeys = { pending: 1, in_progress: 2, testing: 3, in_review: 4, resolved: 5 };
+
+        var onlyOverdue = $('#filter-overdue').is(':checked');
+        var today = new Date().toISOString().substring(0, 10);
+
+        Object.keys(columns).forEach(function (key) {
+            var tasks = columns[key];
+            if (onlyOverdue) {
+                tasks = tasks.filter(function (t) { return t.due_date && t.due_date < today; });
+            }
+            var listId = statusListMap[statusKeys[key]];
+            var countId = statusCountMap[statusKeys[key]];
+            var html = '';
+            tasks.forEach(function (t) { html += renderCard(t); });
+            $('#' + listId).html(html || '<p class="text-muted text-center py-3" style="font-size:0.8125rem">無任務</p>');
+            $('#' + countId).text(tasks.length);
+        });
+
+        bindCardClick();
+        initSortable();
+    }
+
+    /**
+     * 取出首屏內嵌的資料（只能用一次）
+     *
+     * 進頁面會「空一下」的主因是那趟 ajax 往返 —— 後端查詢本身只要十幾毫秒。
+     * 首屏的資料跟著 HTML 一起送過來了，直接畫就好。
+     *
+     * 但它是用**預設條件**產生的，所以下列情況不能用，要乖乖發 ajax：
+     *   - 使用者在 localStorage 記了別的排序
+     *   - 帶了篩選條件（理論上首次進頁面不會有，保險起見一起判斷）
+     *
+     * @return {Object|null}
+     */
+    function takeInlineBoard() {
+        var data = window.__boardData;
+
+        // 只用一次：之後的重新載入一定要拿最新的
+        window.__boardData = null;
+
+        if (!data) { return null; }
+
+        var isDefaultSort = $('#filter-sort-field').val() === 'created'
+            && $('#filter-sort-dir').val() === 'desc';
+        var hasFilter = !!($('#filter-project').val() || $('#filter-assignee').val()
+            || $('#filter-priority').val() || $('#filter-keyword').val());
+
+        return (isDefaultSort && !hasFilter) ? data : null;
+    }
+
     function loadBoard() {
+        var inline = takeInlineBoard();
+
+        if (inline) {
+            renderBoard(inline);
+
+            return;
+        }
+
         showBoardSkeleton();
 
         var params = {};
@@ -528,34 +610,7 @@ $(function () {
             data: params,
             headers: { 'X-CSRF-TOKEN': csrfToken },
             success: function (data) {
-                var columns = {
-                    pending: data.pending || [],
-                    in_progress: data.in_progress || [],
-                    testing: data.testing || [],
-                    in_review: data.in_review || [],
-                    resolved: data.resolved || []
-                };
-
-                var statusKeys = { pending: 1, in_progress: 2, testing: 3, in_review: 4, resolved: 5 };
-
-                var onlyOverdue = $('#filter-overdue').is(':checked');
-                var today = new Date().toISOString().substring(0, 10);
-
-                Object.keys(columns).forEach(function (key) {
-                    var tasks = columns[key];
-                    if (onlyOverdue) {
-                        tasks = tasks.filter(function (t) { return t.due_date && t.due_date < today; });
-                    }
-                    var listId = statusListMap[statusKeys[key]];
-                    var countId = statusCountMap[statusKeys[key]];
-                    var html = '';
-                    tasks.forEach(function (t) { html += renderCard(t); });
-                    $('#' + listId).html(html || '<p class="text-muted text-center py-3" style="font-size:0.8125rem">無任務</p>');
-                    $('#' + countId).text(tasks.length);
-                });
-
-                bindCardClick();
-                initSortable();
+                renderBoard(data);
             },
             // 沒有這段的話，請求失敗時骨架會一直閃在那裡，看起來像永遠載不完。
             // session 過期（401／419）由 common.js 的全域 ajaxError 接手提示，
@@ -1004,17 +1059,21 @@ $(function () {
                 var val = t[fieldName] || '';
                 var editorId = 'panel-editor-' + Date.now();
                 $valueDiv.html('<textarea id="' + editorId + '">' + val + '</textarea><div class="d-flex gap-2 mt-1">' + editConfirmBtn + editCancelBtn + '</div>');
-                tinymce.init(getTinyConfig({ selector: '#' + editorId, height: 250 }));
+                // TinyMCE 是 async 載入的，可能還沒到位
+                whenTinyReady(function () {
+                    tinymce.init(getTinyConfig({ selector: '#' + editorId, height: 250 }));
+                });
 
                 $valueDiv.find('.js-edit-confirm').on('click', function (e) {
                     e.stopPropagation();
-                    var editor = tinymce.get(editorId);
-                    saveField(fieldName, editor ? editor.getContent() : '');
+                    var editor = window.tinymce ? tinymce.get(editorId) : null;
+                    // 編輯器沒起來時退回讀 textarea 的原值，至少不會存成空字串
+                    saveField(fieldName, editor ? editor.getContent() : $('#' + editorId).val());
                     if (editor) editor.remove();
                 });
                 $valueDiv.find('.js-edit-cancel').on('click', function (e) {
                     e.stopPropagation();
-                    var editor = tinymce.get(editorId);
+                    var editor = window.tinymce ? tinymce.get(editorId) : null;
                     if (editor) editor.remove();
                     $valueDiv.html(originalHtml);
                 });
@@ -1997,7 +2056,9 @@ $(function () {
         formData.append('project_id', $('#task-project').val());
         if ($('#task-station').val()) formData.append('station_id', $('#task-station').val());
         formData.append('title', $('#task-title').val());
-        var descContent = tinymce.get('task-description') ? tinymce.get('task-description').getContent() : $('#task-description').val();
+        // TinyMCE 是 async 載入的，沒起來就直接讀 textarea
+        var descEditor = window.tinymce ? tinymce.get('task-description') : null;
+        var descContent = descEditor ? descEditor.getContent() : $('#task-description').val();
         if (descContent) formData.append('description', descContent);
         formData.append('priority', $('input[name="task_priority"]:checked').val());
         $('.js-assignee-check:checked').each(function () { formData.append('assignee_ids[]', $(this).val()); });
@@ -2060,18 +2121,19 @@ $(function () {
     $uploadUrl = route('admin.task-board.ajax-upload-editor-image');
     $csrf = csrf_token();
 @endphp
-{{-- defer：這支 422KB，但只有開「新增任務」或編輯描述時才用得到。
-     沒有 defer 的話瀏覽器會停下來等它下載完才繼續解析與繪製，
-     看板的卡片也要跟著晚一步出現（而且它還會跟看板的 ajax 搶頻寬）。
+{{-- async：這支 422KB，但只有開「新增任務」或編輯描述時才用得到。
 
-     ⚠ defer 的執行順序是「HTML 解析完之後」，所以**後面那支 inline script
-     反而會先跑**。這裡之所以安全，是因為下面所有 tinymce.* 都寫在函式或
-     事件回呼裡，沒有任何一處在頂層立即執行。
-     真要在頂層用到 tinymce 的話，這個 defer 就得拿掉。
+     ⚠ 這裡**不能用 defer**。defer 雖然不阻塞解析，但 DOMContentLoaded 必須
+     等所有 defer script 執行完 —— 而看板是掛在 jQuery ready（= DOMContentLoaded）
+     上的，等於卡片還是要等這 422KB 下載完才畫得出來。
+     async 完全不參與 DOMContentLoaded，看板才真的不受它影響。
 
-     使用者也不會「太早」點到 —— defer 保證在 DOMContentLoaded 之前執行完，
-     而按鈕要等頁面可互動才按得到。 --}}
-<script src="{{ $tinyBase }}/tinymce.min.js" referrerpolicy="origin" defer></script>
+     代價是 async 不保證何時載完，可能晚於使用者點「新增任務」的時間，
+     所以初始化一律走 whenTinyReady()。
+
+     下面所有 tinymce.* 都寫在函式或事件回呼裡，沒有一處在頂層立即執行 ——
+     真要在頂層用到就得改回同步載入。 --}}
+<script src="{{ $tinyBase }}/tinymce.min.js" referrerpolicy="origin" async></script>
 <script>
 // 描述內容樣式來自 public/css/task-content.css，編輯器與詳情面板共用同一份
 var TASK_CONTENT_CSS_URL = '{{ asset('css/task-content.css') }}?v={{ filemtime(public_path('css/task-content.css')) }}';
@@ -2133,7 +2195,8 @@ function uploadErrorMessage(body) {
  * @param {string} message
  */
 function notifyEditorError(message) {
-    var editor = tinymce.activeEditor;
+    // 只有編輯器活著時才會走到這裡，但 async 載入下還是判斷一次比較保險
+    var editor = window.tinymce ? tinymce.activeEditor : null;
     if (editor && editor.notificationManager) {
         editor.notificationManager.open({ text: message, type: 'error' });
 
@@ -2284,13 +2347,47 @@ function getTinyConfig(overrides) {
     return config;
 }
 
+/**
+ * 等 TinyMCE 載好再執行
+ *
+ * 它是 async 載入的（理由見那支 script 上的註解），所以可能還沒到位。
+ * 實務上 422KB 在使用者點開 Modal 之前多半已經好了，這裡只是保險。
+ *
+ * @param {Function} callback
+ */
+function whenTinyReady(callback) {
+    if (window.tinymce) {
+        callback();
+
+        return;
+    }
+
+    var tries = 0;
+    var timer = setInterval(function () {
+        if (window.tinymce) {
+            clearInterval(timer);
+            callback();
+
+            return;
+        }
+
+        // 10 秒還沒好就放棄，不要無止境地空轉
+        if (++tries > 200) { clearInterval(timer); }
+    }, 50);
+}
+
 // Modal 打開時初始化 TinyMCE
 $('#modal-task').on('shown.bs.modal', function () {
-    if (!tinymce.get('task-description')) {
-        tinymce.init(getTinyConfig({ selector: '#task-description' }));
-    }
+    whenTinyReady(function () {
+        if (!tinymce.get('task-description')) {
+            tinymce.init(getTinyConfig({ selector: '#task-description' }));
+        }
+    });
 });
 $('#modal-task').on('hidden.bs.modal', function () {
+    // 沒載好就沒有東西要收
+    if (!window.tinymce) { return; }
+
     var editor = tinymce.get('task-description');
     if (editor) editor.remove();
 });
