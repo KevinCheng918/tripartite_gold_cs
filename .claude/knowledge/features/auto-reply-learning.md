@@ -2,7 +2,7 @@
 
 ## 現況
 
-已完成，**待跑 migration**。
+已完成並上線（`quick_reply_phrasing` 表已建立）。
 
 ## 問題
 
