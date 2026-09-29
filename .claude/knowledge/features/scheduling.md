@@ -89,7 +89,16 @@
 
 > ⚠️ **`.ts-select` 的 `font-size` 不可以小於 16px。**
 > iOS Safari 在聚焦字級小於 16px 的表單元件時，會自動把整個頁面放大，
-> 使用者得手動縮回去。
+> 使用者得手動縮回去。現在設 `1.125rem`（18px）——
+> **展開後是一長串純數字（時 24 項、分 60 項），選單裡每一項的字級是跟著
+> select 走的**，所以放大這裡就等於放大整份選單，掃讀會輕鬆很多。
+> 另外加了 `font-variant-numeric: tabular-nums`，個位數與十位數才不會左右跳動。
+
+> ⚠️ **深色模式下 `.ts-select` 要加 `color-scheme: dark`。**
+> 展開的選單是瀏覽器畫的原生 popup，CSS 選不到它的內容 ——
+> 不加的話深色背景上會彈出一片白底的清單。
+> 特異性要贏過 `custom.css` 的 `.form-select`（那裡有 `font-size: 1rem`），
+> 用 `.ts-wrap .ts-select` 兩層剛好夠，而且 app.css 本來就排在 custom.css 後面。
 
 ## 分層檔案
 

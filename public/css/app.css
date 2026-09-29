@@ -1368,13 +1368,30 @@ input[type="time"].form-control {
     /* 不要讓它撐滿：時間只有兩位數，拉寬之後「時」和「分」會離很遠，
        視覺上看不出是同一組 */
     width: auto;
-    min-width: 4.75rem;
-    /* ⚠ 不可以小於 16px —— iOS Safari 在聚焦字級小於 16px 的表單元件時，
+    min-width: 5.25rem;
+    /* 展開後是一長串純數字（時 24 項、分 60 項），字級跟一般內文一樣大的話
+       很難掃讀 —— 選單裡每一項的字級是跟著 select 走的，所以放大這裡就等於
+       放大整份選單。
+       ⚠ 另外也不可以小於 16px：iOS Safari 在聚焦字級小於 16px 的表單元件時，
        會自動把整個頁面放大，使用者得手動縮回去 */
-    font-size: 1rem;
+    font-size: 1.125rem;
+    /* 數字用等寬字，個位數與十位數才不會左右跳動 */
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    /* 觸控目標拉高一點，手機上比較好點 */
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+}
+
+/* 展開的選單是瀏覽器畫的原生 popup，CSS 選不到它的內容 ——
+   只有 color-scheme 能讓它跟著頁面變深色，
+   否則深色背景上會彈出一片白底的清單。 */
+[data-theme="dark"] .ts-wrap .ts-select {
+    color-scheme: dark;
 }
 
 .ts-separator {
+    font-size: 1.125rem;
     font-weight: 600;
     opacity: 0.6;
 }
@@ -1382,7 +1399,7 @@ input[type="time"].form-control {
 /* 回訊時間是「起 ~ 迄」兩組並排，手機上四個下拉擠不下，讓它換行 */
 @media (max-width: 575.98px) {
     .ts-wrap .ts-select {
-        min-width: 4.25rem;
+        min-width: 4.75rem;
         padding-right: 1.75rem;
     }
 }
