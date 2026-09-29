@@ -55,6 +55,15 @@ if (intercepted) { return intercepted; }
 > 有些情況（例如被導到登入頁的 HTML）body 根本不是 JSON，
 > 先 parse 會先炸在 SyntaxError 上，攔不到真正的原因。
 
+> ⚠️ **jQuery 的 `$.ajax` 要另外攔。**（2026-09-29 補）
+> 任務看板、帳號、站台、虛擬機等**十幾個頁面走的是 jQuery 而不是 apiFetch**，
+> 只改 apiFetch 的話那些頁面 session 過期時依然靜悄悄。
+> `common.js` 加一個全域 `$(document).ajaxError`，一次涵蓋所有 `$.ajax`，
+> 不必去改每一支呼叫。jqXHR 有 `status` 屬性，`isExpired()` 只看 status，
+> 直接吃得下。
+>
+> jQuery 在 layout 的第 500 行、`common.js` 在 509 行 —— 順序是對的。
+
 其他細節：
 
 - 提示視窗**動態建立**而不是寫在 layout —— 各頁面的訊息 Modal id 都不一樣

@@ -376,6 +376,21 @@
         }
     };
 
+    /*
+     * jQuery 的 $.ajax 也要攔。
+     *
+     * 任務看板、帳號、站台、虛擬機等十幾個頁面走的是 jQuery 而不是各自的
+     * apiFetch —— 只改 apiFetch 的話，那些頁面 session 過期時依然是靜悄悄的。
+     *
+     * ajaxError 是全域事件，一次涵蓋所有 $.ajax，不必去改每一支呼叫。
+     * jqXHR 有 status 屬性，isExpired() 只看 status，所以直接吃得下。
+     */
+    if (window.jQuery) {
+        window.jQuery(document).ajaxError(function (event, xhr) {
+            if (window.AuthGuard.isExpired(xhr)) { window.AuthGuard.notify(); }
+        });
+    }
+
     // ---------------------------------------------------------------
     //  Session 心跳
     // ---------------------------------------------------------------

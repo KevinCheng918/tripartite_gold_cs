@@ -79,35 +79,37 @@
                 <span><i class="fas fa-inbox me-2"></i>{{ trans('task_board.status_pending') }}</span>
                 <span class="badge bg-secondary" id="count-pending">0</span>
             </div>
-            <div class="card-list" id="list-pending"></div>
+            {{-- 骨架卡：卡片是進頁面後才用 ajax 撈的，五欄空著的那一秒看起來像當掉。
+                 loadBoard() 成功後會整個 html() 覆蓋掉，不需要另外清 --}}
+            <div class="card-list" id="list-pending">@include('admin.task-board.partials.skeleton')</div>
         </div>
         <div class="kanban-column col-in-progress" data-status="2">
             <div class="column-header">
                 <span><i class="fas fa-spinner me-2"></i>{{ trans('task_board.status_in_progress') }}</span>
                 <span class="badge bg-primary" id="count-in-progress">0</span>
             </div>
-            <div class="card-list" id="list-in-progress"></div>
+            <div class="card-list" id="list-in-progress">@include('admin.task-board.partials.skeleton')</div>
         </div>
         <div class="kanban-column col-testing" data-status="3">
             <div class="column-header">
                 <span><i class="fas fa-vial me-2"></i>{{ trans('task_board.status_testing') }}</span>
                 <span class="badge" style="background:#6f42c1" id="count-testing">0</span>
             </div>
-            <div class="card-list" id="list-testing"></div>
+            <div class="card-list" id="list-testing">@include('admin.task-board.partials.skeleton')</div>
         </div>
         <div class="kanban-column col-in-review" data-status="4">
             <div class="column-header">
                 <span><i class="fas fa-search me-2"></i>{{ trans('task_board.status_in_review') }}</span>
                 <span class="badge bg-warning text-dark" id="count-in-review">0</span>
             </div>
-            <div class="card-list" id="list-in-review"></div>
+            <div class="card-list" id="list-in-review">@include('admin.task-board.partials.skeleton')</div>
         </div>
         <div class="kanban-column col-resolved" data-status="5">
             <div class="column-header">
                 <span><i class="fas fa-check-circle me-2"></i>{{ trans('task_board.status_resolved') }}</span>
                 <span class="badge bg-success" id="count-resolved">0</span>
             </div>
-            <div class="card-list" id="list-resolved"></div>
+            <div class="card-list" id="list-resolved">@include('admin.task-board.partials.skeleton')</div>
         </div>
     </div>
     </div>{{-- end kanban-board-wrapper --}}
@@ -491,7 +493,24 @@ $(function () {
         return html;
     }
 
+    /** @type {string} 一欄的載入骨架，內容與 partials/skeleton.blade.php 一致 */
+    var SKELETON_HTML = '<div class="tb-skeleton"></div><div class="tb-skeleton"></div><div class="tb-skeleton"></div>';
+
+    /**
+     * 五欄換成載入骨架
+     *
+     * 首次進頁面的骨架是 blade 直接渲染的（不必等 JS）；這支是給「換篩選條件、
+     * 拖完重載」用的 —— 不換的話畫面會停在舊資料，使用者不知道新的還在路上。
+     */
+    function showBoardSkeleton() {
+        Object.keys(statusListMap).forEach(function (status) {
+            $('#' + statusListMap[status]).html(SKELETON_HTML);
+        });
+    }
+
     function loadBoard() {
+        showBoardSkeleton();
+
         var params = {};
         var projectId = $('#filter-project').val();
         var assigneeId = $('#filter-assignee').val();
@@ -537,6 +556,15 @@ $(function () {
 
                 bindCardClick();
                 initSortable();
+            },
+            // 沒有這段的話，請求失敗時骨架會一直閃在那裡，看起來像永遠載不完。
+            // session 過期（401／419）由 common.js 的全域 ajaxError 接手提示，
+            // 這裡只負責把畫面收乾淨
+            error: function () {
+                Object.keys(statusListMap).forEach(function (status) {
+                    $('#' + statusListMap[status])
+                        .html('<p class="text-muted text-center py-3" style="font-size:0.8125rem">載入失敗</p>');
+                });
             }
         });
     }
@@ -2032,7 +2060,18 @@ $(function () {
     $uploadUrl = route('admin.task-board.ajax-upload-editor-image');
     $csrf = csrf_token();
 @endphp
-<script src="{{ $tinyBase }}/tinymce.min.js" referrerpolicy="origin"></script>
+{{-- defer：這支 422KB，但只有開「新增任務」或編輯描述時才用得到。
+     沒有 defer 的話瀏覽器會停下來等它下載完才繼續解析與繪製，
+     看板的卡片也要跟著晚一步出現（而且它還會跟看板的 ajax 搶頻寬）。
+
+     ⚠ defer 的執行順序是「HTML 解析完之後」，所以**後面那支 inline script
+     反而會先跑**。這裡之所以安全，是因為下面所有 tinymce.* 都寫在函式或
+     事件回呼裡，沒有任何一處在頂層立即執行。
+     真要在頂層用到 tinymce 的話，這個 defer 就得拿掉。
+
+     使用者也不會「太早」點到 —— defer 保證在 DOMContentLoaded 之前執行完，
+     而按鈕要等頁面可互動才按得到。 --}}
+<script src="{{ $tinyBase }}/tinymce.min.js" referrerpolicy="origin" defer></script>
 <script>
 // 描述內容樣式來自 public/css/task-content.css，編輯器與詳情面板共用同一份
 var TASK_CONTENT_CSS_URL = '{{ asset('css/task-content.css') }}?v={{ filemtime(public_path('css/task-content.css')) }}';
