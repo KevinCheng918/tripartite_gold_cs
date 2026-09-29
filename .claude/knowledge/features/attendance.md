@@ -88,8 +88,7 @@
 順手補了後端驗證：`date` 加上 `before_or_equal:today`。
 補的是「已經發生但沒打到」的卡，未來日期沒有意義，而前端的 `max` 擋不住直接打 API。
 
-> ⚠️ 排班頁（`public/js/shifts.js`）還有 **15 處**同樣的
-> `disableMobile: true` 時間／日期選擇器，手機上一樣難按。尚未處理。
+排班頁（[[scheduling]]）的 12 個欄位也在 2026-09-29 一併換掉了，做法相同。
 
 ### 相關檔案
 - Controller: `app/Http/Controllers/Admin/AttendanceController.php`

@@ -1526,6 +1526,26 @@
         });
     }
 
+    /**
+     * 綁定換班日期：選好日期就載入那天的排班
+     *
+     * @param {string}      dateId   日期 input 的 id
+     * @param {string}      selectId 要填入排班的 select id
+     * @param {number|null} userId   限定員工；null 表示全部
+     */
+    function bindDateChange(dateId, selectId, userId) {
+        var input = document.getElementById(dateId);
+
+        if (!input) { return; }
+
+        input.addEventListener('change', function () {
+            // 清空或輸入到一半時 value 會是空字串，這時不要打 API
+            if (!input.value) { return; }
+
+            loadAssignmentsByDate(input.value, selectId, userId);
+        });
+    }
+
     // 初始化 flatpickr — 報班日期
     flatpickr('#assign-date', {
         dateFormat: 'Y-m-d',
@@ -1535,45 +1555,20 @@
         disableMobile: true
     });
 
-    // 初始化 flatpickr — 班別時間
-    // 初始化 flatpickr — 新增班別時間
-    flatpickr('#create-start-time', {
-        enableTime: true,
-        noCalendar: true,
-        dateFormat: 'H:i',
-        time_24hr: true,
-        disableMobile: true
-    });
-
-    flatpickr('#create-end-time', {
-        enableTime: true,
-        noCalendar: true,
-        dateFormat: 'H:i',
-        time_24hr: true,
-        disableMobile: true
-    });
-
-    flatpickr('#edit-start-time', {
-        enableTime: true,
-        noCalendar: true,
-        dateFormat: 'H:i',
-        time_24hr: true,
-        disableMobile: true
-    });
-
-    flatpickr('#edit-end-time', {
-        enableTime: true,
-        noCalendar: true,
-        dateFormat: 'H:i',
-        time_24hr: true,
-        disableMobile: true
-    });
-
-    var replyTimeConfig = { enableTime: true, noCalendar: true, dateFormat: 'H:i', time_24hr: true, disableMobile: true };
-    flatpickr('#create-reply-start-time', replyTimeConfig);
-    flatpickr('#create-reply-end-time', replyTimeConfig);
-    flatpickr('#edit-reply-start-time', replyTimeConfig);
-    flatpickr('#edit-reply-end-time', replyTimeConfig);
+    /*
+     * 班別時間、回訊時間、代班時間都改用原生 <input type="time">，不再套 flatpickr。
+     *
+     * 原本是 flatpickr 加 disableMobile: true —— 那等於強制手機也用它自繪的 UI，
+     * 時間選擇器在手機上是一組很小的數字配上下箭頭，手指幾乎按不準；
+     * 而且 flatpickr 預設把 input 設成 readonly，連直接打字都不行。
+     *
+     * 原生的值固定是 24 小時制的 HH:mm，跟原本 dateFormat: 'H:i' 完全一樣，
+     * 送出去的 payload 不受影響。
+     *
+     * 保留 flatpickr 的只有兩個，它們沒有原生替代品：
+     *   #assign-date —— mode: 'multiple'，原生 date 不能多選
+     *   週次跳轉      —— 綁在文字元素上，根本不是 input
+     */
 
     // 排班操作 modal — 刪除按鈕（沒權限時按鈕不存在）
     var btnDelete = document.getElementById('btn-delete-assignment');
@@ -1602,29 +1597,18 @@
         formCover.addEventListener('submit', submitCoverRequest);
     }
 
-    // 初始化換班 Modal 的 flatpickr — 選日期後自動載入排班
-    flatpickr('#swap-my-date', {
-        dateFormat: 'Y-m-d',
-        disableMobile: true,
-        onChange: function (selectedDates) {
-            if (selectedDates.length === 0) { return; }
-            loadAssignmentsByDate(formatDate(selectedDates[0]), 'swap-my-shift', currentUserId);
-        }
-    });
-
-    flatpickr('#swap-target-date', {
-        dateFormat: 'Y-m-d',
-        disableMobile: true,
-        onChange: function (selectedDates) {
-            if (selectedDates.length === 0) { return; }
-            // 對方排班不限員工，顯示全部
-            loadAssignmentsByDate(formatDate(selectedDates[0]), 'swap-target-shift', null);
-        }
-    });
-
-    // 初始化代班 Modal 的 flatpickr
-    flatpickr('#cover-start', { enableTime: true, noCalendar: true, dateFormat: 'H:i', time_24hr: true, disableMobile: true });
-    flatpickr('#cover-end', { enableTime: true, noCalendar: true, dateFormat: 'H:i', time_24hr: true, disableMobile: true });
+    /*
+     * 換班日期：原生 date 的 change 取代 flatpickr 的 onChange。
+     *
+     * 差別在時機 —— flatpickr 是點日曆格子當下觸發，原生 date 則是
+     * 值真的變了才觸發（手機上是按「完成」之後）。對這裡沒有影響：
+     * 兩者都是「選好日期 → 載入那天的排班」。
+     *
+     * 值本身就是 Y-m-d，不必再經過 formatDate()。
+     */
+    bindDateChange('swap-my-date', 'swap-my-shift', currentUserId);
+    // 對方排班不限員工，顯示全部
+    bindDateChange('swap-target-date', 'swap-target-shift', null);
 
     // 載入班別後渲染 tabs（預設顯示課表）
     if (hasPerm('shift.view') || hasPerm('shift.update')) {

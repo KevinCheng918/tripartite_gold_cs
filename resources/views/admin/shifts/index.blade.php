@@ -11,9 +11,9 @@
         [data-theme="dark"] .modal-content .form-select { background: #2d2d2d; color: #e0e0e0; border-color: #444; }
         [data-theme="dark"] .modal-content .input-group-text { background: #333; color: #ccc; border-color: #444; }
         [data-theme="dark"] .modal-content .form-check-label { color: #e0e0e0; }
-        /* 瀏覽器原生 date/time picker dark mode */
-        [data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
-        [data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1); }
+        {{-- 原生 date/time 的深色處理移到 public/css/app.css 用 color-scheme 統一做。
+             這裡原本的 filter: invert(1) 不能留 —— color-scheme 已經把圖示畫成白的，
+             再 invert 一次會翻回黑色，深色背景上反而看不見。 --}}
         /* input-group 統一白底 */
         #leave-date-group .input-group-text { background: #fff; }
         #leave-date-group .form-control { background: #fff; }
@@ -69,7 +69,10 @@
             <p class="modal-section-label">{{ trans('shift.swap_my_section') }}</p>
             <div class="mb-3">
                 <label class="form-label" for="swap-my-date">{{ trans('shift.field_date') }}</label>
-                <input id="swap-my-date" type="text" class="form-control" required placeholder="選擇日期" autocomplete="off">
+                {{-- 原生 date/time：手機跳系統的滾輪選擇器，桌機可以直接打字。
+                     值的格式固定（YYYY-MM-DD / HH:mm），正好是後端要的。
+                     報班日期是多選、週次跳轉綁在文字上，那兩個仍然是 flatpickr。 --}}
+                <input id="swap-my-date" type="date" class="form-control" required autocomplete="off">
             </div>
             <div class="mb-3">
                 <label class="form-label" for="swap-my-shift">{{ trans('shift.field_shift') }}</label>
@@ -79,7 +82,7 @@
             <p class="modal-section-label">{{ trans('shift.swap_target_section') }}</p>
             <div class="mb-3">
                 <label class="form-label" for="swap-target-date">{{ trans('shift.field_date') }}</label>
-                <input id="swap-target-date" type="text" class="form-control" required placeholder="選擇日期" autocomplete="off">
+                <input id="swap-target-date" type="date" class="form-control" required autocomplete="off">
             </div>
             <div class="mb-3">
                 <label class="form-label" for="swap-target-shift">{{ trans('shift.field_shift') }}</label>
@@ -102,18 +105,18 @@
             </div>
             <div class="mb-3">
                 <label class="form-label" for="create-start-time">{{ trans('shift.field_start_time') }}</label>
-                <input id="create-start-time" type="text" name="start_time" class="form-control" required placeholder="HH:mm" autocomplete="off">
+                <input id="create-start-time" type="time" lang="en-GB" name="start_time" class="form-control" required autocomplete="off">
             </div>
             <div class="mb-3">
                 <label class="form-label" for="create-end-time">{{ trans('shift.field_end_time') }}</label>
-                <input id="create-end-time" type="text" name="end_time" class="form-control" required placeholder="HH:mm" autocomplete="off">
+                <input id="create-end-time" type="time" lang="en-GB" name="end_time" class="form-control" required autocomplete="off">
             </div>
             <div class="mb-3">
                 <label class="form-label">主要回訊時間</label>
                 <div class="d-flex gap-2 align-items-center">
-                    <input id="create-reply-start-time" type="text" class="form-control" placeholder="HH:mm" autocomplete="off">
+                    <input id="create-reply-start-time" type="time" lang="en-GB" class="form-control" autocomplete="off">
                     <span>~</span>
-                    <input id="create-reply-end-time" type="text" class="form-control" placeholder="HH:mm" autocomplete="off">
+                    <input id="create-reply-end-time" type="time" lang="en-GB" class="form-control" autocomplete="off">
                 </div>
             </div>
             <div class="text-end mt-3">
@@ -155,11 +158,11 @@
                 <label class="form-label">{{ trans('leave.field_time') }} <span class="text-danger">*</span></label>
                 <div class="row g-2">
                     <div class="col">
-                        <input id="leave-start-time" type="time" class="form-control">
+                        <input id="leave-start-time" type="time" lang="en-GB" class="form-control">
                     </div>
                     <div class="col-auto d-flex align-items-center">~</div>
                     <div class="col">
-                        <input id="leave-end-time" type="time" class="form-control">
+                        <input id="leave-end-time" type="time" lang="en-GB" class="form-control">
                     </div>
                 </div>
             </div>
@@ -206,18 +209,18 @@
             </div>
             <div class="mb-3">
                 <label class="form-label" for="edit-start-time">{{ trans('shift.field_start_time') }}</label>
-                <input id="edit-start-time" type="text" name="start_time" class="form-control" required placeholder="HH:mm" autocomplete="off">
+                <input id="edit-start-time" type="time" lang="en-GB" name="start_time" class="form-control" required autocomplete="off">
             </div>
             <div class="mb-3">
                 <label class="form-label" for="edit-end-time">{{ trans('shift.field_end_time') }}</label>
-                <input id="edit-end-time" type="text" name="end_time" class="form-control" required placeholder="HH:mm" autocomplete="off">
+                <input id="edit-end-time" type="time" lang="en-GB" name="end_time" class="form-control" required autocomplete="off">
             </div>
             <div class="mb-3">
                 <label class="form-label" for="edit-reply-start-time">主要回訊時間</label>
                 <div class="d-flex gap-2 align-items-center">
-                    <input id="edit-reply-start-time" type="text" class="form-control" placeholder="HH:mm" autocomplete="off">
+                    <input id="edit-reply-start-time" type="time" lang="en-GB" class="form-control" autocomplete="off">
                     <span>~</span>
-                    <input id="edit-reply-end-time" type="text" class="form-control" placeholder="HH:mm" autocomplete="off">
+                    <input id="edit-reply-end-time" type="time" lang="en-GB" class="form-control" autocomplete="off">
                 </div>
             </div>
             <div class="text-end mt-3">
@@ -255,11 +258,11 @@
             </div>
             <div class="mb-3">
                 <label class="form-label" for="cover-start">{{ trans('shift.field_start_time') }}</label>
-                <input id="cover-start" type="text" name="cover_start" class="form-control" required placeholder="HH:mm" autocomplete="off">
+                <input id="cover-start" type="time" lang="en-GB" name="cover_start" class="form-control" required autocomplete="off">
             </div>
             <div class="mb-3">
                 <label class="form-label" for="cover-end">{{ trans('shift.field_end_time') }}</label>
-                <input id="cover-end" type="text" name="cover_end" class="form-control" required placeholder="HH:mm" autocomplete="off">
+                <input id="cover-end" type="time" lang="en-GB" name="cover_end" class="form-control" required autocomplete="off">
             </div>
             <div class="mb-3">
                 <label class="form-label" for="cover-reason">{{ trans('cover.field_reason') }}</label>

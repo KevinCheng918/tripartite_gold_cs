@@ -1341,13 +1341,15 @@ input[type="time"].form-control {
 
 /* 深色模式：日曆／時鐘圖示與展開的選擇器都是瀏覽器畫的，
  * 只改 color 沒有用 —— 要靠 color-scheme 才會整組跟著變深色，
- * 否則深色背景上會出現一個白底的日曆面板。 */
+ * 否則深色背景上會出現一個白底的日曆面板。
+ *
+ * ⚠ 這裡**只設 color-scheme，不設顏色**。加上 [type="..."] 之後特異性會比
+ * 各頁面既有的 `[data-theme="dark"] .modal-content .form-control` 還高，
+ * 一旦在這裡指定 background，同一個表單裡的時間欄位就會跟隔壁的
+ * 文字欄位變成兩種底色。顏色交給各頁面既有的規則決定。 */
 [data-theme="dark"] input[type="date"].form-control,
 [data-theme="dark"] input[type="time"].form-control {
     color-scheme: dark;
-    background: #1a1d27;
-    border-color: #2d3039;
-    color: #f3f4f6;
 }
 
 /* 月份切換 */
