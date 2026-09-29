@@ -236,4 +236,184 @@
     document.addEventListener('DOMContentLoaded', function () {
         window.TimeSelect.init();
     });
+
+    // ---------------------------------------------------------------
+    //  登入過期
+    // ---------------------------------------------------------------
+
+    /*
+     * 以前每一支 apiFetch 都只是把後端的訊息原樣顯示出來，session 一過期，
+     * 使用者看到的是「Unauthenticated.」或「CSRF token mismatch.」——
+     * 看不懂，也不知道要重新登入，更不會被導到登入頁。
+     *
+     * 打卡最容易踩到：早上打完上班卡就把頁面掛著，下班要打卡時 session
+     * 早就過期了。
+     *
+     * 兩件事一起做：
+     *   1. 任何 AJAX 收到 401／419 就明講「登入已過期」並導向登入頁
+     *   2. 頁面開著時定期心跳，讓 session 不會在使用中過期（見下方 keepAlive）
+     */
+
+    /** @type {number[]} 代表「這個 session 不能再用了」的狀態碼 */
+    var EXPIRED_STATUS = [401, 419];
+
+    /** @type {boolean} 已經提示過就不再重複 —— 一個畫面同時發好幾支 AJAX 是常態 */
+    var expiredNotified = false;
+
+    /**
+     * 建立提示視窗
+     *
+     * 動態建立而不是寫在 layout：這支要能在任何頁面用，
+     * 而各頁面的訊息 Modal id 都不一樣。
+     *
+     * @returns {HTMLElement}
+     */
+    function buildExpiredModal() {
+        var data = document.body.dataset;
+        var el = document.createElement('div');
+
+        el.className = 'modal fade';
+        el.id = 'auth-expired-modal';
+        el.setAttribute('data-bs-backdrop', 'static');
+        el.setAttribute('data-bs-keyboard', 'false');
+        el.innerHTML =
+            '<div class="modal-dialog modal-sm modal-dialog-centered">' +
+            '<div class="modal-content"><div class="modal-body text-center py-4">' +
+            '<p class="mb-1 fw-bold js-auth-title"></p>' +
+            '<p class="mb-3 text-muted js-auth-hint" style="font-size:0.875rem"></p>' +
+            '<button type="button" class="btn btn-primary js-auth-action"></button>' +
+            '</div></div></div>';
+
+        // textContent 而不是拼進 innerHTML：這些字來自語系檔，不該有被當成 HTML 的機會
+        el.querySelector('.js-auth-title').textContent = data.authExpiredTitle || '登入已過期';
+        el.querySelector('.js-auth-hint').textContent = data.authExpiredHint || '請重新登入後再操作。';
+        el.querySelector('.js-auth-action').textContent = data.authExpiredAction || '重新登入';
+
+        el.querySelector('button').addEventListener('click', function () {
+            window.location.href = loginUrl();
+        });
+
+        document.body.appendChild(el);
+
+        return el;
+    }
+
+    /**
+     * 登入頁網址
+     *
+     * @returns {string}
+     */
+    function loginUrl() {
+        return document.body.dataset.loginUrl || '/login';
+    }
+
+    window.AuthGuard = {
+        /**
+         * 這個回應是不是「登入已過期」
+         *
+         * 401 是沒登入，419 是 CSRF token 對不上 —— session 換掉之後
+         * 頁面上那份 token 就失效了，兩種都是同一件事。
+         *
+         * @param {Response} response
+         * @returns {boolean}
+         */
+        isExpired: function (response) {
+            return EXPIRED_STATUS.indexOf(response.status) !== -1;
+        },
+
+        /**
+         * 提示並準備導向登入頁
+         *
+         * @returns {void}
+         */
+        notify: function () {
+            if (expiredNotified) { return; }
+
+            expiredNotified = true;
+
+            // 先關掉畫面上其他 Modal：留著的話會疊兩層 backdrop，
+            // 而且那些視窗上的按鈕按了也沒用
+            document.querySelectorAll('.modal.show').forEach(function (opened) {
+                var instance = window.bootstrap && window.bootstrap.Modal.getInstance(opened);
+
+                if (instance) { instance.hide(); }
+            });
+
+            var el = document.getElementById('auth-expired-modal') || buildExpiredModal();
+
+            // 等前面那些 Modal 的關閉動畫跑完，否則 backdrop 會殘留
+            setTimeout(function () {
+                if (window.bootstrap) {
+                    window.bootstrap.Modal.getOrCreateInstance(el).show();
+
+                    return;
+                }
+
+                // Bootstrap 沒載入（理論上不會）也不能讓使用者卡在原地
+                window.location.href = loginUrl();
+            }, 300);
+        },
+
+        /**
+         * 給各頁面的 apiFetch 用的攔截
+         *
+         * 回傳 null 表示「不是過期，照原本流程走」；
+         * 回傳 Promise 表示「已經接手了，呼叫端不要再處理」。
+         *
+         * ⚠ 接手時回的是**永遠不 settle 的 Promise**，這是故意的 ——
+         * 讓呼叫端的 then/catch 都不會跑，畫面上就只有這個提示視窗，
+         * 不會再疊一個「Unauthenticated.」的錯誤訊息。反正下一步是離開頁面。
+         *
+         * @param {Response} response
+         * @returns {Promise|null}
+         */
+        intercept: function (response) {
+            if (!this.isExpired(response)) { return null; }
+
+            this.notify();
+
+            return new Promise(function () {});
+        }
+    };
+
+    // ---------------------------------------------------------------
+    //  Session 心跳
+    // ---------------------------------------------------------------
+
+    /** @type {number} 心跳間隔。要明顯小於 SESSION_LIFETIME（120 分鐘） */
+    var PING_INTERVAL = 15 * 60 * 1000;
+
+    /**
+     * 戳一下後端，把 session 的有效期往後推
+     *
+     * 續期的效果來自「有發出這個請求」本身，回傳什麼不重要。
+     *
+     * @returns {void}
+     */
+    function ping() {
+        if (expiredNotified) { return; }
+
+        fetch('/admin/ajax-ping', {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin'
+        }).then(function (response) {
+            window.AuthGuard.intercept(response);
+        }).catch(function () {
+            // 網路斷線不提示 —— 那不是登入過期，下一輪再試就好
+        });
+    }
+
+    // 登入頁與錯誤頁不需要心跳，只有後台頁面要
+    if (window.location.pathname.indexOf('/admin') === 0) {
+        setInterval(ping, PING_INTERVAL);
+
+        /*
+         * 分頁切到背景時瀏覽器會把 setInterval 壓到最慢一分鐘一次，
+         * 電腦休眠更是完全停住 —— 回到頁面時先補一次，
+         * 使用者才不會在「看起來正常」的畫面上按下去才發現已經過期。
+         */
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) { ping(); }
+        });
+    }
 })();

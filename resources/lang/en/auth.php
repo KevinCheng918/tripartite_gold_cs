@@ -18,4 +18,9 @@ return [
     'throttle' => 'Too many login attempts. Please try again in :seconds seconds.',
     'logout' => 'Logout',
 
+    // Session expiry notice (passed from the layout to AuthGuard in public/js/common.js)
+    'expired_title' => 'Session expired',
+    'expired_hint' => 'Please sign in again. Your last action was not saved.',
+    'expired_action' => 'Sign in again',
+
 ];

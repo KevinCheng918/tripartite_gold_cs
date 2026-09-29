@@ -26,6 +26,13 @@
         }, options.headers || {});
 
         return fetch(url, options).then(function (response) {
+            // session 過期（401／419）交給 AuthGuard：跳「請重新登入」並導向登入頁。
+            // 接手後回的 Promise 永遠不 settle，所以下面的 then/catch 都不會跑，
+            // 畫面上不會再疊一個看不懂的「Unauthenticated.」
+            var intercepted = window.AuthGuard && window.AuthGuard.intercept(response);
+
+            if (intercepted) { return intercepted; }
+
             return response.json().then(function (body) {
                 if (!response.ok) { throw body; }
                 return body;
@@ -369,9 +376,34 @@
         });
     }
 
+    /**
+     * 後端真的寫進去了嗎
+     *
+     * 以前這裡是 `.then(function () { 顯示成功 })`，連回傳內容都沒接 ——
+     * 只要 HTTP 是 2xx 就報成功。打卡沒寫進去卻跳「打卡成功」，
+     * 使用者要等到看紀錄才發現，那時已經補不回來了。
+     *
+     * 後端成功時回的是 AttendanceResource，一定帶 id。
+     *
+     * @param {Object} body
+     * @returns {boolean}
+     */
+    function isSaved(body) {
+        var record = body && (body.data || body);
+
+        return !!(record && record.id);
+    }
+
     function clockIn() {
         apiFetch('/admin/attendance/ajax-clock-in', { method: 'POST' })
-            .then(function () {
+            .then(function (body) {
+                if (!isSaved(body)) {
+                    showMessage(i18n.msg.clock_in_failed);
+                    loadClockStatus();
+
+                    return;
+                }
+
                 showMessage(i18n.msg.clock_in_success);
                 loadClockStatus();
             })
@@ -380,7 +412,14 @@
 
     function clockOut() {
         apiFetch('/admin/attendance/ajax-clock-out', { method: 'POST' })
-            .then(function () {
+            .then(function (body) {
+                if (!isSaved(body)) {
+                    showMessage(i18n.msg.clock_out_failed);
+                    loadClockStatus();
+
+                    return;
+                }
+
                 showMessage(i18n.msg.clock_out_success);
                 loadClockStatus();
             })

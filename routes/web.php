@@ -44,6 +44,8 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard/ajax-usdt-rate', [DashboardController::class, 'ajaxUsdtRate'])->name('dashboard.ajax-usdt-rate');
+    // session 心跳。不綁權限 —— 任何登入中的帳號都要能續期
+    Route::get('/ajax-ping', [DashboardController::class, 'ajaxPing'])->name('ajax-ping');
 
     // 個人資訊修改
     Route::put('/profile/ajax-update', [AccountController::class, 'ajaxUpdateProfile'])->name('profile.ajax-update');

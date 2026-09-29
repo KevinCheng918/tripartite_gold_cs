@@ -63,7 +63,12 @@
     </style>
 </head>
 
-<body>
+{{-- 登入過期的提示文字。AuthGuard 在 public/js/common.js，那支是全站共用的、
+     讀不到 PHP 語系檔，所以從這裡傳過去（同 TimeSelect 的 data-*-label 作法）。 --}}
+<body data-auth-expired-title="{{ trans('auth.expired_title') }}"
+      data-auth-expired-hint="{{ trans('auth.expired_hint') }}"
+      data-auth-expired-action="{{ trans('auth.expired_action') }}"
+      data-login-url="{{ route('login') }}">
     {{-- Sidebar 狀態同步 --}}
     <script>
         (function() {

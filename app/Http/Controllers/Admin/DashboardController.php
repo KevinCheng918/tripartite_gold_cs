@@ -47,6 +47,25 @@ class DashboardController extends Controller
     }
 
     /**
+     * Ajax 心跳：把 session 的有效期往後延
+     *
+     * 客服上班會把頁面掛著一整天，但 SESSION_LIFETIME 只有 120 分鐘 ——
+     * 早上打完上班卡之後不再操作，下班要打卡時 session 早就過期了。
+     *
+     * 這支刻意什麼都不做：能走到這裡就代表 `auth` middleware 通過，
+     * 而 session driver 會在請求結束時把 last activity 往後推，
+     * 續期的效果來自「有這一次請求」本身，不是回傳的內容。
+     *
+     * 不綁權限 keyword —— 任何登入中的帳號都要能續期。
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxPing()
+    {
+        return response()->json(['ok' => true]);
+    }
+
+    /**
      * Ajax 取得 USDT 匯率（當前 + 4 小時 K 線）
      *
      * @return \Illuminate\Http\JsonResponse

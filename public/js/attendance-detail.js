@@ -26,6 +26,11 @@
         }, options.headers || {});
 
         return fetch(url, options).then(function (response) {
+            // session 過期交給 AuthGuard 統一處理，理由見 public/js/common.js
+            var intercepted = window.AuthGuard && window.AuthGuard.intercept(response);
+
+            if (intercepted) { return intercepted; }
+
             return response.json().then(function (body) {
                 if (!response.ok) { throw body; }
                 return body;
