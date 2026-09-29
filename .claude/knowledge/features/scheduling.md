@@ -73,6 +73,11 @@
 - **`change` 事件要 `bubbles: true`。** 請假時長那類計算是掛在 `document` 上的
   事件委派，不冒泡的話它永遠收不到。
 
+下拉的「時」「分」提示字寫死中文，理由同 `WEEKDAYS` —— `common.js` 讀不到
+PHP 語系檔（見 [[attendance]] 的「日期一律標註星期」）。但留了
+`data-hour-label` / `data-minute-label` 可以從 Blade 覆寫，
+之後要三語系化時不必改 `common.js`。
+
 ### 兩個 CSS 的坑
 
 > ⚠️ **`color-scheme: dark` 與 `filter: invert(1)` 不能並存。**

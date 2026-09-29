@@ -144,8 +144,13 @@
         input.type = 'hidden';
 
         var wrap = document.createElement('div');
-        var hour = buildSelect(24, required, '時');
-        var minute = buildSelect(60, required, '分');
+        /*
+         * 「時」「分」寫死中文，理由同 WEEKDAYS：common.js 讀不到 PHP 語系檔。
+         * 但留了 data-hour-label / data-minute-label 可以從 Blade 覆寫，
+         * 之後要三語系化時不必改這支。
+         */
+        var hour = buildSelect(24, required, input.dataset.hourLabel || '時');
+        var minute = buildSelect(60, required, input.dataset.minuteLabel || '分');
         var separator = document.createElement('span');
 
         wrap.className = 'ts-wrap';
