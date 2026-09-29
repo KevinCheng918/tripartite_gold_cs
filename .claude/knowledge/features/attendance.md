@@ -58,6 +58,39 @@
 - `data-date`、`amendLookup` 的 key、跨日比較等**非顯示用途**的日期必須維持純
   `Y-m-d`，加了星期會送壞 API 或比對失敗
 
+### 補打卡的日期與時間用原生 input（2026-09-29）
+
+原本是 flatpickr 加 `disableMobile: true`。那個參數等於**強制手機也用 flatpickr
+自繪的 UI** —— 時間選擇器在手機上是一組很小的數字配上下箭頭，手指幾乎按不準；
+而且 flatpickr 預設把 input 設成 `readonly`，連直接打字都不行。
+
+改用原生 `<input type="date">` / `<input type="time">`：
+
+- 手機跳系統的滾輪選擇器，桌機可以直接輸入
+- 值的格式固定（`YYYY-MM-DD` / `HH:mm`），**正好是後端 `date_format:H:i` 要的**，不必轉
+- 零依賴，不用再同步 flatpickr 的值
+
+> **月份選擇器（`report-month-picker`、`detail-month-picker`）要留著 flatpickr。**
+> 原生沒有「只選月份」這種控制項，拿掉會退化成完整的日期選擇器。
+> 這也是 `disableMobile: true` 在那裡仍然正確的原因。
+
+兩個配套：
+
+- **CSS 要自己補**（`public/css/app.css`）。這兩種 input 的內部是瀏覽器畫的，
+  Bootstrap 的 `.form-control` 蓋不到：iOS 上內容會靠上、整體比其他欄位矮，
+  要補 `min-height` 與 `-webkit-appearance: none`（**不會**關掉原生選擇器）。
+  深色模式要加 `color-scheme: dark` —— 日曆／時鐘圖示與展開的面板都是瀏覽器畫的，
+  只改 `color` 沒有用，不加會在深色背景上跳出一個白底的日曆。
+- **`max` 要在每次開啟時重設**。頁面開著跨日的話，昨天算出來的 max 會擋掉今天。
+  算今天用 `todayString()` 拆組件組出來，**不可以用 `toISOString()`** ——
+  那是 UTC，台灣時間早上八點前會算成昨天。
+
+順手補了後端驗證：`date` 加上 `before_or_equal:today`。
+補的是「已經發生但沒打到」的卡，未來日期沒有意義，而前端的 `max` 擋不住直接打 API。
+
+> ⚠️ 排班頁（`public/js/shifts.js`）還有 **15 處**同樣的
+> `disableMobile: true` 時間／日期選擇器，手機上一樣難按。尚未處理。
+
 ### 相關檔案
 - Controller: `app/Http/Controllers/Admin/AttendanceController.php`
 - Service: `app/Services/AttendanceService.php`

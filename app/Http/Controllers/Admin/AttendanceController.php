@@ -196,8 +196,10 @@ class AttendanceController extends Controller
      */
     public function ajaxRequestAmend(Request $request)
     {
+        // 補的是「已經發生但沒打到」的卡，未來日期沒有意義。
+        // 前端的 max 只是方便，擋不住直接打 API
         $params = $request->validate([
-            'date'       => 'required|date',
+            'date'       => 'required|date|before_or_equal:today',
             'type'       => 'required|integer|in:1,2',
             'clock_time' => 'required|date_format:H:i',
             'reason'     => 'nullable|string|max:500',

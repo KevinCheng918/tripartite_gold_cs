@@ -1323,6 +1323,33 @@ table tbody tr:hover { background: rgba(0, 0, 0, 0.02); }
     color: #f3f4f6;
 }
 
+/* ===== 原生日期／時間輸入框（補打卡申請） =====
+ *
+ * 這兩種 input 的內部是瀏覽器自己繪的，Bootstrap 的 .form-control 蓋不到，
+ * 所以要自己補齊，否則會跟旁邊的欄位長得不一樣。
+ */
+input[type="date"].form-control,
+input[type="time"].form-control {
+    /* iOS Safari 的 date/time input 內容會靠上、整體也比其他欄位矮，
+       固定最小高度才對得齊（數值同 Bootstrap 的 .form-control） */
+    min-height: calc(1.5em + 0.75rem + 2px);
+    /* iOS 會自己加圓角與內陰影，關掉才會跟其他欄位一致。
+       ⚠ 這不會關掉原生的滾輪選擇器，點下去照樣跳出來 */
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+/* 深色模式：日曆／時鐘圖示與展開的選擇器都是瀏覽器畫的，
+ * 只改 color 沒有用 —— 要靠 color-scheme 才會整組跟著變深色，
+ * 否則深色背景上會出現一個白底的日曆面板。 */
+[data-theme="dark"] input[type="date"].form-control,
+[data-theme="dark"] input[type="time"].form-control {
+    color-scheme: dark;
+    background: #1a1d27;
+    border-color: #2d3039;
+    color: #f3f4f6;
+}
+
 /* 月份切換 */
 .att-month-nav {
     display: flex;

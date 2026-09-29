@@ -261,6 +261,11 @@
         var btnAmend = document.getElementById('btn-open-amend');
         if (btnAmend) {
             btnAmend.addEventListener('click', function () {
+                // 每次開啟都重設上限：頁面開著跨日的話，昨天算出來的 max 會擋掉今天
+                var dateInput = document.getElementById('amend-date');
+
+                if (dateInput) { dateInput.max = todayString(); }
+
                 showBsModal('modal-amend');
             });
             loadMyAmendments();
@@ -827,22 +832,40 @@
             });
     }
 
+    /**
+     * 今天的 YYYY-MM-DD
+     *
+     * 不能用 toISOString() —— 那是 UTC，台灣時間早上八點前會算成昨天。
+     *
+     * @return {string}
+     */
+    function todayString() {
+        var now = new Date();
+        var month = String(now.getMonth() + 1);
+        var day = String(now.getDate());
+
+        return now.getFullYear() + '-' +
+            (month.length < 2 ? '0' + month : month) + '-' +
+            (day.length < 2 ? '0' + day : day);
+    }
+
     // 補打卡申請表單
     var formAmend = document.getElementById('form-amend');
     if (formAmend) {
-        flatpickr('#amend-date', {
-            dateFormat: 'Y-m-d',
-            disableMobile: true,
-            maxDate: 'today'
-        });
-
-        flatpickr('#amend-time', {
-            enableTime: true,
-            noCalendar: true,
-            dateFormat: 'H:i',
-            time_24hr: true,
-            disableMobile: true
-        });
+        /*
+         * 日期與時間用原生 input，不套 flatpickr。
+         *
+         * 原本是 flatpickr 加 disableMobile: true，等於強制手機也用它自繪的 UI ——
+         * 時間選擇器在手機上是一組很小的數字配上下箭頭，手指幾乎按不準，
+         * 而且 flatpickr 預設把 input 設成 readonly，連直接打字都不行。
+         *
+         * 原生 date/time 在手機上是系統的滾輪選擇器，桌機也能直接輸入，
+         * 而且值的格式固定（YYYY-MM-DD / HH:mm），正是後端要的。
+         *
+         * 月份選擇器（report-month-picker）仍然留著 flatpickr —— 原生沒有
+         * 「只選月份」這種控制項，拿掉會退化成完整的日期選擇器。
+         */
+        document.getElementById('amend-date').max = todayString();
 
         formAmend.addEventListener('submit', function (e) {
             e.preventDefault();

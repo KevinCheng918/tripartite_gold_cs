@@ -37,7 +37,10 @@
                     <form id="form-amend">
                         <div class="mb-3">
                             <label class="form-label">{{ trans('attendance.amend_field_date') }}</label>
-                            <input id="amend-date" type="text" class="form-control" required placeholder="選擇日期" autocomplete="off">
+                            {{-- 原生 date/time：手機上會跳出系統的滾輪選擇器，好按得多，
+                                 而且桌機可以直接打字。值的格式固定是 YYYY-MM-DD / HH:mm，
+                                 正好是後端 date_format:H:i 要的，不必再轉。 --}}
+                            <input id="amend-date" type="date" class="form-control" required autocomplete="off">
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('attendance.amend_field_type') }}</label>
@@ -48,7 +51,7 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('attendance.amend_field_time') }}</label>
-                            <input id="amend-time" type="text" class="form-control" required placeholder="HH:mm" autocomplete="off">
+                            <input id="amend-time" type="time" class="form-control" required autocomplete="off">
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('attendance.amend_field_reason') }}</label>
