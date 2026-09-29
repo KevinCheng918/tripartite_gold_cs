@@ -1,0 +1,228 @@
+/**
+ * 任務看板（Kanban）
+ *
+ * 2026-09-29 從 resources/views/admin/task-board/index.blade.php 的 inline
+ * <style> 搬過來。搬成獨立檔而不是併進 app.css：blade 裡的 <link> 位置
+ * 跟原本的 <style> 一樣在 content 區塊內，載入順序與特異性都不會變動，
+ * 不會去影響其他頁面既有的樣式。旁邊的 task-content.css 也是同一個模式。
+ *
+ * 任務看板的樣式**只放這裡**，不要再散到 app.css 或 blade 裡。
+ */
+
+.app-main__outer, .app-main__inner { overflow-x: hidden !important; }
+.taskboard-toolbar { background: #fff; }
+[data-theme="dark"] .taskboard-toolbar { background: #1a1a1a; color: #e0e0e0; }
+.kanban-board-wrapper { overflow-x: auto; width: 100%; }
+/* padding 是留給「拖曳中的欄位外框」的空間：外框用 outline 畫在欄位外緣，
+   沒有這圈 padding 的話，第一欄與最後一欄的外框會被 wrapper 的 overflow 裁掉 */
+.kanban-board { display: inline-flex; gap: 0.75rem; min-height: 65vh; min-width: 1500px; padding: 6px; }
+.kanban-column { flex: 1; min-width: 0; display: flex; flex-direction: column; border-radius: 0.5rem; overflow: hidden; }
+.kanban-column .card-list { flex: 1; }
+.kanban-column .column-header { padding: 0.75rem 1rem; border-radius: 0.5rem 0.5rem 0 0; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+.kanban-column .card-list { flex: 1; padding: 0.5rem; border-radius: 0 0 0.5rem 0.5rem; min-height: 100px; background: #f1f3f5; }
+.kanban-card { background: #fff; border-radius: 0.5rem; padding: 0.75rem; margin-bottom: 0.5rem; cursor: grab; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: box-shadow 0.2s; border-left: 3px solid transparent; }
+.kanban-card:hover { box-shadow: 0 3px 8px rgba(0,0,0,0.12); }
+.kanban-card.sortable-ghost { opacity: 0.4; }
+/* forceFallback 模式跟著游標走的複製元素 */
+.kanban-card.sortable-fallback { opacity: 0.9; box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.25); cursor: grabbing; }
+.kanban-card .card-project { font-size: 0.75rem; color: #6c757d; margin-bottom: 0.25rem; }
+/* 標題可能是一長串沒有空白的網址或路徑，不斷字會把卡片撐出欄外 */
+.kanban-card { overflow-wrap: break-word; word-break: break-word; }
+.kanban-card .card-title-text { font-weight: 600; font-size: 0.9375rem; margin-bottom: 0.5rem; }
+.kanban-card .card-meta { display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem; }
+.priority-low    { border-left-color: #6c757d !important; }
+.priority-medium { border-left-color: #0dcaf0 !important; }
+.priority-high   { border-left-color: #ffc107 !important; }
+.priority-urgent { border-left-color: #dc3545 !important; }
+.col-pending .column-header     { background: #e9ecef; color: #495057; }
+.col-in-progress .column-header { background: #cfe2ff; color: #084298; }
+.col-testing .column-header     { background: #e8daef; color: #6c3483; }
+.col-in-review .column-header   { background: #fff3cd; color: #664d03; }
+.col-resolved .column-header    { background: #d1e7dd; color: #0f5132; }
+.col-pending .card-list     { background: #f8f9fa; }
+.col-in-progress .card-list { background: #f0f6ff; }
+.col-testing .card-list     { background: #f5f0fa; }
+.col-in-review .card-list   { background: #fffcf0; }
+.col-resolved .card-list    { background: #f0faf4; }
+/* dark mode */
+[data-theme="dark"] .kanban-card { background: #2d2d2d; color: #e0e0e0; }
+[data-theme="dark"] .kanban-card .card-project { color: #999; }
+[data-theme="dark"] .card-list { background: #1e1e1e !important; }
+[data-theme="dark"] .col-pending .column-header     { background: #333; color: #ccc; }
+[data-theme="dark"] .col-in-progress .column-header { background: #1a3a5c; color: #8ec5fc; }
+[data-theme="dark"] .col-testing .column-header     { background: #2d1f3d; color: #bb86fc; }
+[data-theme="dark"] .col-in-review .column-header   { background: #4a3f1f; color: #ffd966; }
+[data-theme="dark"] .col-resolved .column-header    { background: #1a3a2a; color: #81c784; }
+/* 側邊面板 */
+#task-side-panel.open { transform: translateX(0) !important; }
+#side-panel-resize:hover { background: rgba(0,123,255,0.3); }
+/* 面板整體保險：任何漏網的長內容都不該把面板橫向撐開 */
+#task-side-panel { overflow-x: hidden; }
+#side-panel-inner { background: #fff; overflow-wrap: break-word; word-break: break-word; }
+[data-theme="dark"] #side-panel-inner { background: #1e1e1e; color: #e0e0e0; }
+[data-theme="dark"] #side-panel-inner .form-control,
+[data-theme="dark"] #side-panel-inner .form-select { background: #2d2d2d; color: #e0e0e0; border-color: #444; }
+[data-theme="dark"] #side-panel-inner .btn-outline-secondary { color: #ccc; border-color: #555; }
+[data-theme="dark"] #side-panel-inner .btn-outline-secondary:hover { background: #333; }
+[data-theme="dark"] #side-panel-inner .table { color: #e0e0e0; }
+[data-theme="dark"] #task-side-overlay { background: rgba(0,0,0,0.5); }
+.side-field { padding: 0.5rem 0; border-bottom: 1px solid #eee; }
+.side-field label { font-size: 0.8125rem; color: #6c757d; margin-bottom: 0.25rem; display: block; }
+.side-field .field-value { cursor: pointer; padding: 0.25rem 0.5rem; border-radius: 0.25rem; min-height: 1.75rem; }
+.side-field .field-value:hover { background: rgba(0,0,0,0.04); }
+[data-theme="dark"] .side-field { border-bottom-color: #333; }
+[data-theme="dark"] .side-field .field-value:hover { background: rgba(255,255,255,0.05); }
+.comment-item { padding: 0.5rem 0; border-bottom: 1px solid #f0f0f0; }
+.comment-item:last-child { border-bottom: none; }
+[data-theme="dark"] .comment-item { border-bottom-color: #333; }
+/* dark mode 優先順序按鈕 */
+[data-theme="dark"] .btn-check:checked + .btn-outline-secondary { background: #888 !important; color: #fff !important; border-color: #888 !important; box-shadow: 0 0 0 3px rgba(136,136,136,0.4) !important; }
+[data-theme="dark"] .btn-check:checked + .btn-outline-info { background: #0aa2c0 !important; color: #fff !important; border-color: #0aa2c0 !important; box-shadow: 0 0 0 3px rgba(10,162,192,0.4) !important; }
+[data-theme="dark"] .btn-check:checked + .btn-outline-warning { background: #b8860b !important; color: #fff !important; border-color: #b8860b !important; box-shadow: 0 0 0 3px rgba(184,134,11,0.4) !important; }
+[data-theme="dark"] .btn-check:checked + .btn-outline-danger { background: #c62828 !important; color: #fff !important; border-color: #c62828 !important; box-shadow: 0 0 0 3px rgba(198,40,40,0.4) !important; }
+/* 留言內文：pre-wrap 保留換行，但長網址／路徑仍需可斷，否則會撐破卡片 */
+.comment-text {
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+/* 附件 */
+.comment-thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 0.25rem; }
+.comment-preview-thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 0.25rem; }
+/* 送出前的非圖片附件：只需看得出檔名，做小一點不佔輸入區版面 */
+.comment-file-chip {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    max-width: 140px; height: 40px; padding: 0 0.5rem;
+    font-size: 0.75rem; border: 1px solid #dee2e6; border-radius: 0.25rem;
+}
+[data-theme="dark"] .comment-file-chip { color: #e0e0e0; background: #2d2d2d; border-color: #444; }
+.attachment-item { position: relative; display: inline-block; }
+.attachment-thumb { width: 80px; height: 80px; object-fit: cover; border-radius: 0.375rem; border: 1px solid #dee2e6; }
+[data-theme="dark"] .attachment-thumb { border-color: #444; }
+.attachment-file { font-size: 0.8125rem; max-width: 180px; }
+[data-theme="dark"] .attachment-file { color: #e0e0e0 !important; background: #2d2d2d; border-color: #444 !important; }
+[data-theme="dark"] .attachment-file:hover { background: #3a3a3a; }
+/* 刪除鈕的外框要跟卡片底色一致才像「挖」在上面，dark mode 用白框會很突兀 */
+.attachment-del {
+    position: absolute; top: -6px; right: -6px;
+    width: 20px; height: 20px; padding: 0; line-height: 1;
+    border-radius: 50%; font-size: 0.6875rem;
+    background: #dc3545; color: #fff; border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    opacity: 0; transition: opacity 0.15s, background 0.15s;
+}
+.attachment-item:hover .attachment-del,
+.attachment-del:focus { opacity: 1; }
+.attachment-del:hover { background: #bb2d3b; color: #fff; }
+/* 外框取 #side-panel-inner 的深色底 #1e1e1e，才不會像白框那樣浮在上面 */
+[data-theme="dark"] .attachment-del { background: #c62828; border-color: #1e1e1e; box-shadow: 0 1px 4px rgba(0,0,0,0.6); }
+[data-theme="dark"] .attachment-del:hover { background: #e53935; }
+/* 觸控裝置沒有 hover，刪除鈕必須常駐否則按不到 */
+@media (hover: none) {
+    .attachment-del { opacity: 1; }
+}
+/* emoji picker */
+.js-emoji-item:hover { background: rgba(0,0,0,0.08); }
+[data-theme="dark"] #comment-emoji-picker { background: #2d2d2d !important; border-color: #444 !important; }
+[data-theme="dark"] .js-emoji-item:hover { background: rgba(255,255,255,0.1); }
+/* 站台選擇金黃色 */
+.js-station-pick.active { background: linear-gradient(135deg,#d4af37,#a67c00) !important; color: #fff !important; border-color: #a67c00 !important; }
+.js-station-pick.active .text-muted { color: rgba(255,255,255,0.7) !important; }
+[data-theme="dark"] .js-station-pick { color: #e0e0e0; background: #2d2d2d; border-color: #444; }
+[data-theme="dark"] .js-station-pick:hover { background: #3a3a3a; }
+/* 屬性點擊 */
+.side-prop { cursor: pointer; padding: 0.375rem 0.5rem; border-radius: 0.25rem; }
+.side-prop:hover { background: rgba(0,0,0,0.04); }
+.side-prop label { display: block; cursor: pointer; }
+[data-theme="dark"] .side-prop:hover { background: rgba(255,255,255,0.05); }
+/* 描述 HTML 顯示 */
+.side-field .field-value img { max-width: 100%; height: auto; }
+/* 封存清單 */
+[data-theme="dark"] #modal-archived-list .modal-content { background: #1e1e1e; color: #e0e0e0; }
+[data-theme="dark"] #modal-archived-list .modal-header { border-bottom-color: #333; }
+[data-theme="dark"] #modal-archived-list .table { color: #e0e0e0; }
+[data-theme="dark"] #modal-archived-list .table thead th { color: #ccc; border-bottom-color: #444; }
+[data-theme="dark"] #modal-archived-list .table td { border-bottom-color: #333; }
+[data-theme="dark"] #modal-archived-list .table-hover tbody tr:hover { background: rgba(255,255,255,0.05); }
+[data-theme="dark"] #modal-archived-list .form-select,
+[data-theme="dark"] #modal-archived-list .form-control { background: #2d2d2d; color: #e0e0e0; border-color: #444; }
+[data-theme="dark"] #modal-restore-confirm .modal-content { background: #1e1e1e; color: #e0e0e0; }
+/* 新增任務的站台下拉：清單浮在上層，不把 modal 內其他欄位往下擠 */
+.tb-station-picker { position: relative; }
+.tb-station-picker #task-station-toggle.is-open { border-color: #86b7fe; box-shadow: 0 0 0 0.25rem rgba(13,110,253,0.25); }
+.tb-station-panel {
+    position: absolute; z-index: 5; top: calc(100% + 2px); left: 0; right: 0;
+    background: #fff; border: 1px solid #dee2e6; border-radius: 0.25rem;
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+}
+.tb-station-panel #task-station-list { max-height: 200px; overflow-y: auto; }
+.tb-station-panel .js-task-station-pick { font-size: 0.875rem; border-left: 0; border-right: 0; border-radius: 0; }
+[data-theme="dark"] .tb-station-panel { background: #2d2d2d; border-color: #444; }
+[data-theme="dark"] .tb-station-panel .js-task-station-pick { background: #2d2d2d; color: #e0e0e0; border-color: #444; }
+[data-theme="dark"] .tb-station-panel .js-task-station-pick:hover { background: #3a3a3a; }
+[data-theme="dark"] .tb-station-panel .js-task-station-pick.active { background: #0d6efd; color: #fff; }
+[data-theme="dark"] #task-station-toggle { background-color: #2d2d2d; color: #e0e0e0; border-color: #444; }
+@media (max-width: 767px) {
+    #task-side-panel { width: 100% !important; }
+}
+
+/* ================================================================
+   任務看板的拖曳
+   ================================================================ */
+
+/*
+ * 桌機拖卡片時會把卡片上的文字整片反白。
+ *
+ * 看板用 forceFallback（SortableJS 自己的指標事件實作），而桌機的 delay 是 0，
+ * 所以按下去就開始拖 —— 瀏覽器的文字選取同時也啟動了，兩件事撞在一起。
+ * 手機長按也一樣，還會多跳一個系統的複製選單。
+ *
+ * 卡片上是標題與標籤，要複製內容的話點開右側面板就有，擋掉選取不影響使用。
+ */
+.kanban-card {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
+/*
+ * 拖到哪一欄就把那一欄框起來。
+ *
+ * 外框下在 `.kanban-column` 而不是 `.card-list` —— 框住整欄（連標題列一起）
+ * 比只框放置區明顯得多，「那一欄亮起來」的感覺才出得來。
+ *
+ * ⚠ 外框必須用 **outline，不能用 inset box-shadow**。
+ * 欄位裡的 header 與 card-list 加起來就佔滿整欄，父層的 inset 陰影會畫在
+ * 子元素底下 —— 等於完全看不見。outline 畫在元素外緣才不會被蓋掉。
+ *
+ * 代價是 outline 會超出邊界，而外層 `.kanban-board-wrapper` 是
+ * `overflow-x: auto`，第一欄與最後一欄的外框會被裁掉。
+ * 所以 `.kanban-board` 有一圈 `padding: 6px` 專門留給它（見 blade 的註解），
+ * 剛好容得下 `offset 2px + 寬 3px`。
+ *
+ * ⚠ 填色則用 inset box-shadow，**不要動 background** ——
+ * 深色模式那條 `[data-theme="dark"] .card-list { background: … !important }`
+ * 會蓋掉任何 background，改用陰影就不必跟 !important 打架，
+ * 淺色與深色可以共用同一組規則、只換顏色。
+ */
+.kanban-column.is-drop-target {
+    outline: 3px solid #a67c00;
+    outline-offset: 2px;
+    border-radius: 0.5rem;
+}
+
+.kanban-column.is-drop-target .card-list {
+    /* 9999px 的 inset 陰影等於整塊填色，而且不碰 background */
+    box-shadow: inset 0 0 0 9999px rgba(166, 124, 0, 0.16);
+}
+
+[data-theme="dark"] .kanban-column.is-drop-target {
+    outline-color: #d4af37;
+}
+
+[data-theme="dark"] .kanban-column.is-drop-target .card-list {
+    box-shadow: inset 0 0 0 9999px rgba(212, 175, 55, 0.2);
+}
+

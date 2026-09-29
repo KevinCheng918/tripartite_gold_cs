@@ -151,6 +151,7 @@ inline 無法表達 `[data-theme="dark"]` 選擇器。
 
 ### View
 - `resources/views/admin/task-board/index.blade.php`
+- `public/css/task-board.css` — **看板的全部樣式**（2026-09-29 從 blade 的 inline `<style>` 搬出）
 - `public/css/task-content.css` — 描述內容樣式（清單分層、勾選清單），詳情面板與 TinyMCE 共用
 
 ### 路由
@@ -209,7 +210,18 @@ inline 無法表達 `[data-theme="dark"]` 選擇器。
 > 淺色深色也能共用同一組規則（只換顏色）。
 > `inset 0 0 0 9999px` 等於整塊填色。
 
-樣式在 `public/css/app.css`（與其他拖曳樣式放一起），不在 blade 的 inline `<style>`。
+### 樣式全部在 `public/css/task-board.css`（2026-09-29）
+
+原本 158 行 CSS 寫在 blade 的 inline `<style>` 裡，已整份搬出來。
+
+> **搬成獨立檔，不要併進 `app.css`。**
+> blade 裡的 `<link>` 位置跟原本的 `<style>` 一樣在 `@section('content')` 內，
+> 所以**載入順序與特異性完全不變** —— 併進 head 載入的 `app.css` 反而會讓
+> 它跟 `custom.css` 的既有規則重新比順序，風險無謂。
+> 旁邊的 `task-content.css` 也是同一個模式。
+
+拖曳高亮那幾條原本放在 `app.css`，一併移過來 ——
+**任務看板的樣式只放這一個檔案**，不要再散到 `app.css` 或 blade 裡。
 
 ## 注意事項
 - `assignee_ids` JSON 欄位可能存整數或字串，查詢時需同時用 `whereJsonContains` 比對 int 和 string

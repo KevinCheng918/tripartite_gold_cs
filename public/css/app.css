@@ -1976,63 +1976,7 @@ input[type="time"].form-control {
     -webkit-touch-callout: none;
 }
 
-/* ================================================================
-   任務看板的拖曳
-   ================================================================ */
-
-/*
- * 桌機拖卡片時會把卡片上的文字整片反白。
- *
- * 看板用 forceFallback（SortableJS 自己的指標事件實作），而桌機的 delay 是 0，
- * 所以按下去就開始拖 —— 瀏覽器的文字選取同時也啟動了，兩件事撞在一起。
- * 手機長按也一樣，還會多跳一個系統的複製選單。
- *
- * 卡片上是標題與標籤，要複製內容的話點開右側面板就有，擋掉選取不影響使用。
- */
-.kanban-card {
-    -webkit-user-select: none;
-    user-select: none;
-    -webkit-touch-callout: none;
-}
-
-/*
- * 拖到哪一欄就把那一欄框起來。
- *
- * 外框下在 `.kanban-column` 而不是 `.card-list` —— 框住整欄（連標題列一起）
- * 比只框放置區明顯得多，「那一欄亮起來」的感覺才出得來。
- *
- * ⚠ 外框必須用 **outline，不能用 inset box-shadow**。
- * 欄位裡的 header 與 card-list 加起來就佔滿整欄，父層的 inset 陰影會畫在
- * 子元素底下 —— 等於完全看不見。outline 畫在元素外緣才不會被蓋掉。
- *
- * 代價是 outline 會超出邊界，而外層 `.kanban-board-wrapper` 是
- * `overflow-x: auto`，第一欄與最後一欄的外框會被裁掉。
- * 所以 `.kanban-board` 有一圈 `padding: 6px` 專門留給它（見 blade 的註解），
- * 剛好容得下 `offset 2px + 寬 3px`。
- *
- * ⚠ 填色則用 inset box-shadow，**不要動 background** ——
- * 深色模式那條 `[data-theme="dark"] .card-list { background: … !important }`
- * 會蓋掉任何 background，改用陰影就不必跟 !important 打架，
- * 淺色與深色可以共用同一組規則、只換顏色。
- */
-.kanban-column.is-drop-target {
-    outline: 3px solid #a67c00;
-    outline-offset: 2px;
-    border-radius: 0.5rem;
-}
-
-.kanban-column.is-drop-target .card-list {
-    /* 9999px 的 inset 陰影等於整塊填色，而且不碰 background */
-    box-shadow: inset 0 0 0 9999px rgba(166, 124, 0, 0.16);
-}
-
-[data-theme="dark"] .kanban-column.is-drop-target {
-    outline-color: #d4af37;
-}
-
-[data-theme="dark"] .kanban-column.is-drop-target .card-list {
-    box-shadow: inset 0 0 0 9999px rgba(212, 175, 55, 0.2);
-}
+/* 任務看板的樣式全部在 public/css/task-board.css，這裡不要再放 */
 
 .qr-drag-ghost {
     opacity: 0.4;
