@@ -281,6 +281,32 @@ blade 內嵌成 `window.__boardData`，`loadBoard()` 首次就拿它來畫。
 > 所有 `tinymce.*` 都寫在函式或事件回呼裡，沒有一處在頂層立即執行 ——
 > 真要在頂層用到就得改回同步載入。
 
+## 改欄位不要重載整個看板（2026-09-29）
+
+編輯任務卡的欄位、每存一次都要等一下。原因是 `saveField()` 存完之後跑了
+`loadPanel()` + `loadBoard()` —— **兩趟請求**，而且看板整個清成骨架重畫、
+面板閃一次 `Loading...`。改幾個字卻像當掉一秒。
+
+> **後端本來就把更新後的任務回傳了**（`ajaxUpdateTask` 的 `'task' => TaskResource`），
+> 前端卻把它丟掉再撈兩趟。
+
+現在：
+
+- `updateCardInPlace(task)` 用回傳的資料就地換掉那張卡片，**看板一趟請求都不用發**
+- 面板仍要重載（活動紀錄多了一筆，只有後端知道），但傳 `silent` 不清空內容、
+  不重新開啟面板，避免閃動
+
+`updateCardInPlace()` 要處理的邊界：
+
+- 狀態改掉時卡片要**搬到別欄**，順便維護兩邊的計數與「無任務」佔位文字
+- 找不到那張卡（例如目前的篩選把它濾掉了）就退回 `loadBoard()`
+- 換欄之後要重新 `bindCardClick()` 與 `initSortable()`
+
+> `response()->json(['task' => new TaskResource($task)])` **不會**包 `data` ——
+> wrapper 只在直接回傳 Resource 時才加。前端兩種都吃是防禦性寫法。
+
+附件上傳（`images[]`）走同一套。
+
 ## 注意事項
 - `assignee_ids` JSON 欄位可能存整數或字串，查詢時需同時用 `whereJsonContains` 比對 int 和 string
 - `LIST_COLUMNS` 需包含 `updated_at`，否則封存清單時間顯示為 1970/1/1

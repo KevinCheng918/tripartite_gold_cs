@@ -678,10 +678,21 @@ $(function () {
         return '<div class="side-field" data-field="' + fieldName + '" data-type="' + (type || 'text') + '"><label>' + label + '</label><div class="field-value">' + (value || '<span class="text-muted">點擊編輯</span>') + '</div></div>';
     }
 
-    function loadPanel(taskId) {
+    /**
+     * 載入／重載側邊面板
+     *
+     * @param {number}  taskId
+     * @param {boolean} [silent] true = 不清空內容也不重新開啟面板。
+     *                  存完欄位重載時用 —— 內容其實只差幾個字，
+     *                  卻整片閃成「Loading...」再跳回來，看起來像卡住
+     */
+    function loadPanel(taskId, silent) {
         currentTaskId = taskId;
-        $('#side-panel-body').html('<p class="text-center py-3 text-muted">Loading...</p>');
-        openPanel();
+
+        if (!silent) {
+            $('#side-panel-body').html('<p class="text-center py-3 text-muted">Loading...</p>');
+            openPanel();
+        }
 
         $.ajax({
             url: '/admin/task-board/ajax-task/' + taskId,
@@ -829,7 +840,11 @@ $(function () {
                         processData: false,
                         contentType: false,
                         data: formData,
-                        success: function () { loadPanel(taskId); loadBoard(); },
+                        // 同 saveField：用回傳的任務就地換卡片，不必再撈一次整個看板
+                        success: function (body) {
+                            updateCardInPlace(body.task && body.task.data ? body.task.data : body.task);
+                            loadPanel(taskId, true);
+                        },
                         error: function (xhr) { showMsg((xhr.responseJSON && xhr.responseJSON.message) || '上傳失敗'); }
                     });
                 });
@@ -1184,13 +1199,87 @@ $(function () {
             headers: { 'X-CSRF-TOKEN': csrfToken },
             contentType: 'application/json',
             data: JSON.stringify(payload),
-            success: function () {
-                loadPanel(currentTaskId);
-                loadBoard();
+            success: function (body) {
+                /*
+                 * 以前這裡是 loadPanel() + loadBoard()，等於每存一個欄位就再發
+                 * 兩趟請求，而且整個看板會清成骨架重畫、面板閃一次 Loading ——
+                 * 改幾個字而已卻像當掉一秒。
+                 *
+                 * 後端本來就把更新後的任務回傳了（'task' => TaskResource），
+                 * 拿它就地換掉那張卡片，看板一趟請求都不用發。
+                 */
+                updateCardInPlace(body.task && body.task.data ? body.task.data : body.task);
+
+                // 面板還是要重載 —— 活動紀錄多了一筆，那只有後端知道。
+                // 但用 silent 不清空內容，避免閃動
+                loadPanel(currentTaskId, true);
             },
             error: function (xhr) {
                 showMsg((xhr.responseJSON && xhr.responseJSON.message) || '更新失敗');
             }
+        });
+    }
+
+    /**
+     * 就地換掉看板上的一張卡片
+     *
+     * 狀態改掉時要搬到別欄，順便維護兩邊的計數與「無任務」佔位文字。
+     * 找不到那張卡（例如目前的篩選條件把它濾掉了）就退回整個重載。
+     *
+     * @param {Object} task 後端回傳的最新任務
+     */
+    function updateCardInPlace(task) {
+        if (!task || !task.id) {
+            loadBoard();
+
+            return;
+        }
+
+        var $card = $('.kanban-card[data-task-id="' + task.id + '"]');
+
+        if (!$card.length) {
+            loadBoard();
+
+            return;
+        }
+
+        var $fromList = $card.closest('.card-list');
+        var toListId = statusListMap[task.status];
+        var $toList = $('#' + toListId);
+
+        if (!$toList.length) {
+            loadBoard();
+
+            return;
+        }
+
+        var $newCard = $(renderCard(task));
+
+        if ($fromList.attr('id') === toListId) {
+            $card.replaceWith($newCard);
+        } else {
+            $card.remove();
+            // 目標欄可能還掛著「無任務」，先清掉再放
+            $toList.find('p.text-muted').remove();
+            $toList.append($newCard);
+
+            if (!$fromList.find('.kanban-card').length) {
+                $fromList.html('<p class="text-muted text-center py-3" style="font-size:0.8125rem">無任務</p>');
+            }
+
+            refreshColumnCounts();
+        }
+
+        bindCardClick();
+        initSortable();
+    }
+
+    /**
+     * 依畫面上實際的卡片數更新每一欄的計數
+     */
+    function refreshColumnCounts() {
+        Object.keys(statusListMap).forEach(function (status) {
+            $('#' + statusCountMap[status]).text($('#' + statusListMap[status]).find('.kanban-card').length);
         });
     }
 
