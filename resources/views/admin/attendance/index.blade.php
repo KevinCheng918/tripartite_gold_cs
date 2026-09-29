@@ -51,13 +51,12 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('attendance.amend_field_time') }}</label>
-                            {{-- lang="en-GB"：原生 time 顯示 12 或 24 小時制是看 locale，
-                                 沒有屬性可以直接指定。頁面的 lang 是 zh-TW，Chrome 會顯示
-                                 「上午／下午」，跟系統其他地方寫的 13:00 對不起來。
-                                 en-GB 是 24 小時制的 locale，桌機與 Android Chrome 會吃這個設定。
-                                 ⚠ iOS Safari 不看 lang，它跟著裝置的「24 小時制」開關走。
-                                 value 送出去的永遠是 24 小時制的 HH:mm，只有顯示會變。 --}}
-                            <input id="amend-time" type="time" lang="en-GB" class="form-control" required autocomplete="off">
+                            {{-- js-time-select：由 public/js/common.js 轉成「時」「分」兩個下拉。
+                                 原生 <input type="time"> 顯示 12 還是 24 小時制是看瀏覽器／系統的
+                                 locale，網頁端控制不了（掛 lang="en-GB" 也沒用，Chromium 不吃），
+                                 客服會看到「下午 01:05」而跟系統其他地方的 13:05 對不起來。
+                                 這個 input 會變成 hidden，id 與 value（HH:mm）都維持原樣。 --}}
+                            <input id="amend-time" type="text" class="js-time-select" required autocomplete="off">
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('attendance.amend_field_reason') }}</label>

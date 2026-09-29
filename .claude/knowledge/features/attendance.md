@@ -64,11 +64,14 @@
 自繪的 UI** —— 時間選擇器在手機上是一組很小的數字配上下箭頭，手指幾乎按不準；
 而且 flatpickr 預設把 input 設成 `readonly`，連直接打字都不行。
 
-改用原生 `<input type="date">` / `<input type="time">`：
+日期改用原生 `<input type="date">`（手機跳系統滾輪、桌機可打字、值固定 `YYYY-MM-DD`）。
 
-- 手機跳系統的滾輪選擇器，桌機可以直接輸入
-- 值的格式固定（`YYYY-MM-DD` / `HH:mm`），**正好是後端 `date_format:H:i` 要的**，不必轉
-- 零依賴，不用再同步 flatpickr 的值
+**時間沒有用原生 `<input type="time">`** —— 它顯示 12 還是 24 小時制由瀏覽器
+locale 決定，網頁端控制不了，客服會看到「下午 01:05」而跟系統其他地方的
+`13:05` 對不起來。改成「時」「分」兩個下拉（`window.TimeSelect`），
+完整說明見 [[scheduling]] 的「時間最後不是原生 input，是兩個下拉」。
+
+兩者的 value 都還是 `YYYY-MM-DD` / `HH:mm`，**正好是後端 `date_format:H:i` 要的**，不必轉。
 
 > **月份選擇器（`report-month-picker`、`detail-month-picker`）要留著 flatpickr。**
 > 原生沒有「只選月份」這種控制項，拿掉會退化成完整的日期選擇器。

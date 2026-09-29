@@ -39,23 +39,39 @@
 > 月份選擇器（出勤頁）同理，原生沒有「只選月份」這種控制項。
 > 這幾個地方的 `disableMobile: true` 是對的，不是漏改。
 
-### 12 / 24 小時制
+### 時間最後不是原生 input，是兩個下拉
 
-原生 time 顯示成 `下午 01:00` 還是 `13:00`，**看 locale，沒有屬性可以直接指定**。
-頁面的 `lang` 是 `zh-TW`，Chrome 會顯示「上午／下午」，跟系統其他地方寫的
-`13:00` 對不起來，客服容易看錯。
+換成原生 `<input type="time">` 之後發現它**顯示 12 還是 24 小時制由瀏覽器／
+系統的 locale 決定，網頁端控制不了**。客服看到「下午 01:05」、系統其他地方
+寫「13:05」，很容易看錯。
 
-每個 time input 掛 `lang="en-GB"`（24 小時制的 locale）解決：
+> ⚠️ **`lang="en-GB"` 沒有用，不要再試一次。** 已經實測過：
+> HTML 確實輸出了那個屬性，但 Chromium 的 time input 看的是**瀏覽器的 UI 語言**，
+> 不吃元素的 `lang`。iOS Safari 更是只跟著裝置的「24 小時制」開關走。
 
-| 環境 | 結果 |
-|---|---|
-| 桌機 Chrome / Edge | 24 小時制 ✅ |
-| Android Chrome | 24 小時制 ✅ |
-| iOS Safari | **不看 `lang`**，跟著裝置的「設定 → 一般 → 日期與時間 → 24 小時制」走 |
-| Firefox | 依系統 locale |
+所以時間欄位改成自己畫的**「時」「分」兩個 `<select>`**（`window.TimeSelect`，
+在 `public/js/common.js`）：
 
-`value` 送出去的**永遠是 24 小時制的 `HH:mm`**，只有顯示會變 —— 所以後端與
-既有的 `.substring(0, 5)` 都不受影響。
+- 選項固定是 `00`～`23` 與 `00`～`59`，**24 小時制 100% 可控**，不看任何系統設定
+- 手機上 select 是系統原生的底部滾輪，比 flatpickr 那組小箭頭好按得多
+- 日期欄位維持原生 `<input type="date">` —— 日期沒有 12/24 小時制的問題
+
+用法是在原本的 input 標 `class="js-time-select"`，元件會把它轉成 `hidden`
+並在後面插入兩個下拉。**id 與 value（`HH:mm`）都維持原樣**，所以既有的
+`getElementById(id).value` 讀取完全不用改，後端那排 `date_format:H:i` 也不用動。
+
+> ⚠️ **用程式設值必須走 `TimeSelect.set(id, value)`。**
+> 直接改 `input.value` 兩個下拉不會跟著動，畫面會停在上一次開啟時的選擇。
+> `set()` 自己會處理後端帶秒的格式（`08:00:00` → `08:00`）。
+
+三個實作上的必要條件：
+
+- **空選項要留著。** 沒有它，下拉一渲染就等於已經選了 `00`，
+  使用者沒碰過的欄位會被當成 `00:00` 送出去。
+- **`required` 要從 input 搬到兩個 select 上。** hidden input 不參與 HTML5 驗證，
+  留在上面的話表單會在一個看不見的欄位上報錯，而且沒有任何提示。
+- **`change` 事件要 `bubbles: true`。** 請假時長那類計算是掛在 `document` 上的
+  事件委派，不冒泡的話它永遠收不到。
 
 ### 兩個 CSS 的坑
 
@@ -67,8 +83,13 @@
 > ⚠️ **app.css 的規則只設 `color-scheme`，不要設顏色。**
 > 加上 `[type="..."]` 之後特異性比
 > `[data-theme="dark"] .modal-content .form-control` 還高，一旦指定 background，
-> 同一個表單裡的時間欄位就會跟隔壁的文字欄位變成兩種底色。
+> 同一個表單裡的日期欄位就會跟隔壁的文字欄位變成兩種底色。
 > 顏色由 `public/css/custom.css` 的全域 `.form-control`（帶 `!important`）統一管。
+> 時分下拉本身是 `.form-select`，同樣吃那份全域樣式。
+
+> ⚠️ **`.ts-select` 的 `font-size` 不可以小於 16px。**
+> iOS Safari 在聚焦字級小於 16px 的表單元件時，會自動把整個頁面放大，
+> 使用者得手動縮回去。
 
 ## 分層檔案
 

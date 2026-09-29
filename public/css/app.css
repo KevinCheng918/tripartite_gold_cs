@@ -1352,6 +1352,41 @@ input[type="time"].form-control {
     color-scheme: dark;
 }
 
+/* ===== 時間選擇（時、分兩個下拉） =====
+ *
+ * 結構由 public/js/common.js 的 TimeSelect 產生，原本的 input 變成 hidden。
+ * 用下拉而不用原生 <input type="time"> 的原因寫在那支的註解裡：
+ * 原生的 12／24 小時制由瀏覽器 locale 決定，網頁端控制不了。
+ */
+.ts-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.ts-wrap .ts-select {
+    /* 不要讓它撐滿：時間只有兩位數，拉寬之後「時」和「分」會離很遠，
+       視覺上看不出是同一組 */
+    width: auto;
+    min-width: 4.75rem;
+    /* ⚠ 不可以小於 16px —— iOS Safari 在聚焦字級小於 16px 的表單元件時，
+       會自動把整個頁面放大，使用者得手動縮回去 */
+    font-size: 1rem;
+}
+
+.ts-separator {
+    font-weight: 600;
+    opacity: 0.6;
+}
+
+/* 回訊時間是「起 ~ 迄」兩組並排，手機上四個下拉擠不下，讓它換行 */
+@media (max-width: 575.98px) {
+    .ts-wrap .ts-select {
+        min-width: 4.25rem;
+        padding-right: 1.75rem;
+    }
+}
+
 /* 月份切換 */
 .att-month-nav {
     display: flex;

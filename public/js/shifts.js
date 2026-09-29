@@ -736,10 +736,13 @@
     function openEditShiftModal(shift) {
         document.getElementById('edit-shift-id').value = shift.id;
         document.getElementById('edit-display-name').value = shift.display_name;
-        document.getElementById('edit-start-time').value = shift.start_time.substring(0, 5);
-        document.getElementById('edit-end-time').value = shift.end_time.substring(0, 5);
-        document.getElementById('edit-reply-start-time').value = shift.reply_start_time || '';
-        document.getElementById('edit-reply-end-time').value = shift.reply_end_time || '';
+        // 時間欄位是兩個下拉組成的，要走 TimeSelect.set() ——
+        // 直接改 input.value 的話下拉不會跟著動，畫面會停在上一次開啟時的選擇。
+        // set() 自己會處理帶秒的格式（08:00:00 → 08:00）
+        TimeSelect.set('edit-start-time', shift.start_time);
+        TimeSelect.set('edit-end-time', shift.end_time);
+        TimeSelect.set('edit-reply-start-time', shift.reply_start_time);
+        TimeSelect.set('edit-reply-end-time', shift.reply_end_time);
         openModal('modal-edit-shift');
     }
 
@@ -1195,13 +1198,11 @@
         document.getElementById('cover-assignment-id').value = assignmentId;
         document.getElementById('cover-reason').value = '';
 
-        // 預填班別時段
+        // 預填班別時段。走 TimeSelect.set() 才會同步到兩個下拉
         var assignment = assignmentsData.filter(function (a) { return a.id === assignmentId; })[0];
         if (assignment && assignment.shift) {
-            var startStr = assignment.shift.start_time ? assignment.shift.start_time.substring(0, 5) : '';
-            var endStr = assignment.shift.end_time ? assignment.shift.end_time.substring(0, 5) : '';
-            document.getElementById('cover-start').value = startStr;
-            document.getElementById('cover-end').value = endStr;
+            TimeSelect.set('cover-start', assignment.shift.start_time);
+            TimeSelect.set('cover-end', assignment.shift.end_time);
         }
 
         // 載入客服選單

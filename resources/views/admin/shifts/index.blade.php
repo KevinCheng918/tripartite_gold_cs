@@ -105,18 +105,19 @@
             </div>
             <div class="mb-3">
                 <label class="form-label" for="create-start-time">{{ trans('shift.field_start_time') }}</label>
-                <input id="create-start-time" type="time" lang="en-GB" name="start_time" class="form-control" required autocomplete="off">
+                <input id="create-start-time" type="text" name="start_time" class="js-time-select" required autocomplete="off">
             </div>
             <div class="mb-3">
                 <label class="form-label" for="create-end-time">{{ trans('shift.field_end_time') }}</label>
-                <input id="create-end-time" type="time" lang="en-GB" name="end_time" class="form-control" required autocomplete="off">
+                <input id="create-end-time" type="text" name="end_time" class="js-time-select" required autocomplete="off">
             </div>
             <div class="mb-3">
                 <label class="form-label">主要回訊時間</label>
-                <div class="d-flex gap-2 align-items-center">
-                    <input id="create-reply-start-time" type="time" lang="en-GB" class="form-control" autocomplete="off">
+                {{-- flex-wrap：時間各自是「時」「分」兩個下拉，起迄加起來四個，手機上擠不下 --}}
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <input id="create-reply-start-time" type="text" class="js-time-select" autocomplete="off">
                     <span>~</span>
-                    <input id="create-reply-end-time" type="time" lang="en-GB" class="form-control" autocomplete="off">
+                    <input id="create-reply-end-time" type="text" class="js-time-select" autocomplete="off">
                 </div>
             </div>
             <div class="text-end mt-3">
@@ -158,11 +159,11 @@
                 <label class="form-label">{{ trans('leave.field_time') }} <span class="text-danger">*</span></label>
                 <div class="row g-2">
                     <div class="col">
-                        <input id="leave-start-time" type="time" lang="en-GB" class="form-control">
+                        <input id="leave-start-time" type="text" class="js-time-select">
                     </div>
                     <div class="col-auto d-flex align-items-center">~</div>
                     <div class="col">
-                        <input id="leave-end-time" type="time" lang="en-GB" class="form-control">
+                        <input id="leave-end-time" type="text" class="js-time-select">
                     </div>
                 </div>
             </div>
@@ -209,18 +210,19 @@
             </div>
             <div class="mb-3">
                 <label class="form-label" for="edit-start-time">{{ trans('shift.field_start_time') }}</label>
-                <input id="edit-start-time" type="time" lang="en-GB" name="start_time" class="form-control" required autocomplete="off">
+                <input id="edit-start-time" type="text" name="start_time" class="js-time-select" required autocomplete="off">
             </div>
             <div class="mb-3">
                 <label class="form-label" for="edit-end-time">{{ trans('shift.field_end_time') }}</label>
-                <input id="edit-end-time" type="time" lang="en-GB" name="end_time" class="form-control" required autocomplete="off">
+                <input id="edit-end-time" type="text" name="end_time" class="js-time-select" required autocomplete="off">
             </div>
             <div class="mb-3">
                 <label class="form-label" for="edit-reply-start-time">主要回訊時間</label>
-                <div class="d-flex gap-2 align-items-center">
-                    <input id="edit-reply-start-time" type="time" lang="en-GB" class="form-control" autocomplete="off">
+                {{-- flex-wrap：時間各自是「時」「分」兩個下拉，起迄加起來四個，手機上擠不下 --}}
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <input id="edit-reply-start-time" type="text" class="js-time-select" autocomplete="off">
                     <span>~</span>
-                    <input id="edit-reply-end-time" type="time" lang="en-GB" class="form-control" autocomplete="off">
+                    <input id="edit-reply-end-time" type="text" class="js-time-select" autocomplete="off">
                 </div>
             </div>
             <div class="text-end mt-3">
@@ -258,11 +260,11 @@
             </div>
             <div class="mb-3">
                 <label class="form-label" for="cover-start">{{ trans('shift.field_start_time') }}</label>
-                <input id="cover-start" type="time" lang="en-GB" name="cover_start" class="form-control" required autocomplete="off">
+                <input id="cover-start" type="text" name="cover_start" class="js-time-select" required autocomplete="off">
             </div>
             <div class="mb-3">
                 <label class="form-label" for="cover-end">{{ trans('shift.field_end_time') }}</label>
-                <input id="cover-end" type="time" lang="en-GB" name="cover_end" class="form-control" required autocomplete="off">
+                <input id="cover-end" type="text" name="cover_end" class="js-time-select" required autocomplete="off">
             </div>
             <div class="mb-3">
                 <label class="form-label" for="cover-reason">{{ trans('cover.field_reason') }}</label>
