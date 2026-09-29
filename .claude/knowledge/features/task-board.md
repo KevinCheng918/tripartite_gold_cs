@@ -191,11 +191,23 @@ inline 無法表達 `[data-theme="dark"]` 選擇器。
   每次都把五欄全部 remove/add 是白做工
 - 拖曳取消（放回原處、按 ESC）一樣會走 `onEnd`，所以高亮清在那裡就夠
 
-> ⚠️ **高亮用 `outline` 與 inset `box-shadow`，不要動 `background`。**
+外框下在 `.kanban-column`（框住整欄、含標題列），填色下在 `.card-list`。
+三個踩過的點：
+
+> ⚠️ **外框必須用 `outline`，不能用 inset `box-shadow`。**
+> 欄位裡的 header 與 card-list 加起來就佔滿整欄，父層的 inset 陰影會畫在
+> 子元素底下 —— 等於完全看不見。
+
+> ⚠️ **`.kanban-board` 的 `padding: 6px` 是給外框用的，不要拿掉。**
+> outline 畫在元素外緣，而外層 `.kanban-board-wrapper` 是 `overflow-x: auto`，
+> 沒有這圈 padding 的話，第一欄與最後一欄的外框會被裁掉（或多撐出一截捲軸）。
+> 6px 剛好容得下 `outline-offset: 2px` + `寬 3px`。
+
+> ⚠️ **填色用 inset `box-shadow`，不要動 `background`。**
 > 深色模式那條 `[data-theme="dark"] .card-list { background: … !important }`
-> 會蓋掉任何 background；改用這兩個屬性就不必跟 `!important` 打架，
-> 而且淺色深色可以共用同一組規則（只換顏色）。
-> inset 陰影用 `0 0 0 9999px` 等於整塊填色。
+> 會蓋掉任何 background；改用陰影就不必跟 `!important` 打架，
+> 淺色深色也能共用同一組規則（只換顏色）。
+> `inset 0 0 0 9999px` 等於整塊填色。
 
 樣式在 `public/css/app.css`（與其他拖曳樣式放一起），不在 blade 的 inline `<style>`。
 

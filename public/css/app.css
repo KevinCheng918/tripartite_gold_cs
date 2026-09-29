@@ -1998,21 +1998,40 @@ input[type="time"].form-control {
 /*
  * 拖到哪一欄就把那一欄框起來。
  *
- * ⚠ 用 outline 與 inset box-shadow 做，**不要動 background** ——
+ * 外框下在 `.kanban-column` 而不是 `.card-list` —— 框住整欄（連標題列一起）
+ * 比只框放置區明顯得多，「那一欄亮起來」的感覺才出得來。
+ *
+ * ⚠ 外框必須用 **outline，不能用 inset box-shadow**。
+ * 欄位裡的 header 與 card-list 加起來就佔滿整欄，父層的 inset 陰影會畫在
+ * 子元素底下 —— 等於完全看不見。outline 畫在元素外緣才不會被蓋掉。
+ *
+ * 代價是 outline 會超出邊界，而外層 `.kanban-board-wrapper` 是
+ * `overflow-x: auto`，第一欄與最後一欄的外框會被裁掉。
+ * 所以 `.kanban-board` 有一圈 `padding: 6px` 專門留給它（見 blade 的註解），
+ * 剛好容得下 `offset 2px + 寬 3px`。
+ *
+ * ⚠ 填色則用 inset box-shadow，**不要動 background** ——
  * 深色模式那條 `[data-theme="dark"] .card-list { background: … !important }`
- * 會蓋掉任何 background，改用這兩個屬性就不必跟 !important 打架，
- * 淺色與深色也是同一組規則。
+ * 會蓋掉任何 background，改用陰影就不必跟 !important 打架，
+ * 淺色與深色可以共用同一組規則、只換顏色。
  */
+.kanban-column.is-drop-target {
+    outline: 3px solid #a67c00;
+    outline-offset: 2px;
+    border-radius: 0.5rem;
+}
+
 .kanban-column.is-drop-target .card-list {
-    outline: 2px dashed #a67c00;
-    outline-offset: -3px;
     /* 9999px 的 inset 陰影等於整塊填色，而且不碰 background */
-    box-shadow: inset 0 0 0 9999px rgba(166, 124, 0, 0.07);
+    box-shadow: inset 0 0 0 9999px rgba(166, 124, 0, 0.16);
+}
+
+[data-theme="dark"] .kanban-column.is-drop-target {
+    outline-color: #d4af37;
 }
 
 [data-theme="dark"] .kanban-column.is-drop-target .card-list {
-    outline-color: #d4af37;
-    box-shadow: inset 0 0 0 9999px rgba(212, 175, 55, 0.1);
+    box-shadow: inset 0 0 0 9999px rgba(212, 175, 55, 0.2);
 }
 
 .qr-drag-ghost {

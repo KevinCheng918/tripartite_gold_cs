@@ -14,7 +14,9 @@
         .taskboard-toolbar { background: #fff; }
         [data-theme="dark"] .taskboard-toolbar { background: #1a1a1a; color: #e0e0e0; }
         .kanban-board-wrapper { overflow-x: auto; width: 100%; }
-        .kanban-board { display: inline-flex; gap: 0.75rem; min-height: 65vh; min-width: 1500px; }
+        /* padding 是留給「拖曳中的欄位外框」的空間：外框用 outline 畫在欄位外緣，
+           沒有這圈 padding 的話，第一欄與最後一欄的外框會被 wrapper 的 overflow 裁掉 */
+        .kanban-board { display: inline-flex; gap: 0.75rem; min-height: 65vh; min-width: 1500px; padding: 6px; }
         .kanban-column { flex: 1; min-width: 0; display: flex; flex-direction: column; border-radius: 0.5rem; overflow: hidden; }
         .kanban-column .card-list { flex: 1; }
         .kanban-column .column-header { padding: 0.75rem 1rem; border-radius: 0.5rem 0.5rem 0 0; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
