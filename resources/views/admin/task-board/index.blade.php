@@ -681,12 +681,13 @@ $(function () {
     /**
      * 載入／重載側邊面板
      *
-     * @param {number}  taskId
-     * @param {boolean} [silent] true = 不清空內容也不重新開啟面板。
-     *                  存完欄位重載時用 —— 內容其實只差幾個字，
-     *                  卻整片閃成「Loading...」再跳回來，看起來像卡住
+     * @param {number}   taskId
+     * @param {boolean}  [silent] true = 不清空內容也不重新開啟面板。
+     *                   存完欄位重載時用 —— 內容其實只差幾個字，
+     *                   卻整片閃成「Loading...」再跳回來，看起來像卡住
+     * @param {Function} [done]   載完（含失敗）後呼叫，用來解鎖面板
      */
-    function loadPanel(taskId, silent) {
+    function loadPanel(taskId, silent, done) {
         currentTaskId = taskId;
 
         if (!silent) {
@@ -840,12 +841,17 @@ $(function () {
                         processData: false,
                         contentType: false,
                         data: formData,
+                        // 上傳期間一樣鎖住面板，理由同 saveField
+                        beforeSend: function () { lockPanel(true); },
                         // 同 saveField：用回傳的任務就地換卡片，不必再撈一次整個看板
                         success: function (body) {
                             updateCardInPlace(body.task && body.task.data ? body.task.data : body.task);
-                            loadPanel(taskId, true);
+                            loadPanel(taskId, true, function () { lockPanel(false); });
                         },
-                        error: function (xhr) { showMsg((xhr.responseJSON && xhr.responseJSON.message) || '上傳失敗'); }
+                        error: function (xhr) {
+                            showMsg((xhr.responseJSON && xhr.responseJSON.message) || '上傳失敗');
+                            lockPanel(false);
+                        }
                     });
                 });
 
@@ -886,6 +892,10 @@ $(function () {
                 $('#panel-comment-input').on('keydown', function (e) {
                     if (e.ctrlKey && e.which === 13) sendComment(taskId);
                 });
+            },
+            // 成功或失敗都要走到 —— 呼叫端用這個解鎖面板，漏掉會把人鎖死
+            complete: function () {
+                if (typeof done === 'function') { done(); }
             }
         });
     }
@@ -1188,10 +1198,39 @@ $(function () {
         })();
     }
 
+    /** @type {boolean} 面板是不是正在存檔。存檔期間不接受任何新的編輯 */
+    var panelBusy = false;
+
+    /**
+     * 鎖住／放開側邊面板
+     *
+     * 存檔還沒回來就讓人繼續改別的欄位的話，兩筆更新會互相蓋掉，
+     * 而且存完重載面板時，正開著的編輯框會整個被沖掉。
+     *
+     * 鎖兩塊：`#side-panel-body`（欄位與留言區），以及頂部動作列的
+     * 「異動紀錄」「封存」。
+     *
+     * **關閉鈕刻意留著** —— 萬一請求卡住，至少還關得掉。
+     *
+     * @param {boolean} locked
+     */
+    function lockPanel(locked) {
+        panelBusy = locked;
+        $('#side-panel-body').toggleClass('tb-panel-busy', locked);
+        $('#side-panel-actions').toggleClass('tb-panel-busy-actions', locked);
+    }
+
     function saveField(fieldName, value) {
         if (!currentTaskId) return;
+
+        // 上一筆還沒回來就不收第二筆。CSS 的 pointer-events 擋得掉滑鼠，
+        // 但擋不掉鍵盤操作與程式呼叫，所以這裡再判一次
+        if (panelBusy) { return; }
+
         var payload = {};
         payload[fieldName] = value;
+
+        lockPanel(true);
 
         $.ajax({
             url: '/admin/task-board/ajax-update-task/' + currentTaskId,
@@ -1211,11 +1250,13 @@ $(function () {
                 updateCardInPlace(body.task && body.task.data ? body.task.data : body.task);
 
                 // 面板還是要重載 —— 活動紀錄多了一筆，那只有後端知道。
-                // 但用 silent 不清空內容，避免閃動
-                loadPanel(currentTaskId, true);
+                // 但用 silent 不清空內容，避免閃動。
+                // 鎖要留到面板真的換好才放，否則重載會把剛開的編輯框沖掉
+                loadPanel(currentTaskId, true, function () { lockPanel(false); });
             },
             error: function (xhr) {
                 showMsg((xhr.responseJSON && xhr.responseJSON.message) || '更新失敗');
+                lockPanel(false);
             }
         });
     }

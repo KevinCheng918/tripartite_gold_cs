@@ -261,3 +261,37 @@
 @media (prefers-reduced-motion: reduce) {
     .tb-skeleton { animation: none; }
 }
+
+/* ================================================================
+   存檔中的側邊面板
+   ================================================================ */
+
+/*
+ * 存檔還沒回來就讓人繼續改別的欄位的話，兩筆更新會互相蓋掉，
+ * 而且存完重載面板時，正開著的編輯框會整個被沖掉。
+ */
+.tb-panel-busy {
+    pointer-events: none;
+    opacity: 0.55;
+    /* 用 transition 淡入淡出，才不會每存一次就閃一下 */
+    transition: opacity 0.15s ease;
+}
+
+/* 游標停在上面時就看得出來是在忙，不是壞掉 */
+.tb-panel-busy,
+.tb-panel-busy * {
+    cursor: progress;
+}
+
+/*
+ * 頂部動作列只鎖「異動紀錄」與「封存」。
+ *
+ * ⚠ **關閉鈕（.btn-close）要留著能按** —— 萬一請求卡住，
+ * 至少還關得掉面板，不會把人困在半透明的畫面裡。
+ */
+.tb-panel-busy-actions .btn:not(.btn-close) {
+    pointer-events: none;
+    opacity: 0.55;
+    cursor: progress;
+    transition: opacity 0.15s ease;
+}

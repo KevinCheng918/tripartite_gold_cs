@@ -307,6 +307,28 @@ blade 內嵌成 `window.__boardData`，`loadBoard()` 首次就拿它來畫。
 
 附件上傳（`images[]`）走同一套。
 
+### 存檔期間鎖住面板
+
+存檔還沒回來就讓人繼續改別的欄位的話，**兩筆更新會互相蓋掉**，
+而且存完重載面板時，正開著的編輯框會整個被沖掉。
+
+`lockPanel()` 鎖兩塊：`#side-panel-body`（欄位與留言區）與頂部動作列的
+「異動紀錄」「封存」。
+
+> ⚠️ **關閉鈕（`.btn-close`）刻意留著能按。**
+> 萬一請求卡住，至少還關得掉面板，不會把人困在半透明的畫面裡。
+> 它在 `#side-panel-actions` 而不是 `#side-panel-body`，
+> 所以 CSS 用 `:not(.btn-close)` 把它排除。
+
+兩道防線都要：
+
+- CSS 的 `pointer-events: none` 擋滑鼠
+- `panelBusy` 旗標擋鍵盤操作與程式呼叫 —— `saveField()` 開頭判一次
+
+> ⚠️ **鎖要留到面板重載完才放**，不是請求一回來就放。
+> `loadPanel()` 因此多了第三個參數 `done`，掛在 `complete` 上（成功失敗都會走到）——
+> 漏掉就會把人鎖死。
+
 ## 注意事項
 - `assignee_ids` JSON 欄位可能存整數或字串，查詢時需同時用 `whereJsonContains` 比對 int 和 string
 - `LIST_COLUMNS` 需包含 `updated_at`，否則封存清單時間顯示為 1970/1/1

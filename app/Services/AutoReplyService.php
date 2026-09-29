@@ -326,10 +326,11 @@ class AutoReplyService
          * 判斷「該不該先問」。題庫還沒有相符的題目時 item_id 會是 null，
          * 那就照舊轉人工 —— 寧可轉人工，也不要讓它自己編要問什麼。
          */
-        if (Arr::get($result, 'needs_info') === true && filled($itemId)) {
+        // 冷卻判斷（讀 Cache）排在查題庫之前 —— 冷卻中就直接跳過，不必白查一次 DB
+        if (Arr::get($result, 'needs_info') === true && filled($itemId) && $this->canAskInfo($group)) {
             $item = $this->quickReplyRepository->findActiveItem($itemId);
 
-            if (filled($item) && $this->canAskInfo($group)) {
+            if (filled($item)) {
                 return ['action' => $actions['ASK_INFO'], 'item' => $item, 'opening' => $opening];
             }
         }
