@@ -1976,6 +1976,45 @@ input[type="time"].form-control {
     -webkit-touch-callout: none;
 }
 
+/* ================================================================
+   任務看板的拖曳
+   ================================================================ */
+
+/*
+ * 桌機拖卡片時會把卡片上的文字整片反白。
+ *
+ * 看板用 forceFallback（SortableJS 自己的指標事件實作），而桌機的 delay 是 0，
+ * 所以按下去就開始拖 —— 瀏覽器的文字選取同時也啟動了，兩件事撞在一起。
+ * 手機長按也一樣，還會多跳一個系統的複製選單。
+ *
+ * 卡片上是標題與標籤，要複製內容的話點開右側面板就有，擋掉選取不影響使用。
+ */
+.kanban-card {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
+/*
+ * 拖到哪一欄就把那一欄框起來。
+ *
+ * ⚠ 用 outline 與 inset box-shadow 做，**不要動 background** ——
+ * 深色模式那條 `[data-theme="dark"] .card-list { background: … !important }`
+ * 會蓋掉任何 background，改用這兩個屬性就不必跟 !important 打架，
+ * 淺色與深色也是同一組規則。
+ */
+.kanban-column.is-drop-target .card-list {
+    outline: 2px dashed #a67c00;
+    outline-offset: -3px;
+    /* 9999px 的 inset 陰影等於整塊填色，而且不碰 background */
+    box-shadow: inset 0 0 0 9999px rgba(166, 124, 0, 0.07);
+}
+
+[data-theme="dark"] .kanban-column.is-drop-target .card-list {
+    outline-color: #d4af37;
+    box-shadow: inset 0 0 0 9999px rgba(212, 175, 55, 0.1);
+}
+
 .qr-drag-ghost {
     opacity: 0.4;
     background: #e9ecef;

@@ -171,6 +171,34 @@ inline 無法表達 `[data-theme="dark"]` 選擇器。
   會讓滑鼠拖曳被當成觸控而拖不動
 - 重新渲染前先 `destroy()` 舊實例，否則同容器疊出多個實例會互搶事件
 
+### 拖曳時不要選到文字（2026-09-29）
+
+桌機拖卡片會把卡片上的文字整片反白 —— `forceFallback` 配上桌機的 `delay: 0`，
+等於按下去就開始拖，瀏覽器的文字選取同時也啟動了，兩件事撞在一起。
+手機長按還會多跳一個系統的複製選單。
+
+`.kanban-card` 加 `user-select: none` + `-webkit-touch-callout: none`
+（作法同 [[quick-reply]] 的 `.js-qr-item`）。卡片上只有標題與標籤，
+要複製內容點開右側面板就有。
+
+### 拖到哪一欄，那一欄就框起來（2026-09-29）
+
+`onMove` 把游標所在的 `.kanban-column` 加上 `is-drop-target`，
+`onStart` 先標來源欄，`onEnd` 清掉。
+
+- **`onMove` 不可以 `return false`** —— 那會被 SortableJS 當成「不允許放置」
+- **只在換欄時才動 DOM**。`onMove` 在拖曳期間會連續觸發很多次，
+  每次都把五欄全部 remove/add 是白做工
+- 拖曳取消（放回原處、按 ESC）一樣會走 `onEnd`，所以高亮清在那裡就夠
+
+> ⚠️ **高亮用 `outline` 與 inset `box-shadow`，不要動 `background`。**
+> 深色模式那條 `[data-theme="dark"] .card-list { background: … !important }`
+> 會蓋掉任何 background；改用這兩個屬性就不必跟 `!important` 打架，
+> 而且淺色深色可以共用同一組規則（只換顏色）。
+> inset 陰影用 `0 0 0 9999px` 等於整塊填色。
+
+樣式在 `public/css/app.css`（與其他拖曳樣式放一起），不在 blade 的 inline `<style>`。
+
 ## 注意事項
 - `assignee_ids` JSON 欄位可能存整數或字串，查詢時需同時用 `whereJsonContains` 比對 int 和 string
 - `LIST_COLUMNS` 需包含 `updated_at`，否則封存清單時間顯示為 1970/1/1

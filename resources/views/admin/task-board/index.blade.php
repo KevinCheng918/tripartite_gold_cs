@@ -1673,9 +1673,44 @@ $(function () {
     // SortableJS — 拖曳
     var sortableInstances = [];
 
+    // 目前正要放進去的那一欄。null 表示沒在拖，或游標不在任何一欄上
+    var dropColumn = null;
+
+    /**
+     * 清掉目標欄位的高亮
+     */
+    function clearDropTarget() {
+        if (!dropColumn) { return; }
+
+        dropColumn.classList.remove('is-drop-target');
+        dropColumn = null;
+    }
+
+    /**
+     * 高亮游標所在的那一欄
+     *
+     * 只在「換了一欄」時才動 DOM —— onMove 在拖曳期間會連續觸發很多次，
+     * 每次都 removeClass/addClass 全部五欄是白做工。
+     *
+     * @param {Element} list 游標所在的 .card-list
+     */
+    function markDropTarget(list) {
+        var column = list ? list.closest('.kanban-column') : null;
+
+        if (column === dropColumn) { return; }
+
+        clearDropTarget();
+
+        if (!column) { return; }
+
+        column.classList.add('is-drop-target');
+        dropColumn = column;
+    }
+
     function initSortable() {
         sortableInstances.forEach(function (s) { s.destroy(); });
         sortableInstances = [];
+        clearDropTarget();
 
         if (!canUpdate) return;
 
@@ -1685,6 +1720,15 @@ $(function () {
                 group: 'tasks',
                 animation: 150,
                 ghostClass: 'sortable-ghost',
+                // 拖到哪一欄就把那一欄框起來，使用者才知道會放進哪裡。
+                // ⚠ 不要 return false，那會讓 SortableJS 以為不允許放置
+                onMove: function (evt) {
+                    markDropTarget(evt.to);
+                },
+                // 拖曳取消（放回原處、按 ESC）也會走到 onEnd，高亮在那裡清
+                onStart: function (evt) {
+                    markDropTarget(evt.from);
+                },
                 // 強制使用 SortableJS 自己的拖曳實作，不走原生 HTML5 drag and drop。
                 // 原生 DnD 在各 OS／瀏覽器的行為差異很大（Windows 上常整個失效），
                 // fallback 模式各平台一致
@@ -1695,6 +1739,8 @@ $(function () {
                 delayOnTouchOnly: true,
                 touchStartThreshold: 5,
                 onEnd: function (evt) {
+                    clearDropTarget();
+
                     var taskId = $(evt.item).data('task-id');
                     var newStatus = parseInt($(evt.to).closest('.kanban-column').data('status'), 10);
                     var newIndex = evt.newIndex;
