@@ -8,6 +8,7 @@ use App\Repositories\QuickReplyRepository;
 use App\Repositories\TelegramRepository;
 use App\Services\AutoReply\AnswerSplitter;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -242,7 +243,7 @@ class AutoReplyService
      */
     private function dispatchResult(TelegramGroup $group, array $result, $text, $messageId, array $history = [])
     {
-        $decision = $this->decide($result);
+        $decision = $this->decide($result, $group);
         $actions = config('constants.AUTO_REPLY.DECISION');
 
         // 客人只說了「好」「收到」——再回一句才是打擾。
@@ -256,6 +257,19 @@ class AutoReplyService
 
         if ($decision['action'] === $actions['ANSWER']) {
             $this->replyWithItem($group, $decision['item'], $decision['opening']);
+
+            return;
+        }
+
+        // 資訊不足：先跟客人要資料，內容一樣是題庫原文
+        if ($decision['action'] === $actions['ASK_INFO']) {
+            Log::info('自動回覆判定資訊不足，先向客人索取', [
+                'group_id' => $group->id,
+                'item_id'  => $decision['item']->id,
+                'text'     => $text,
+            ]);
+
+            $this->replyAskInfo($group, $decision['item'], $decision['opening']);
 
             return;
         }
@@ -276,10 +290,11 @@ class AutoReplyService
      * 這樣 auto-reply:test 可以重用同一套判斷而不會有副作用，
      * 測出來的結果也才等於線上真正會做的事。
      *
-     * @param array $result 比對器的輸出
+     * @param array              $result 比對器的輸出
+     * @param TelegramGroup|null $group  追問冷卻要看是哪個對話；預覽沒有對話，傳 null
      * @return array action（見 constants.AUTO_REPLY.DECISION）／item／opening
      */
-    private function decide(array $result)
+    private function decide(array $result, ?TelegramGroup $group = null)
     {
         $actions = config('constants.AUTO_REPLY.DECISION');
         $intents = config('constants.AUTO_REPLY.INTENT');
@@ -298,8 +313,28 @@ class AutoReplyService
             return ['action' => $actions['WAIT'], 'item' => null, 'opening' => $opening];
         }
 
-        $isHigh = Arr::get($result, 'confidence') === config('constants.AUTO_REPLY.CONFIDENCE.HIGH');
         $itemId = Arr::get($result, 'item_id');
+
+        /*
+         * 資訊不足：先跟客人要資料，不要拿題庫答案硬回。
+         *
+         * 客人只丟一句「訂單沒收到款」，同仁得先問代理帳號與訂單號才查得下去。
+         * 以前這種訊息會被當成一般提問轉人工，同仁收到求助單卻只能按忽略 ——
+         * 那次對話就白費了。
+         *
+         * ⚠ 追問的內容一定是題庫原文（「需要補充資訊」那一類），模型只負責
+         * 判斷「該不該先問」。題庫還沒有相符的題目時 item_id 會是 null，
+         * 那就照舊轉人工 —— 寧可轉人工，也不要讓它自己編要問什麼。
+         */
+        if (Arr::get($result, 'needs_info') === true && filled($itemId)) {
+            $item = $this->quickReplyRepository->findActiveItem($itemId);
+
+            if (filled($item) && $this->canAskInfo($group)) {
+                return ['action' => $actions['ASK_INFO'], 'item' => $item, 'opening' => $opening];
+            }
+        }
+
+        $isHigh = Arr::get($result, 'confidence') === config('constants.AUTO_REPLY.CONFIDENCE.HIGH');
 
         if ($isHigh && filled($itemId)) {
             $item = $this->quickReplyRepository->findActiveItem($itemId);
@@ -315,6 +350,86 @@ class AutoReplyService
         // 沒把握就轉人工。答錯的代價遠高於多轉一次人工，
         // 而且每轉一次就是一次把題庫補起來的機會
         return ['action' => $actions['WAIT'], 'item' => null, 'opening' => $opening];
+    }
+
+    /**
+     * 這個對話現在可以追問嗎
+     *
+     * ⚠️ **這道冷卻是必要的，不要拿掉。**
+     * 客人補了資料之後，模型有可能又覺得「還是不夠」而再問一次 ——
+     * 一來一往變成無止境的追問，客人會直接炸掉。
+     *
+     * 同一個對話在冷卻期間內只追問一次；第二次即使判斷資訊不足也照舊轉人工，
+     * 交給同仁判斷還缺什麼。
+     *
+     * 預覽沒有對話（$group 是 null），不受冷卻限制 ——
+     * 那是用來測判斷結果的，擋掉反而測不出來。
+     *
+     * @param TelegramGroup|null $group
+     * @return bool
+     */
+    private function canAskInfo($group)
+    {
+        if (blank($group)) {
+            return true;
+        }
+
+        return !Cache::has($this->askInfoCacheKey($group->id));
+    }
+
+    /**
+     * 記下「這個對話剛剛追問過」
+     *
+     * @param TelegramGroup $group
+     * @return void
+     */
+    private function markAsked(TelegramGroup $group)
+    {
+        $minutes = (int) config('auto_reply.ask_info_cooldown');
+
+        // 設定成 0 等於關掉冷卻，那是刻意的選擇，不要用 fallback 蓋掉
+        if ($minutes < 1) {
+            return;
+        }
+
+        Cache::put($this->askInfoCacheKey($group->id), true, now()->addMinutes($minutes));
+    }
+
+    /**
+     * @param int $groupId
+     * @return string
+     */
+    private function askInfoCacheKey($groupId)
+    {
+        return "auto_reply.asked.{$groupId}";
+    }
+
+    /**
+     * 先跟客人要資料
+     *
+     * 走的是跟命中答案同一套模板與分則邏輯 —— 對客人來說，
+     * 「請提供訂單號」跟一般回覆沒有差別，不該長得不一樣。
+     *
+     * ⚠️ **不標記已回覆**：這件事還沒處理完，客人補資料之前
+     * 既有的未回覆告警要繼續響，同仁才不會漏掉。
+     *
+     * @param TelegramGroup $group
+     * @param object        $item
+     * @param string|null   $opening
+     * @return void
+     */
+    private function replyAskInfo(TelegramGroup $group, $item, $opening)
+    {
+        $content = $this->renderTemplate(
+            $group,
+            AppSettingService::KEY_TPL_ANSWER_FULL,
+            AppSettingService::KEY_TPL_ANSWER_SHORT,
+            ['{答案}' => $item->answer]
+        );
+
+        $this->send($group, $this->joinOpening($opening, $content), false);
+        $this->markAsked($group);
+        $this->telegramRepository->updateAutoReplyState($group, $item->id);
     }
 
     /**
@@ -409,7 +524,8 @@ class AutoReplyService
             return '';
         }
 
-        if ($action === $actions['ANSWER']) {
+        // 追問跟命中答案送出去的東西一樣（模板 + 題庫原文），預覽自然也一樣
+        if ($action === $actions['ANSWER'] || $action === $actions['ASK_INFO']) {
             $template = $this->appSettingService->get(AppSettingService::KEY_TPL_ANSWER_FULL);
             $content = filled($template) ? strtr($template, ['{答案}' => $item->answer]) : '';
             $content = $this->joinOpening($opening, $content);

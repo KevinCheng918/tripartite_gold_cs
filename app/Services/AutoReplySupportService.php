@@ -452,6 +452,64 @@ class AutoReplySupportService
     }
 
     /**
+     * 先問客人，並把這句追問記進題庫
+     *
+     * 客人只丟一句「訂單沒收到款」，同仁得先問代理帳號與訂單號才查得下去。
+     * 以前這種單子只能按忽略，那次對話就白費了 —— 現在存起來之後，
+     * AI 比對到同樣的問法就會自己追問。
+     *
+     * 跟「② 回覆客人並加入題庫」的差別只有一個：**不必選類別**。
+     * 一律歸到「需要補充資訊」，因為那個類別名稱同時是給模型看的線索。
+     *
+     * @param AutoReplyTicket $ticket
+     * @param int|null        $messageId
+     * @return void
+     */
+    private function handleAskInfo(AutoReplyTicket $ticket, $messageId)
+    {
+        $sent = $this->replyToCustomer($ticket);
+        $item = $this->saveToQuickReply($ticket, $this->askInfoCategoryId());
+
+        $lines = [$sent ? '✅ 已把問題送給客人。' : '⚠️ 送給客人失敗，請到後台手動處理。'];
+
+        if (blank($item)) {
+            $lines[] = '';
+            $lines[] = '⚠️ 這句沒能存進題庫，下次同樣的問法還是會轉過來。';
+            $this->editSupportMessage($messageId, implode("\n", $lines));
+
+            return;
+        }
+
+        $lines[] = '';
+        $lines[] = "📝 已記住：客人這樣問的時候要先跟他要這些資料（#{$item->id}）。";
+        $lines[] = '之後遇到同樣的問法，系統會自己問，不會再轉過來。';
+
+        $this->editSupportMessage($messageId, implode("\n", $lines));
+    }
+
+    /**
+     * 取「需要補充資訊」類別的 id，沒有就建一個
+     *
+     * 正常情況下 AskInfoCategorySeeder 已經建好了。這裡補一層是因為
+     * 漏跑 seeder 的話，同仁會按下按鈕卻存不進去 —— 那比多建一個類別糟。
+     *
+     * @return int
+     */
+    private function askInfoCategoryId()
+    {
+        $label = config('constants.AUTO_REPLY.ASK_INFO_CATEGORY');
+        $category = $this->quickReplyRepository->findCategoryByLabel($label);
+
+        if (filled($category)) {
+            return $category->id;
+        }
+
+        Log::warning('「需要補充資訊」類別不存在，自動建立（AskInfoCategorySeeder 可能沒跑）');
+
+        return $this->quickReplyService->createCategory(['label' => $label])->id;
+    }
+
+    /**
      * 用題庫原文回覆客人
      *
      * 走的是自動回覆命中時的同一套話術模板與分則邏輯 ——
@@ -538,6 +596,14 @@ class AutoReplySupportService
             $sent = $this->replyToCustomer($ticket);
             $this->ticketRepository->update($ticket, ['status' => $statuses['REPLIED']]);
             $this->editSupportMessage($messageId, $sent ? '✅ 已回覆客人。' : '⚠️ 回覆客人失敗，請到後台手動處理。');
+
+            return;
+        }
+
+        // 先問客人：送出去之後把這句存進「需要補充資訊」類別，
+        // 之後 AI 比對到同樣的問法就會自己追問，不必再轉一次人工
+        if ($action === $actions['ASK_INFO']) {
+            $this->handleAskInfo($ticket, $messageId);
 
             return;
         }
@@ -716,7 +782,14 @@ class AutoReplySupportService
             ],
             [
                 ['text' => '③ 只加入題庫', 'callback_data' => "{$prefix}:{$actions['SAVE_ONLY']}:{$ticketId}"],
-                ['text' => '④ 忽略', 'callback_data' => "{$prefix}:{$actions['IGNORE']}:{$ticketId}"],
+            ],
+            [
+                // 客人給的資訊不夠，要先跟他要資料。跟②的差別是**不必選類別** ——
+                // 一律歸到「需要補充資訊」，之後 AI 就靠這一類自己追問
+                ['text' => '④ 先問客人，並記住要問什麼', 'callback_data' => "{$prefix}:{$actions['ASK_INFO']}:{$ticketId}"],
+            ],
+            [
+                ['text' => '⑤ 忽略', 'callback_data' => "{$prefix}:{$actions['IGNORE']}:{$ticketId}"],
             ],
         ];
     }

@@ -406,6 +406,7 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
             'confidence' => (string) Arr::get($result, 'confidence', config('constants.AUTO_REPLY.CONFIDENCE.LOW')),
             'opening'    => filled($opening) ? (string) $opening : null,
             'candidates' => $this->parseCandidates($result, $itemId),
+            'needs_info' => (bool) Arr::get($result, 'needs_info', false),
         ];
     }
 
@@ -481,6 +482,11 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
                     'type'        => ['string', 'null'],
                     'description' => '回應客人的那一兩句話（最多 60 字）。不含任何規格、價格、承諾，也不要指示客人怎麼回覆。只是純寒暄且不需要回應時填 null',
                 ],
+                // 「要先跟客人要資料」跟「答得出來」是兩件事，分開問才不會混在 confidence 裡
+                'needs_info' => [
+                    'type'        => 'boolean',
+                    'description' => '客人給的資訊不足以回答，必須先跟他要資料（訂單號、代理帳號、是代收還是代付等）時填 true',
+                ],
                 // 轉人工時附在求助訊息上，讓同仁一鍵用題庫原文回覆。
                 // 模型已經看過整份題庫，順手多回兩個候選幾乎沒有成本，
                 // 卻能讓「題庫其實有答案卻沒命中」這種情況不必重打一次答案
@@ -491,7 +497,7 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
                     'description' => '可能沾得上邊的題目 id，最相近的排前面。就算沒把握也要列出來，這是給同仁參考的，不會直接送給客人。真的完全無關才給空陣列',
                 ],
             ],
-            'required'             => ['intent', 'item_id', 'confidence', 'opening', 'candidates'],
+            'required'             => ['intent', 'item_id', 'confidence', 'opening', 'candidates', 'needs_info'],
             'additionalProperties' => false,
         ];
 
@@ -544,6 +550,7 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
 
             $intents = config('constants.AUTO_REPLY.INTENT');
             $maxLength = config('constants.AUTO_REPLY.OPENING.MAX_LENGTH');
+            $askInfoCategory = config('constants.AUTO_REPLY.ASK_INFO_CATEGORY');
 
             return implode("\n", [
                 '你是線上客服的助手。客人傳來一則訊息，你要做兩件事：',
@@ -598,6 +605,25 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
                 '',
                 '「客人也這樣問過」那幾句是同仁確認過、確實該對到那一題的說法。',
                 '客人這次講的跟其中一句意思相同，就是命中。',
+                '',
+                '## 資訊夠不夠回答（needs_info）',
+                '',
+                '客人常常只丟一句「訂單沒收到款」「這筆卡住了」就沒了 ——',
+                '同仁得先跟他要代理帳號、訂單號，或問清楚是代收還是代付，才查得下去。',
+                '',
+                "這種情況 `needs_info` 填 true，而且**要去「{$askInfoCategory}」這一類裡挑題目**，",
+                '把 item_id 填成那一題 —— 那些題目的答案就是「要跟客人要哪些資料」。',
+                '',
+                '**不要自己寫要問什麼。** 你只負責判斷「該不該先問」，',
+                '問什麼一律照題庫的原文，沒有相符的題目就把 item_id 填 null（會轉給同仁處理）。',
+                '',
+                '什麼時候**不要**填 true：',
+                '',
+                '- 題庫那題的答案本身就含「麻煩提供…」——那題直接回答就好，不必再多問一次',
+                '- 客人只是在寒暄、或在提需求（那是 intent 的事）',
+                '- 前面的對話裡他已經給過那些資料了',
+                '',
+                '⚠️ 客人最討厭的就是被一問再問。拿不準的時候，寧可轉給同仁，也不要多問一輪。',
                 '',
                 '## 候選題目（candidates）',
                 '',
