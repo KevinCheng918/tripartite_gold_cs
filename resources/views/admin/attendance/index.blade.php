@@ -41,6 +41,10 @@
                                  而且桌機可以直接打字。值的格式固定是 YYYY-MM-DD / HH:mm，
                                  正好是後端 date_format:H:i 要的，不必再轉。 --}}
                             <input id="amend-date" type="date" class="form-control" required autocomplete="off">
+                            {{-- 晚班下班是隔天凌晨，選哪一天不直覺。後端會自己往前找到
+                                 對應的班次（見 ClockAmendmentService::applyAmendment()），
+                                 但先講清楚可以少一次來回 --}}
+                            <div class="form-text">{{ trans('attendance.amend_date_hint') }}</div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('attendance.amend_field_type') }}</label>

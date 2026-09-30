@@ -72,6 +72,7 @@ return [
     'amend_type_in'      => 'Clock In',
     'amend_type_out'     => 'Clock Out',
     'amend_field_date'   => 'Date',
+    'amend_date_hint'    => 'Pick the day you actually clocked. For an overnight shift ending after midnight, that is the next day.',
     'amend_field_type'   => 'Type',
     'amend_field_time'   => 'Time',
     'amend_field_reason' => 'Reason',

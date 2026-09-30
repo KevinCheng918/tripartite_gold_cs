@@ -125,19 +125,46 @@ class ClockAmendmentService
                 ]);
             }
         } elseif ($amendment->type === ClockAmendment::TYPE_CLOCK_OUT) {
-            if (!$record || !$record->clock_in) {
+            /*
+             * 晚班（例如 16:00–00:00）補下班卡時，申請的日期會是「隔天」——
+             * 人是隔天凌晨 00:00 下班的，但那筆出勤紀錄掛在**前一天**。
+             *
+             * 只查申請日期的話會找不到紀錄，這張單就默默作廢（以前只寫一行 log）。
+             * 往前一天補查一次，跟正常打卡的 clockOut() 同一套做法。
+             */
+            $isOvernight = false;
+
+            if (blank($record) || blank($record->clock_in)) {
+                $previous = $this->attendanceRepository->findByUserAndDate(
+                    $amendment->user_id,
+                    $amendment->date->copy()->subDay()->format('Y-m-d')
+                );
+
+                // 只接手「上班了但還沒下班」的那一筆，已經完成的不要覆蓋
+                if (filled($previous) && filled($previous->clock_in) && blank($previous->clock_out)) {
+                    $record = $previous;
+                    $isOvernight = true;
+                }
+            }
+
+            if (blank($record) || blank($record->clock_in)) {
                 Log::warning('補下班卡但無上班紀錄', [
                     'amendment_id' => $amendment->id,
                     'user_id'      => $amendment->user_id,
                     'date'         => $dateStr,
                 ]);
+
                 return;
             }
 
-            $earlyMinutes = $this->calcEarlyMinutes($record, $amendment->clock_time);
-            $overtimeMinutes = $this->calcOvertimeMinutes($record, $amendment->clock_time);
+            $earlyMinutes = $this->calcEarlyMinutes($record, $amendment->clock_time, $isOvernight);
+            $overtimeMinutes = $this->calcOvertimeMinutes($record, $amendment->clock_time, $isOvernight);
             $status = $this->calcStatus($record->late_minutes ?? 0, $earlyMinutes);
 
+            /*
+             * clock_out 存的是**申請日期**的那個時刻（也就是隔天凌晨），
+             * 紀錄的 date 維持前一天 —— 跟 clockOut() 存 now() 的模型一致。
+             */
             $this->attendanceRepository->update($record, [
                 'clock_out'           => $clockTime,
                 'early_leave_minutes' => $earlyMinutes,
@@ -201,7 +228,7 @@ class ClockAmendmentService
      * @param string           $clockTime
      * @return int
      */
-    private function calcEarlyMinutes($record, $clockTime)
+    private function calcEarlyMinutes($record, $clockTime, $isOvernight = false)
     {
         if (!$record->assignment || !$record->assignment->shift) {
             return 0;
@@ -209,10 +236,31 @@ class ClockAmendmentService
 
         $endTime = $record->assignment->shift->end_time;
         $endMin = $this->timeToMinutes($endTime);
+
+        // 跨日班的 end_time 是 00:00，代表「到午夜」而不是當天零點
         if ($endMin === 0) { $endMin = 1440; }
-        $clockMin = $this->timeToMinutes($clockTime);
+
+        $clockMin = $this->clockMinutes($clockTime, $isOvernight);
 
         return max(0, $endMin - $clockMin);
+    }
+
+    /**
+     * 打卡時刻換算成「從該班次當天零點起算」的分鐘數
+     *
+     * ⚠️ 跨日班一定要加 1440，否則晚班（16:00–00:00）補 `00:00` 的下班卡
+     * 會算成 `1440 - 0 = 1440` 分鐘早退 —— 整整一天。
+     * 正常打卡的 `AttendanceService::calcEarlyLeaveAndOvertime()` 也是這樣處理的。
+     *
+     * @param string $clockTime   HH:mm 或 HH:mm:ss
+     * @param bool   $isOvernight 這筆下班卡是不是打在隔天
+     * @return int
+     */
+    private function clockMinutes($clockTime, $isOvernight)
+    {
+        $minutes = $this->timeToMinutes($clockTime);
+
+        return $isOvernight ? $minutes + 1440 : $minutes;
     }
 
     /**
@@ -222,7 +270,7 @@ class ClockAmendmentService
      * @param string           $clockTime
      * @return int
      */
-    private function calcOvertimeMinutes($record, $clockTime)
+    private function calcOvertimeMinutes($record, $clockTime, $isOvernight = false)
     {
         if (!$record->assignment || !$record->assignment->shift) {
             return 0;
@@ -230,8 +278,11 @@ class ClockAmendmentService
 
         $endTime = $record->assignment->shift->end_time;
         $endMin = $this->timeToMinutes($endTime);
+
+        // 跨日班的 end_time 是 00:00，代表「到午夜」而不是當天零點
         if ($endMin === 0) { $endMin = 1440; }
-        $clockMin = $this->timeToMinutes($clockTime);
+
+        $clockMin = $this->clockMinutes($clockTime, $isOvernight);
 
         return max(0, $clockMin - $endMin);
     }

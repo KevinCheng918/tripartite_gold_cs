@@ -72,6 +72,7 @@ return [
     'amend_type_in'      => '补上班卡',
     'amend_type_out'     => '补下班卡',
     'amend_field_date'   => '日期',
+    'amend_date_hint'    => '请选实际打卡的那一天。晚班下班在凌晨的话，选的是隔天。',
     'amend_field_type'   => '类型',
     'amend_field_time'   => '时间',
     'amend_field_reason' => '原因',
