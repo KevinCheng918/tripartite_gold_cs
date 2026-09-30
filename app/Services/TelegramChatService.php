@@ -643,28 +643,28 @@ class TelegramChatService
      */
     private function autoAssignOnDuty(TelegramGroup $group)
     {
-        $today = now()->format('Y-m-d');
-        $nowMinutes = now()->hour * 60 + now()->minute;
+        /*
+         * 走 getOnDutyAssignments() 而不是自己再查一次排班 ——
+         * 這裡原本有一份幾乎相同的迴圈，正是那支的註解要避免的
+         * 「兩邊各寫一次而漂移」。今天改成以回訊時間判斷時，
+         * 也得兩個地方都記得改。
+         *
+         * 順帶修掉一個差異：舊版只檢查 shift 存在，共用版連 user 也會檢查 ——
+         * 沒有 user 的排班本來就指派不出去。
+         */
+        $assignments = $this->getOnDutyAssignments();
 
-        $assignments = $this->assignmentRepository->getByDateRange($today, $today);
-
-        if ($assignments->isEmpty()) {
+        if (blank($assignments)) {
             return;
         }
 
-        // 找出第一個當前值班的客服
-        foreach ($assignments as $assignment) {
-            if (!$assignment->shift) {
-                continue;
-            }
+        $assignment = $assignments[0];
 
-            if ($this->isTimeInShiftRange($assignment->shift, $nowMinutes)) {
-                if ((int) $group->assigned_user_id !== (int) $assignment->user_id) {
-                    $this->telegramRepository->assignGroup($group, $assignment->user_id);
-                }
-                return;
-            }
+        if ((int) $group->assigned_user_id === (int) $assignment->user_id) {
+            return;
         }
+
+        $this->telegramRepository->assignGroup($group, $assignment->user_id);
     }
 
     /**
