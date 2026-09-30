@@ -66,12 +66,26 @@ if (intercepted) { return intercepted; }
 
 其他細節：
 
-- 提示視窗**動態建立**而不是寫在 layout —— 各頁面的訊息 Modal id 都不一樣
+- 提示視窗寫在 `layouts/app.blade.php`，結構與 `modal-profile-msg` 等其他 Modal 完全一致
 - 顯示前先關掉畫面上其他 `.modal.show`，否則會疊兩層 backdrop，
   而且那些視窗上的按鈕按了也沒用；等 300ms 讓關閉動畫跑完再開，避免 backdrop 殘留
 - `expiredNotified` 旗標只提示一次 —— 一個畫面同時發好幾支 AJAX 是常態
-- 文字走語系檔，由 `layouts/app.blade.php` 的 `<body data-auth-expired-*>` 傳進來
-  （`common.js` 讀不到 PHP 語系檔，同 `TimeSelect` 的 `data-*-label` 作法）
+- 文字直接走 `trans()`（視窗在 blade 裡，不必像 `TimeSelect` 那樣用 `data-*` 傳）
+- 按鈕做成 `<a href="{{ route('login') }}">`，不必等 JS 也能點
+
+> ⚠️ **不要加 `modal-dialog-centered`。**（2026-09-30 修）
+> 第一版用 JS 動態建視窗並加了 centered，畫面上會在視窗後面多出一條
+> **整頁高的白色長條**。原因是 `custom.css` 有一條全域規則：
+>
+> ```css
+> .modal { align-items: flex-start !important; padding-top: 2rem !important; }
+> ```
+>
+> 專案刻意讓所有 Modal 靠上顯示，而 centered 會給 `.modal-dialog` 補上
+> `min-height: calc(100% - 3.5rem)` 把它撐成整頁高，兩者打架。
+>
+> **全站的 Modal 結構都是 `modal fade` + `tabindex="-1"` + `modal-dialog modal-sm`，
+> 照抄就對了，不要自己發明。**
 
 ### Session 心跳
 

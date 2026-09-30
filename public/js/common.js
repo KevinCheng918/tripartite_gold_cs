@@ -261,50 +261,16 @@
     var expiredNotified = false;
 
     /**
-     * 建立提示視窗
-     *
-     * 動態建立而不是寫在 layout：這支要能在任何頁面用，
-     * 而各頁面的訊息 Modal id 都不一樣。
-     *
-     * @returns {HTMLElement}
-     */
-    function buildExpiredModal() {
-        var data = document.body.dataset;
-        var el = document.createElement('div');
-
-        el.className = 'modal fade';
-        el.id = 'auth-expired-modal';
-        el.setAttribute('data-bs-backdrop', 'static');
-        el.setAttribute('data-bs-keyboard', 'false');
-        el.innerHTML =
-            '<div class="modal-dialog modal-sm modal-dialog-centered">' +
-            '<div class="modal-content"><div class="modal-body text-center py-4">' +
-            '<p class="mb-1 fw-bold js-auth-title"></p>' +
-            '<p class="mb-3 text-muted js-auth-hint" style="font-size:0.875rem"></p>' +
-            '<button type="button" class="btn btn-primary js-auth-action"></button>' +
-            '</div></div></div>';
-
-        // textContent 而不是拼進 innerHTML：這些字來自語系檔，不該有被當成 HTML 的機會
-        el.querySelector('.js-auth-title').textContent = data.authExpiredTitle || '登入已過期';
-        el.querySelector('.js-auth-hint').textContent = data.authExpiredHint || '請重新登入後再操作。';
-        el.querySelector('.js-auth-action').textContent = data.authExpiredAction || '重新登入';
-
-        el.querySelector('button').addEventListener('click', function () {
-            window.location.href = loginUrl();
-        });
-
-        document.body.appendChild(el);
-
-        return el;
-    }
-
-    /**
      * 登入頁網址
+     *
+     * 提示視窗裡的按鈕本身就是連結，這支只在 Bootstrap 沒載入時的退路用得到。
      *
      * @returns {string}
      */
     function loginUrl() {
-        return document.body.dataset.loginUrl || '/login';
+        var link = document.querySelector('#auth-expired-modal a');
+
+        return link ? link.getAttribute('href') : '/login';
     }
 
     window.AuthGuard = {
@@ -339,18 +305,22 @@
                 if (instance) { instance.hide(); }
             });
 
-            var el = document.getElementById('auth-expired-modal') || buildExpiredModal();
+            // 視窗本身寫在 layouts/app.blade.php，跟其他 Modal 同一種結構。
+            // 早期是用 JS 動態建的，但那份多了 modal-dialog-centered，
+            // 跟 custom.css 那條全域的 `.modal { align-items: flex-start !important }`
+            // 打架，畫面上會多出一條整頁高的白色長條
+            var el = document.getElementById('auth-expired-modal');
+
+            // 登入頁沒有這個視窗（它不吃 app layout），直接轉走
+            if (!el || !window.bootstrap) {
+                window.location.href = loginUrl();
+
+                return;
+            }
 
             // 等前面那些 Modal 的關閉動畫跑完，否則 backdrop 會殘留
             setTimeout(function () {
-                if (window.bootstrap) {
-                    window.bootstrap.Modal.getOrCreateInstance(el).show();
-
-                    return;
-                }
-
-                // Bootstrap 沒載入（理論上不會）也不能讓使用者卡在原地
-                window.location.href = loginUrl();
+                window.bootstrap.Modal.getOrCreateInstance(el).show();
             }, 300);
         },
 

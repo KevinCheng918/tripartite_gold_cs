@@ -63,12 +63,7 @@
     </style>
 </head>
 
-{{-- 登入過期的提示文字。AuthGuard 在 public/js/common.js，那支是全站共用的、
-     讀不到 PHP 語系檔，所以從這裡傳過去（同 TimeSelect 的 data-*-label 作法）。 --}}
-<body data-auth-expired-title="{{ trans('auth.expired_title') }}"
-      data-auth-expired-hint="{{ trans('auth.expired_hint') }}"
-      data-auth-expired-action="{{ trans('auth.expired_action') }}"
-      data-login-url="{{ route('login') }}">
+<body>
     {{-- Sidebar 狀態同步 --}}
     <script>
         (function() {
@@ -490,6 +485,28 @@
                 <div class="modal-body text-center py-4">
                     <p id="modal-profile-msg-text" class="mb-3"></p>
                     <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- 登入過期提示。由 public/js/common.js 的 AuthGuard 在收到 401／419 時打開。
+
+         ⚠ 結構要跟上面幾個 Modal 一致，**不要加 modal-dialog-centered** ——
+         custom.css 有一條全域的 `.modal { align-items: flex-start !important }`，
+         centered 會給 .modal-dialog 補上 min-height 把它撐成整頁高，
+         跟那條規則打架，畫面上會多出一條白色長條。
+
+         static + keyboard=false 是刻意的：session 都沒了，讓人隨手關掉
+         繼續操作只會一直失敗。按鈕直接做成連結，不必等 JS。 --}}
+    <div class="modal fade" id="auth-expired-modal" tabindex="-1"
+         data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-body text-center py-4">
+                    <p class="mb-1 fw-bold">{{ trans('auth.expired_title') }}</p>
+                    <p class="mb-3 text-muted" style="font-size:0.875rem">{{ trans('auth.expired_hint') }}</p>
+                    <a href="{{ route('login') }}" class="btn btn-primary">{{ trans('auth.expired_action') }}</a>
                 </div>
             </div>
         </div>
