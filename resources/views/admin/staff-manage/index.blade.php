@@ -493,6 +493,23 @@ $(function () {
      */
 
     /**
+     * 把排序下拉還原成 HTML 裡的預設值
+     *
+     * 不要在重設的地方寫死選項字串 —— 改了 option 的預設就會變成
+     * 「載入時是身份排序、按了重設卻跳回 ID 排序」。
+     *
+     * 用 attribute selector 而不是 `:selected`：後者選到的是「使用者當前選的」，
+     * 那正是要被重設掉的值。真的沒有 selected 屬性就退回第一個選項。
+     *
+     * @param {string} selector 排序下拉的選擇器
+     */
+    function resetSortSelect(selector) {
+        var $sort = $(selector);
+
+        $sort.val($sort.find('option[selected]').val() || $sort.find('option').first().val());
+    }
+
+    /**
      * 身份為主、年資（長→短）為次
      *
      * @param {number} dir 1 = 身份高→低，-1 = 身份低→高
@@ -963,7 +980,7 @@ $(function () {
     $('#btn-staff-reset').on('click', function () {
         $('#staff-search-account, #staff-search-name, #staff-search-tenure-years, #staff-search-tenure-months').val('');
         $('#staff-search-level, #staff-search-tenure-op').val('');
-        $('#staff-sort').val('id');
+        resetSortSelect('#staff-sort');
         renderStaffTable(staffData); renderStaffCards(staffData);
     });
     var $staffCollapse = $('#staff-search-collapse');
@@ -982,7 +999,7 @@ $(function () {
     $('#btn-eq-reset').on('click', function () {
         $('#eq-search-account, #eq-search-name, #eq-search-eq, #eq-search-serial, #eq-search-duration-years, #eq-search-duration-months').val('');
         $('#eq-search-duration-op, #eq-search-status').val('');
-        $('#eq-sort').val('id');
+        resetSortSelect('#eq-sort');
         renderEqTable(staffData); renderEqCards(staffData);
     });
     // 切到設備 Tab 時刷新

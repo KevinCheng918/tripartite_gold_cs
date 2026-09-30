@@ -38,6 +38,24 @@
 實作是兩個 comparator 工廠 `byLevelThenTenure(dir)` / `byTenureThenLevel(dir)`，
 `dir` 傳 `1` / `-1` 決定第一層方向，第二層固定。
 
+## ⚠ 改排序預設值時，別忘了「重設」按鈕
+
+搜尋區的「重設」原本是 `$('#staff-sort').val('id')` —— **把預設值寫死在第二個地方**。
+
+把 option 的預設改成身份排序後，就出現「頁面載入是身份排序、
+按了重設卻跳回 ID 排序」的不一致。這是改預設值時很容易漏掉的一處。
+
+改成 `resetSortSelect(selector)`，讀 HTML 裡的 `option[selected]`，
+人員與設備兩個區塊共用：
+
+```js
+$sort.val($sort.find('option[selected]').val() || $sort.find('option').first().val());
+```
+
+用 attribute selector 而不是 `:selected` —— 後者選到的是「使用者當前選的」，
+那正是要被重設掉的值。設備區塊的下拉沒有 `selected` 屬性，
+會退回第一個選項（`id`），行為跟原本一樣。
+
 ## 年資的計算與「沒填」的處理
 
 `calcTenureMonths(hiredAt)` 回月數，**沒填或填了未來日期回 `-1`**。
@@ -56,7 +74,7 @@
 
 ## 異動檔案
 
-- `resources/views/admin/staff-manage/index.blade.php` — 排序 comparator、選項順序與預設值
+- `resources/views/admin/staff-manage/index.blade.php` — 排序 comparator、選項順序與預設值、`resetSortSelect()`
 - `resources/lang/{tw,cn,en}/staff_manage.php` — 身份排序標籤加註「同身份依年資」
 
 ## 相關
