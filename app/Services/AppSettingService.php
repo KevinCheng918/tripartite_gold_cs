@@ -38,15 +38,16 @@ class AppSettingService
     const KEY_REMIND_FIRST_MINUTES  = 'auto_reply.remind_first_minutes';
     const KEY_REMIND_SECOND_MINUTES = 'auto_reply.remind_second_minutes';
 
-    // 對客話術模板（完整版 / 精簡版）
-    const KEY_TPL_ANSWER_FULL   = 'auto_reply.tpl_answer_full';
-    const KEY_TPL_ANSWER_SHORT  = 'auto_reply.tpl_answer_short';
-    // 反問編號選項已移除，tpl_clarify_* 不再讀取。
-    // 既有資料留在 app_setting 沒有影響，不為了這個跑一支 migration
-    const KEY_TPL_WAIT_FULL     = 'auto_reply.tpl_wait_full';
-    const KEY_TPL_WAIT_SHORT    = 'auto_reply.tpl_wait_short';
-    const KEY_TPL_SUPPORT_FULL  = 'auto_reply.tpl_support_full';
-    const KEY_TPL_SUPPORT_SHORT = 'auto_reply.tpl_support_short';
+    /*
+     * 對客話術（tpl_*）2026-09-30 隨著「對客話術」頁一起移除。
+     *
+     * 開頭由模型的承接句負責、答案用題庫原文，中間那層外殼反而會跟承接句
+     * 重複問候。剩下的兩段（轉人工的 fallback、同仁作答的外殼）搬到
+     * config/auto_reply.php 的 templates。
+     *
+     * 既有資料留在 app_setting 沒有影響，不為了這個跑一支 migration ——
+     * 同 tpl_clarify_*（更早移除的反問編號選項）的處理方式。
+     */
 
     /** @var array 需要加密存放的設定 */
     private const SECRET_KEYS = [

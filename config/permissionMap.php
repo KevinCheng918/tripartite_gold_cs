@@ -98,13 +98,6 @@ return [
             'telegram_chat.broadcast' => 'permission.telegram_chat.broadcast',
             'telegram_chat.delete'    => 'permission.telegram_chat.delete',
             /*
-             * 對客話術跟著客服功能走，但與 Claude 憑證（setting.*）分開授權：
-             * 客服要能自己調語氣，不該連 token 頁一起開放。
-             */
-            'telegram_chat.template_view'   => 'permission.telegram_chat.template_view',
-            'telegram_chat.template_manage' => 'permission.telegram_chat.template_manage',
-
-            /*
              * 不跟 reply 綁一起：設定誰不自動回覆會改變系統對客人的自動行為，
              * 影響範圍比「回一則訊息」大，該由管理者單獨指派。
              */

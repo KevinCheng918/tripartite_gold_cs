@@ -521,15 +521,9 @@ class AutoReplySupportService
      */
     private function replyWithItem(AutoReplyTicket $ticket, $item)
     {
-        $template = $this->appSettingService->get(AppSettingService::KEY_TPL_ANSWER_FULL);
-
-        if (blank($template)) {
-            Log::error('答案話術模板為空，無法用題庫原文回覆', ['ticket_id' => $ticket->id]);
-
-            return false;
-        }
-
-        $chunks = $this->splitter->split(strtr($template, ['{答案}' => $item->answer]));
+        // 直接送題庫原文，不包外殼 —— 跟自動回覆命中題庫時完全一致
+        // （對客話術頁 2026-09-30 移除，那層外殼本來就跟 AI 的承接句重複）
+        $chunks = $this->splitter->split($item->answer);
         $lastIndex = count($chunks) - 1;
 
         foreach ($chunks as $index => $chunk) {
@@ -731,7 +725,9 @@ class AutoReplySupportService
      */
     private function replyToCustomer(AutoReplyTicket $ticket)
     {
-        $template = $this->appSettingService->get(AppSettingService::KEY_TPL_SUPPORT_FULL);
+        // 同仁的答案要原文轉給客人（求助訊息上就是這樣寫的），
+        // 所以這層開頭結尾得自己來，模型不參與
+        $template = (string) config('auto_reply.templates.support');
 
         if (blank($template) || blank($ticket->answer)) {
             return false;

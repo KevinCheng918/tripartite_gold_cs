@@ -421,14 +421,8 @@ class AutoReplyService
      */
     private function replyAskInfo(TelegramGroup $group, $item, $opening)
     {
-        $content = $this->renderTemplate(
-            $group,
-            AppSettingService::KEY_TPL_ANSWER_FULL,
-            AppSettingService::KEY_TPL_ANSWER_SHORT,
-            ['{答案}' => $item->answer]
-        );
-
-        $this->send($group, $this->joinOpening($opening, $content), false);
+        // 跟命中答案一樣：承接句 + 題庫原文，不包外殼
+        $this->send($group, $this->joinOpening($opening, $item->answer), false);
         $this->markAsked($group);
         $this->telegramRepository->updateAutoReplyState($group, $item->id);
     }
@@ -525,17 +519,13 @@ class AutoReplyService
             return '';
         }
 
-        // 追問跟命中答案送出去的東西一樣（模板 + 題庫原文），預覽自然也一樣
+        // 追問跟命中答案送出去的東西一樣（承接句 + 題庫原文），預覽自然也一樣
         if ($action === $actions['ANSWER'] || $action === $actions['ASK_INFO']) {
-            $template = $this->appSettingService->get(AppSettingService::KEY_TPL_ANSWER_FULL);
-            $content = filled($template) ? strtr($template, ['{答案}' => $item->answer]) : '';
-            $content = $this->joinOpening($opening, $content);
+            $content = $this->joinOpening($opening, $item->answer);
         } elseif ($action === $actions['REPLY']) {
             $content = (string) $opening;
         } else {
-            $content = filled($opening)
-                ? $opening
-                : (string) $this->appSettingService->get(AppSettingService::KEY_TPL_WAIT_FULL);
+            $content = filled($opening) ? $opening : (string) config('auto_reply.templates.wait');
         }
 
         return filled($content) ? "{$content} {$signature}" : '';
@@ -554,15 +544,15 @@ class AutoReplyService
      */
     private function replyWithItem(TelegramGroup $group, $item, $opening)
     {
-        $content = $this->renderTemplate(
-            $group,
-            AppSettingService::KEY_TPL_ANSWER_FULL,
-            AppSettingService::KEY_TPL_ANSWER_SHORT,
-            ['{答案}' => $item->answer]
-        );
-
+        /*
+         * 送出去的就是「承接句 + 題庫原文」，不再包話術外殼。
+         *
+         * 以前這裡會套一層完整版模板（「您好，感謝您的詢問 😊…」），結果
+         * 第一次對話會連續兩個開頭問候 —— 承接句一個、模板一個。
+         * 開頭交給模型、答案用題庫原文，本來就不需要中間那層。
+         */
         // 命中答案沒有冷卻 —— 客人重複問同一件事，就重複回答
-        $this->send($group, $this->joinOpening($opening, $content), true);
+        $this->send($group, $this->joinOpening($opening, $item->answer), true);
         $this->telegramRepository->updateAutoReplyState($group, $item->id);
     }
 
@@ -604,12 +594,9 @@ class AutoReplyService
          * 依客人的話生成的承接句，每次都不一樣，這個理由已經不存在。
          * 客人問一次就回一次，本來就是客服該做的事。
          */
-        $content = filled($opening) ? $opening : $this->renderTemplate(
-            $group,
-            AppSettingService::KEY_TPL_WAIT_FULL,
-            AppSettingService::KEY_TPL_WAIT_SHORT,
-            []
-        );
+        // 沒有承接句才退回固定話術 —— 模型逾時、額度用盡、或它判斷不需要回應
+        // 的時候會走到這裡，沒有這段客人會完全收不到訊息
+        $content = filled($opening) ? $opening : (string) config('auto_reply.templates.wait');
 
         $this->send($group, $content, false);
         $this->telegramRepository->updateAutoReplyState($group, null);
@@ -730,51 +717,12 @@ class AutoReplyService
     }
 
 
-    /**
-     * 套用話術模板
+    /*
+     * renderTemplate() 與 shouldGreet() 在 2026-09-30 移除。
      *
-     * 距離上次自動回覆超過一段時間才用帶問候語的完整版，
-     * 連續對話用精簡版 —— 每則都「您好，感謝您的詢問」很快就顯得虛假。
-     *
-     * @param TelegramGroup $group
-     * @param string        $fullKey
-     * @param string        $shortKey
-     * @param array         $replacements 變數 => 值
-     * @return string
+     * 那兩支是「完整版／精簡版話術」的切換：距離上次回覆超過 30 分鐘就帶問候語，
+     * 連續對話用精簡版。現在開頭一律由模型的承接句負責，沒有模板可切了。
      */
-    private function renderTemplate(TelegramGroup $group, $fullKey, $shortKey, array $replacements)
-    {
-        $key = $this->shouldGreet($group) ? $fullKey : $shortKey;
-        $template = $this->appSettingService->get($key);
-
-        // 精簡版沒設定就退回完整版，寧可囉唆也不要送出空訊息
-        if (blank($template)) {
-            $template = $this->appSettingService->get($fullKey);
-        }
-
-        if (blank($template)) {
-            return '';
-        }
-
-        return strtr($template, $replacements);
-    }
-
-    /**
-     * 這次要不要用帶問候語的完整版
-     *
-     * @param TelegramGroup $group
-     * @return bool
-     */
-    private function shouldGreet(TelegramGroup $group)
-    {
-        if (blank($group->auto_reply_at)) {
-            return true;
-        }
-
-        $minutes = (int) config('constants.AUTO_REPLY.GREETING_GAP_MINUTES');
-
-        return $group->auto_reply_at->lt(now()->subMinutes($minutes));
-    }
 
 
 }

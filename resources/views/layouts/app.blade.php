@@ -232,14 +232,6 @@
                                 </a>
                             </li>
                             @endif
-                            @if(Auth::user()->hasPermission('telegram_chat.template_view'))
-                            <li>
-                                <a href="{{ route('admin.reply-template.index') }}" class="{{ request()->routeIs('admin.reply-template.*') ? 'mm-active' : '' }}">
-                                    <i class="metismenu-icon fas fa-comment-dots"></i>
-                                    {{ trans('reply_template.nav_label') }}
-                                </a>
-                            </li>
-                            @endif
                             @if(Auth::user()->hasPermission('setting.view'))
                             <li>
                                 <a href="{{ route('admin.setting.index') }}" class="{{ request()->routeIs('admin.setting.*') ? 'mm-active' : '' }}">

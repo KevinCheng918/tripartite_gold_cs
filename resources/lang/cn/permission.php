@@ -79,8 +79,6 @@ return [
         'assign'          => '指派值班',
         'broadcast'       => '群发公告',
         'delete'          => '删除对话记录',
-        'template_view'   => '查看对客话术',
-        'template_manage' => '修改对客话术',
         'ignore_manage'   => '设定不自动回覆的成员',
     ],
     'staff_manage' => [

@@ -75,8 +75,6 @@ return [
         'broadcast'       => '群發公告',
         'assign'          => '指派值班',
         'delete'          => '刪除對話紀錄',
-        'template_view'   => '檢視對客話術',
-        'template_manage' => '修改對客話術',
         'ignore_manage'   => '設定不自動回覆的成員',
     ],
     'setting' => [

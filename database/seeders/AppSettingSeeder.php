@@ -64,39 +64,14 @@ class AppSettingSeeder extends Seeder
             AppSettingService::KEY_REMIND_SECOND_MINUTES => '10',
 
             /*
-             * 開場白與結尾語都不放在模板裡 —— 那些由 AI 的承接句負責，每次不同。
-             * 在這裡寫固定句子，客人連著問就會看到一模一樣的開頭與結尾，
-             * 那正是改版前被嫌罐頭的原因。
+             * 對客話術（tpl_*）2026-09-30 移到 config/auto_reply.php 的 templates，
+             * 後台那一頁也一起移除了。
+             *
+             * 當初這裡把開場白與結尾語刻意留空（只有 '{答案}'），理由是那些該由
+             * AI 的承接句負責；但後來有人在後台把問候語加了回去，於是客人第一次
+             * 對話會連著看到兩個「您好」—— 一個來自承接句、一個來自模板。
+             * 移除之後就沒有這個問題了。
              */
-            AppSettingService::KEY_TPL_ANSWER_FULL  => '{答案}',
-            AppSettingService::KEY_TPL_ANSWER_SHORT => '{答案}',
-
-            AppSettingService::KEY_TPL_WAIT_FULL => implode("\n", [
-                '您好，感謝您的詢問 🙏',
-                '',
-                '這部分我幫您向相關同仁確認一下，稍後馬上回覆您，',
-                '感謝您的耐心等候，造成您的等待不好意思！',
-            ]),
-
-            AppSettingService::KEY_TPL_WAIT_SHORT => implode("\n", [
-                '這部分我再幫您確認一下，稍後馬上回覆您，感謝您的耐心等候 🙏',
-            ]),
-
-            /*
-             * 同仁回答之後轉給客人的。這則前面沒有 AI 承接句，
-             * 所以保留一句「久等了」承接，但不加固定結尾語。
-             */
-            AppSettingService::KEY_TPL_SUPPORT_FULL => implode("\n", [
-                '久等了，已為您確認完畢 😊',
-                '',
-                '{答案}',
-            ]),
-
-            AppSettingService::KEY_TPL_SUPPORT_SHORT => implode("\n", [
-                '久等了，已為您確認完畢 😊',
-                '',
-                '{答案}',
-            ]),
         ];
     }
 }

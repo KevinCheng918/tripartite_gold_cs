@@ -16,7 +16,6 @@ use App\Http\Controllers\Admin\LeaveRequestController;
 use App\Http\Controllers\Admin\StaffManageController;
 use App\Http\Controllers\Admin\ProjectController;
 use App\Http\Controllers\Admin\QuickReplyController;
-use App\Http\Controllers\Admin\ReplyTemplateController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\FinanceController;
 use App\Http\Controllers\Admin\SharedFileController;
@@ -140,13 +139,6 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::put('/ajax-update-fallback', [SettingController::class, 'ajaxUpdateFallback'])->middleware('can:setting.manage')->name('ajax-update-fallback');
         Route::put('/ajax-update-support', [SettingController::class, 'ajaxUpdateSupport'])->middleware('can:setting.manage')->name('ajax-update-support');
         Route::post('/ajax-test-support', [SettingController::class, 'ajaxTestSupport'])->middleware('can:setting.manage')->name('ajax-test-support');
-    });
-
-    // 對客話術（與憑證分開授權：客服要能自己調語氣，但不該碰得到 token）
-    Route::prefix('reply-template')->name('reply-template.')->group(function () {
-        Route::get('/', [ReplyTemplateController::class, 'index'])->middleware('can:telegram_chat.template_view')->name('index');
-        Route::get('/ajax-templates', [ReplyTemplateController::class, 'ajaxTemplates'])->middleware('can:telegram_chat.template_view')->name('ajax-templates');
-        Route::put('/ajax-update', [ReplyTemplateController::class, 'ajaxUpdate'])->middleware('can:telegram_chat.template_manage')->name('ajax-update');
     });
 
     // 站台管理
