@@ -974,7 +974,9 @@
                 date: document.getElementById('amend-date').value,
                 type: parseInt(document.getElementById('amend-type').value, 10),
                 clock_time: document.getElementById('amend-time').value,
-                reason: document.getElementById('amend-reason').value,
+                // trim 過再送：只打幾個空白的話 HTML5 的 required 會放行
+                // （它只看有沒有內容），後端擋下來反而是一次白跑的來回
+                reason: document.getElementById('amend-reason').value.trim(),
             };
 
             apiFetch('/admin/attendance/ajax-request-amend', {
