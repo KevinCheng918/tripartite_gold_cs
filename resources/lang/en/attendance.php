@@ -60,6 +60,8 @@ return [
         'clock_out_success'   => 'Clocked out successfully',
         'clock_in_failed'     => 'Failed to clock in',
         'clock_out_failed'    => 'Failed to clock out',
+        'amend_reason_required' => 'Please explain why the punch was missed',
+        'amend_reason_max'      => 'Reason must not exceed :value characters',
         'previous_not_clocked_out' => 'Previous shift not clocked out yet. Please clock out first.',
         'confirm'             => 'Confirm',
         'cancel'              => 'Cancel',
@@ -76,6 +78,9 @@ return [
     'amend_date_example_title' => 'Example: night shift 16:00–00:00, the Oct 1 shift',
     'amend_date_example_in'    => 'Clock-in  → Oct 1, 16:00',
     'amend_date_example_out'   => 'Clock-out → Oct 2, 00:00 (after midnight — it still counts toward the Oct 1 shift)',
+
+    'amend_reason_placeholder' => 'Explain why the punch was missed',
+    'amend_month_hint'         => 'Requests this month: :in clock-in, :out clock-out',
     'amend_field_type'   => 'Type',
     'amend_field_time'   => 'Time',
     'amend_field_reason' => 'Reason',

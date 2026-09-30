@@ -273,6 +273,7 @@
 
                 if (dateInput) { dateInput.max = todayString(); }
 
+                renderMonthHint();
                 showBsModal('modal-amend');
             });
             loadMyAmendments();
@@ -886,6 +887,67 @@
         return now.getFullYear() + '-' +
             (month.length < 2 ? '0' + month : month) + '-' +
             (day.length < 2 ? '0' + day : day);
+    }
+
+    /** @type {number} 補打卡申請的狀態，對應 ClockAmendment 的常數 */
+    var AMEND_STATUS_REJECTED = 2;
+
+    /** @type {Object} 補打卡類型 */
+    var AMEND_TYPE = { IN: 1, OUT: 2 };
+
+    /**
+     * 算出本月已經申請過幾次補卡
+     *
+     * 資料直接用「我的補打卡申請」那支 ajax 已經載好的 myAmendData ——
+     * 它撈的是全部申請（沒有限制筆數），所以當月的一定在裡面，
+     * 不必為了這個數字再打一次後端。
+     *
+     * **被駁回的不算**：那通常代表「其實沒忘記打卡」，算進來會誤導。
+     *
+     * @return {Object} { in: 次數, out: 次數 }
+     */
+    function countMonthlyAmendments() {
+        var now = new Date();
+        var month = String(now.getMonth() + 1);
+        var prefix = now.getFullYear() + '-' + (month.length < 2 ? '0' + month : month);
+        var counts = { in: 0, out: 0 };
+
+        myAmendData.forEach(function (item) {
+            if (item.status === AMEND_STATUS_REJECTED) { return; }
+            if (String(item.date).indexOf(prefix) !== 0) { return; }
+
+            if (item.type === AMEND_TYPE.IN) {
+                counts.in += 1;
+            } else if (item.type === AMEND_TYPE.OUT) {
+                counts.out += 1;
+            }
+        });
+
+        return counts;
+    }
+
+    /**
+     * 在申請視窗裡顯示本月已補幾次
+     *
+     * 兩種都是 0 就整塊不顯示 —— 第一次補卡的人不需要被提醒什麼
+     */
+    function renderMonthHint() {
+        var box = document.getElementById('amend-month-hint');
+
+        if (!box) { return; }
+
+        var counts = countMonthlyAmendments();
+
+        if (!counts.in && !counts.out) {
+            box.style.display = 'none';
+
+            return;
+        }
+
+        box.textContent = (i18n.amend_month_hint || '本月已申請補卡：上班卡 :in 次、下班卡 :out 次')
+            .replace(':in', counts.in)
+            .replace(':out', counts.out);
+        box.style.display = '';
     }
 
     // 補打卡申請表單

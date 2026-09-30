@@ -66,6 +66,8 @@ return [
         'clock_out_success'   => '下班打卡成功',
         'clock_in_failed'     => '上班打卡失敗',
         'clock_out_failed'    => '下班打卡失敗',
+        'amend_reason_required' => '請填寫補打卡的原因',
+        'amend_reason_max'      => '原因不可超過 :value 字',
         'previous_not_clocked_out' => '前一班尚未下班打卡，請先完成下班打卡',
         'confirm'             => '確認打卡',
         'cancel'              => '取消',
@@ -87,6 +89,14 @@ return [
     'amend_date_example_title' => '例：晚班 16:00 ～ 00:00，10/01 的班',
     'amend_date_example_in'    => '上班卡 → 10/01 16:00',
     'amend_date_example_out'   => '下班卡 → 10/02 00:00（隔天凌晨，系統會自動算回 10/01 的班）',
+
+    'amend_reason_placeholder' => '請說明忘記打卡的原因',
+
+    /*
+     * 本月已補幾次。:in / :out 是次數。
+     * 措辭刻意中性 —— 這是提醒，不是指責。
+     */
+    'amend_month_hint'         => '本月已申請補卡：上班卡 :in 次、下班卡 :out 次',
     'amend_field_type'   => '類型',
     'amend_field_time'   => '時間',
     'amend_field_reason' => '原因',

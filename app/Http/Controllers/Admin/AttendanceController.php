@@ -196,13 +196,21 @@ class AttendanceController extends Controller
      */
     public function ajaxRequestAmend(Request $request)
     {
-        // 補的是「已經發生但沒打到」的卡，未來日期沒有意義。
-        // 前端的 max 只是方便，擋不住直接打 API
+        /*
+         * 補的是「已經發生但沒打到」的卡，未來日期沒有意義 ——
+         * 前端的 max 只是方便，擋不住直接打 API。
+         *
+         * reason 從選填改成必填（2026-09-30）：補打卡等於事後修改出勤紀錄，
+         * 主管要據此核准，沒有原因就無從判斷。
+         */
         $params = $request->validate([
             'date'       => 'required|date|before_or_equal:today',
             'type'       => 'required|integer|in:1,2',
             'clock_time' => 'required|date_format:H:i',
-            'reason'     => 'nullable|string|max:500',
+            'reason'     => 'required|string|max:500',
+        ], [
+            'reason.required' => trans('attendance.msg.amend_reason_required'),
+            'reason.max'      => trans('attendance.msg.amend_reason_max', ['value' => 500]),
         ]);
 
         try {

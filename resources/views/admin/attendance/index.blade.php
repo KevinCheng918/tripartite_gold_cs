@@ -72,8 +72,16 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('attendance.amend_field_reason') }}</label>
-                            <textarea id="amend-reason" class="form-control" rows="2" placeholder="選填"></textarea>
+                            {{-- 必填：補打卡等於事後修改出勤紀錄，主管要據此核准 --}}
+                            <textarea id="amend-reason" class="form-control" rows="2" required
+                                      maxlength="500"
+                                      placeholder="{{ trans('attendance.amend_reason_placeholder') }}"></textarea>
                         </div>
+
+                        {{-- 本月已補幾次。資料來自「我的補打卡申請」那支 ajax（已經載好了），
+                             不必為了這個數字再打一次後端。都是 0 就不顯示 --}}
+                        <div id="amend-month-hint" class="alert alert-warning py-2 px-3 mb-3"
+                             style="font-size:0.8125rem;display:none"></div>
                         <div class="text-end">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                             <button type="submit" class="btn btn-primary">送出申請</button>
