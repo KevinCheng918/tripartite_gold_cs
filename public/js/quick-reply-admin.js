@@ -126,25 +126,39 @@
     /**
      * 題目內容有沒有命中
      *
-     * ⚠️ **純數字要用邊界比對，不能直接 indexOf。**
-     * 搜「9」的時候，`indexOf` 會把 #19、#50 這些答案裡出現過 19、1996 的
-     * 題目全部撈出來 —— 數字是任何一段文字裡都會出現的東西，噪音大到搜尋
-     * 等於沒用。要求前後都不是數字之後，「9」就只會命中真正獨立的 9。
-     *
-     * 非純數字（含錯誤碼的 `-4`、中文關鍵字）照舊用 indexOf。
-     *
-     * @param {Object} item
-     * @param {string} text 已轉小寫
+     * @param {Object}      item
+     * @param {string}      text    已轉小寫
+     * @param {RegExp|null} pattern 純數字時的邊界比對；非數字傳 null 走 indexOf
      * @return {boolean}
      */
-    function matchesText(item, text) {
+    function matchesText(item, text, pattern) {
         var haystack = (item.label + ' ' + item.answer).toLowerCase();
 
-        if (/^\d+$/.test(text)) {
-            return new RegExp('(^|[^0-9])' + text + '([^0-9]|$)').test(haystack);
-        }
+        return pattern ? pattern.test(haystack) : haystack.indexOf(text) !== -1;
+    }
 
-        return haystack.indexOf(text) !== -1;
+    /**
+     * 純數字關鍵字的邊界比對樣式
+     *
+     * ⚠️ **純數字不能直接 indexOf。**
+     * 搜「9」的時候會把 #19、#50 這些答案裡出現過 19、1996 的題目全部撈出來
+     * —— 數字是任何一段文字裡都會出現的東西，噪音大到搜尋等於沒用。
+     * 要求前後都不是數字之後，「9」就只會命中真正獨立的 9。
+     *
+     * 非純數字（錯誤碼的 `-4`、中文關鍵字）回 null，交給 indexOf。
+     *
+     * 這支在迴圈外呼叫一次就好 —— 搜尋掛在 input 事件上，
+     * 每按一鍵都要跑過全部題目，每題各建一個 RegExp 是白費。
+     *
+     * @param {string} text
+     * @return {RegExp|null}
+     */
+    function buildNumberPattern(text) {
+        // 只有純數字會走到 new RegExp，所以不必 escape —— 數字沒有正則特殊字元。
+        // 要放寬這個條件的話，記得先 escape
+        if (!/^\d+$/.test(text)) { return null; }
+
+        return new RegExp('(^|[^0-9])' + text + '([^0-9]|$)');
     }
 
     /**
@@ -168,6 +182,7 @@
 
         if (!text) { return []; }
 
+        var pattern = buildNumberPattern(text);
         var byId = [];
         var byText = [];
 
@@ -181,7 +196,7 @@
 
                 if (idOnly) { return; }
 
-                if (matchesText(item, text)) {
+                if (matchesText(item, text, pattern)) {
                     byText.push({ category: category, item: item });
                 }
             });
