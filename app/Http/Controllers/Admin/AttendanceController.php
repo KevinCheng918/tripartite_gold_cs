@@ -274,8 +274,11 @@ class AttendanceController extends Controller
         $params = $request->validated();
 
         try {
-            $this->amendmentService->respond($amendment, (int) $params['status'], Auth::id());
-            $msg = (int) $params['status'] === 1
+            $status = (int) $params['status'];
+            $this->amendmentService->respond($amendment, $status, Auth::id());
+
+            // 用常數不寫死 1 —— RespondAmendRequest 的 in: 也是用同一組常數組出來的
+            $msg = $status === ClockAmendment::STATUS_APPROVED
                 ? trans('attendance.amend_approved')
                 : trans('attendance.amend_rejected');
 
