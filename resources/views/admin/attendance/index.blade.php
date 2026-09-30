@@ -43,8 +43,16 @@
                             <input id="amend-date" type="date" class="form-control" required autocomplete="off">
                             {{-- 晚班下班是隔天凌晨，選哪一天不直覺。後端會自己往前找到
                                  對應的班次（見 ClockAmendmentService::applyAmendment()），
-                                 但先講清楚可以少一次來回 --}}
-                            <div class="form-text">{{ trans('attendance.amend_date_hint') }}</div>
+                                 但先講清楚可以少一次來回。
+                                 直接舉晚班的例子 —— 那是唯一會搞混的情況 --}}
+                            <div class="form-text">
+                                {{ trans('attendance.amend_date_hint') }}
+                                <div class="mt-1 ps-2 border-start">
+                                    {{ trans('attendance.amend_date_example_title') }}<br>
+                                    {{ trans('attendance.amend_date_example_in') }}<br>
+                                    {{ trans('attendance.amend_date_example_out') }}
+                                </div>
+                            </div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('attendance.amend_field_type') }}</label>

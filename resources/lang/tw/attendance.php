@@ -79,7 +79,14 @@ return [
     'amend_type_in'      => '補上班卡',
     'amend_type_out'     => '補下班卡',
     'amend_field_date'   => '日期',
-    'amend_date_hint'    => '請選實際打卡的那一天。晚班下班在凌晨的話，選的是隔天。',
+    /*
+     * 補打卡的日期說明。晚班下班在隔天凌晨，「要選哪一天」是唯一會搞混的地方，
+     * 所以直接把那個情境的兩張卡都舉出來。
+     */
+    'amend_date_hint'          => '請選「實際打卡」的那一天，不是班表上的日期。',
+    'amend_date_example_title' => '例：晚班 16:00 ～ 00:00，10/01 的班',
+    'amend_date_example_in'    => '上班卡 → 10/01 16:00',
+    'amend_date_example_out'   => '下班卡 → 10/02 00:00（隔天凌晨，系統會自動算回 10/01 的班）',
     'amend_field_type'   => '類型',
     'amend_field_time'   => '時間',
     'amend_field_reason' => '原因',
