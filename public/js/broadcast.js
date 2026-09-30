@@ -198,7 +198,7 @@
 
         var rows = records.map(function (r) {
             var sender = r.sender ? r.sender.nickname : '-';
-            var time = r.sent_at ? r.sent_at.substring(0, 16) : '-';
+            var time = window.formatDateTime(r.sent_at);
             var target = r.target_type === 1 ? i18n.target_all : i18n.target_selected;
             var preview = r.content.length > 50 ? r.content.substring(0, 50) + '...' : r.content;
 

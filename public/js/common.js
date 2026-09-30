@@ -46,6 +46,81 @@
     };
 
     /**
+     * 把後端回的時間字串顯示成台北時間，例如 2026-09-30 15:58
+     *
+     * ⚠ 不要自己 substring API 回傳的時間字串。
+     *
+     * Laravel 的 Model 轉 JSON 時會把 Carbon 序列化成 **UTC** 的 ISO 字串
+     * （`serializeDate()` 預設走 `toJSON()`）—— DB 裡存的是台北時間
+     * 「2026-09-07 22:05:31」，前端收到的卻是「2026-09-07T14:05:31.000000Z」。
+     * 直接 `substring(0, 16).replace('T', ' ')` 會顯示 14:05，**少 8 小時**。
+     *
+     * 這裡明確指定 Asia/Taipei 而不是依賴瀏覽器本地時區：系統的時間基準是
+     * 台北（config/app.php 的 timezone），客服在別的時區登入時看到的
+     * 「上傳時間」也該跟同事講的是同一個時間。
+     *
+     * ⚠ 用 formatToParts 自己組，不要借某個 locale 的預設格式
+     * （例如 sv-SE 剛好輸出 YYYY-MM-DD HH:mm:ss）—— **locale 不一定存在**。
+     * small-icu 的環境只認得 en-US，傳 sv-SE 會被無聲忽略而吐出
+     * 「9/7/2026, 10:05:31 PM」。formatToParts 拿到的是結構化欄位，
+     * 跟 locale 的排版無關，時區轉換照樣正確。
+     *
+     * @param {string|null} value   後端回的時間（ISO 含 Z，或 'Y-m-d H:i:s'）
+     * @param {boolean}     seconds 要不要顯示秒，預設不顯示
+     * @returns {string} 格式化後的台北時間；空值或解析不出來時回 '-'
+     */
+    window.formatDateTime = function (value, seconds) {
+        if (!value) { return '-'; }
+
+        var raw = String(value).trim();
+        var length = seconds ? 19 : 16;
+
+        /*
+         * 沒有時區標記的字串（'2026-09-30 15:58:20'）已經是台北時間了 ——
+         * 走 Resource 明確 format 過的欄位都是這種。
+         *
+         * 這種**不能**再丟給 new Date() 轉一次：它會被當成「瀏覽器本地時間」
+         * 解析，客服在別的時區登入就會整個偏掉。原樣顯示才是對的。
+         */
+        if (!/([Zz]|[+-]\d{2}:?\d{2})$/.test(raw)) {
+            return raw.replace('T', ' ').substring(0, length);
+        }
+
+        // 到這裡才是帶時區的 ISO 字串（Model 直接序列化的 UTC），需要轉成台北
+        var d = new Date(raw);
+
+        if (isNaN(d.getTime())) {
+            return raw.replace('T', ' ').substring(0, length);
+        }
+
+        // 環境太舊沒有 Intl 就退回原字串，至少不是壞掉的畫面
+        if (!window.Intl || !window.Intl.DateTimeFormat) {
+            return raw.replace('T', ' ').substring(0, length);
+        }
+
+        var parts = {};
+        new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Taipei',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        }).formatToParts(d).forEach(function (p) {
+            parts[p.type] = p.value;
+        });
+
+        // hour12:false 在部分實作會把午夜給成 24 而不是 00
+        var hour = parts.hour === '24' ? '00' : parts.hour;
+        var text = parts.year + '-' + parts.month + '-' + parts.day
+            + ' ' + hour + ':' + parts.minute + ':' + parts.second;
+
+        return text.substring(0, length);
+    };
+
+    /**
      * 停用 input[type=number] 的滾輪改值
      *
      * 數字欄位取得焦點後，滑鼠滾過去就會把金額、天數這類值改掉，

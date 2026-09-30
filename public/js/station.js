@@ -110,7 +110,7 @@
                 ? '<span class="badge ' + st.css + ' js-status-btn" data-id="' + s.id + '" data-status="' + s.status + '" style="cursor:pointer">' + st.text + '</span>'
                 : '<span class="badge ' + st.css + '">' + st.text + '</span>';
 
-            var syncedAt = s.synced_at ? s.synced_at.substring(0, 16) : '-';
+            var syncedAt = window.formatDateTime(s.synced_at);
 
             var actions = '<button class="btn-sm js-station-detail" data-id="' + s.id + '">' + (i18n.action_detail || '詳細') + '</button> ';
             if (canUpdate) {
@@ -426,7 +426,7 @@
             detailRow('站台名稱', s.name) +
             detailRow('域名', s.domain || '-') +
             detailRow('點數', s.credits) +
-            detailRow('同步時間', s.synced_at ? s.synced_at.substring(0, 16) : '未同步') +
+            detailRow('同步時間', s.synced_at ? window.formatDateTime(s.synced_at) : '未同步') +
             '</table></div>' +
 
             '<div class="stn-detail__section"><h4>代收付</h4>' +

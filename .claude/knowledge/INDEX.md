@@ -57,3 +57,4 @@
 | [bugfix/2026-09-29-session-expired-silent.md](bugfix/2026-09-29-session-expired-silent.md) | session 過期只跳「CSRF token mismatch.」：8 支 apiFetch 都沒處理 401/419，加 AuthGuard 統一攔截 + 15 分鐘心跳 + 打卡不再假成功 |
 | [bugfix/2026-09-29-broadcast-js-syntax-error.md](bugfix/2026-09-29-broadcast-js-syntax-error.md) | broadcast.js 有兩個孤兒 `});`，語法錯誤讓群發頁的 JS 整份不執行（從 `9474c2d` 起一直壞著） |
 | [bugfix/2026-09-14-multi-bot-media-download.md](bugfix/2026-09-14-multi-bot-media-download.md) | 固定某一個 Bot 的群組讀不到圖片：媒體下載排在 `switchBotToken()` 之前，`file_id` 用錯 Bot 的 token 呼叫 `getFile` |
+| [bugfix/2026-09-30-utc-timestamp-display.md](bugfix/2026-09-30-utc-timestamp-display.md) | 上傳時間顯示少 8 小時：Model 轉 JSON 會序列化成 UTC，前端 `substring` 切字串不換算時區；新增共用的 `window.formatDateTime()`（附帶發現 `station.js` 是死檔） |

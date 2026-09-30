@@ -112,7 +112,7 @@
             // 設定者的帳號被刪掉時 ignored_by 會是 null（nullOnDelete）
             var setter = T.i18n.ignore_set_by
                 .replace(':name', m.ignored_by || T.i18n.ignore_deleted_user)
-                .replace(':time', (m.ignored_at || '').substring(0, 16));
+                .replace(':time', window.formatDateTime(m.ignored_at));
 
             return '<div class="d-flex align-items-center justify-content-between border-bottom py-2">' +
                 '<div style="min-width:0">' +

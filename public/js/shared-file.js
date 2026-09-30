@@ -234,7 +234,7 @@ $(function () {
                 escapeHtml(f.original_name) + '</a></td>';
             html += '<td class="sf-file-meta">' + fmtSize(f.file_size) + '</td>';
             html += '<td class="sf-file-meta">' + escapeHtml(f.uploader ? f.uploader.nickname : '-') + '</td>';
-            html += '<td class="sf-file-meta">' + (f.created_at ? f.created_at.substring(0, 16).replace('T', ' ') : '-') + '</td>';
+            html += '<td class="sf-file-meta">' + window.formatDateTime(f.created_at) + '</td>';
             html += '<td class="sf-file-actions"><div class="d-flex gap-1">';
             if (canAddFolder(type)) {
                 html += '<button class="btn btn-sm btn-outline-secondary js-move-file" data-id="' + f.id +
