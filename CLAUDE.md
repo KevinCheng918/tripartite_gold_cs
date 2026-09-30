@@ -38,10 +38,14 @@ php artisan db:seed --class=SetPermissionSeeder
 php artisan db:seed --class=CategorySeeder
 ```
 
-Note: `CreateAdminSeeder`, `SetPermissionSeeder`, and `CategorySeeder` don't exist yet in
-`database/seeders/` (only the default `DatabaseSeeder` is present) — they are expected to be
-added as the admin/permission/category features are built out. When implementing those features,
-follow this naming convention for the seeder classes.
+Note: that list is **out of date**. `CreateAdminSeeder` exists, but `SetPermissionSeeder` and
+`CategorySeeder` never did — permissions are config-driven (see below), so no seeder is involved.
+The seeders that actually exist are:
+
+```
+AppSettingSeeder  AskInfoCategorySeeder  AutoReplyCategorySeeder  CreateAdminSeeder
+DatabaseSeeder    QuickReplyKnowledgeSeeder  QuickReplySeeder  ShiftSeeder
+```
 
 The README's version header states PHP 7.4, Laravel v8.83.29 (matches `composer.lock`), and
 Node 10.16.* — the install SOP's numbered steps have been aligned to match (PHP 7.3.*, Node 10.16.*).
@@ -87,9 +91,14 @@ inside that container rather than locally:
 # after changing anything under routes/
 cd ../laradock && docker-compose exec workspace bash -c "cd /var/www/tripartite_gold_cs && php artisan optimize"
 
-# after changing permissions
-cd ../laradock && docker-compose exec workspace bash -c "cd /var/www/tripartite_gold_cs && php artisan db:seed --class=SetPermissionSeeder"
+# after changing config/permissionMap.php — same `optimize`, no seeder needed
 ```
+
+Permissions are **config-driven**: `PermissionMapService` reads `config('permissionMap')`
+directly, and per-account grants live in the `user_permission` table. Changing a keyword only
+needs `php artisan optimize` to clear the config cache. There is no `SetPermissionSeeder` —
+older docs referenced one, but it has never existed and running it errors with
+`Target class does not exist`.
 
 Test environment (`phpunit.xml`) overrides: `APP_ENV=testing`, `CACHE_DRIVER=array`,
 `SESSION_DRIVER=array`, `QUEUE_CONNECTION=sync`, `MAIL_MAILER=array`, `BCRYPT_ROUNDS=4`. The

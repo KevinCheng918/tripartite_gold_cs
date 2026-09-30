@@ -300,7 +300,7 @@
                 (canEdit ? dragHandle() : '') +
                 '<div class="flex-fill" style="min-width:0">' +
                 '<div class="fw-bold" style="font-size:0.875rem">' +
-                '<span class="badge bg-light text-muted border me-1" style="font-weight:400">#' + item.id + '</span>' +
+                '<span class="badge qr-badge me-1">#' + item.id + '</span>' +
                 phrasingBadge(item) +
                 disabled + escapeHtml(item.label) + '</div>' +
                 '<div class="text-muted mt-1" style="font-size:0.8125rem;white-space:pre-wrap">' +
@@ -366,7 +366,7 @@
 
             html += '<div class="px-3 py-2 border-bottom">' +
                 '<div class="d-flex align-items-center gap-2 mb-1" style="font-size:0.75rem">' +
-                '<span class="badge bg-light text-muted border">#' + item.id + '</span>' +
+                '<span class="badge qr-badge">#' + item.id + '</span>' +
                 '<span class="text-muted">' + escapeHtml(row.category.label) + '</span>' +
                 '</div>' +
                 '<div class="fw-bold" style="font-size:0.875rem">' +
@@ -430,8 +430,8 @@
     function phrasingBadge(item) {
         if (!item.phrasing_count) { return ''; }
 
-        return '<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle me-1 js-qr-phrasing-badge" ' +
-            'data-id="' + item.id + '" role="button" style="font-weight:400" title="' +
+        return '<span class="badge qr-badge qr-badge--phrasing me-1 js-qr-phrasing-badge" ' +
+            'data-id="' + item.id + '" role="button" title="' +
             escapeHtml(i18n.phrasing_title) + '">💬 ' + item.phrasing_count + '</span>';
     }
 

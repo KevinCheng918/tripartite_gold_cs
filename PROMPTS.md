@@ -77,12 +77,18 @@
 > 專案跑在 Docker laradock，需從 laradock 目錄執行：
 
 ```bash
-# 改到 route：
+# 改到 route 或 config（含 config/permissionMap.php）：
 cd ../laradock && docker-compose exec workspace bash -c "cd /var/www/tripartite_gold_cs && php artisan optimize"
-
-# 改到 permission：
-cd ../laradock && docker-compose exec workspace bash -c "cd /var/www/tripartite_gold_cs && php artisan db:seed --class=SetPermissionSeeder"
 ```
+
+> **權限不需要跑 seeder。**
+> 本專案的權限定義完全由 `config/permissionMap.php` 驅動
+> （`PermissionMapService` 直接 `config('permissionMap')`），
+> 帳號被指派的權限存在 `user_permission` 表。
+> 改了 keyword 只要 `php artisan optimize` 清掉 config 快取即可。
+>
+> （舊版這裡寫 `db:seed --class=SetPermissionSeeder`，但那支 seeder
+> 從來沒有存在過，照著跑會得到 `Target class does not exist`。）
 
 ---
 
@@ -99,10 +105,8 @@ cd ../laradock && docker-compose exec workspace bash -c "cd /var/www/tripartite_
      ```bash
      cd /Users/zheng-kai-wen/Documents/laradock && docker-compose exec workspace bash -c "cd /var/www/tripartite_gold_cs && php artisan optimize"
      ```
-   - 有異動 permission → **必須執行**：
-     ```bash
-     cd /Users/zheng-kai-wen/Documents/laradock && docker-compose exec workspace bash -c "cd /var/www/tripartite_gold_cs && php artisan db:seed --class=SetPermissionSeeder"
-     ```
+   - 有異動 `config/permissionMap.php` → 同上跑一次 `php artisan optimize` 就好，
+     **不需要 seeder**（權限完全由 config 驅動，理由見第 7 節）
 6. **文件更新（必須執行）**：
    - 新增或更新 `.claude/knowledge/bugfix/*.md` 或 `.claude/knowledge/features/*.md`，記錄本次功能要點
    - 同步更新 `.claude/knowledge/INDEX.md` 對應索引行
@@ -173,6 +177,6 @@ last: 必須執行完成前自我檢核
 ### 收尾指令
 
 - [ ] 改 route → 已執行 `cd ../laradock && docker-compose exec workspace bash -c "cd /var/www/tripartite_gold_cs && php artisan optimize"`
-- [ ] 改 permission → 已執行 `cd ../laradock && docker-compose exec workspace bash -c "cd /var/www/tripartite_gold_cs && php artisan db:seed --class=SetPermissionSeeder"`
+- [ ] 改 `config/permissionMap.php` → 已執行 `php artisan optimize`（**不需要 seeder**）
 - [ ] 新增或更新 `.claude/knowledge/bugfix/*.md` 或 `.claude/knowledge/features/*.md`
 - [ ] 若有新增文件，同步更新 `.claude/knowledge/INDEX.md` 對應索引表

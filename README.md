@@ -17,7 +17,13 @@ node : 10.16.*
 7. php artisan migrate:install
 8. php artisan migrate
 9. php artisan db:seed --class=CreateAdminSeeder
-10. php artisan db:seed --class=SetPermissionSeeder
-11. php artisan db:seed --class=ShiftSeeder
-12. php artisan db:seed --class=AppSettingSeeder
-13. php artisan db:seed --class=AutoReplyCategorySeeder
+10. php artisan db:seed --class=ShiftSeeder
+11. php artisan db:seed --class=AppSettingSeeder
+12. php artisan db:seed --class=AutoReplyCategorySeeder
+13. php artisan db:seed --class=AskInfoCategorySeeder
+14. php artisan db:seed --class=QuickReplySeeder
+15. php artisan db:seed --class=QuickReplyKnowledgeSeeder
+16. php artisan optimize
+
+> 權限不需要 seeder：定義在 `config/permissionMap.php`，帳號的授權存在 `user_permission` 表。
+> 舊版這裡列過 `SetPermissionSeeder`，但那支從來沒有存在過。
