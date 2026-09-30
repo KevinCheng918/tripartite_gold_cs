@@ -178,7 +178,10 @@
                                        class="btn btn-sm btn-outline-secondary">
                                         <i class="fas fa-key me-1"></i>{{ trans('account.action_assign_permissions') }}
                                     </a>
-                                    <button class="btn btn-sm btn-outline-info js-login-log"
+                                    {{-- outline-secondary 與同一列的「指派權限」「停用」一致。
+                                         不要用 outline-info：custom.css 只替深色模式定義了它的
+                                         hover，淺色模式沒有覆蓋，滑上去文字不會變色 --}}
+                                    <button class="btn btn-sm btn-outline-secondary js-login-log"
                                             data-id="{{ $account->id }}"
                                             data-account="{{ $account->account }}">
                                         <i class="fas fa-sign-in-alt me-1"></i>{{ trans('login_log.nav_label') }}
@@ -247,7 +250,8 @@
                            class="btn btn-sm btn-outline-secondary">
                             <i class="fas fa-key me-1"></i>{{ trans('account.action_assign_permissions') }}
                         </a>
-                        <button class="btn btn-sm btn-outline-info js-login-log"
+                        {{-- 理由同桌機版那顆 --}}
+                        <button class="btn btn-sm btn-outline-secondary js-login-log"
                                 data-id="{{ $account->id }}"
                                 data-account="{{ $account->account }}">
                             <i class="fas fa-sign-in-alt me-1"></i>{{ trans('login_log.nav_label') }}

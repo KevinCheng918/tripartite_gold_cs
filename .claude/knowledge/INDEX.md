@@ -49,6 +49,7 @@
 | [bugfix/2026-08-10-hardcoded-chinese.md](bugfix/2026-08-10-hardcoded-chinese.md) | 待辦：Blade 寫死中文改用 trans() 語系檔 |
 | [bugfix/2026-08-26-password-regex-pipe.md](bugfix/2026-08-26-password-regex-pipe.md) | 修改密碼一律「更新失敗」：regex 含 `|` 被 pipe 規則字串拆壞 + 全形符號未提示 |
 | [bugfix/2026-09-08-task-comment-emoji-duplicate.md](bugfix/2026-09-08-task-comment-emoji-duplicate.md) | 任務留言按一次表情符號插入好幾個：事件委派在 `document` 卻寫在會重跑的 `loadPanel()` 內而累積（含委派綁定的判斷準則） |
+| [bugfix/2026-09-30-btn-outline-info-light-mode.md](bugfix/2026-09-30-btn-outline-info-light-mode.md) | 登入紀錄按鈕在淺色模式滑上去沒反應：`btn-outline-info` 只補了深色模式那一半 |
 | [bugfix/2026-09-29-session-expired-silent.md](bugfix/2026-09-29-session-expired-silent.md) | session 過期只跳「CSRF token mismatch.」：8 支 apiFetch 都沒處理 401/419，加 AuthGuard 統一攔截 + 15 分鐘心跳 + 打卡不再假成功 |
 | [bugfix/2026-09-29-broadcast-js-syntax-error.md](bugfix/2026-09-29-broadcast-js-syntax-error.md) | broadcast.js 有兩個孤兒 `});`，語法錯誤讓群發頁的 JS 整份不執行（從 `9474c2d` 起一直壞著） |
 | [bugfix/2026-09-14-multi-bot-media-download.md](bugfix/2026-09-14-multi-bot-media-download.md) | 固定某一個 Bot 的群組讀不到圖片：媒體下載排在 `switchBotToken()` 之前，`file_id` 用錯 Bot 的 token 呼叫 `getFile` |
