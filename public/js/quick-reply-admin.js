@@ -123,9 +123,51 @@
      * @param {string} keyword
      * @returns {Array} [{category, item}]
      */
+    /**
+     * 題目內容有沒有命中
+     *
+     * ⚠️ **純數字要用邊界比對，不能直接 indexOf。**
+     * 搜「9」的時候，`indexOf` 會把 #19、#50 這些答案裡出現過 19、1996 的
+     * 題目全部撈出來 —— 數字是任何一段文字裡都會出現的東西，噪音大到搜尋
+     * 等於沒用。要求前後都不是數字之後，「9」就只會命中真正獨立的 9。
+     *
+     * 非純數字（含錯誤碼的 `-4`、中文關鍵字）照舊用 indexOf。
+     *
+     * @param {Object} item
+     * @param {string} text 已轉小寫
+     * @return {boolean}
+     */
+    function matchesText(item, text) {
+        var haystack = (item.label + ' ' + item.answer).toLowerCase();
+
+        if (/^\d+$/.test(text)) {
+            return new RegExp('(^|[^0-9])' + text + '([^0-9]|$)').test(haystack);
+        }
+
+        return haystack.indexOf(text) !== -1;
+    }
+
+    /**
+     * 搜尋題目
+     *
+     * 兩種模式，用開頭的井字號區分：
+     *
+     *   `#9`  → **只找編號 9**，不比對內容
+     *   `9`   → 編號 9 排最前面，後面接內容裡出現獨立「9」的題目
+     *
+     * 分開的理由：清單裡的編號習慣寫成 #23，貼進來時本來就帶著井字號，
+     * 那正好是「我要找這一題」的明確意圖。沒帶井字號就是關鍵字搜尋。
+     *
+     * @param {string} keyword
+     * @return {Array}
+     */
     function searchItems(keyword) {
-        // 清單裡的編號習慣寫成 #23，貼進來時把井字號去掉
-        var text = keyword.replace(/^#/, '').toLowerCase();
+        var raw = keyword.trim();
+        var idOnly = raw.charAt(0) === '#';
+        var text = raw.replace(/^#/, '').toLowerCase();
+
+        if (!text) { return []; }
+
         var byId = [];
         var byText = [];
 
@@ -137,10 +179,9 @@
                     return;
                 }
 
-                var hit = item.label.toLowerCase().indexOf(text) !== -1
-                    || item.answer.toLowerCase().indexOf(text) !== -1;
+                if (idOnly) { return; }
 
-                if (hit) {
+                if (matchesText(item, text)) {
                     byText.push({ category: category, item: item });
                 }
             });

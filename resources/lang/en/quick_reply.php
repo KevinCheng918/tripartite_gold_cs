@@ -33,7 +33,7 @@ return [
     'phrasing_source_2' => 'Added manually',
     'confirm_delete_phrasing' => 'Delete this phrase? Customers asking this way may no longer match.',
 
-    'search_placeholder' => 'Search by ID or keyword, e.g. 23 or sign',
+    'search_placeholder' => 'Type a keyword, or #23 to jump to an ID',
     'search_clear'       => 'Clear search',
     'search_result'      => 'Search results (:count)',
     'search_empty'       => 'No matching entries',

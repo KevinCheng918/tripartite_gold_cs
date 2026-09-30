@@ -34,7 +34,7 @@ return [
     'phrasing_source_2' => '手動新增',
     'confirm_delete_phrasing' => '確定刪除這句說法？刪掉之後，客人這樣問就不一定命中了。',
 
-    'search_placeholder' => '搜尋編號或關鍵字，例如 23 或 加簽',
+    'search_placeholder' => '輸入關鍵字，或用 #23 直接找編號',
     'search_clear'       => '清除搜尋',
     'search_result'      => '搜尋結果（:count 題）',
     'search_empty'       => '找不到符合的問答',

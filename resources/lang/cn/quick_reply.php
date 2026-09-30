@@ -33,7 +33,7 @@ return [
     'phrasing_source_2' => '手动新增',
     'confirm_delete_phrasing' => '确定删除这句说法？删掉之后，客人这样问就不一定命中了。',
 
-    'search_placeholder' => '搜寻编号或关键字，例如 23 或 加签',
+    'search_placeholder' => '输入关键字，或用 #23 直接找编号',
     'search_clear'       => '清除搜寻',
     'search_result'      => '搜寻结果（:count 题）',
     'search_empty'       => '找不到符合的问答',
