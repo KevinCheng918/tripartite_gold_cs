@@ -31,6 +31,7 @@
 | [features/auto-reply-ask-info.md](features/auto-reply-ask-info.md) | 資訊不足時先跟客人要資料（求助單「先問客人」按鈕、AI 判斷 needs_info、追問冷卻） | 已完成 |
 | [features/auto-reply-learning.md](features/auto-reply-learning.md) | 假陰性回收（求助單候選按鈕一鍵用題庫原文回覆、自動累積客人的實際問法） | 已完成 |
 | [features/login-log.md](features/login-log.md) | 登入紀錄（每帳號登入時間/IP/裝置/成敗） | 已完成 |
+| [features/staff-manage.md](features/staff-manage.md) | 內勤管理（身份 `level` 定義、名單兩層排序規則、年資「沒填」的處理） | 已完成（持續迭代，文件待補完） |
 | [features/task-board.md](features/task-board.md) | 任務看板（Kanban 五欄、封存系統、活動紀錄、多人指派、留言編輯、描述勾選清單、附件上傳） | 已完成（持續迭代） |
 | [features/broadcast.md](features/broadcast.md) | 群發公告（多站台 Telegram 群發、附圖、預約傳送） | 已完成（持續迭代） |
 | [features/vm.md](features/vm.md) | 虛擬機管理（主機、開關機、月費帳單、繳款通知） | 已完成（持續迭代，文件待補完） |

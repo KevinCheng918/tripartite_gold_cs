@@ -72,11 +72,12 @@
                         <div class="col-md-3 col-6">
                             <label class="form-label fw-bold">{{ trans('staff_manage.label_sort') }}：</label>
                             <select class="form-select" id="staff-sort">
-                                <option value="id">{{ trans('staff_manage.sort_default') }}</option>
+                                {{-- 預設身份排序：內勤名單先看身份，同身份再看年資 --}}
+                                <option value="level_asc" selected>{{ trans('staff_manage.sort_level_asc') }}</option>
+                                <option value="level_desc">{{ trans('staff_manage.sort_level_desc') }}</option>
                                 <option value="tenure_desc">{{ trans('staff_manage.sort_tenure_desc') }}</option>
                                 <option value="tenure_asc">{{ trans('staff_manage.sort_tenure_asc') }}</option>
-                                <option value="level_asc">{{ trans('staff_manage.sort_level_asc') }}</option>
-                                <option value="level_desc">{{ trans('staff_manage.sort_level_desc') }}</option>
+                                <option value="id">{{ trans('staff_manage.sort_default') }}</option>
                             </select>
                         </div>
                     </div>
@@ -478,6 +479,45 @@ $(function () {
         return (now.getFullYear() - hired.getFullYear()) * 12 + (now.getMonth() - hired.getMonth());
     }
 
+    /*
+     * 排序一律是兩層的，第一層分不出高下時用第二層。
+     *
+     * 只比一個欄位的話，同身份（或同年資）那幾個人的順序就看瀏覽器怎麼排 ——
+     * 名單每次重新篩選都可能換位置，看起來像壞掉。
+     *
+     * level 的數字越小身份越高（ADMIN=0 … CS=4，見 config/constants.php），
+     * 所以「身份高→低」是 level 升冪。
+     *
+     * 年資一律「長→短」當第二層：同身份時資深的排前面。
+     * 沒填入職日或填了未來日期的，calcTenureMonths 回 -1，自然落到最後。
+     */
+
+    /**
+     * 身份為主、年資（長→短）為次
+     *
+     * @param {number} dir 1 = 身份高→低，-1 = 身份低→高
+     */
+    function byLevelThenTenure(dir) {
+        return function (a, b) {
+            var diff = dir * (a.level - b.level);
+
+            return diff !== 0 ? diff : calcTenureMonths(b.hired_at) - calcTenureMonths(a.hired_at);
+        };
+    }
+
+    /**
+     * 年資為主、身份（高→低）為次
+     *
+     * @param {number} dir 1 = 年資短→長，-1 = 年資長→短
+     */
+    function byTenureThenLevel(dir) {
+        return function (a, b) {
+            var diff = dir * (calcTenureMonths(a.hired_at) - calcTenureMonths(b.hired_at));
+
+            return diff !== 0 ? diff : a.level - b.level;
+        };
+    }
+
     function filterStaffData(list) {
         var acct = ($('#staff-search-account').val() || '').toLowerCase();
         var name = ($('#staff-search-name').val() || '').toLowerCase();
@@ -502,13 +542,13 @@ $(function () {
 
         var sort = $('#staff-sort').val();
         if (sort === 'tenure_desc') {
-            filtered.sort(function (a, b) { return calcTenureMonths(b.hired_at) - calcTenureMonths(a.hired_at); });
+            filtered.sort(byTenureThenLevel(-1));
         } else if (sort === 'tenure_asc') {
-            filtered.sort(function (a, b) { return calcTenureMonths(a.hired_at) - calcTenureMonths(b.hired_at); });
+            filtered.sort(byTenureThenLevel(1));
         } else if (sort === 'level_asc') {
-            filtered.sort(function (a, b) { return a.level - b.level; });
+            filtered.sort(byLevelThenTenure(1));
         } else if (sort === 'level_desc') {
-            filtered.sort(function (a, b) { return b.level - a.level; });
+            filtered.sort(byLevelThenTenure(-1));
         }
 
         return filtered;

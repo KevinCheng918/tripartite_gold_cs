@@ -48,8 +48,8 @@ return [
 
     'sort_tenure_desc' => '年資 長→短',
     'sort_tenure_asc'  => '年資 短→長',
-    'sort_level_asc'   => '身份 高→低',
-    'sort_level_desc'  => '身份 低→高',
+    'sort_level_asc'   => '身份 高→低（同身份依年資）',
+    'sort_level_desc'  => '身份 低→高（同身份依年資）',
 
     'edit_staff'    => '編輯人員',
     'not_yet_hired' => '尚未到職',

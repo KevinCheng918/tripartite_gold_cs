@@ -48,8 +48,8 @@ return [
 
     'sort_tenure_desc' => 'Tenure: longest first',
     'sort_tenure_asc'  => 'Tenure: shortest first',
-    'sort_level_asc'   => 'Role: highest first',
-    'sort_level_desc'  => 'Role: lowest first',
+    'sort_level_asc'   => 'Role: highest first (then seniority)',
+    'sort_level_desc'  => 'Role: lowest first (then seniority)',
 
     'edit_staff'    => 'Edit staff',
     'not_yet_hired' => 'Not started yet',
