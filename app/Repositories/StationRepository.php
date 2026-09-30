@@ -129,6 +129,35 @@ class StationRepository
     }
 
     /**
+     * 啟用中、但因為沒設 API 而同步不到餘點的站台
+     *
+     * `getForCreditSync()` 是在 SQL 的 WHERE 就把這些篩掉的 —— 不是進了迴圈
+     * 才跳過，所以它們不會出現在處理結果裡，也不會有任何 log。
+     *
+     * 問題是「啟用中卻檢查不到」通常不是刻意的（api_key 被清空、貼錯），
+     * 而餘點用完照樣會停用客戶後台。靜默漏掉比漏報更糟，所以單獨撈出來記一筆。
+     *
+     * 只看 status=1：停用／凍結的站台本來就不該檢查，那是刻意的狀態。
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getMissingApiForCreditSync()
+    {
+        return Station::query()
+            ->select(['id', 'name', 'api_url', 'api_key'])
+            ->where('status', config('constants.STATION.STATUS.ACTIVE'))
+            ->where(function ($query) {
+                // 四個條件都是 or，包在 closure 裡才不會把 status 條件也一起 or 掉
+                $query->whereNull('api_url')
+                    ->orWhere('api_url', '')
+                    ->orWhereNull('api_key')
+                    ->orWhere('api_key', '');
+            })
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
      * 依 ID 查詢
      *
      * @param int $id

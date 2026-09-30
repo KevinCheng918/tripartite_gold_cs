@@ -62,8 +62,17 @@ class SyncStationCreditCommand extends Command
             'station_id' => $stationId,
         ]);
 
+        /*
+         * 指定單一站台時不查「未設定」清單 —— 那是全量檢查才有意義的總結，
+         * 跑 --station=2 卻列出別的站台缺設定會看得莫名其妙。
+         */
+        $unconfigured = filled($stationId)
+            ? collect()
+            : $this->alertService->unconfiguredStations();
+
         if (blank($results)) {
             $this->info('沒有需要同步的站台（啟用中且 api_url / api_key 都有值的才會被撈出來）');
+            $this->reportUnconfigured($unconfigured, $dryRun);
 
             return 0;
         }
@@ -85,8 +94,9 @@ class SyncStationCreditCommand extends Command
 
         if (!$dryRun) {
             Log::info('站台餘點同步完成', [
-                'checked' => count($results),
-                'alerted' => $alerted,
+                'checked'      => count($results),
+                'alerted'      => $alerted,
+                'unconfigured' => $unconfigured->count(),
             ]);
         }
 
@@ -94,6 +104,8 @@ class SyncStationCreditCommand extends Command
         $this->info($dryRun
             ? "共檢查 {$checked} 個站台，其中 {$alerted} 個符合告警條件（空跑未發送）"
             : "共檢查 {$checked} 個站台，送出 {$alerted} 則告警");
+
+        $this->reportUnconfigured($unconfigured, $dryRun);
 
         return 0;
     }
@@ -150,6 +162,74 @@ class SyncStationCreditCommand extends Command
             $this->warn("── {$station} → {$target} ──");
             $this->line($text);
         }
+    }
+
+    /**
+     * 印出並記錄「啟用中卻沒設 API」的站台
+     *
+     * 這些站台在 SQL 就被篩掉了，不會出現在上面的表格裡。少了這一段，
+     * 「某個站台的 api_key 被清空、從此不再被檢查」這件事沒有任何地方看得到 ——
+     * 而它的點數用完照樣會停用客戶的後台。
+     *
+     * 記 warning 而不是 info：啟用中卻檢查不到是需要有人處理的狀態。
+     * 真的不打算接主系統的站台，把狀態改成停用就不會再被列出來，
+     * 那是消除這個警告的正確方式。
+     *
+     * @param \Illuminate\Database\Eloquent\Collection $stations
+     * @param bool                                     $dryRun
+     * @return void
+     */
+    private function reportUnconfigured($stations, $dryRun)
+    {
+        if (blank($stations)) {
+            return;
+        }
+
+        $count = $stations->count();
+        $describe = function ($station) {
+            return $station->name . '（缺 ' . implode('、', $this->missingFields($station)) . '）';
+        };
+
+        $this->warn("另有 {$count} 個站台未檢查：" . $stations->map($describe)->implode('；'));
+        $this->line('  這些站台啟用中但同步不到餘點。不打算接主系統的話，把狀態改成停用就不會再列出來。');
+
+        if ($dryRun) {
+            return;
+        }
+
+        Log::warning('有啟用中的站台因未設定 API 而未檢查餘點', [
+            'count'    => $count,
+            'stations' => $stations->map(function ($station) {
+                return [
+                    'id'      => $station->id,
+                    'name'    => $station->name,
+                    'missing' => $this->missingFields($station),
+                ];
+            })->all(),
+        ]);
+    }
+
+    /**
+     * 這個站台缺哪些設定
+     *
+     * 印出來與寫 log 都要用，所以抽出來。
+     *
+     * @param \App\Models\Station $station
+     * @return array
+     */
+    private function missingFields($station)
+    {
+        $missing = [];
+
+        if (blank($station->api_url)) {
+            $missing[] = 'API 網址';
+        }
+
+        if (blank($station->api_key)) {
+            $missing[] = 'API 金鑰';
+        }
+
+        return $missing;
     }
 
     /**

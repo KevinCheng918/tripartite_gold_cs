@@ -103,6 +103,20 @@ class StationCreditAlertService
     }
 
     /**
+     * 啟用中、但因為沒設 API 而不會被檢查的站台
+     *
+     * 這些站台在 `getForCreditSync()` 的 WHERE 就被篩掉了，不會出現在
+     * `run()` 的結果裡 —— 單獨撈出來讓 Command 印出並記 log，
+     * 否則「有站台從此不再被檢查」這件事沒有任何地方看得到。
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function unconfiguredStations()
+    {
+        return $this->stationRepository->getMissingApiForCreditSync();
+    }
+
+    /**
      * 全域告警設定（繳款設定頁維護，沒設過就用 constants 的預設）
      *
      * @return array{threshold:float, cooldown_days:int, template:string}

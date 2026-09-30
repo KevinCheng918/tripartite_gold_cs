@@ -87,8 +87,45 @@ per-station 的門檻覆寫在 `station.credit_alert_threshold`，填在站台�
 | API 掛掉 / 逾時 / 回非成功狀態 | `syncInfo()` 回 `null` → **跳過，絕不拿上次的舊點數判斷** |
 | 站台與內部群組都沒設 | 記 warning 後跳過 |
 | 站台停用 / 凍結 | `getForCreditSync()` 只撈 `status=1` |
+| **啟用中但沒設 api_url / api_key** | 在 SQL 就被篩掉 → 另外撈出來印訊息 + 記 warning（見下） |
 | 連日低於門檻 | 冷卻天數控制 |
 | 發送噴錯 | 逐站 try/catch，**不寫 `credit_alerted_at`**，下一輪會重試 |
+
+### 「沒設 API」跟「跳過」不是同一件事
+
+`getForCreditSync()` 是在 SQL 的 `WHERE` 就把沒設 API 的站台篩掉的 ——
+不是進了迴圈才跳過。差別在能見度：
+
+| | 出現在結果表格 | 有 log |
+|---|---|---|
+| API 有設但沒回應（像「測試」站） | ✅ | ✅ |
+| 沒設 api_url / api_key | ❌ | ❌（原本） |
+
+原本後者是**完全靜默**的。問題是「啟用中卻檢查不到」通常不是刻意的
+（api_key 被清空、貼錯），而餘點用完照樣會停用客戶後台 ——
+靜默漏掉比漏報更糟。
+
+所以 `getMissingApiForCreditSync()` 單獨把它們撈出來：
+
+```
+共檢查 2 個站台，送出 0 則告警
+另有 2 個站台未檢查：甲站（缺 API 網址）；乙站（缺 API 網址、API 金鑰）
+  這些站台啟用中但同步不到餘點。不打算接主系統的話，把狀態改成停用就不會再列出來。
+```
+
+正式跑時一併記 warning（空跑不記）：
+
+```
+local.WARNING: 有啟用中的站台因未設定 API 而未檢查餘點
+{"count":1,"stations":[{"id":51,"name":"丙站","missing":["API 金鑰"]}]}
+```
+
+用 `warning` 而不是 `info`：這是需要有人處理的狀態。真的不打算接主系統的站台，
+**把狀態改成停用就不會再被列出來** —— 那是消除這個警告的正確方式，
+而不是去改 code 的判斷。
+
+`--station=` 指定單一站台時不查這份清單：那是全量檢查才有意義的總結，
+跑單站卻列出別的站台缺設定會看得莫名其妙。
 
 > 「API 失敗就跳過」是這個功能最重要的一行判斷。
 > DB 裡的 `credits` 可能是好幾天前的值，拿它來判斷會發出
@@ -159,7 +196,7 @@ php artisan station:sync-credit --station=2 --dry-run
 | `app/Services/AppSettingService.php` | 3 個 `KEY_CREDIT_ALERT_*` 常數 + `getFloat()` |
 | `app/Services/PaymentConfigService.php` | `renderTemplate()` 加 `{credit}` / `{threshold}`，`??` 改 `Arr::get` |
 | `app/Services/StationService.php` | create/update 支援 `credit_alert_threshold`；create 的 `??` 改 `Arr::get` |
-| `app/Repositories/StationRepository.php` | `CREDIT_SYNC_COLUMNS` + `getForCreditSync()`；`LIST_COLUMNS` 加兩欄 |
+| `app/Repositories/StationRepository.php` | `CREDIT_SYNC_COLUMNS`、`getForCreditSync()`、`getMissingApiForCreditSync()`；`LIST_COLUMNS` 加兩欄 |
 | `app/Models/Station.php` | casts、PHPDoc |
 | `app/Http/Resources/StationResource.php` | 兩個新欄位 |
 | `app/Http/Controllers/Admin/PaymentConfigController.php` | 告警設定讀寫；`ajaxRenderTemplate` 支援 credit/threshold |
