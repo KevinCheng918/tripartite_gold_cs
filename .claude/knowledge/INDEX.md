@@ -49,6 +49,7 @@
 | [bugfix/2026-08-10-hardcoded-chinese.md](bugfix/2026-08-10-hardcoded-chinese.md) | 待辦：Blade 寫死中文改用 trans() 語系檔 |
 | [bugfix/2026-08-26-password-regex-pipe.md](bugfix/2026-08-26-password-regex-pipe.md) | 修改密碼一律「更新失敗」：regex 含 `|` 被 pipe 規則字串拆壞 + 全形符號未提示 |
 | [bugfix/2026-09-08-task-comment-emoji-duplicate.md](bugfix/2026-09-08-task-comment-emoji-duplicate.md) | 任務留言按一次表情符號插入好幾個：事件委派在 `document` 卻寫在會重跑的 `loadPanel()` 內而累積（含委派綁定的判斷準則） |
+| [bugfix/2026-09-30-on-duty-reply-time.md](bugfix/2026-09-30-on-duty-reply-time.md) | 提醒 tag 到所有在班的人而非負責回訊的人：關聯 select 漏了 `reply_start_time`，`??` 悄悄 fallback 到上下班時間 |
 | [bugfix/2026-09-30-amend-overnight-clock-out.md](bugfix/2026-09-30-amend-overnight-clock-out.md) | 晚班補下班卡核准後沒生效：出勤紀錄掛在前一天，只查申請日期找不到；跨日的早退計算也錯算成 1440 分 |
 | [bugfix/2026-09-30-qr-badge-dark-mode.md](bugfix/2026-09-30-qr-badge-dark-mode.md) | 題庫編號在深色模式白底白字；句數標記誤用 Bootstrap 5.3 才有的 `*-subtle`（本專案是 5.1） |
 | [bugfix/2026-09-30-btn-outline-info-light-mode.md](bugfix/2026-09-30-btn-outline-info-light-mode.md) | 登入紀錄按鈕在淺色模式滑上去沒反應：`btn-outline-info` 只補了深色模式那一半 |

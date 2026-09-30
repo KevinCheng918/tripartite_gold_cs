@@ -44,6 +44,20 @@ class ShiftAssignment extends Model
      */
     public function shift()
     {
-        return $this->belongsTo(Shift::class)->select(['id', 'name', 'display_name', 'start_time', 'end_time']);
+        /*
+         * ⚠ reply_start_time / reply_end_time 一定要帶。
+         *
+         * 「現在該由誰回訊」看的是**回訊時間**，不是上下班時間 ——
+         * 上班時間普遍是 12 小時、彼此大量重疊（早班 08–20、午班 10–22、
+         * 晚班 12–00），15:00 用上班時間算會同時撈到三個人。
+         *
+         * 少了這兩欄，`isTimeInShiftRange()` 的 fallback 會悄悄改用上下班時間，
+         * 不會報錯、只會 tag 錯人。
+         */
+        return $this->belongsTo(Shift::class)->select([
+            'id', 'name', 'display_name',
+            'start_time', 'end_time',
+            'reply_start_time', 'reply_end_time',
+        ]);
     }
 }

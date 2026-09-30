@@ -676,14 +676,20 @@ class TelegramChatService
      */
     private function isTimeInShiftRange($shift, $nowMinutes)
     {
-        $start = $shift->reply_start_time ?? $shift->start_time;
-        $end = $shift->reply_end_time ?? $shift->end_time;
+        /*
+         * 以**回訊時間**為準，沒設定才退回上下班時間。
+         *
+         * 上班時間普遍是 12 小時、彼此大量重疊（早班 08–20、午班 10–22、
+         * 晚班 12–00），拿它來判斷「現在該由誰回訊」會一次撈到三個人。
+         *
+         * ⚠ 用 filled() 而不是 `??`：欄位沒填時可能是空字串而不是 null，
+         * `??` 不會 fallback，explode(':', '') 會算出 00:00 —— 變成整天在班。
+         */
+        $start = filled($shift->reply_start_time) ? $shift->reply_start_time : $shift->start_time;
+        $end = filled($shift->reply_end_time) ? $shift->reply_end_time : $shift->end_time;
 
-        $parts = explode(':', $start);
-        $startMin = (int) $parts[0] * 60 + (int) $parts[1];
-
-        $parts = explode(':', $end);
-        $endMin = (int) $parts[0] * 60 + (int) $parts[1];
+        $startMin = $this->timeToMinutes($start);
+        $endMin = $this->timeToMinutes($end);
 
         if ($endMin > $startMin) {
             return $nowMinutes >= $startMin && $nowMinutes < $endMin;
@@ -691,6 +697,19 @@ class TelegramChatService
 
         // 跨日班
         return $nowMinutes >= $startMin || $nowMinutes < $endMin;
+    }
+
+    /**
+     * HH:mm 或 HH:mm:ss 換算成分鐘數
+     *
+     * @param string $time
+     * @return int
+     */
+    private function timeToMinutes($time)
+    {
+        $parts = explode(':', (string) $time);
+
+        return (int) Arr::get($parts, 0) * 60 + (int) Arr::get($parts, 1);
     }
 
     /**
