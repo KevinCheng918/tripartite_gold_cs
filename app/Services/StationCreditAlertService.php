@@ -46,6 +46,7 @@ class StationCreditAlertService
 
     private $stationRepository;
     private $stationService;
+    private $mainSystemApi;
     private $appSettingService;
     private $paymentConfigService;
     private $chatService;
@@ -54,6 +55,7 @@ class StationCreditAlertService
     public function __construct(
         StationRepository $stationRepository,
         StationService $stationService,
+        MainSystemApiService $mainSystemApi,
         AppSettingService $appSettingService,
         PaymentConfigService $paymentConfigService,
         TelegramChatService $chatService,
@@ -61,6 +63,8 @@ class StationCreditAlertService
     ) {
         $this->stationRepository = $stationRepository;
         $this->stationService = $stationService;
+        // 只有空跑會直接用它（不寫 DB）；正常跑一律走 StationService::syncInfo()
+        $this->mainSystemApi = $mainSystemApi;
         $this->appSettingService = $appSettingService;
         $this->paymentConfigService = $paymentConfigService;
         $this->chatService = $chatService;
@@ -170,8 +174,16 @@ class StationCreditAlertService
     {
         $threshold = $this->thresholdFor($station, $settings['threshold']);
 
-        // 同步在最前面：沒有新的點數就沒什麼可判斷的
-        $info = $this->stationService->syncInfo($station);
+        /*
+         * 同步在最前面：沒有新的點數就沒什麼可判斷的。
+         *
+         * 空跑時只問 API、不走 syncInfo —— syncInfo 會把 credits / settings /
+         * synced_at 寫進 DB，那就不是「空跑」了。空跑的用途就是安心確認
+         * 「會發給誰、內容長怎樣」，它不該留下任何痕跡。
+         */
+        $info = $dryRun
+            ? $this->mainSystemApi->getStationInfo($station->api_url, $station->api_key)
+            : $this->stationService->syncInfo($station);
 
         if (blank($info)) {
             /*
@@ -189,7 +201,25 @@ class StationCreditAlertService
             return $this->result($station, $threshold, false, null, self::SKIP_SYNC_FAILED);
         }
 
-        $credits = (float) $station->credits;
+        /*
+         * 非空跑時 syncInfo 已經把新點數寫回 model，讀 $station 就是最新值；
+         * 空跑沒有寫入，所以直接從 API 的回傳取。
+         *
+         * 用 Arr::get 的預設值接住「API 回了但沒有 admin_credit 這個欄位」——
+         * 這時 syncInfo 的行為也是保留舊值，兩條路徑要一致。
+         */
+        $credits = $dryRun
+            ? (float) Arr::get($info, 'admin_credit', $station->credits)
+            : (float) $station->credits;
+
+        /*
+         * 空跑沒有經過 syncInfo，model 上還是 DB 的舊值 —— 放回去（只改記憶體、
+         * 不 save），後面輸出的結果才是「實際拿來判斷的那個數字」，
+         * 否則表格會顯示舊點數、判斷卻用新點數，看起來像 bug。
+         */
+        if ($dryRun) {
+            $station->credits = $credits;
+        }
 
         if ($credits >= $threshold) {
             return $this->result($station, $threshold, false, null, self::SKIP_ABOVE_THRESHOLD);

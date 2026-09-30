@@ -14,11 +14,15 @@ use Illuminate\Support\Facades\Log;
  *
  * 手動驗證用 --dry-run：印出「誰會被告警、訊息長什麼樣」但不真的送出去，
  * 否則要驗這支得等到排程時間。--station 可以只跑一個站台。
+ *
+ * ⚠ --dry-run 是**完全唯讀**的：它只問主系統 API，不走 syncInfo()，
+ * 所以 station 的 credits / synced_at 都不會被更新，站台管理頁看到的還是舊值。
+ * 要讓頁面顯示最新點數，跑正常的（不加 --dry-run）或按頁面上的「同步」按鈕。
  */
 class SyncStationCreditCommand extends Command
 {
     protected $signature = 'station:sync-credit
-        {--dry-run : 只同步與判斷，不實際送出告警}
+        {--dry-run : 完全唯讀：只判斷並印出結果，不送告警也不更新點數}
         {--station= : 只處理指定的站台 ID}';
 
     protected $description = '同步各站台的系統餘點，低於門檻時發送告警';
@@ -50,7 +54,7 @@ class SyncStationCreditCommand extends Command
         $stationId = $this->option('station');
 
         if ($dryRun) {
-            $this->warn('── 空跑模式：只同步與判斷，不會送出任何訊息 ──');
+            $this->warn('── 空跑模式：不會送出任何訊息，也不會更新站台的點數 ──');
         }
 
         $results = $this->alertService->run([
