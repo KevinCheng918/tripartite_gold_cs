@@ -32,6 +32,10 @@ class Kernel extends ConsoleKernel
 
         // 每月 1 號凌晨 0 點產生 VM 帳單
         $schedule->command('vm:generate-billing')->monthlyOn(1, '00:00');
+
+        // 每日上午 10 點同步各站台系統餘點，低於門檻發告警
+        // withoutOverlapping：逐站打主系統 API，站台多的時候可能跑超過一輪
+        $schedule->command('station:sync-credit')->dailyAt('10:00')->withoutOverlapping();
     }
 
     /**

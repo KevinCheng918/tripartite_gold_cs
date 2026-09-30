@@ -98,6 +98,9 @@ class StationController extends Controller
             'api_url'           => 'nullable|string|max:255',
             'api_key'           => 'nullable|string|max:64',
             'telegram_chat_id'  => 'nullable|string|max:30',
+            // 留空 = 沿用全域門檻（ConvertEmptyStringsToNull middleware 會把 '' 轉成 null）；
+            // 填 0 才是「這站不要告警」
+            'credit_alert_threshold' => 'nullable|numeric|min:0|max:' . config('rules.STATION_CREDIT_MAX'),
             'note'              => 'nullable|string',
         ]);
 
@@ -129,6 +132,8 @@ class StationController extends Controller
             'api_key'           => 'nullable|string|max:64',
             'telegram_chat_id'  => 'nullable|string|max:30',
             'status'            => 'sometimes|integer|in:0,1,2',
+            // 留空 = 沿用全域門檻，填 0 = 這站不要告警
+            'credit_alert_threshold' => 'nullable|numeric|min:0|max:' . config('rules.STATION_CREDIT_MAX'),
             'note'              => 'nullable|string',
         ]);
 

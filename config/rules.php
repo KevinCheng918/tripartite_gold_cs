@@ -24,6 +24,17 @@ return [
     'TELEGRAM_CHAT_ID_REGEX' => 'regex:/^-?\d{5,20}$/',
 
     /*
+     * 點數欄位的數值上限。
+     *
+     * station.credits 與 station.credit_alert_threshold 都是 decimal(15,2)，
+     * 超過這個值寫進去會被 MySQL 截斷（非 strict mode）或直接報錯。
+     *
+     * 告警門檻的驗證有三個入口（繳款設定的全域門檻、站台新增、站台更新），
+     * 各自寫一次魔術數字遲早會改一邊漏兩邊。
+     */
+    'STATION_CREDIT_MAX' => 99999999999999,
+
+    /*
      * 上傳檔案禁止的副檔名
      *
      * 上傳目的地在 storage/app/public 底下、對外可直接存取，

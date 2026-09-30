@@ -14,6 +14,70 @@
     </div>
     @endif
 
+    {{-- 站台餘點告警：全站台共用一份設定，跟下面 per-system 的繳款設定是兩件事 --}}
+    <div class="main-card mb-3 card">
+        <div class="card-header d-flex justify-content-between align-items-center"
+             role="button" data-bs-toggle="collapse" data-bs-target="#pc-alert-section"
+             aria-expanded="false" aria-controls="pc-alert-section">
+            <div>
+                <strong><i class="fas fa-triangle-exclamation me-1"></i>{{ trans('payment_config.alert_section_title') }}</strong>
+                <small class="text-muted d-none d-md-inline ms-2">{{ trans('payment_config.alert_section_subtitle') }}</small>
+            </div>
+            <i class="fas fa-chevron-down"></i>
+        </div>
+        <div class="collapse" id="pc-alert-section">
+            <div class="card-body">
+                <small class="text-muted d-block d-md-none mb-3">{{ trans('payment_config.alert_section_subtitle') }}</small>
+
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold" for="pc-alert-threshold">{{ trans('payment_config.alert_field_threshold') }}</label>
+                        <input type="number" step="0.01" min="0" class="form-control" id="pc-alert-threshold"
+                               value="{{ $alertSetting['threshold'] }}"
+                               @if(!Auth::user()->hasPermission('payment_config.manage')) disabled @endif>
+                        <small class="text-muted">{{ trans('payment_config.alert_threshold_hint') }}</small>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold" for="pc-alert-cooldown">{{ trans('payment_config.alert_field_cooldown') }}</label>
+                        <div class="input-group">
+                            <input type="number" step="1" min="0" max="365" class="form-control" id="pc-alert-cooldown"
+                                   value="{{ $alertSetting['cooldown_days'] }}"
+                                   @if(!Auth::user()->hasPermission('payment_config.manage')) disabled @endif>
+                            <span class="input-group-text">天</span>
+                        </div>
+                        <small class="text-muted">{{ trans('payment_config.alert_cooldown_hint') }}</small>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold" for="pc-alert-template">{{ trans('payment_config.alert_field_template') }}</label>
+                        <textarea class="form-control" id="pc-alert-template" rows="5"
+                                  @if(!Auth::user()->hasPermission('payment_config.manage')) disabled @endif>{{ $alertSetting['template'] }}</textarea>
+                        <small class="text-muted">{{ trans('payment_config.alert_template_hint') }}</small>
+                    </div>
+                </div>
+
+                <div class="alert alert-info mt-3 mb-0 py-2">
+                    <small><i class="fas fa-circle-info me-1"></i>{{ trans('payment_config.alert_target_hint') }}</small>
+                </div>
+
+                <div class="d-flex gap-2 mt-3">
+                    <button class="btn btn-outline-secondary" id="btn-pc-alert-preview">
+                        <i class="fas fa-eye me-1"></i>{{ trans('payment_config.alert_preview') }}
+                    </button>
+                    @can('payment_config.manage')
+                    <button class="btn btn-primary" id="btn-pc-alert-save">
+                        <i class="fas fa-save me-1"></i>{{ trans('payment_config.action_save_alert') }}
+                    </button>
+                    @endcan
+                </div>
+
+                <div id="pc-alert-preview-wrap" class="mt-3 d-none">
+                    <p class="text-muted mb-1">{{ trans('payment_config.alert_preview_title') }}：</p>
+                    <div class="pc-template-box" id="pc-alert-preview-box"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- 篩選 --}}
     <div class="main-card mb-3 card">
         <div class="card-body">
@@ -72,10 +136,10 @@
                     <div class="row">
                         <div class="{{ $config->image ? 'col-md-8' : 'col-12' }}">
                             <p class="text-muted mb-1">{{ trans('payment_config.field_content') }}：</p>
-                            <div class="pc-content-box" style="white-space:pre-wrap;background:#f8f9fa;padding:0.75rem;border-radius:0.375rem;font-size:0.875rem">{{ $config->content }}</div>
+                            <div class="pc-content-box">{{ $config->content }}</div>
                             @if(filled($config->template))
                                 <p class="text-muted mb-1 mt-3">{{ trans('payment_config.field_template') }}：</p>
-                                <div class="pc-template-box" style="white-space:pre-wrap;background:#fef3c7;padding:0.75rem;border-radius:0.375rem;font-size:0.875rem">{{ $config->template }}</div>
+                                <div class="pc-template-box">{{ $config->template }}</div>
                             @endif
                         </div>
                         @if($config->image)
@@ -279,6 +343,77 @@ $(function () {
             error: function (xhr) {
                 hideBsModal(document.getElementById('modal-pc-confirm'));
                 showMessage((xhr.responseJSON && xhr.responseJSON.message) || '刪除失敗');
+            }
+        });
+    });
+
+    // ── 站台餘點告警設定 ──
+
+    // 展開/收起時箭頭跟著轉，否則看不出目前是開還是關
+    $('#pc-alert-section')
+        .on('show.bs.collapse', function () {
+            $('[data-bs-target="#pc-alert-section"] .fa-chevron-down').addClass('fa-rotate-180');
+        })
+        .on('hide.bs.collapse', function () {
+            $('[data-bs-target="#pc-alert-section"] .fa-chevron-down').removeClass('fa-rotate-180');
+        });
+
+    /*
+     * 預覽走後端的 render-template，不在前端自己做字串替換 ——
+     * 變數代換只有一份實作，客服看到的就是客戶會收到的。
+     */
+    $('#btn-pc-alert-preview').on('click', function () {
+        var $btn = $(this);
+        $btn.prop('disabled', true);
+
+        $.ajax({
+            url: '{{ route("admin.payment-config.ajax-render-template") }}',
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            data: {
+                template: $('#pc-alert-template').val(),
+                station: '{{ trans("payment_config.alert_preview_station") }}',
+                // 範例點數，只為了看格式；實際數字由每天的同步帶入
+                credit: '16390.94',
+                threshold: $('#pc-alert-threshold').val()
+            },
+            success: function (body) {
+                $('#pc-alert-preview-box').text(body.text || '');
+                $('#pc-alert-preview-wrap').removeClass('d-none');
+            },
+            error: function (xhr) {
+                showMessage((xhr.responseJSON && xhr.responseJSON.message) || '預覽失敗');
+            },
+            complete: function () { $btn.prop('disabled', false); }
+        });
+    });
+
+    $('#btn-pc-alert-save').on('click', function () {
+        var $btn = $(this);
+        var $fields = $('#pc-alert-threshold, #pc-alert-cooldown, #pc-alert-template');
+
+        // 存檔中鎖住欄位，避免等回傳的空檔又被改掉
+        $btn.prop('disabled', true);
+        $fields.prop('disabled', true);
+
+        $.ajax({
+            url: '{{ route("admin.payment-config.ajax-alert-setting") }}',
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            data: {
+                alert_template: $('#pc-alert-template').val(),
+                threshold: $('#pc-alert-threshold').val(),
+                cooldown_days: $('#pc-alert-cooldown').val()
+            },
+            success: function (body) {
+                showMessage(body.message || '{{ trans("payment_config.msg.alert_saved") }}');
+            },
+            error: function (xhr) {
+                showMessage((xhr.responseJSON && xhr.responseJSON.message) || '{{ trans("payment_config.msg.alert_save_failed") }}');
+            },
+            complete: function () {
+                $btn.prop('disabled', false);
+                $fields.prop('disabled', false);
             }
         });
     });

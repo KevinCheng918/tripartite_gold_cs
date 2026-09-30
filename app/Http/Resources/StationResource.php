@@ -26,6 +26,8 @@ class StationResource extends JsonResource
             'api_url'           => $this->api_url,
             'api_key'           => $this->api_key,
             'credits'           => $this->credits,
+            // 留 null 不轉 0：前端要靠這個區分「這站有自己的門檻」與「沿用全域設定」
+            'credit_alert_threshold' => $this->credit_alert_threshold,
             'settings'          => $this->settings,
             'telegram_group_id' => $this->telegram_group_id,
             'telegram_chat_id'  => $this->whenLoaded('telegramGroup', function () {
@@ -38,6 +40,8 @@ class StationResource extends JsonResource
             'note'              => $this->note,
             'synced_at'         => $this->synced_at
                 ? \Carbon\Carbon::parse($this->synced_at)->toDateTimeString() : null,
+            'credit_alerted_at' => $this->credit_alerted_at
+                ? \Carbon\Carbon::parse($this->credit_alerted_at)->toDateTimeString() : null,
             'created_at'        => \Carbon\Carbon::parse($this->created_at)->toDateTimeString(),
         ];
     }

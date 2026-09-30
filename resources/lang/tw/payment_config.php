@@ -19,6 +19,21 @@ return [
     'status_active'   => '啟用',
     'status_disabled' => '停用',
 
+    // 站台餘點告警
+    'alert_section_title'    => '站台餘點告警',
+    'alert_section_subtitle' => '每天上午 10 點自動同步各站台的系統餘點，低於門檻時發 Telegram 提醒客戶補點',
+    'alert_field_threshold'  => '告警門檻',
+    'alert_field_cooldown'   => '重複告警間隔',
+    'alert_field_template'   => '告警公版',
+    'alert_threshold_hint'   => '餘點低於這個數字就發告警。各站台可在站台管理填自己的門檻，留空才沿用這裡。填 0 表示不告警',
+    'alert_cooldown_hint'    => '同一個站台幾天內不重複告警。填 1 等於每天提醒一次，填 0 表示每次跑到都發',
+    'alert_template_hint'    => '可用變數：{station} 站台名稱、{credit} 當前餘點、{threshold} 告警門檻',
+    'alert_target_hint'      => '告警發到站台自己的 Telegram 群組；站台沒設群組時會改發到內部支援群組，並標註「沒有發給客戶」提醒客服手動通知',
+    'alert_preview'          => '預覽',
+    'alert_preview_title'    => '客戶會收到的內容',
+    'alert_preview_station'  => '範例站台',
+    'action_save_alert'      => '儲存告警設定',
+
     'action_create' => '新增繳款設定',
     'action_edit'   => '編輯',
     'action_delete' => '刪除',
@@ -37,5 +52,17 @@ return [
         'send_failed'   => '發送失敗',
         'no_config'     => '此系統尚未設定繳款資訊',
         'no_telegram'   => '此站台未設定 Telegram 群組',
+
+        // 餘點告警設定
+        'alert_saved'              => '告警設定已儲存',
+        'alert_save_failed'        => '告警設定儲存失敗',
+        'alert_template_required'  => '請填寫告警公版',
+        'alert_template_max'       => '告警公版不可超過 :value 字',
+        'alert_threshold_required' => '請填寫告警門檻',
+        'alert_threshold_numeric'  => '告警門檻請填數字',
+        'alert_threshold_min'      => '告警門檻不可小於 0',
+        'alert_cooldown_required'  => '請填寫重複告警間隔',
+        'alert_cooldown_integer'   => '重複告警間隔請填整數天數',
+        'alert_cooldown_max'       => '重複告警間隔不可超過 :value 天',
     ],
 ];

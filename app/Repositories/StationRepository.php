@@ -12,7 +12,18 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 class StationRepository
 {
     /** @var array 列表查詢欄位 */
-    private const LIST_COLUMNS = ['id', 'system_id', 'name', 'domain', 'api_url', 'api_key', 'credits', 'settings', 'telegram_group_id', 'status', 'note', 'synced_at', 'created_at'];
+    private const LIST_COLUMNS = ['id', 'system_id', 'name', 'domain', 'api_url', 'api_key', 'credits', 'credit_alert_threshold', 'settings', 'telegram_group_id', 'status', 'note', 'synced_at', 'credit_alerted_at', 'created_at'];
+
+    /**
+     * 餘點同步要用的欄位
+     *
+     * ⚠ `credits` 一定要帶 —— `StationService::syncInfo()` 在 API 沒回
+     * `admin_credit` 時會退回舊值（`$info['admin_credit'] ?? $station->credits`），
+     * 少了這欄會把站台的點數寫成 null。
+     *
+     * `settings` 不帶：syncInfo 只覆寫不讀它，撈整包 JSON 是白費流量。
+     */
+    private const CREDIT_SYNC_COLUMNS = ['id', 'system_id', 'name', 'api_url', 'api_key', 'credits', 'credit_alert_threshold', 'telegram_group_id', 'credit_alerted_at'];
 
     /**
      * 分頁查詢
@@ -86,6 +97,35 @@ class StationRepository
             ->whereNotNull('telegram_group_id')
             ->orderBy('name')
             ->get();
+    }
+
+    /**
+     * 取得要同步餘點的站台
+     *
+     * 只撈啟用中、且 api_url / api_key 都有值的 —— 少了任一個
+     * `MainSystemApiService::getStationInfo()` 會直接回 null，撈出來只是白跑一趟。
+     *
+     * 刻意**不**篩 telegram_group_id：沒設群組的站台照樣要同步，
+     * 告警會退到內部支援群組讓客服手動通知。
+     *
+     * @param int|null $stationId 只跑單一站台（Command 的 --station）
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getForCreditSync($stationId = null)
+    {
+        $query = Station::query()
+            ->select(self::CREDIT_SYNC_COLUMNS)
+            ->where('status', config('constants.STATION.STATUS.ACTIVE'))
+            ->whereNotNull('api_url')
+            ->where('api_url', '!=', '')
+            ->whereNotNull('api_key')
+            ->where('api_key', '!=', '');
+
+        if (filled($stationId)) {
+            $query->where('id', (int) $stationId);
+        }
+
+        return $query->orderBy('id')->get();
     }
 
     /**

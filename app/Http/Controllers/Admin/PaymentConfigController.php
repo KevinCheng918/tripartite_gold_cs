@@ -3,10 +3,15 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\PaymentConfig\UpdateAlertSettingRequest;
 use App\Models\PaymentConfig;
+use App\Services\AppSettingService;
 use App\Services\PaymentConfigService;
+use App\Services\StationCreditAlertService;
 use App\Services\StationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -16,11 +21,19 @@ class PaymentConfigController extends Controller
 {
     private $service;
     private $stationService;
+    private $appSettingService;
+    private $creditAlertService;
 
-    public function __construct(PaymentConfigService $service, StationService $stationService)
-    {
+    public function __construct(
+        PaymentConfigService $service,
+        StationService $stationService,
+        AppSettingService $appSettingService,
+        StationCreditAlertService $creditAlertService
+    ) {
         $this->service = $service;
         $this->stationService = $stationService;
+        $this->appSettingService = $appSettingService;
+        $this->creditAlertService = $creditAlertService;
     }
 
     /**
@@ -38,6 +51,8 @@ class PaymentConfigController extends Controller
             'systems'  => $systems,
             'configs'  => $configs,
             'systemId' => $systemId,
+            // 餘點告警的公版與門檻。沒設定過時 globalSettings() 會給 constants 的預設值
+            'alertSetting' => $this->creditAlertService->globalSettings(),
         ]);
     }
 
@@ -50,7 +65,7 @@ class PaymentConfigController extends Controller
     public function ajaxList(Request $request)
     {
         $params = $request->only(['system_id']);
-        $configs = $this->service->list($params['system_id'] ?? null);
+        $configs = $this->service->list(Arr::get($params, 'system_id'));
 
         return response()->json($configs->map(function ($c) {
             return [
@@ -178,18 +193,51 @@ class PaymentConfigController extends Controller
     public function ajaxRenderTemplate(Request $request)
     {
         $params = $request->validate([
-            'template' => 'required|string',
-            'station'  => 'nullable|string',
-            'amount'   => 'nullable|string',
-            'month'    => 'nullable|string',
+            'template'  => 'required|string',
+            'station'   => 'nullable|string',
+            'amount'    => 'nullable|string',
+            'month'     => 'nullable|string',
+            // 餘點告警的公版也用這支預覽，不另開端點
+            'credit'    => 'nullable|string',
+            'threshold' => 'nullable|string',
         ]);
 
-        $text = $this->service->renderTemplate($params['template'], [
-            'station' => $params['station'] ?? '',
-            'amount'  => $params['amount'] ?? '',
-            'month'   => $params['month'] ?? '',
+        $text = $this->service->renderTemplate(Arr::get($params, 'template'), [
+            'station'   => Arr::get($params, 'station', ''),
+            'amount'    => Arr::get($params, 'amount', ''),
+            'month'     => Arr::get($params, 'month', ''),
+            'credit'    => Arr::get($params, 'credit', ''),
+            'threshold' => Arr::get($params, 'threshold', ''),
         ]);
 
         return response()->json(['text' => $text]);
+    }
+
+    /**
+     * Ajax 儲存站台餘點告警設定
+     *
+     * 公版、門檻、冷卻天數存在 app_setting，不是 payment_config 的一筆 ——
+     * payment_config 是每個 system 一組，而餘點告警是全站台共用的一份。
+     *
+     * @param UpdateAlertSettingRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxUpdateAlertSetting(UpdateAlertSettingRequest $request)
+    {
+        $params = $request->validated();
+
+        try {
+            $this->appSettingService->putMany([
+                AppSettingService::KEY_CREDIT_ALERT_TEMPLATE      => Arr::get($params, 'alert_template'),
+                AppSettingService::KEY_CREDIT_ALERT_THRESHOLD     => Arr::get($params, 'threshold'),
+                AppSettingService::KEY_CREDIT_ALERT_COOLDOWN_DAYS => Arr::get($params, 'cooldown_days'),
+            ], Auth::id());
+
+            return response()->json(['message' => trans('payment_config.msg.alert_saved')]);
+        } catch (\Exception $e) {
+            Log::error('餘點告警設定儲存失敗', ['error' => $e->getMessage()]);
+
+            return response()->json(['message' => trans('payment_config.msg.alert_save_failed')], 500);
+        }
     }
 }

@@ -6,7 +6,6 @@ use App\Models\AutoReplyTicket;
 use App\Models\TelegramGroup;
 use App\Repositories\AutoReplyTicketRepository;
 use App\Repositories\QuickReplyRepository;
-use App\Repositories\StationRepository;
 use App\Repositories\TelegramRepository;
 use App\Repositories\UserRepository;
 use App\Services\AutoReply\AnswerSplitter;
@@ -43,11 +42,11 @@ class AutoReplySupportService
     private $telegramRepository;
     private $quickReplyRepository;
     private $userRepository;
-    private $stationRepository;
     private $botService;
     private $chatService;
     private $quickReplyService;
     private $appSettingService;
+    private $supportGroup;
     private $splitter;
 
     public function __construct(
@@ -55,22 +54,22 @@ class AutoReplySupportService
         TelegramRepository $telegramRepository,
         QuickReplyRepository $quickReplyRepository,
         UserRepository $userRepository,
-        StationRepository $stationRepository,
         TelegramBotService $botService,
         TelegramChatService $chatService,
         QuickReplyService $quickReplyService,
         AppSettingService $appSettingService,
+        SupportGroupService $supportGroup,
         AnswerSplitter $splitter
     ) {
         $this->ticketRepository = $ticketRepository;
         $this->telegramRepository = $telegramRepository;
         $this->quickReplyRepository = $quickReplyRepository;
         $this->userRepository = $userRepository;
-        $this->stationRepository = $stationRepository;
         $this->botService = $botService;
         $this->chatService = $chatService;
         $this->quickReplyService = $quickReplyService;
         $this->appSettingService = $appSettingService;
+        $this->supportGroup = $supportGroup;
         $this->splitter = $splitter;
     }
 
@@ -111,7 +110,7 @@ class AutoReplySupportService
      */
     public function openTicket(TelegramGroup $group, $question, $messageId = null, $hint = null, array $history = [], array $candidates = [])
     {
-        if (blank($this->appSettingService->get(AppSettingService::KEY_SUPPORT_CHAT_ID))) {
+        if (!$this->supportGroup->isConfigured()) {
             Log::warning('未設定內部支援群組，答不出來的問題沒有轉出去', ['group_id' => $group->id]);
 
             return null;
@@ -871,7 +870,7 @@ class AutoReplySupportService
      */
     public function remindTimeoutTickets()
     {
-        if (blank($this->appSettingService->get(AppSettingService::KEY_SUPPORT_CHAT_ID))) {
+        if (!$this->supportGroup->isConfigured()) {
             return 0;
         }
 
@@ -992,6 +991,10 @@ class AutoReplySupportService
 
     // ---------------------------------------------------------------
     //  發訊息
+    //
+    //  實作搬到 SupportGroupService（站台餘點告警也要走同一條路）。
+    //  這兩支留著當這個 class 的語意入口 —— 裡面沒有邏輯，只是 21 個呼叫點
+    //  讀起來是「送到支援群組」而不是「送到某個 chat_id」。
     // ---------------------------------------------------------------
 
     /**
@@ -1004,15 +1007,7 @@ class AutoReplySupportService
      */
     private function sendToSupport($text, $keyboard = null, $replyTo = null)
     {
-        $chatId = $this->appSettingService->get(AppSettingService::KEY_SUPPORT_CHAT_ID);
-
-        if (blank($chatId)) {
-            return null;
-        }
-
-        $this->switchSupportBot();
-
-        return $this->botService->sendMessage($chatId, $text, $replyTo, $keyboard);
+        return $this->supportGroup->send($text, $keyboard, $replyTo);
     }
 
     /**
@@ -1025,35 +1020,6 @@ class AutoReplySupportService
      */
     private function editSupportMessage($messageId, $text, $keyboard = null)
     {
-        $chatId = $this->appSettingService->get(AppSettingService::KEY_SUPPORT_CHAT_ID);
-
-        if (blank($chatId) || blank($messageId)) {
-            return;
-        }
-
-        $this->switchSupportBot();
-        $this->botService->editMessageText($chatId, $messageId, $text, $keyboard);
-    }
-
-    /**
-     * 切換到支援群組所屬的 Bot
-     *
-     * 設定頁用下拉選 system，沒選就用 .env 的預設 bot。
-     *
-     * @return void
-     */
-    private function switchSupportBot()
-    {
-        $systemId = $this->appSettingService->getInt(AppSettingService::KEY_SUPPORT_SYSTEM_ID);
-
-        if ($systemId <= 0) {
-            return;
-        }
-
-        $system = $this->stationRepository->getActiveSystems()->firstWhere('id', $systemId);
-
-        if (filled($system) && filled($system->bot_token)) {
-            $this->botService->setToken($system->bot_token);
-        }
+        $this->supportGroup->editMessage($messageId, $text, $keyboard);
     }
 }

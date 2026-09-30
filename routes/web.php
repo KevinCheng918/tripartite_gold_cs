@@ -191,6 +191,8 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::delete('/ajax-delete/{config}', [PaymentConfigController::class, 'ajaxDelete'])->middleware('can:payment_config.manage')->name('ajax-delete');
         Route::get('/ajax-by-system', [PaymentConfigController::class, 'ajaxBySystem'])->middleware('can:payment_config.view')->name('ajax-by-system');
         Route::post('/ajax-render-template', [PaymentConfigController::class, 'ajaxRenderTemplate'])->middleware('can:payment_config.view')->name('ajax-render-template');
+        // 站台餘點告警的公版與門檻（全站台共用一份，存 app_setting）
+        Route::post('/ajax-alert-setting', [PaymentConfigController::class, 'ajaxUpdateAlertSetting'])->middleware('can:payment_config.manage')->name('ajax-alert-setting');
     });
 
     // 任務看板

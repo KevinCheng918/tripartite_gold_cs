@@ -6,6 +6,7 @@ use App\Models\Station;
 use App\Repositories\StationRepository;
 use App\Repositories\TelegramRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -63,14 +64,16 @@ class StationService
         $telegramGroupId = $this->resolveTelegramGroupId($params);
 
         return $this->stationRepository->create([
-            'system_id'         => $params['system_id'] ?? null,
-            'name'              => $params['name'],
-            'domain'            => $params['domain'] ?? null,
-            'api_url'           => $params['api_url'] ?? null,
-            'api_key'           => $params['api_key'] ?? null,
+            'system_id'         => Arr::get($params, 'system_id'),
+            'name'              => Arr::get($params, 'name'),
+            'domain'            => Arr::get($params, 'domain'),
+            'api_url'           => Arr::get($params, 'api_url'),
+            'api_key'           => Arr::get($params, 'api_key'),
             'telegram_group_id' => $telegramGroupId,
             'status'            => config('constants.STATION.STATUS.ACTIVE'),
-            'note'              => $params['note'] ?? null,
+            // null = 沿用全域告警門檻
+            'credit_alert_threshold' => Arr::get($params, 'credit_alert_threshold'),
+            'note'              => Arr::get($params, 'note'),
         ]);
     }
 
@@ -89,7 +92,7 @@ class StationService
             unset($params['telegram_chat_id']);
         }
 
-        $fields = ['system_id', 'name', 'domain', 'api_url', 'api_key', 'telegram_group_id', 'status', 'note'];
+        $fields = ['system_id', 'name', 'domain', 'api_url', 'api_key', 'telegram_group_id', 'status', 'credit_alert_threshold', 'note'];
         $attributes = [];
 
         foreach ($fields as $field) {

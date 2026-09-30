@@ -275,6 +275,7 @@
                                                 data-api-url="{{ $station->api_url }}"
                                                 data-key-masked="{{ filled($station->api_key) ? Str::substr($station->api_key, 0, 4) . str_repeat('*', max(0, Str::length($station->api_key) - 8)) . Str::substr($station->api_key, -4) : '' }}"
                                                 data-tg-masked="{{ $station->telegramGroup && filled($station->telegramGroup->chat_id) ? Str::substr((string)$station->telegramGroup->chat_id, 0, 4) . str_repeat('*', max(0, Str::length((string)$station->telegramGroup->chat_id) - 8)) . Str::substr((string)$station->telegramGroup->chat_id, -4) : '' }}"
+                                                data-credit-alert-threshold="{{ $station->credit_alert_threshold }}"
                                                 data-note="{{ $station->note }}">
                                             <i class="fas fa-edit me-1"></i>編輯
                                         </button>
@@ -367,6 +368,7 @@
                                     data-api-url="{{ $station->api_url }}"
                                     data-key-masked="{{ filled($station->api_key) ? Str::substr($station->api_key, 0, 4) . str_repeat('*', max(0, Str::length($station->api_key) - 8)) . Str::substr($station->api_key, -4) : '' }}"
                                     data-tg-masked="{{ $station->telegramGroup && filled($station->telegramGroup->chat_id) ? Str::substr((string)$station->telegramGroup->chat_id, 0, 4) . str_repeat('*', max(0, Str::length((string)$station->telegramGroup->chat_id) - 8)) . Str::substr((string)$station->telegramGroup->chat_id, -4) : '' }}"
+                                    data-credit-alert-threshold="{{ $station->credit_alert_threshold }}"
                                     data-note="{{ $station->note }}">
                                 <i class="fas fa-edit me-1"></i>編輯
                             </button>
@@ -695,6 +697,13 @@
                             <div id="bot-group-list" class="mt-2" style="display:none"></div>
                         </div>
                         <div class="mb-3">
+                            <label class="form-label">{{ trans('station.field_credit_alert_threshold') }}</label>
+                            <input id="station-credit-alert-threshold" type="number" step="0.01" min="0"
+                                   class="form-control" name="credit_alert_threshold"
+                                   placeholder="{{ trans('station.credit_alert_threshold_placeholder') }}">
+                            <small class="text-muted">{{ trans('station.credit_alert_threshold_hint') }}</small>
+                        </div>
+                        <div class="mb-3">
                             <label class="form-label">{{ trans('station.field_note') }}</label>
                             <input id="station-note" type="text" class="form-control" name="note">
                         </div>
@@ -879,6 +888,7 @@ $(function () {
         $('#station-api-url').val($btn.data('api-url'));
         $('#station-api-key').val(editApiKeyMasked);
         $('#station-telegram-chat-id').val(editChatIdMasked);
+        $('#station-credit-alert-threshold').val($btn.data('credit-alert-threshold'));
         $('#station-note').val($btn.data('note'));
         $('#modal-station .modal-title').text('{{ trans("station.action_edit") }}');
         $('#bot-group-list').hide();
@@ -899,6 +909,9 @@ $(function () {
             name: $('#station-name').val(),
             domain: $('#station-domain').val(),
             api_url: $('#station-api-url').val(),
+            // 留空要送空字串，讓後端的 ConvertEmptyStringsToNull 轉成 null
+            // ——「沿用全域門檻」與「填 0 不告警」是兩件事，不能混
+            credit_alert_threshold: $('#station-credit-alert-threshold').val(),
             note: $('#station-note').val(),
         };
         // 敏感欄位：只有被修改時才傳送（遮罩值不傳）

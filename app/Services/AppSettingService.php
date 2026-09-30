@@ -38,6 +38,11 @@ class AppSettingService
     const KEY_REMIND_FIRST_MINUTES  = 'auto_reply.remind_first_minutes';
     const KEY_REMIND_SECOND_MINUTES = 'auto_reply.remind_second_minutes';
 
+    // 站台餘點告警（繳款設定頁維護）
+    const KEY_CREDIT_ALERT_TEMPLATE      = 'station_credit.alert_template';
+    const KEY_CREDIT_ALERT_THRESHOLD     = 'station_credit.threshold';
+    const KEY_CREDIT_ALERT_COOLDOWN_DAYS = 'station_credit.cooldown_days';
+
     /*
      * 對客話術（tpl_*）2026-09-30 隨著「對客話術」頁一起移除。
      *
@@ -112,6 +117,23 @@ class AppSettingService
         $value = $this->get($key);
 
         return filled($value) ? (int) $value : $default;
+    }
+
+    /**
+     * 讀取數值設定
+     *
+     * 餘點門檻這種會跟小數比較的值用這支，不要用 getInt ——
+     * 點數本身是 decimal(15,2)，門檻被截成整數會在邊界上判斷錯。
+     *
+     * @param string $key
+     * @param float  $default
+     * @return float
+     */
+    public function getFloat($key, $default = 0.0)
+    {
+        $value = $this->get($key);
+
+        return filled($value) ? (float) $value : $default;
     }
 
     /**

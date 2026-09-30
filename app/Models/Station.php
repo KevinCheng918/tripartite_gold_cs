@@ -16,10 +16,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $api_url           主系統 API 網址
  * @property string|null $api_key           主系統 API Key
  * @property float       $credits           點數餘額（從 API 同步）
+ * @property float|null  $credit_alert_threshold 餘點告警門檻，null 表示沿用全域設定
  * @property array|null  $settings          站台設定 JSON（費率、存款類型開關等）
  * @property int|null    $telegram_group_id 對應的 Telegram 群組 ID
  * @property int         $status            1=啟用, 2=凍結, 0=停用
  * @property string|null $note              備註
+ * @property \Illuminate\Support\Carbon|null $synced_at         最後一次同步站台資訊的時間
+ * @property \Illuminate\Support\Carbon|null $credit_alerted_at 最後一次送出餘點告警的時間
  */
 class Station extends Model
 {
@@ -31,6 +34,10 @@ class Station extends Model
         'settings' => 'array',
         'status'    => 'integer',
         'synced_at' => 'datetime',
+        // 門檻不轉 decimal：cast 成 decimal 會變字串，
+        // 而這個值要拿去跟 credits 做數值比較，也要能判斷「有沒有設」
+        'credit_alert_threshold' => 'float',
+        'credit_alerted_at'      => 'datetime',
     ];
 
     /**

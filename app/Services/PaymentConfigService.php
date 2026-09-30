@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Repositories\PaymentConfigRepository;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Arr;
 
 /**
  * 繳款設定 Service
@@ -82,20 +83,27 @@ class PaymentConfigService
     }
 
     /**
-     * 套用模板變數，產生繳款文案
+     * 套用模板變數，產生文案
+     *
+     * 繳款通知與站台餘點告警共用這支 —— 兩邊的公版都是客服在後台自己維護的，
+     * 變數認得多一點不會有副作用：公版裡沒寫到的變數不會出現在結果裡。
      *
      * @param string $template
-     * @param array  $vars  ['station' => '...', 'amount' => '...', 'month' => '...']
+     * @param array  $vars ['station' => '...', 'amount' => '...', 'credit' => '...', ...]
      * @return string
      */
     public function renderTemplate($template, $vars)
     {
         $replacements = [
-            '{station}'  => $vars['station'] ?? '',
-            '{amount}'   => $vars['amount'] ?? '',
-            '{month}'    => $vars['month'] ?? '',
-            '{due_date}' => $vars['due_date'] ?? '',
-            '{content}'  => $vars['content'] ?? '',
+            // 繳款通知
+            '{station}'   => Arr::get($vars, 'station', ''),
+            '{amount}'    => Arr::get($vars, 'amount', ''),
+            '{month}'     => Arr::get($vars, 'month', ''),
+            '{due_date}'  => Arr::get($vars, 'due_date', ''),
+            '{content}'   => Arr::get($vars, 'content', ''),
+            // 餘點告警
+            '{credit}'    => Arr::get($vars, 'credit', ''),
+            '{threshold}' => Arr::get($vars, 'threshold', ''),
         ];
 
         return str_replace(array_keys($replacements), array_values($replacements), $template);
