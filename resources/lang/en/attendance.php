@@ -60,6 +60,7 @@ return [
         'clock_out_success'   => 'Clocked out successfully',
         'clock_in_failed'     => 'Failed to clock in',
         'clock_out_failed'    => 'Failed to clock out',
+        'amend_date_future'     => 'Cannot amend a future date',
         'amend_reason_required' => 'Please explain why the punch was missed',
         'amend_reason_max'      => 'Reason must not exceed :value characters',
         'previous_not_clocked_out' => 'Previous shift not clocked out yet. Please clock out first.',

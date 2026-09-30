@@ -60,6 +60,7 @@ return [
         'clock_out_success'   => '下班打卡成功',
         'clock_in_failed'     => '上班打卡失败',
         'clock_out_failed'    => '下班打卡失败',
+        'amend_date_future'     => '不能补未来的打卡',
         'amend_reason_required' => '请填写补打卡的原因',
         'amend_reason_max'      => '原因不可超过 :value 字',
         'previous_not_clocked_out' => '前一班尚未下班打卡，请先完成下班打卡',

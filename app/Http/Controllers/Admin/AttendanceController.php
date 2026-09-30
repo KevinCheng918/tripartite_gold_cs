@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Attendance\RequestAmendRequest;
+use App\Http\Requests\Attendance\RespondAmendRequest;
 use App\Http\Resources\AttendanceResource;
 use App\Models\ClockAmendment;
 use App\Repositories\UserRepository;
@@ -191,27 +193,12 @@ class AttendanceController extends Controller
     /**
      * Ajax 申請補打卡
      *
-     * @param Request $request
+     * @param RequestAmendRequest $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function ajaxRequestAmend(Request $request)
+    public function ajaxRequestAmend(RequestAmendRequest $request)
     {
-        /*
-         * 補的是「已經發生但沒打到」的卡，未來日期沒有意義 ——
-         * 前端的 max 只是方便，擋不住直接打 API。
-         *
-         * reason 從選填改成必填（2026-09-30）：補打卡等於事後修改出勤紀錄，
-         * 主管要據此核准，沒有原因就無從判斷。
-         */
-        $params = $request->validate([
-            'date'       => 'required|date|before_or_equal:today',
-            'type'       => 'required|integer|in:1,2',
-            'clock_time' => 'required|date_format:H:i',
-            'reason'     => 'required|string|max:500',
-        ], [
-            'reason.required' => trans('attendance.msg.amend_reason_required'),
-            'reason.max'      => trans('attendance.msg.amend_reason_max', ['value' => 500]),
-        ]);
+        $params = $request->validated();
 
         try {
             $this->amendmentService->request($params, Auth::id());
@@ -278,15 +265,13 @@ class AttendanceController extends Controller
     /**
      * Ajax 審核補打卡
      *
-     * @param Request        $request
-     * @param ClockAmendment $amendment
+     * @param RespondAmendRequest $request
+     * @param ClockAmendment      $amendment
      * @return \Illuminate\Http\JsonResponse
      */
-    public function ajaxRespondAmend(Request $request, ClockAmendment $amendment)
+    public function ajaxRespondAmend(RespondAmendRequest $request, ClockAmendment $amendment)
     {
-        $params = $request->validate([
-            'status' => 'required|integer|in:1,2',
-        ]);
+        $params = $request->validated();
 
         try {
             $this->amendmentService->respond($amendment, (int) $params['status'], Auth::id());

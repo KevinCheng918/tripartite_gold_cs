@@ -129,12 +129,23 @@ locale 決定，網頁端控制不了，客服會看到「下午 01:05」而跟�
 
 ### 相關檔案
 - Controller: `app/Http/Controllers/Admin/AttendanceController.php`
-- Service: `app/Services/AttendanceService.php`
-- Repository: `app/Repositories/AttendanceRepository.php`
-- Model: `app/Models/AttendanceRecord.php`
+- Request: `app/Http/Requests/Attendance/RequestAmendRequest.php`（申請補打卡）、
+  `RespondAmendRequest.php`（審核）
+- Service: `app/Services/AttendanceService.php`、`app/Services/ClockAmendmentService.php`
+- Repository: `app/Repositories/AttendanceRepository.php`、`app/Repositories/ClockAmendmentRepository.php`
+- Model: `app/Models/AttendanceRecord.php`、`app/Models/ClockAmendment.php`
 - Presenter: `app/Presenters/DatePresenter.php`
 - Views: `resources/views/admin/attendance/index.blade.php`, `detail.blade.php`
 - JS: `public/js/attendance.js`, `public/js/attendance-detail.js`, `public/js/common.js`
+
+> 補打卡的兩支端點 2026-09-30 從內聯 `$request->validate()` 抽成 Request 檔。
+> **打卡本身（`ajaxClockIn` / `ajaxClockOut`）沒有輸入要驗證**，仍收
+> `Illuminate\Http\Request`（只取 IP 與 User-Agent），那不是漏抽。
+>
+> `RequestAmendRequest` 的字數上限寫成常數 `REASON_MAX` ——
+> `rules()` 與 `messages()` 都要用到，分開寫遲早改一邊漏一邊。
+> `RespondAmendRequest` 的 `in:` 用 `ClockAmendment::STATUS_*` 組出來，
+> 不寫死 `1,2`。
 
 ## 待釐清
 
