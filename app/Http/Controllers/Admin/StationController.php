@@ -50,6 +50,21 @@ class StationController extends Controller
         }
 
         $params = $request->only(['keyword', 'domain', 'system_id', 'status', 'credits_min', 'credits_max', 'support_shop', 'score_runner', 'per_page']);
+
+        /*
+         * 沒帶 status 就預設只看「正常」的站台 —— 凍結與停用的平常不會想看，
+         * 每次進來都要自己篩一次很煩。
+         *
+         * 用 has() 而不是 filled()／isset()：使用者主動選「全部」時送出的是
+         * status=（空字串），那是明確的選擇，不能被預設值蓋掉。
+         * only() 不會帶入沒出現在 query string 的 key，所以這兩種情況分得開。
+         *
+         * 轉成字串是因為 blade 的 selected 判斷用的是 `=== '1'` 嚴格比較。
+         */
+        if (!$request->has('status')) {
+            $params['status'] = (string) config('constants.STATION.STATUS.ACTIVE');
+        }
+
         $stations = $this->stationService->list($params);
         $systems = $this->stationService->getActiveSystems();
         $systemStats = $this->stationService->getSystemStats();
