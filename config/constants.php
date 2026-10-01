@@ -177,18 +177,28 @@ return [
              * 只要 K 線圖那一塊：從 USDT/TWD 標題列到成交量圖底部，
              * 不要右邊的成交明細、掛單簿與下單面板。
              *
-             * CLI 截圖沒辦法指定元素，只能截整個視窗再裁。這幾個值是對著
-             * 1920×1080 量出來的，**換了 WIDTH/HEIGHT 或 MAX 改版就要重新校正** ——
-             * 用匯率頁的「測試截圖」按鈕看效果最快。
+             * 優先用 SELECTOR 直接截那個元素 —— 位置與大小由 MAX 自己決定，
+             * 改版也不容易壞。下面幾個是常見的圖表容器，**實際值要用
+             * 「測試截圖」確認**（F12 看圖表外層的 id/class 最快）。
              *
-             * 設成 null 就不裁切，直接送整張。
+             * 選不到元素時會退回「截整頁 + 用 CROP 裁切」。CROP 是備案不是主力：
+             * 座標寫死，改版就裁錯而且不會報錯。
              */
+            'SELECTOR' => '#tv_chart_container',
+
             'CROP' => [
                 'X'      => 0,
                 'Y'      => 60,
                 'WIDTH'  => 1035,
                 'HEIGHT' => 660,
             ],
+
+            /*
+             * headless Chrome 預設的 User-Agent 帶有「HeadlessChrome」字樣，
+             * 有 bot 防護的網站會直接擋 —— MAX 對一般 HTTP 請求就已經回 403，
+             * 不設這個很可能連頁面都載不到。
+             */
+            'USER_AGENT' => 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         ],
 
         'ASK_TEMPLATE' => "💱 <b>{date} 匯率報價</b>\n\n"

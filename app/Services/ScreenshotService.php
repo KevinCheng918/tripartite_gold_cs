@@ -2,34 +2,39 @@
 
 namespace App\Services;
 
+use HeadlessChromium\BrowserFactory;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 
 /**
  * 網頁截圖
  *
- * 用 headless Chrome 把網頁截成圖，存進 public disk 後回傳相對路徑
- * （給 `asset('storage/...')` 用，TelegramBotService::sendPhoto() 認得這種網址，
- * 會自己換回本地檔案走 multipart 上傳）。
+ * 用 chrome-php/chrome（DevTools protocol）控制 headless Chrome，
+ * 把網頁截成圖存進 public disk，回傳相對路徑 —— 給 `asset('storage/...')` 用，
+ * `TelegramBotService::sendPhoto()` 認得這種網址，會自己換回本地檔案走 multipart。
  *
  * ⚠ **沒有 Chrome 就回 null，呼叫端要能接受沒有圖。**
- * 這是刻意的：報價訊息不能因為截圖失敗就整則發不出去。
+ * 報價訊息不能因為截圖失敗就整則發不出去。
  *
- * 環境需求：x86_64 Linux 裝 google-chrome-stable 即可。
- * arm64（Apple Silicon 上的 Docker）沒有官方 Chrome，Ubuntu 22.04 的
- * chromium 套件又是 snap 過渡包、容器裡裝不起來 —— 開發機通常截不了圖，
- * 這時走的就是「沒有圖、只發文字」那條路。
+ * 為什麼用套件而不是自己呼叫 CLI：
+ *
+ * - **可以直接截某個元素**（CSS selector）。CLI 只能截整個視窗再用座標裁，
+ *   對方改版就裁到錯的地方，而且不會報錯
+ * - 可以「等元素真的出現」，比固定等幾秒可靠
+ *
+ * 環境需求沒有變，仍然要有 Chrome 執行檔：x86_64 Linux 裝
+ * google-chrome-stable 即可。arm64（Apple Silicon 上的 Docker）沒有官方
+ * Chrome，開發機通常截不了圖，走的就是「沒有圖、只發文字」那條路。
  */
 class ScreenshotService
 {
     /**
      * 可能的 Chrome 執行檔
      *
-     * 依序找第一個存在的。不同發行版與安裝方式的命名不一樣，
-     * 寫死單一路徑在換機器時就會失效。
+     * 套件自己也會猜路徑，但猜不到時會丟例外。先自己找一輪，
+     * 找不到就乾脆不要開始 —— 這樣才能安靜降級而不是噴錯。
      *
      * @var array
      */
@@ -47,10 +52,10 @@ class ScreenshotService
     /** @var string 截圖放這個資料夾（public disk 底下） */
     private const DIRECTORY = 'screenshot';
 
-    /** @var int 整支 Process 的逾時秒數。網站慢或卡住時不能讓排程一直等 */
-    private const TIMEOUT = 60;
+    /** @var int 等頁面與元素的逾時（毫秒） */
+    private const WAIT_TIMEOUT = 30000;
 
-    /** @var string|null 找到的執行檔，null 表示還沒找過 */
+    /** @var string|null 找到的執行檔 */
     private $binary;
 
     /** @var bool 找過了沒 —— 找不到時 $binary 也是 null，要靠這個分辨 */
@@ -67,7 +72,7 @@ class ScreenshotService
     }
 
     /**
-     * 目前用的是哪個執行檔（給測試按鈕顯示用）
+     * 目前用的是哪個執行檔
      *
      * @return string|null
      */
@@ -93,8 +98,10 @@ class ScreenshotService
     /**
      * 截一張圖
      *
+     * 有給 selector 就只截那個元素，沒給就截整個視窗。
+     *
      * @param string $url
-     * @param array  $options width / height / wait_ms / prefix
+     * @param array  $options width / height / wait_ms / selector / prefix
      * @return string|null public disk 的相對路徑；截不成回 null
      */
     public function capture($url, $options = [])
@@ -110,50 +117,187 @@ class ScreenshotService
         $relative = self::DIRECTORY . '/' . Arr::get($options, 'prefix', 'shot')
             . '-' . now()->format('Ymd-His') . '-' . substr(md5($url . microtime()), 0, 6) . '.png';
 
-        // Storage::path() 需要資料夾先存在，Chrome 不會幫忙建
         Storage::disk('public')->makeDirectory(self::DIRECTORY);
         $target = Storage::disk('public')->path($relative);
 
-        $process = new Process($this->buildCommand($binary, $url, $target, $options));
-        $process->setTimeout(self::TIMEOUT);
+        $browser = null;
 
         try {
-            $process->run();
-        } catch (ProcessTimedOutException $e) {
-            Log::error('截圖逾時', ['url' => $url, 'timeout' => self::TIMEOUT]);
-
-            return null;
-        }
-
-        /*
-         * 不看 exit code —— headless Chrome 常常截圖成功卻回非 0
-         * （GPU、字型、dbus 之類的警告都會影響），看檔案有沒有生出來才準。
-         */
-        if (!file_exists($target) || filesize($target) === 0) {
+            $browser = $this->createBrowser($binary, $options);
+            $this->shoot($browser, $url, $target, $options);
+        } catch (\Throwable $e) {
+            /*
+             * 這裡攔 Throwable 不只是 Exception —— 套件在連線中斷時可能丟
+             * Error。截圖失敗絕對不能讓報價整則送不出去。
+             */
             Log::error('截圖失敗', [
-                'url'    => $url,
-                'exit'   => $process->getExitCode(),
-                'stderr' => mb_substr((string) $process->getErrorOutput(), 0, 500),
+                'url'      => $url,
+                'selector' => Arr::get($options, 'selector'),
+                'error'    => $e->getMessage(),
             ]);
 
             return null;
+        } finally {
+            if (filled($browser)) {
+                // 不關的話 Chrome 行程會留著，跑久了會把機器塞滿
+                $browser->close();
+            }
         }
 
-        $this->crop($target, Arr::get($options, 'crop'));
+        if (!file_exists($target) || filesize($target) === 0) {
+            Log::error('截圖檔案是空的', ['url' => $url]);
 
-        Log::info('截圖完成', ['url' => $url, 'path' => $relative, 'bytes' => filesize($target)]);
+            return null;
+        }
+
+        Log::info('截圖完成', [
+            'url'      => $url,
+            'path'     => $relative,
+            'bytes'    => filesize($target),
+            'selector' => Arr::get($options, 'selector'),
+        ]);
 
         return $relative;
     }
 
     /**
-     * 裁出想要的那一塊
+     * 刪掉截圖檔
      *
-     * headless Chrome 的 CLI 截圖沒辦法指定元素，只能截整個視窗再裁。
-     * 所以座標是對著特定視窗寬度量出來的，**換了尺寸或對方改版就要重新校正**。
+     * 截圖只是為了送出去，送完就沒用了 —— 不刪的話 public 會一直長大。
      *
-     * 裁切失敗（座標超出範圍、GD 讀不到檔）就保留原圖 ——
-     * 送一張沒裁好的圖，總比整個截圖作廢好。
+     * @param string|null $relative
+     * @return void
+     */
+    public function forget($relative)
+    {
+        if (blank($relative)) {
+            return;
+        }
+
+        Storage::disk('public')->delete($relative);
+    }
+
+    // ---------------------------------------------------------------
+    //  內部
+    // ---------------------------------------------------------------
+
+    /**
+     * 開一個瀏覽器
+     *
+     * @param string $binary
+     * @param array  $options
+     * @return \HeadlessChromium\Browser\ProcessAwareBrowser
+     */
+    private function createBrowser($binary, $options)
+    {
+        $browserOptions = [
+            'headless'       => true,
+            // 容器裡沒有 sandbox 需要的權限，不關掉會直接起不來
+            'noSandbox'      => true,
+            'windowSize'     => [
+                (int) Arr::get($options, 'width', 1920),
+                (int) Arr::get($options, 'height', 1080),
+            ],
+            'startupTimeout' => 30,
+            'customFlags'    => [
+                // /dev/shm 在容器裡預設只有 64MB，Chrome 會因此崩潰
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--hide-scrollbars',
+                // headless 的 navigator.webdriver 是 true，一併關掉
+                '--disable-blink-features=AutomationControlled',
+            ],
+        ];
+
+        /*
+         * 偽裝成一般瀏覽器。
+         *
+         * headless Chrome 預設的 User-Agent 帶有「HeadlessChrome」字樣，
+         * 有 bot 防護的網站會直接擋掉 —— MAX 對一般的 HTTP 請求就已經回 403，
+         * 不設這個很可能連頁面都載不到。
+         */
+        $userAgent = Arr::get($options, 'user_agent');
+
+        if (filled($userAgent)) {
+            $browserOptions['userAgent'] = $userAgent;
+        }
+
+        return (new BrowserFactory($binary))->createBrowser($browserOptions);
+    }
+
+    /**
+     * 導頁、等畫面、截圖存檔
+     *
+     * @param \HeadlessChromium\Browser\ProcessAwareBrowser $browser
+     * @param string                                        $url
+     * @param string                                        $target
+     * @param array                                         $options
+     * @return void
+     */
+    private function shoot($browser, $url, $target, $options)
+    {
+        $page = $browser->createPage();
+        $page->navigate($url)->waitForNavigation();
+
+        $selector = Arr::get($options, 'selector');
+        $node = filled($selector) ? $this->findNode($page, $selector) : null;
+
+        if (filled($node)) {
+            $page->screenshotElement($node)->saveToFile($target, self::WAIT_TIMEOUT);
+
+            return;
+        }
+
+        /*
+         * 沒給 selector、或選不到元素時退回整頁。
+         *
+         * 這時才用座標裁切 —— 它是備案不是主力：座標寫死，對方改版就裁錯，
+         * 而且不會報錯。能用 selector 就別用它。
+         */
+        $page->screenshot()->saveToFile($target, self::WAIT_TIMEOUT);
+        $this->crop($target, Arr::get($options, 'crop'));
+    }
+
+    /**
+     * 等元素出現並取得它
+     *
+     * K 線圖是 JS 畫的，頁面「載入完成」不等於圖已經畫好。等元素比固定睡幾秒
+     * 可靠：慢的時候不會截到空白，快的時候也不用白等。
+     *
+     * 等不到就回 null 讓呼叫端退回整頁 —— 選擇器失效不該讓整張圖沒了。
+     *
+     * @param \HeadlessChromium\Page $page
+     * @param string                 $selector
+     * @return \HeadlessChromium\Dom\Node|null
+     */
+    private function findNode($page, $selector)
+    {
+        try {
+            $page->waitUntilContainsElement($selector, self::WAIT_TIMEOUT);
+            $nodes = $page->dom()->search($selector);
+        } catch (\Throwable $e) {
+            Log::warning('截圖選擇器等不到元素，改截整頁', [
+                'selector' => $selector,
+                'error'    => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        if (blank($nodes)) {
+            Log::warning('截圖選擇器找不到元素，改截整頁', ['selector' => $selector]);
+
+            return null;
+        }
+
+        return $nodes[0];
+    }
+
+    /**
+     * 裁出想要的那一塊（只在退回整頁時才用）
+     *
+     * 座標是對著特定視窗寬度量出來的，**換了尺寸或對方改版就要重新校正**。
+     * 裁切失敗一律保留原圖：送一張沒裁好的，總比整個截圖作廢好。
      *
      * @param string     $path 圖檔絕對路徑，會就地覆寫
      * @param array|null $crop X / Y / WIDTH / HEIGHT，null 表示不裁
@@ -185,10 +329,7 @@ class ScreenshotService
         $rect['height'] = min($rect['height'], imagesy($source) - $rect['y']);
 
         if ($rect['width'] <= 0 || $rect['height'] <= 0) {
-            Log::warning('截圖裁切範圍無效，保留原圖', [
-                'crop'   => $crop,
-                'source' => imagesx($source) . 'x' . imagesy($source),
-            ]);
+            Log::warning('截圖裁切範圍無效，保留原圖', ['crop' => $crop]);
             imagedestroy($source);
 
             return;
@@ -206,55 +347,6 @@ class ScreenshotService
         imagepng($cropped, $path);
         imagedestroy($cropped);
         imagedestroy($source);
-    }
-
-    /**
-     * 刪掉截圖檔
-     *
-     * 截圖只是為了送出去，送完就沒用了 —— 不刪的話 public 會一直長大。
-     *
-     * @param string|null $relative
-     * @return void
-     */
-    public function forget($relative)
-    {
-        if (blank($relative)) {
-            return;
-        }
-
-        Storage::disk('public')->delete($relative);
-    }
-
-    /**
-     * 組 headless Chrome 的參數
-     *
-     * @param string $binary
-     * @param string $url
-     * @param string $target 輸出檔案的絕對路徑
-     * @param array  $options
-     * @return array
-     */
-    private function buildCommand($binary, $url, $target, $options)
-    {
-        $width = (int) Arr::get($options, 'width', 1280);
-        $height = (int) Arr::get($options, 'height', 900);
-        $waitMs = (int) Arr::get($options, 'wait_ms', 8000);
-
-        return [
-            $binary,
-            '--headless=new',
-            // 容器裡沒有 sandbox 需要的權限，不加這個會直接起不來
-            '--no-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--hide-scrollbars',
-            '--force-device-scale-factor=1',
-            "--window-size={$width},{$height}",
-            // 圖表是 JS 畫的，要給它時間跑完才截得到東西
-            "--virtual-time-budget={$waitMs}",
-            "--screenshot={$target}",
-            $url,
-        ];
     }
 
     /**
