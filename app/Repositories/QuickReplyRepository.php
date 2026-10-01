@@ -16,7 +16,15 @@ class QuickReplyRepository
     private const CATEGORY_COLUMNS = ['id', 'label', 'sort', 'status'];
 
     /** @var array 問答列表欄位 */
-    private const ITEM_COLUMNS = ['id', 'category_id', 'label', 'answer', 'sort', 'status'];
+    /*
+     * ⚠ import_key 一定要帶。
+     *
+     * 它不只是 seeder 的去重標記 —— 有些題目的答案是**動態的**，靠這個 key
+     * 在送出前被換掉（例如每日匯率，見 AutoReplyService::resolveAnswer()）。
+     * 少了這欄讀出來是 null，那些題目就會把題庫裡的佔位文字原樣送給客戶，
+     * 而且不會報錯。
+     */
+    private const ITEM_COLUMNS = ['id', 'category_id', 'label', 'answer', 'import_key', 'sort', 'status'];
 
     /** @var array 問法樣本欄位 */
     private const PHRASING_COLUMNS = ['id', 'quick_reply_item_id', 'text', 'source', 'created_at'];

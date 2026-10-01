@@ -45,6 +45,7 @@ class AutoReplyService
     private $chatService;
     private $supportService;
     private $appSettingService;
+    private $dailyRateService;
     private $splitter;
 
     public function __construct(
@@ -54,6 +55,7 @@ class AutoReplyService
         TelegramChatService $chatService,
         AutoReplySupportService $supportService,
         AppSettingService $appSettingService,
+        DailyRateService $dailyRateService,
         AnswerSplitter $splitter
     ) {
         $this->matcher = $matcher;
@@ -62,6 +64,8 @@ class AutoReplyService
         $this->chatService = $chatService;
         $this->supportService = $supportService;
         $this->appSettingService = $appSettingService;
+        // 只有匯率題用得到：答案每天不同，送出前要換成當日報價
+        $this->dailyRateService = $dailyRateService;
         $this->splitter = $splitter;
     }
 
@@ -552,8 +556,27 @@ class AutoReplyService
          * 開頭交給模型、答案用題庫原文，本來就不需要中間那層。
          */
         // 命中答案沒有冷卻 —— 客人重複問同一件事，就重複回答
-        $this->send($group, $this->joinOpening($opening, $item->answer), true);
+        $this->send($group, $this->joinOpening($opening, $this->resolveAnswer($item)), true);
         $this->telegramRepository->updateAutoReplyState($group, $item->id);
+    }
+
+    /**
+     * 題庫答案，必要時換成動態內容
+     *
+     * 絕大多數題目送的就是題庫原文。少數題目的答案會變（目前只有匯率）——
+     * 那種題目在題庫裡用 import_key 標記，比對照常進行（準度沿用現有機制、
+     * 不用改 prompt），只在**要送出之前**把內容換掉。
+     *
+     * @param mixed $item 題庫項目
+     * @return string
+     */
+    private function resolveAnswer($item)
+    {
+        if ($item->import_key === config('constants.DAILY_RATE.QUICK_REPLY_KEY')) {
+            return $this->dailyRateService->customerAnswer();
+        }
+
+        return (string) $item->answer;
     }
 
     /**

@@ -272,6 +272,29 @@ class UserRepository
     }
 
     /**
+     * 依 Telegram 帳號找人
+     *
+     * Telegram 那邊傳來的 username 不帶 @，而後台可能填成 `@name` 或 `name`，
+     * 所以兩邊都去掉 @ 再比。大小寫不敏感 —— Telegram 的 username 本來就是。
+     *
+     * @param string|null $username
+     * @return User|null
+     */
+    public function findByTelegramUsername($username)
+    {
+        $clean = ltrim(trim((string) $username), '@');
+
+        if (blank($clean)) {
+            return null;
+        }
+
+        return User::query()
+            ->select(['id', 'nickname', 'telegram_username', 'level', 'status'])
+            ->whereRaw('LOWER(TRIM(LEADING "@" FROM telegram_username)) = ?', [mb_strtolower($clean)])
+            ->first();
+    }
+
+    /**
      * 依 id 取得可 @ 的帳號（自動回覆求助單第一階段提醒用）
      *
      * 傳入當下排班的人員 id，濾掉工程與沒填 Telegram 帳號的人。

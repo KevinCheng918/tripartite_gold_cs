@@ -135,6 +135,47 @@ return [
         ],
     ],
 
+    /*
+     * 每日匯率報價。
+     *
+     * ASK_TEMPLATE 是「還沒設定公版時」的預設值 —— 正式公版由需求方提供後
+     * 填到後台（app_setting 的 daily_rate.ask_template），這裡的只是備援。
+     *
+     * 對客的兩則（CUSTOMER_*）維持固定話術、不放語系檔，
+     * 理由同 STATION.TOPUP_NOTIFY_FOOTER：語系會跟著客服後台的語言跑，
+     * 客戶收到的內容不該因此變動。
+     */
+    'DAILY_RATE' => [
+        /*
+         * 題庫裡「匯率是多少」那一題的 import_key。
+         *
+         * 匯率每天不同，題庫存不了固定答案 —— AI 比對照常命中這一題，
+         * 但送出前會把內容換成當日報價（AutoReplyService::resolveAnswer()）。
+         * 題庫裡的 answer 只是佔位用，實際不會送出去。
+         */
+        'QUICK_REPLY_KEY' => 'system.daily_rate',
+
+        'ASK_TEMPLATE' => "💱 <b>{date} 匯率報價</b>\n\n"
+            . "4H 均價：{reference}\n"
+            . "建議報價：<b>{suggested}</b>\n"
+            . "上次報價（{yesterday_date}）：{yesterday}\n\n"
+            . "請<b>引用這則訊息</b>回覆：\n"
+            . "・回數字 → 當日就用這個數字\n"
+            . "・回「好」 → 採用建議報價 {suggested}",
+
+        'CONFIRM' => "✅ 今日匯率已定為 <b>{rate}</b>",
+        'CONFIRM_CHANGED' => "✅ 今日匯率已從 {previous} 改為 <b>{rate}</b>",
+        'REPLY_UNPARSED' => "看不懂這個回覆 🤔\n請直接回數字（例如 32.95），或回「好」採用建議報價。",
+
+        'REMIND' => "⏰ 今日匯率還沒決定（第 {count} 次提醒）\n"
+            . "建議報價：<b>{suggested}</b>\n"
+            . "引用上面那則訊息回覆數字或「好」就可以了\n{mentions}",
+
+        // 對客
+        'CUSTOMER_ANSWER'  => '您好，今日匯率為 {rate} 😊 有需要都歡迎再告訴我們！',
+        'CUSTOMER_PENDING' => '您好，今日匯率正在確認中 🙏 確認後會第一時間回覆您，再請您稍候，謝謝！',
+    ],
+
     'VM' => [
         'POWER' => [
             'ON'  => 1,

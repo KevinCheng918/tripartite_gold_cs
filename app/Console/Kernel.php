@@ -33,6 +33,17 @@ class Kernel extends ConsoleKernel
         // 每月 1 號凌晨 0 點產生 VM 帳單
         $schedule->command('vm:generate-billing')->monthlyOn(1, '00:00');
 
+        // 每日上午 9 點在內部支援群組報匯率。週末假日照報 —— 每天都要有匯率
+        $schedule->command('rate:ask')->dailyAt('09:00');
+
+        /*
+         * 沒人決定就每 30 分鐘提醒一次，到當天結束為止。
+         *
+         * 從 09:30 開始（報價後半小時才第一次催），23:59 之後不再提醒 ——
+         * 跨過午夜就是新的一天，該報的是新匯率而不是繼續催昨天的。
+         */
+        $schedule->command('rate:remind')->everyThirtyMinutes()->between('09:30', '23:59')->withoutOverlapping();
+
         // 每日上午 10 點同步各站台系統餘點，低於門檻發告警
         // withoutOverlapping：逐站打主系統 API，站台多的時候可能跑超過一輪
         $schedule->command('station:sync-credit')->dailyAt('10:00')->withoutOverlapping();

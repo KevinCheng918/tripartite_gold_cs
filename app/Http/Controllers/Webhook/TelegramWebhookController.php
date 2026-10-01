@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Webhook;
 
 use App\Http\Controllers\Controller;
 use App\Services\AutoReplySupportService;
+use App\Services\DailyRateService;
 use App\Services\TelegramChatService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -18,11 +19,16 @@ class TelegramWebhookController extends Controller
 {
     private $chatService;
     private $supportService;
+    private $dailyRateService;
 
-    public function __construct(TelegramChatService $chatService, AutoReplySupportService $supportService)
-    {
+    public function __construct(
+        TelegramChatService $chatService,
+        AutoReplySupportService $supportService,
+        DailyRateService $dailyRateService
+    ) {
         $this->chatService = $chatService;
         $this->supportService = $supportService;
+        $this->dailyRateService = $dailyRateService;
     }
 
     /**
@@ -66,6 +72,15 @@ class TelegramWebhookController extends Controller
             // 讓它往下走的話，內部群組會被當成新客戶建進對話列表，
             // 自己人的討論也會被存成客戶訊息
             if ($this->isFromSupportChat($payload)) {
+                /*
+                 * 匯率報價與求助單都靠「引用回覆」運作，所以要先問匯率那邊
+                 * 認不認得被引用的那則訊息。認得就由它處理完直接結束，
+                 * 不認得才往求助單走。
+                 */
+                if ($this->dailyRateService->handleSupportReply($payload)) {
+                    return response()->json(['ok' => true]);
+                }
+
                 $this->supportService->handleSupportMessage($payload);
 
                 return response()->json(['ok' => true]);

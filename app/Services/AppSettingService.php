@@ -38,6 +38,9 @@ class AppSettingService
     const KEY_REMIND_FIRST_MINUTES  = 'auto_reply.remind_first_minutes';
     const KEY_REMIND_SECOND_MINUTES = 'auto_reply.remind_second_minutes';
 
+    // 每日匯率報價（匯率頁維護）
+    const KEY_DAILY_RATE_TEMPLATE = 'daily_rate.ask_template';
+
     // 站台餘點告警（繳款設定頁維護）
     const KEY_CREDIT_ALERT_TEMPLATE      = 'station_credit.alert_template';
     const KEY_CREDIT_ALERT_THRESHOLD     = 'station_credit.threshold';
