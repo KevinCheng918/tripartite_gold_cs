@@ -207,6 +207,52 @@ floor(3229 / 10) / 10 = 32.2      // ← 報價變成 32.2，少報 0.1
 公版存 `app_setting` 的 `daily_rate.ask_template`，沒設定過就用
 `constants.DAILY_RATE.ASK_TEMPLATE`。
 
+## 走勢圖截圖
+
+報價時一併附上 MAX 的走勢圖（`ScreenshotService`，headless Chrome）。
+
+**截不到就只發文字** —— 報價不能因為截圖失敗就整則發不出去，這是前提。
+
+### 環境需求與那四道牆
+
+x86_64 Linux 裝 `google-chrome-stable` 就能用。但開發機（Apple Silicon Mac
+上的 Docker）裝不起來，2026-10-01 逐一試過：
+
+| 做法 | 結果 |
+|---|---|
+| `apt install chromium-browser` | Ubuntu 22.04 給的是 **snap 過渡包**，裝出來只是個印「requires the chromium snap」的 shell script |
+| Google Chrome 官方 .deb | **沒有 Linux arm64 版** |
+| Playwright / Puppeteer | 需要 **Node 14+**，容器是 v12（而且 Node 版本是 pin 過的，不該為截圖動它） |
+| Debian repo 的 chromium | GPG key 缺失，混 repo 有拉壞系統庫的風險 |
+
+所以 `canRun()` **不能只看檔案存不存在** —— 那個 snap stub 檔案在、
+`command -v` 也找得到，卻完全不能用。實際跑一次 `--version`，
+輸出要符合 `/(chrome|chromium)\s+\d+\./` 才算數。
+
+### 幾個實作上的點
+
+- **不看 exit code**：headless Chrome 常常截圖成功卻回非 0（GPU、字型、
+  dbus 的警告都算），看檔案有沒有生出來才準
+- **`--no-sandbox`**：容器裡沒有 sandbox 需要的權限，不加會直接起不來
+- **`--virtual-time-budget`**：圖表是 JS 畫的，要給它時間跑完。
+  截到空白圖就是這個值不夠，調 `constants.DAILY_RATE.SCREENSHOT.WAIT_MS`
+- **截完就刪**：截圖只是為了送出去，不刪的話 public 會一直長大
+- **caption 上限 1024 字**：公版是客服自己維護的，寫長很正常。
+  超過就退回「先發圖、再發文字」，並且**回傳文字那則的結果** ——
+  引用回覆要對應的是文字訊息
+
+`TelegramBotService::sendPhoto()` 本來就處理了「截圖太長 Telegram 不收」
+（`PHOTO_INVALID_DIMENSIONS`）自動改用檔案傳送，整頁截圖正好用得上。
+
+### 兩個測試按鈕
+
+| 按鈕 | 做什麼 | 什麼時候用 |
+|---|---|---|
+| **立即報價** | 把 9 點那套完整跑一次（等同 `rate:ask --force`） | 測整條迴路 —— 送出後可以直接在群組引用回覆，驗證回覆解析 |
+| **測試截圖** | 只截一張發到群組，不動今天的紀錄 | 環境裝好 Chrome 後先確認截得到、而且截到的是想要的畫面 |
+
+「立即報價」會覆蓋今天已經報過的那則，所以有確認視窗。
+
 ## 上線前要做的三件事
 
 1. `php artisan migrate`

@@ -32,6 +32,17 @@ return [
 
     'empty' => 'No rate records yet',
 
+    // Chart screenshot
+    'screenshot_title'     => 'Chart Screenshot',
+    'screenshot_ready'     => 'This machine can take screenshots',
+    'screenshot_missing'   => 'No usable Chrome on this machine — the quote will be text only',
+    'screenshot_hint'      => "The quote includes a screenshot of MAX's chart. If it can't be captured the quote still goes out, just without the image",
+    'screenshot_install'   => 'Install (x86_64 Linux): apt-get install -y google-chrome-stable',
+    'action_test_shot'     => 'Test Screenshot',
+    'action_ask_now'       => 'Post Now',
+    'ask_now_hint'         => 'Runs the whole 09:00 routine now and posts to the internal group, so you can reply there to test the full loop',
+    'ask_now_confirm'      => "This really posts to the internal support group and replaces today's existing post. Continue?",
+
     'msg' => [
         'saved'                 => 'Rate saved',
         'save_failed'           => 'Failed to save rate',
@@ -44,5 +55,17 @@ return [
         'rate_min'              => 'Rate must be greater than 0',
         'template_required'     => 'Template is required',
         'template_max'          => 'Template must not exceed :value characters',
+
+        'ask_sent'            => 'Quote posted to the internal support group (no chart this time)',
+        'ask_sent_with_chart' => 'Quote posted to the internal support group with the chart',
+        'ask_no_support_group' => 'Internal support group is not configured',
+        'ask_send_failed'      => 'Failed to post the quote — see the log',
+        'ask_already_asked'    => 'Already posted today',
+
+        'screenshot_sent'             => 'Screenshot sent to the internal support group (using :binary)',
+        'screenshot_no_chrome'        => 'No usable Chrome on this machine',
+        'screenshot_no_support_group' => 'Internal support group is not configured',
+        'screenshot_capture_failed'   => 'Screenshot failed — see the log (the site may be slow, or the wait time too short)',
+        'screenshot_send_failed'      => 'Captured but failed to send — see the log',
     ],
 ];

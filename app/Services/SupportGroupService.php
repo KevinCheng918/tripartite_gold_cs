@@ -77,6 +77,30 @@ class SupportGroupService
     }
 
     /**
+     * 發圖片到內部支援群組
+     *
+     * `$photoUrl` 傳 `asset('storage/...')` 這種本站網址即可 ——
+     * TelegramBotService 會自己換回本地檔案走 multipart 上傳，
+     * 不會讓 Telegram 反過來抓我們的網址（內網時抓不到）。
+     *
+     * @param string      $photoUrl
+     * @param string|null $caption 圖說。Telegram 上限 1024 字，超過會整則失敗
+     * @return array|null Telegram API 的回傳，未設定群組時為 null
+     */
+    public function sendPhoto($photoUrl, $caption = null)
+    {
+        $chatId = $this->chatId();
+
+        if (blank($chatId)) {
+            return null;
+        }
+
+        $this->switchBot();
+
+        return $this->botService->sendPhoto($chatId, $photoUrl, $caption);
+    }
+
+    /**
      * 編輯支援群組裡的訊息（按鈕按完就地改成結果）
      *
      * @param int|null   $messageId

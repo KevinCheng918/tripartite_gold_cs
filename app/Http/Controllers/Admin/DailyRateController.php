@@ -37,10 +37,65 @@ class DailyRateController extends Controller
         $perPage = (int) Arr::get($params, 'per_page', 30);
 
         return view('admin.daily-rate.index', [
-            'rates'     => $this->rateService->history($perPage > 0 ? $perPage : 30),
-            'todayRate' => $this->rateService->todayRate(),
-            'template'  => $this->rateService->askTemplate(),
+            'rates'      => $this->rateService->history($perPage > 0 ? $perPage : 30),
+            'todayRate'  => $this->rateService->todayRate(),
+            'template'   => $this->rateService->askTemplate(),
+            'screenshot' => $this->rateService->screenshotStatus(),
         ]);
+    }
+
+    /**
+     * Ajax 立即報價：把早上 9 點那套完整跑一次
+     *
+     * 等同 `rate:ask --force`。跟「測試截圖」不同 —— 這會真的建立今天的紀錄、
+     * 送出完整報價訊息，而且**可以直接在群組引用回覆來測整條迴路**。
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxAskNow()
+    {
+        $result = $this->rateService->ask(true);
+
+        if (Arr::get($result, 'sent') === true) {
+            return response()->json([
+                'message' => trans(Arr::get($result, 'with_chart') === true
+                    ? 'daily_rate.msg.ask_sent_with_chart'
+                    : 'daily_rate.msg.ask_sent'),
+            ]);
+        }
+
+        $reason = (string) Arr::get($result, 'reason');
+
+        return response()->json([
+            'message' => trans("daily_rate.msg.ask_{$reason}"),
+        ], 422);
+    }
+
+    /**
+     * Ajax 截圖測試：截一張發到內部群組
+     *
+     * 環境裝好 Chrome 之後先按這個，確認截得到、而且截到的是想要的畫面，
+     * 再等明天早上的自動報價。
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxTestScreenshot()
+    {
+        $result = $this->rateService->testScreenshot();
+
+        if (Arr::get($result, 'ok') === true) {
+            return response()->json([
+                'message' => trans('daily_rate.msg.screenshot_sent', [
+                    'binary' => Arr::get($result, 'binary'),
+                ]),
+            ]);
+        }
+
+        $reason = (string) Arr::get($result, 'reason');
+
+        return response()->json([
+            'message' => trans("daily_rate.msg.screenshot_{$reason}"),
+        ], 422);
     }
 
     /**

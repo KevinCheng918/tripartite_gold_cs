@@ -25,24 +25,30 @@ class DailyRateService
     /** @var array 回覆內容視為「採用建議值」的詞 */
     private const ACCEPT_WORDS = ['好', '好的', 'ok', 'OK', 'Ok', '可以', '就這樣', '同意', 'yes', 'Yes'];
 
+    /** @var int Telegram 圖說的字數上限。超過整則會失敗，要改成圖文分開發 */
+    private const CAPTION_MAX = 1024;
+
     private $rateRepository;
     private $usdtRateService;
     private $supportGroup;
     private $userRepository;
     private $appSettingService;
+    private $screenshotService;
 
     public function __construct(
         DailyRateRepository $rateRepository,
         UsdtRateService $usdtRateService,
         SupportGroupService $supportGroup,
         UserRepository $userRepository,
-        AppSettingService $appSettingService
+        AppSettingService $appSettingService,
+        ScreenshotService $screenshotService
     ) {
         $this->rateRepository = $rateRepository;
         $this->usdtRateService = $usdtRateService;
         $this->supportGroup = $supportGroup;
         $this->userRepository = $userRepository;
         $this->appSettingService = $appSettingService;
+        $this->screenshotService = $screenshotService;
     }
 
     // ---------------------------------------------------------------
@@ -140,7 +146,12 @@ class DailyRateService
         ]);
 
         $text = $this->buildAskText($record, $previous);
-        $result = $this->supportGroup->send($text);
+        $shot = $this->captureChart();
+        $result = $this->sendAsk($text, $shot);
+
+        // 截圖只是為了送出去，送完就沒用了
+        $this->screenshotService->forget($shot);
+
         $messageId = Arr::get($result, 'result.message_id');
 
         if (blank($messageId)) {
@@ -152,18 +163,72 @@ class DailyRateService
         $this->rateRepository->update($record, ['ask_message_id' => (int) $messageId]);
 
         Log::info('今日匯率已報出', [
-            'date'      => $today,
-            'avg_rate'  => $avgRate,
-            'suggested' => $suggested,
+            'date'       => $today,
+            'avg_rate'   => $avgRate,
+            'suggested'  => $suggested,
+            'with_chart' => filled($shot),
         ]);
 
         return [
-            'sent'      => true,
-            'suggested' => $suggested,
-            'reference' => $avgRate,
-            'previous'  => filled($previous) ? $previous->rate : null,
-            'text'      => $text,
+            'sent'       => true,
+            'suggested'  => $suggested,
+            'reference'  => $avgRate,
+            'previous'   => filled($previous) ? $previous->rate : null,
+            'text'       => $text,
+            'with_chart' => filled($shot),
         ];
+    }
+
+    /**
+     * 截 MAX 的走勢圖
+     *
+     * 截不到就回 null —— 報價不能因為截圖失敗就整則發不出去，
+     * 這是整個截圖功能的前提。
+     *
+     * @return string|null public disk 的相對路徑
+     */
+    private function captureChart()
+    {
+        $config = (array) config('constants.DAILY_RATE.SCREENSHOT');
+
+        if (Arr::get($config, 'ENABLED') !== true) {
+            return null;
+        }
+
+        return $this->screenshotService->capture(Arr::get($config, 'URL'), [
+            'width'   => Arr::get($config, 'WIDTH'),
+            'height'  => Arr::get($config, 'HEIGHT'),
+            'wait_ms' => Arr::get($config, 'WAIT_MS'),
+            'prefix'  => 'rate',
+        ]);
+    }
+
+    /**
+     * 送出報價訊息（有圖就附圖）
+     *
+     * ⚠ Telegram 的圖說上限是 **1024 字**，超過整則會失敗。
+     * 公版是客服自己維護的，寫長一點很正常 —— 超過就退回「先發圖、再發文字」，
+     * 並且回傳**文字那則**的結果：引用回覆要對應的是文字訊息。
+     *
+     * @param string      $text
+     * @param string|null $shot public disk 的相對路徑
+     * @return array|null
+     */
+    private function sendAsk($text, $shot)
+    {
+        if (blank($shot)) {
+            return $this->supportGroup->send($text);
+        }
+
+        $photoUrl = asset('storage/' . $shot);
+
+        if (mb_strlen($text) <= self::CAPTION_MAX) {
+            return $this->supportGroup->sendPhoto($photoUrl, $text);
+        }
+
+        $this->supportGroup->sendPhoto($photoUrl);
+
+        return $this->supportGroup->send($text);
     }
 
     // ---------------------------------------------------------------
@@ -461,6 +526,60 @@ class DailyRateService
         ]);
 
         return $record;
+    }
+
+    /**
+     * 截圖測試：截一張發到內部群組
+     *
+     * 給後台按鈕用。環境裝好 Chrome 之後先按這個，確認截得到、
+     * 而且截到的是想要的畫面，再等明天早上的自動報價。
+     *
+     * @return array 結果說明，給介面顯示
+     */
+    public function testScreenshot()
+    {
+        if (!$this->supportGroup->isConfigured()) {
+            return ['ok' => false, 'reason' => 'no_support_group'];
+        }
+
+        if (!$this->screenshotService->isAvailable()) {
+            return ['ok' => false, 'reason' => 'no_chrome'];
+        }
+
+        $shot = $this->captureChart();
+
+        if (blank($shot)) {
+            return ['ok' => false, 'reason' => 'capture_failed'];
+        }
+
+        $caption = strtr((string) config('constants.DAILY_RATE.SCREENSHOT_TEST_CAPTION'), [
+            '{time}' => now()->format('Y-m-d H:i'),
+            '{url}'  => (string) config('constants.DAILY_RATE.SCREENSHOT.URL'),
+        ]);
+
+        $result = $this->supportGroup->sendPhoto(asset('storage/' . $shot), $caption);
+        $this->screenshotService->forget($shot);
+
+        if (blank(Arr::get($result, 'result'))) {
+            Log::error('截圖測試發送失敗', ['response' => $result]);
+
+            return ['ok' => false, 'reason' => 'send_failed'];
+        }
+
+        return ['ok' => true, 'binary' => $this->screenshotService->binaryPath()];
+    }
+
+    /**
+     * 這台機器能不能截圖（給介面顯示狀態用）
+     *
+     * @return array{available: bool, binary: string|null}
+     */
+    public function screenshotStatus()
+    {
+        return [
+            'available' => $this->screenshotService->isAvailable(),
+            'binary'    => $this->screenshotService->binaryPath(),
+        ];
     }
 
     /**

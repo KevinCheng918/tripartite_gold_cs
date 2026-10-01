@@ -155,6 +155,23 @@ return [
          */
         'QUICK_REPLY_KEY' => 'system.daily_rate',
 
+        /*
+         * 報價時一併附上 MAX 的走勢圖截圖。
+         *
+         * 需要 x86_64 Linux + google-chrome-stable。截不到就只發文字 ——
+         * 報價不能因為截圖失敗就整則發不出去。
+         *
+         * WAIT_MS 是給 JS 畫圖表的時間（--virtual-time-budget）。圖截到一半
+         * 空白的話就是這個值不夠，往上加。
+         */
+        'SCREENSHOT' => [
+            'ENABLED' => true,
+            'URL'     => 'https://max.maicoin.com/trading/usdttwd',
+            'WIDTH'   => 1440,
+            'HEIGHT'  => 900,
+            'WAIT_MS' => 10000,
+        ],
+
         'ASK_TEMPLATE' => "💱 <b>{date} 匯率報價</b>\n\n"
             . "4H 均價：{reference}\n"
             . "建議報價：<b>{suggested}</b>\n"
@@ -162,6 +179,11 @@ return [
             . "請<b>引用這則訊息</b>回覆：\n"
             . "・回數字 → 當日就用這個數字\n"
             . "・回「好」 → 採用建議報價 {suggested}",
+
+        // 後台「測試截圖」按鈕送出的那則，標明是測試免得同仁以為要回覆
+        'SCREENSHOT_TEST_CAPTION' => "🔧 <b>截圖測試</b>（{time}）\n"
+            . "這則是後台按測試鈕送出的，不用回覆。\n"
+            . '來源：{url}',
 
         'CONFIRM' => "✅ 今日匯率已定為 <b>{rate}</b>",
         'CONFIRM_CHANGED' => "✅ 今日匯率已從 {previous} 改為 <b>{rate}</b>",

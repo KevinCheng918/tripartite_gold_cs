@@ -32,6 +32,17 @@ return [
 
     'empty' => '还没有任何汇率纪录',
 
+    // 走势图截图
+    'screenshot_title'     => '走势图截图',
+    'screenshot_ready'     => '这台机器可以截图',
+    'screenshot_missing'   => '这台机器没有可用的 Chrome，报价时只会发文字',
+    'screenshot_hint'      => '报价时会附上 MAX 的走势图。截不到图也不影响报价，只是没有图',
+    'screenshot_install'   => '安装方式（x86_64 Linux）：apt-get install -y google-chrome-stable',
+    'action_test_shot'     => '测试截图',
+    'action_ask_now'       => '立即报价',
+    'ask_now_hint'         => '把早上 9 点那套完整跑一次并送到内部群组，可以直接在群组引用回覆测试',
+    'ask_now_confirm'      => '会真的发送报价到内部支援群组，并覆盖今天已经报过的那则。确定吗？',
+
     'msg' => [
         'saved'                 => '汇率已储存',
         'save_failed'           => '汇率储存失败',
@@ -44,5 +55,17 @@ return [
         'rate_min'              => '汇率必须大于 0',
         'template_required'     => '请填写报价公版',
         'template_max'          => '报价公版不可超过 :value 字',
+
+        'ask_sent'            => '报价已发到内部支援群组（这次没有附图）',
+        'ask_sent_with_chart' => '报价已发到内部支援群组，含走势图',
+        'ask_no_support_group' => '尚未设定内部支援群组，没有地方可以报',
+        'ask_send_failed'      => '报价发送失败，详见 log',
+        'ask_already_asked'    => '今天已经报过了',
+
+        'screenshot_sent'             => '截图已发到内部支援群组（使用 :binary）',
+        'screenshot_no_chrome'        => '这台机器没有可用的 Chrome，无法截图',
+        'screenshot_no_support_group' => '尚未设定内部支援群组，没有地方可以发',
+        'screenshot_capture_failed'   => '截图失败，详见 log（可能是网站太慢或等待时间不够）',
+        'screenshot_send_failed'      => '截到图了但发送失败，详见 log',
     ],
 ];

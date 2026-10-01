@@ -32,6 +32,17 @@ return [
 
     'empty' => '還沒有任何匯率紀錄',
 
+    // 走勢圖截圖
+    'screenshot_title'     => '走勢圖截圖',
+    'screenshot_ready'     => '這台機器可以截圖',
+    'screenshot_missing'   => '這台機器沒有可用的 Chrome，報價時只會發文字',
+    'screenshot_hint'      => '報價時會附上 MAX 的走勢圖。截不到圖也不影響報價，只是沒有圖',
+    'screenshot_install'   => '安裝方式（x86_64 Linux）：apt-get install -y google-chrome-stable',
+    'action_test_shot'     => '測試截圖',
+    'action_ask_now'       => '立即報價',
+    'ask_now_hint'         => '把早上 9 點那套完整跑一次並送到內部群組，可以直接在群組引用回覆測試',
+    'ask_now_confirm'      => '會真的發送報價到內部支援群組，並覆蓋今天已經報過的那則。確定嗎？',
+
     'msg' => [
         'saved'                 => '匯率已儲存',
         'save_failed'           => '匯率儲存失敗',
@@ -44,5 +55,17 @@ return [
         'rate_min'              => '匯率必須大於 0',
         'template_required'     => '請填寫報價公版',
         'template_max'          => '報價公版不可超過 :value 字',
+
+        'ask_sent'            => '報價已發到內部支援群組（這次沒有附圖）',
+        'ask_sent_with_chart' => '報價已發到內部支援群組，含走勢圖',
+        'ask_no_support_group' => '尚未設定內部支援群組，沒有地方可以報',
+        'ask_send_failed'      => '報價發送失敗，詳見 log',
+        'ask_already_asked'    => '今天已經報過了',
+
+        'screenshot_sent'             => '截圖已發到內部支援群組（使用 :binary）',
+        'screenshot_no_chrome'        => '這台機器沒有可用的 Chrome，無法截圖',
+        'screenshot_no_support_group' => '尚未設定內部支援群組，沒有地方可以發',
+        'screenshot_capture_failed'   => '截圖失敗，詳見 log（可能是網站太慢或等待時間不夠）',
+        'screenshot_send_failed'      => '截到圖了但發送失敗，詳見 log',
     ],
 ];

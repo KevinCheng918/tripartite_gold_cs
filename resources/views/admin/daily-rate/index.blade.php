@@ -22,12 +22,43 @@
                 @endif
             </div>
             @if($canManage)
-                <button class="btn btn-primary js-dr-edit"
-                        data-date="{{ now()->toDateString() }}"
-                        data-rate="{{ $todayRate }}">
-                    <i class="fas fa-pen me-1"></i>{{ trans('daily_rate.action_edit') }}
-                </button>
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-outline-secondary" id="btn-dr-ask-now"
+                            title="{{ trans('daily_rate.ask_now_hint') }}">
+                        <i class="fas fa-paper-plane me-1"></i>{{ trans('daily_rate.action_ask_now') }}
+                    </button>
+                    <button class="btn btn-primary js-dr-edit"
+                            data-date="{{ now()->toDateString() }}"
+                            data-rate="{{ $todayRate }}">
+                        <i class="fas fa-pen me-1"></i>{{ trans('daily_rate.action_edit') }}
+                    </button>
+                </div>
             @endif
+        </div>
+    </div>
+
+    {{-- 走勢圖截圖 --}}
+    <div class="main-card mb-3 card">
+        <div class="card-body">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <div>
+                    <strong><i class="fas fa-image me-1"></i>{{ trans('daily_rate.screenshot_title') }}</strong>
+                    @if($screenshot['available'])
+                        <span class="badge bg-success ms-2">{{ trans('daily_rate.screenshot_ready') }}</span>
+                        <div class="text-muted small mt-1">{{ $screenshot['binary'] }}</div>
+                    @else
+                        <span class="badge bg-warning text-dark ms-2">{{ trans('daily_rate.screenshot_missing') }}</span>
+                        <div class="text-muted small mt-1"><code>{{ trans('daily_rate.screenshot_install') }}</code></div>
+                    @endif
+                    <small class="text-muted d-block mt-1">{{ trans('daily_rate.screenshot_hint') }}</small>
+                </div>
+                @if($canManage)
+                    <button class="btn btn-outline-secondary" id="btn-dr-test-shot"
+                            @if(!$screenshot['available']) disabled @endif>
+                        <i class="fas fa-camera me-1"></i>{{ trans('daily_rate.action_test_shot') }}
+                    </button>
+                @endif
+            </div>
         </div>
     </div>
 
@@ -151,6 +182,21 @@
         </div>
     </div>
 
+    {{-- 立即報價的確認 --}}
+    <div class="modal fade" id="modal-dr-ask-confirm" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-body text-center py-4">
+                    <p class="mb-0">{{ trans('daily_rate.ask_now_confirm') }}</p>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="btn-dr-ask-confirm">{{ trans('daily_rate.action_ask_now') }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- 訊息 Modal --}}
     <div class="modal fade" id="modal-dr-msg" tabindex="-1">
         <div class="modal-dialog">
@@ -218,6 +264,54 @@ $(function () {
             },
             error: function (xhr) {
                 showMessage((xhr.responseJSON && xhr.responseJSON.message) || '{{ trans("daily_rate.msg.save_failed") }}');
+            },
+            complete: function () { $btn.prop('disabled', false); }
+        });
+    });
+
+    // 立即報價：會真的發訊息，所以先確認
+    $('#btn-dr-ask-now').on('click', function () {
+        showBsModal('modal-dr-ask-confirm');
+    });
+
+    $('#btn-dr-ask-confirm').on('click', function () {
+        var $btn = $(this);
+        $btn.prop('disabled', true);
+
+        $.ajax({
+            url: '{{ route("admin.daily-rate.ajax-ask-now") }}',
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            success: function (body) {
+                hideBsModal(document.getElementById('modal-dr-ask-confirm'));
+                showMessage(body.message || '{{ trans("daily_rate.msg.ask_sent") }}');
+                // 報價會建立今天那筆紀錄，關掉訊息後重整才看得到
+                $('#modal-dr-msg').off('hidden.bs.modal.reload').on('hidden.bs.modal.reload', function () {
+                    location.reload();
+                });
+            },
+            error: function (xhr) {
+                hideBsModal(document.getElementById('modal-dr-ask-confirm'));
+                showMessage((xhr.responseJSON && xhr.responseJSON.message) || '{{ trans("daily_rate.msg.ask_send_failed") }}');
+            },
+            complete: function () { $btn.prop('disabled', false); }
+        });
+    });
+
+    // 截圖測試：只驗證截得到圖，不會動到今天的報價紀錄
+    $('#btn-dr-test-shot').on('click', function () {
+        var $btn = $(this);
+        $btn.prop('disabled', true);
+
+        $.ajax({
+            url: '{{ route("admin.daily-rate.ajax-test-screenshot") }}',
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            success: function (body) {
+                showMessage(body.message || '已送出');
+            },
+            error: function (xhr) {
+                showMessage((xhr.responseJSON && xhr.responseJSON.message) || '截圖測試失敗');
             },
             complete: function () { $btn.prop('disabled', false); }
         });

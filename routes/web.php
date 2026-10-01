@@ -288,6 +288,9 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::post('/ajax-update-rate', [DailyRateController::class, 'ajaxUpdateRate'])->middleware('can:daily_rate.manage')->name('ajax-update-rate');
         Route::post('/ajax-update-template', [DailyRateController::class, 'ajaxUpdateTemplate'])->middleware('can:daily_rate.manage')->name('ajax-update-template');
         Route::post('/ajax-preview-template', [DailyRateController::class, 'ajaxPreviewTemplate'])->middleware('can:daily_rate.view')->name('ajax-preview-template');
+        // 這兩支都會真的發訊息到內部群組，所以要 manage 權限
+        Route::post('/ajax-ask-now', [DailyRateController::class, 'ajaxAskNow'])->middleware('can:daily_rate.manage')->name('ajax-ask-now');
+        Route::post('/ajax-test-screenshot', [DailyRateController::class, 'ajaxTestScreenshot'])->middleware('can:daily_rate.manage')->name('ajax-test-screenshot');
     });
 
     // Web Push 訂閱
