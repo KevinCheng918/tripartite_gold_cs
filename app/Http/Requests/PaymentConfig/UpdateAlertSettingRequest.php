@@ -11,9 +11,6 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class UpdateAlertSettingRequest extends FormRequest
 {
-    /** @var int 公版字數上限。Telegram 單則訊息的硬上限是 4096，留餘裕給變數代換後變長 */
-    private const TEMPLATE_MAX = 2000;
-
     /** @var int 冷卻天數上限。設超過一年等於關掉告警，用 0 更直覺 */
     private const COOLDOWN_MAX = 365;
 
@@ -25,7 +22,7 @@ class UpdateAlertSettingRequest extends FormRequest
     public function rules()
     {
         return [
-            'alert_template' => 'required|string|max:' . self::TEMPLATE_MAX,
+            'alert_template' => 'required|string|max:' . config('rules.TELEGRAM_TEMPLATE_MAX'),
 
             /*
              * 點數是 decimal(15,2)，門檻用 numeric 才能跟它對得起來。
@@ -44,7 +41,9 @@ class UpdateAlertSettingRequest extends FormRequest
     {
         return [
             'alert_template.required' => trans('payment_config.msg.alert_template_required'),
-            'alert_template.max'      => trans('payment_config.msg.alert_template_max', ['value' => self::TEMPLATE_MAX]),
+            'alert_template.max'      => trans('payment_config.msg.alert_template_max', [
+                'value' => config('rules.TELEGRAM_TEMPLATE_MAX'),
+            ]),
             'threshold.required'      => trans('payment_config.msg.alert_threshold_required'),
             'threshold.numeric'       => trans('payment_config.msg.alert_threshold_numeric'),
             'threshold.min'           => trans('payment_config.msg.alert_threshold_min'),

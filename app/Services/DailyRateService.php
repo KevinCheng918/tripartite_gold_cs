@@ -621,23 +621,38 @@ class DailyRateService
      */
     public function previewAskText($template)
     {
-        $record = $this->rateRepository->findByDate(now()->toDateString());
+        $today = now()->toDateString();
+        $record = $this->rateRepository->findByDate($today);
 
         if (blank($record) || blank($record->suggested_rate)) {
-            $market = $this->usdtRateService->getRateWithHistory();
-            $avgRate = (float) Arr::get($market, 'avg_rate', 0);
-
-            $record = new DailyRate([
-                'date'           => now()->toDateString(),
-                'reference_rate' => $avgRate > 0 ? $avgRate : null,
-                'suggested_rate' => $this->suggestFrom($avgRate) ?: null,
-            ]);
-            $record->date = now();
+            $record = $this->buildPreviewRecord($today);
         }
 
-        $previous = $this->rateRepository->latestDecided(now()->toDateString());
+        return $this->renderAskText($template, $record, $this->rateRepository->latestDecided($today));
+    }
 
-        return $this->renderAskText($template, $record, $previous);
+    /**
+     * 預覽用的暫時資料（不存檔）
+     *
+     * 今天還沒報價時用市場現值試算，讓人看得出明天早上送出去會長怎樣。
+     *
+     * cast 在未存檔的 model 上就會生效（`$record->date` 讀出來是 Carbon），
+     * 所以建構完不用再補一次型別轉換。
+     *
+     * @param string $date Y-m-d
+     * @return DailyRate
+     */
+    private function buildPreviewRecord($date)
+    {
+        $avgRate = (float) Arr::get($this->usdtRateService->getRateWithHistory(), 'avg_rate', 0);
+        $suggested = $this->suggestFrom($avgRate);
+
+        return new DailyRate([
+            'date' => $date,
+            // 抓不到行情時 suggestFrom 回 0，存成 null 讓文案顯示「取不到」
+            'reference_rate' => $avgRate > 0 ? $avgRate : null,
+            'suggested_rate' => $suggested > 0 ? $suggested : null,
+        ]);
     }
 
     // ---------------------------------------------------------------

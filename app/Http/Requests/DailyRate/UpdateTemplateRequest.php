@@ -9,9 +9,6 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class UpdateTemplateRequest extends FormRequest
 {
-    /** @var int 公版字數上限。Telegram 單則訊息硬上限 4096，留餘裕給變數代換後變長 */
-    private const TEMPLATE_MAX = 2000;
-
     public function authorize()
     {
         return true;
@@ -20,7 +17,7 @@ class UpdateTemplateRequest extends FormRequest
     public function rules()
     {
         return [
-            'template' => 'required|string|max:' . self::TEMPLATE_MAX,
+            'template' => 'required|string|max:' . config('rules.TELEGRAM_TEMPLATE_MAX'),
         ];
     }
 
@@ -28,7 +25,9 @@ class UpdateTemplateRequest extends FormRequest
     {
         return [
             'template.required' => trans('daily_rate.msg.template_required'),
-            'template.max'      => trans('daily_rate.msg.template_max', ['value' => self::TEMPLATE_MAX]),
+            'template.max'      => trans('daily_rate.msg.template_max', [
+                'value' => config('rules.TELEGRAM_TEMPLATE_MAX'),
+            ]),
         ];
     }
 }
