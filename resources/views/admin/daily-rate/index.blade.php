@@ -48,8 +48,15 @@
                         <div class="text-muted small mt-1">{{ $screenshot['binary'] }}</div>
                     @else
                         <span class="badge bg-warning text-dark ms-2">{{ trans('daily_rate.screenshot_missing') }}</span>
-                        <div class="text-muted small mt-1"><code>{{ trans('daily_rate.screenshot_install') }}</code></div>
+                        @if(Str::contains($screenshot['arch'], ['aarch64', 'arm64']))
+                            {{-- arm64 沒有官方 Chrome，講清楚免得在這台白試 --}}
+                            <div class="text-muted small mt-1">{{ trans('daily_rate.screenshot_arm_note') }}</div>
+                        @else
+                            <div class="text-muted small mt-1"><code>{{ trans('daily_rate.screenshot_install') }}</code></div>
+                        @endif
                     @endif
+                    {{-- 標明是哪一台：開發機跑容器、正式機是另一台，狀態不一樣 --}}
+                    <div class="text-muted small">{{ $screenshot['host'] }}（{{ $screenshot['arch'] }}）</div>
                     <small class="text-muted d-block mt-1">{{ trans('daily_rate.screenshot_hint') }}</small>
                 </div>
                 @if($canManage)

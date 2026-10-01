@@ -37,6 +37,7 @@ return [
     'screenshot_ready'     => '这台机器可以截图',
     'screenshot_missing'   => '这台机器没有可用的 Chrome，报价时只会发文字',
     'screenshot_hint'      => '报价时会附上 MAX 的走势图。截不到图也不影响报价，只是没有图',
+    'screenshot_arm_note'  => '这台是 arm64，没有官方的 Linux Chrome，装不起来。正式机（x86_64）才截得到图',
     'screenshot_install'   => '安装方式（x86_64 Linux）：apt-get install -y google-chrome-stable',
     'action_test_shot'     => '测试截图',
     'action_ask_now'       => '立即报价',

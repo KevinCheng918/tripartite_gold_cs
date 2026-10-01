@@ -37,6 +37,7 @@ return [
     'screenshot_ready'     => 'This machine can take screenshots',
     'screenshot_missing'   => 'No usable Chrome on this machine — the quote will be text only',
     'screenshot_hint'      => "The quote includes a screenshot of MAX's chart. If it can't be captured the quote still goes out, just without the image",
+    'screenshot_arm_note'  => 'This machine is arm64 — there is no official Linux Chrome for it. Screenshots only work on the x86_64 production machine',
     'screenshot_install'   => 'Install (x86_64 Linux): apt-get install -y google-chrome-stable',
     'action_test_shot'     => 'Test Screenshot',
     'action_ask_now'       => 'Post Now',

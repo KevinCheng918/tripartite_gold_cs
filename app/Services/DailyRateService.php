@@ -574,13 +574,19 @@ class DailyRateService
     /**
      * 這台機器能不能截圖（給介面顯示狀態用）
      *
-     * @return array{available: bool, binary: string|null}
+     * 一併回傳主機名稱與 CPU 架構 —— 開發機跑的是 laradock 容器、
+     * 正式機是另一台，光看「沒有可用的 Chrome」會分不清是哪一台沒有。
+     * arm64 本來就裝不了官方 Chrome，看到架構就知道不用再試。
+     *
+     * @return array{available: bool, binary: string|null, host: string, arch: string}
      */
     public function screenshotStatus()
     {
         return [
             'available' => $this->screenshotService->isAvailable(),
             'binary'    => $this->screenshotService->binaryPath(),
+            'host'      => gethostname() ?: '-',
+            'arch'      => php_uname('m'),
         ];
     }
 
