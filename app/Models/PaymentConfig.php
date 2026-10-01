@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string      $title       繳款方式名稱
  * @property string      $content     繳款資訊內容
  * @property string|null $template       文案模板（繳款通知用）
- * @property string|null $topup_template 補點訊息，接在餘點告警後面。留空不附加
+ * @property string|null $topup_template 補點訊息，餘點告警之後單獨發的第二則。留空就不發
  * @property string|null $image       繳款圖片路徑
  * @property int         $status      1=啟用, 0=停用
  * @property int         $sort_order  排序

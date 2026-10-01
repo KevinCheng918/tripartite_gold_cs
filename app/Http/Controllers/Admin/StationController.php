@@ -202,6 +202,8 @@ class StationController extends Controller
      * 自動告警的那些保護（門檻、冷卻、有待審核就改發內部）是為了不要亂吵客戶，
      * 手動是人按的，不該替他擋。
      *
+     * 跟自動告警一樣發兩則：餘點告警、補點訊息（附繳款圖）。
+     *
      * @param Station $station
      * @return \Illuminate\Http\JsonResponse
      */
@@ -234,6 +236,14 @@ class StationController extends Controller
             } elseif (Arr::get($result, 'has_rate') !== true) {
                 $notes[] = trans('station.msg.topup_notice_no_rate');
             }
+        } elseif (Arr::get($result, 'topup_sent') !== true) {
+            /*
+             * 告警那則出去了、補點訊息那則沒有。
+             *
+             * 這不是整體失敗（Service 不回 ok=false，否則排程會重發告警），
+             * 但客戶只收到一半 —— 按的人要知道，才能再補發一次。
+             */
+            $notes[] = trans('station.msg.topup_notice_topup_failed');
         }
 
         return response()->json([

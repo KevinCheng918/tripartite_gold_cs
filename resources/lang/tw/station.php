@@ -21,6 +21,22 @@ return [
     'field_status'     => '狀態',
     'field_telegram_chat_id' => 'Telegram Chat ID',
     'bot_groups_title'       => '機器人群組列表',
+
+    'action_topup_notice'  => '補點通知',
+
+    /*
+     * 補點通知按鈕 disable 時的說明。
+     *
+     * 缺的欄位名要講出來 —— 只說「無法發送」的話，看的人得自己去開編輯視窗
+     * 一個一個對，才知道該補哪一欄。
+     */
+    'topup_notice_disabled' => '尚未設定 :missing，無法發送補點通知',
+    'topup_notice_missing'  => [
+        'api_url'           => 'API 網址',
+        'api_key'           => 'API 金鑰',
+        'telegram_group_id' => 'Telegram 群組',
+    ],
+
     'field_credit_alert_threshold'       => '餘點告警門檻',
     'credit_alert_threshold_placeholder' => '留空沿用全域設定',
     'credit_alert_threshold_hint'        => '這個站台的餘點低於此數字就發告警。留空沿用繳款設定頁的全域門檻，填 0 表示這個站台不告警',
@@ -68,8 +84,9 @@ return [
         // 手動補點通知
         'topup_notice_sent'            => '補點通知已發送給客戶，當前點數 :credits',
         'topup_notice_above_threshold' => '點數高於門檻，仍依您的指示發送',
-        'topup_notice_no_rate'         => '今日匯率尚未決定，未附補點訊息',
-        'topup_notice_no_template'     => '此系統的繳款設定尚未填寫補點訊息，未附補點訊息',
+        'topup_notice_no_rate'         => '今日匯率尚未決定，只發了餘點告警那則',
+        'topup_notice_no_template'     => '此系統的繳款設定尚未填寫補點訊息，只發了餘點告警那則',
+        'topup_notice_topup_failed'    => '餘點告警已送出，但補點訊息那則發送失敗，詳見 log',
         'topup_notice_no_group'        => '此站台未設定 Telegram 群組，沒有地方可以發',
         'topup_notice_sync_failed'     => '點數同步失敗，沒有發送（避免送出過期的數字）',
         'topup_notice_send_failed'     => '發送失敗，詳見 log',

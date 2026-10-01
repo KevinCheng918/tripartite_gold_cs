@@ -18,6 +18,9 @@ use Illuminate\Support\Facades\Log;
  * 同步本身重用 StationService::syncInfo()（站台管理頁的「同步」按鈕走的是同一支），
  * 這一層只負責「要不要告警、告警給誰」。
  *
+ * 給客戶的通知是**兩則**：先一則餘點告警（純文字），再一則補點訊息（附繳款圖）。
+ * 分開發的理由見 sendTopup()。
+ *
  * ⚠ 這個服務會直接發訊息給客戶，誤報的代價比漏報高。所以：
  *   1. API 失敗（syncInfo 回 null）就跳過，**絕不拿上一次的舊點數判斷**
  *   2. 每個站台各自 try/catch，一站發送失敗不影響其他站台
@@ -115,7 +118,8 @@ class StationCreditAlertService
      * @return array 每個站台一筆處理結果，給 Command 印出來看
      *
      * @phpstan-return array<int, array{station:string, credits:float, threshold:float,
-     *     alerted:bool, target:string|null, reason:string|null, text:string|null}>
+     *     alerted:bool, target:string|null, reason:string|null, text:string|null,
+     *     topup_text:string|null, image_url:string|null}>
      */
     public function run($options = [])
     {
@@ -171,10 +175,12 @@ class StationCreditAlertService
      *
      * 會先同步一次點數，訊息裡的數字才是當下的。
      *
+     * 跟自動流程一樣發兩則：告警一則、補點訊息一則（附圖）。
+     *
      * @param Station  $station
      * @param int|null $userId 操作者，記 log 用
      * @return array{ok: bool, reason: string|null, credits: float|null,
-     *     below: bool, has_topup: bool, has_image: bool}
+     *     below: bool, has_topup: bool, has_image: bool, topup_sent: bool}
      */
     public function sendManual(Station $station, $userId = null)
     {
@@ -192,7 +198,7 @@ class StationCreditAlertService
         $credits = (float) $station->credits;
 
         $topup = $this->topupMessage($station);
-        $text = $this->renderAlert($settings['template'], $station->name, $credits, $threshold) . $topup;
+        $text = $this->renderAlert($settings['template'], $station->name, $credits, $threshold);
         $imageUrl = $this->topupImage($station, $topup);
 
         /*
@@ -206,7 +212,7 @@ class StationCreditAlertService
         $config = $this->paymentConfigFor($station);
 
         try {
-            $this->sendToStation($station, $text, $imageUrl);
+            $this->sendToStation($station, $text);
         } catch (\Exception $e) {
             Log::error('手動補點通知發送失敗', [
                 'station_id' => $station->id,
@@ -216,6 +222,9 @@ class StationCreditAlertService
 
             return ['ok' => false, 'reason' => 'send_failed'];
         }
+
+        // 第二則補點訊息失敗不算整體失敗 —— 告警已經發出去了，理由見 sendTopup()
+        $topupSent = $this->sendTopup($station, $topup, $imageUrl);
 
         /*
          * 手動發了也要記 credit_alerted_at。
@@ -231,6 +240,9 @@ class StationCreditAlertService
             'credits'    => $credits,
             'threshold'  => $threshold,
             'below'      => $credits < $threshold,
+            // 兩個一起看才讀得懂：沒有第二則時 topup_sent 本來就是 true
+            'has_topup'  => filled($topup),
+            'topup_sent' => $topupSent,
             'user_id'    => $userId,
         ]);
 
@@ -241,6 +253,8 @@ class StationCreditAlertService
             'below'        => $credits < $threshold,
             'has_topup'    => filled($topup),
             'has_image'    => filled($imageUrl),
+            // 告警送出了但第二則掛了 —— 按的人要知道客戶只收到一半
+            'topup_sent'   => $topupSent,
             // 沒附補點訊息時，這兩個才看得出是哪一邊缺
             'has_rate'     => filled($this->todayRate()),
             'has_template' => filled($config) && filled($config->topup_template),
@@ -250,13 +264,15 @@ class StationCreditAlertService
     /**
      * 測試發送：把這筆繳款設定的補點訊息發到內部支援群組
      *
-     * 發的是**完整的告警 + 補點訊息 + 圖**，不是只有補點訊息那一段 ——
-     * 補點訊息的意義在於接在告警後面，單獨看看不出實際效果。
+     * 發的是**客戶實際會收到的那兩則**（告警一則、補點訊息＋圖一則），
+     * 不是只有補點訊息那一段 —— 補點訊息是接在告警之後的第二則，
+     * 單獨看看不出實際效果，也看不出兩則合起來的順序對不對。
      *
      * 一律發內部群組，不會送到客戶那邊。
      *
      * @param \App\Models\PaymentConfig $config
-     * @return array{ok: bool, reason: string|null, has_rate: bool, has_image: bool}
+     * @return array{ok: bool, reason: string|null, has_rate: bool,
+     *     has_image: bool, topup_sent: bool}
      */
     public function testTopupMessage($config)
     {
@@ -277,20 +293,16 @@ class StationCreditAlertService
         $topup = $this->topupMessage($station);
         $rate = $this->todayRate();
 
+        // 第一則：告警。不附圖，跟客戶收到的一樣
         $text = (string) config('constants.STATION.CREDIT_ALERT.TEST_PREFIX')
-            . $this->renderAlert($settings['template'], $station->name, (float) $station->credits, $settings['threshold'])
-            . $topup;
+            . $this->renderAlert($settings['template'], $station->name, (float) $station->credits, $settings['threshold']);
 
         if (blank($topup)) {
             // 匯率還沒決定時補一句，免得看的人以為補點訊息壞了
             $text .= (string) config('constants.STATION.CREDIT_ALERT.TEST_NO_RATE_NOTE');
         }
 
-        $imageUrl = $this->topupImage($station, $topup);
-
-        $sent = filled($imageUrl)
-            ? $this->supportGroup->sendPhoto($imageUrl, $text)
-            : $this->supportGroup->send($text);
+        $sent = $this->supportGroup->send($text);
 
         if (blank(Arr::get($sent, 'result'))) {
             Log::error('補點訊息測試發送失敗', ['config_id' => $config->id, 'response' => $sent]);
@@ -298,12 +310,53 @@ class StationCreditAlertService
             return ['ok' => false, 'reason' => 'send_failed'];
         }
 
+        /*
+         * 第二則：補點訊息（附圖）。
+         *
+         * 匯率未定時 $topup 是空的，這則就不存在 —— 這不是失敗，
+         * 客戶在同樣情況下也只會收到告警那一則。
+         */
+        $imageUrl = $this->topupImage($station, $topup);
+        $topupSent = true;
+
+        if (filled($topup)) {
+            $topupSent = $this->sendTopupToSupportGroup($config, $topup, $imageUrl);
+        }
+
         return [
-            'ok'        => true,
-            'reason'    => null,
-            'has_rate'  => filled($rate),
-            'has_image' => filled($imageUrl),
+            'ok'         => true,
+            'reason'     => null,
+            'has_rate'   => filled($rate),
+            'has_image'  => filled($imageUrl),
+            // 第一則出去了、第二則沒有 —— 這時回報「只送出告警」而不是整體成功
+            'topup_sent' => $topupSent,
         ];
+    }
+
+    /**
+     * 測試發送的第二則：補點訊息發到內部支援群組
+     *
+     * @param \App\Models\PaymentConfig $config
+     * @param string                    $topupText
+     * @param string|null               $imageUrl
+     * @return bool 有沒有送出去
+     */
+    private function sendTopupToSupportGroup($config, $topupText, $imageUrl)
+    {
+        $sent = filled($imageUrl)
+            ? $this->supportGroup->sendPhoto($imageUrl, $topupText)
+            : $this->supportGroup->send($topupText);
+
+        if (filled(Arr::get($sent, 'result'))) {
+            return true;
+        }
+
+        Log::error('補點訊息測試發送失敗（告警那則已送出）', [
+            'config_id' => $config->id,
+            'response'  => $sent,
+        ]);
+
+        return false;
     }
 
     /**
@@ -502,44 +555,59 @@ class StationCreditAlertService
         }
 
         $topup = $this->topupMessage($station);
-        $text = $this->renderAlert($settings['template'], $station->name, $credits, $threshold) . $topup;
+        $text = $this->renderAlert($settings['template'], $station->name, $credits, $threshold);
 
-        // 發到內部群組的兩種情境（沒設群組／有待審核）各自要先說明為什麼沒發給客戶
+        /*
+         * 發到內部群組時併成一則，而且不附圖。
+         *
+         * 內部群組那則是「這個站台快沒點了，但沒發給客戶」的轉知 ——
+         * 客服要的是一眼看完整件事，拆成兩則只是讓同一件事在群組裡響兩次。
+         * 圖同理：客服要做的是去設群組或去審核補點單，不是照著付款地址匯款。
+         *
+         * 前綴（沒設群組／有待審核）要擺在最前面，說明為什麼沒發給客戶。
+         */
         if ($target !== self::TARGET_STATION) {
-            $text = $this->internalPrefix($station, $target, $pendingTopups) . $text;
+            $text = $this->internalPrefix($station, $target, $pendingTopups)
+                . $text
+                . $this->topupSuffix($topup);
+
+            if ($dryRun) {
+                return $this->result($station, $threshold, false, $target, null, $text);
+            }
+
+            return $this->send($station, $threshold, $target, $text);
         }
 
         $imageUrl = $this->topupImage($station, $topup);
 
         if ($dryRun) {
-            return $this->result($station, $threshold, false, $target, null, $text, $imageUrl);
+            return $this->result($station, $threshold, false, $target, null, $text, $topup, $imageUrl);
         }
 
-        return $this->send($station, $threshold, $target, $text, $imageUrl);
+        return $this->send($station, $threshold, $target, $text, $topup, $imageUrl);
     }
 
     /**
      * 實際送出告警並記錄時間
      *
-     * @param Station $station
-     * @param float   $threshold
-     * @param string  $target
-     * @param string  $text
+     * @param Station     $station
+     * @param float       $threshold
+     * @param string      $target
+     * @param string      $text      告警那則（內部群組的已含前綴與補點訊息）
+     * @param string|null $topupText 補點訊息，當成第二則發；只有發給客戶時才有
+     * @param string|null $imageUrl  補點訊息要附的圖
      * @return array
      */
-    private function send(Station $station, $threshold, $target, $text, $imageUrl = null)
+    private function send(Station $station, $threshold, $target, $text, $topupText = null, $imageUrl = null)
     {
         try {
             /*
              * 只有 TARGET_STATION 會送到客戶那邊，其餘（沒設群組的退路、
              * 有補點單待審核）一律進內部群組 —— 說明的前綴在 handleStation
              * 就依 target 組好了，這裡只負責送。
-             *
-             * 圖只跟著給客戶的那則走：內部群組是要客服去處理事情，
-             * 再附一張付款地址圖沒有幫助。
              */
             if ($target === self::TARGET_STATION) {
-                $this->sendToStation($station, $text, $imageUrl);
+                $this->sendToStation($station, $text);
             } else {
                 $this->supportGroup->send($text);
             }
@@ -555,24 +623,91 @@ class StationCreditAlertService
             return $this->result($station, $threshold, false, $target, self::SKIP_SEND_FAILED, $text);
         }
 
+        // 補點訊息是獨立的第二則，只發給客戶（內部群組已經併在上面那則裡）
+        $hasSecondMessage = $target === self::TARGET_STATION && filled($topupText);
+        $topupSent = $hasSecondMessage
+            ? $this->sendTopup($station, $topupText, $imageUrl)
+            : null;
+
         $this->stationRepository->update($station, ['credit_alerted_at' => now()]);
 
-        Log::info('站台餘點告警已送出', [
+        $context = [
             'station_id' => $station->id,
             'station'    => $station->name,
             'credits'    => (float) $station->credits,
             'threshold'  => $threshold,
             'target'     => $target,
-        ]);
+        ];
 
-        return $this->result($station, $threshold, true, $target, null, $text);
+        // 沒有第二則時不記這個欄位 —— 記 true 會讓人以為補點訊息也發出去了
+        if ($hasSecondMessage) {
+            $context['topup_sent'] = $topupSent;
+        }
+
+        Log::info('站台餘點告警已送出', $context);
+
+        return $this->result($station, $threshold, true, $target, null, $text, $topupText, $imageUrl);
+    }
+
+    /**
+     * 把補點訊息當第二則發給客戶
+     *
+     * 分兩則而不是接在告警後面，是因為這兩段要做的事不一樣：
+     * 告警是「你的點數快沒了」，補點訊息是「要補的話這樣匯款」。
+     * 分開發，客戶要回頭找匯款資訊時不必在一長串告警裡翻，
+     * 繳款圖也只掛在真正需要它的那一則上。
+     *
+     * **失敗不會讓整則告警算失敗。** 告警已經出去了，這時回報失敗會讓
+     * 下一輪重發一次一模一樣的告警 —— 對客戶是重複打擾。只記 log 讓客服
+     * 看得到，缺的那段可以用站台列表的「發送補點通知」補。
+     *
+     * @param Station     $station
+     * @param string|null $topupText 空的就不發（匯率未定或這個系統沒填公版）
+     * @param string|null $imageUrl
+     * @return bool 有沒有送出去（本來就沒有要送時回 true）
+     */
+    private function sendTopup(Station $station, $topupText, $imageUrl)
+    {
+        if (blank($topupText)) {
+            return true;
+        }
+
+        try {
+            $this->sendToStation($station, $topupText, $imageUrl);
+
+            return true;
+        } catch (\Exception $e) {
+            Log::error('補點訊息發送失敗（餘點告警那則已送出）', [
+                'station_id' => $station->id,
+                'station'    => $station->name,
+                'error'      => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
+     * 併成一則時，補點訊息前面的分隔
+     *
+     * 只有內部群組那則會用到 —— 給客戶的是分開的兩則，不需要分隔。
+     * 公版是客服在表單裡打的，不會（也不該要求他們）自己在開頭留空行，
+     * 不加的話補點訊息會直接黏在告警的最後一行後面。
+     *
+     * @param string $topupText
+     * @return string
+     */
+    private function topupSuffix($topupText)
+    {
+        return filled($topupText) ? "\n\n{$topupText}" : '';
     }
 
     /**
      * 發到站台自己的 Telegram 群組
      *
-     * @param Station $station
-     * @param string  $text
+     * @param Station     $station
+     * @param string      $text
+     * @param string|null $imageUrl
      * @return void
      */
     private function sendToStation(Station $station, $text, $imageUrl = null)
@@ -717,16 +852,19 @@ class StationCreditAlertService
     }
 
     /**
-     * 餘點告警後面接的補點訊息
+     * 餘點告警之後那則補點訊息
      *
-     * ⚠ **只有今天的匯率已經決定時才附上。**
+     * ⚠ **只有今天的匯率已經決定時才發。**
      *
      * 匯率還沒定（含凌晨到早上報價前、或報了還沒人回覆）就只發告警 ——
      * 沒有匯率的補點訊息對客戶沒有意義，他不知道要匯多少台幣；
      * 而附一個過期的昨日匯率更糟。
      *
+     * 回傳的是**不帶前後分隔的純文字**：它自己就是一則訊息。
+     * 併成一則發（內部群組）時才需要分隔，那是 topupSuffix() 的事。
+     *
      * @param Station $station
-     * @return string 不附時回空字串，直接接在告警後面不會多出空行
+     * @return string 不發時回空字串
      */
     private function topupMessage(Station $station)
     {
@@ -743,17 +881,11 @@ class StationCreditAlertService
         }
 
         /*
-         * 前面補兩個換行當分隔。
-         *
-         * 公版是客服在表單裡打的，不會（也不該要求他們）自己在開頭留空行 ——
-         * 不加的話補點訊息會直接黏在告警的最後一行後面。
-         */
-        /*
          * 匯率用 trimZeros 而不是 formatCredits：
          * 點數固定兩位小數（16390.94），匯率則是去尾零（30.5 而不是 30.50）——
          * 匯率報價訊息也是這樣顯示，同一個數字在兩個地方要長一樣。
          */
-        return "\n\n" . strtr($config->topup_template, [
+        return strtr($config->topup_template, [
             // 不補零的 10/1 而不是 10/01 —— 對客訊息習慣這樣寫
             '{date}'    => now()->format('n/j'),
             '{rate}'    => NumberPresenter::trimZeros($rate, 4),
@@ -768,8 +900,11 @@ class StationCreditAlertService
      * 就是繳款設定的那張圖（付款地址、二次確認提醒之類），
      * 跟虛擬機繳費通知用的是同一張、同一個欄位。
      *
-     * **只有真的附了補點訊息時才給圖** —— 單獨一張付款地址圖配著
-     * 「點數不足」的告警，客戶會看不懂那張圖在幹嘛。
+     * **圖只掛在補點訊息那則上，餘點告警那則不附。** 告警講的是
+     * 「你的點數快沒了」，配一張付款地址圖客戶會看不懂那張圖在幹嘛；
+     * 真的要匯款的資訊在第二則，圖跟著它才有意義。
+     *
+     * 所以沒有補點訊息（匯率未定／沒填公版）時就沒有圖 —— 沒有那一則。
      *
      * @param Station $station
      * @param string  $topupText topupMessage() 的結果，空字串表示沒附補點訊息
@@ -894,13 +1029,15 @@ class StationCreditAlertService
      *
      * @param Station     $station
      * @param float       $threshold
-     * @param bool        $alerted 是否真的送出了
+     * @param bool        $alerted   是否真的送出了
      * @param string|null $target
-     * @param string|null $reason  沒送出的原因
-     * @param string|null $text    告警內容（dry-run 預覽用）
+     * @param string|null $reason    沒送出的原因
+     * @param string|null $text      告警那則的內容（dry-run 預覽用）
+     * @param string|null $topupText 補點訊息那則；內部群組已併進 $text，所以是 null
+     * @param string|null $imageUrl  補點訊息那則會附的圖
      * @return array
      */
-    private function result(Station $station, $threshold, $alerted, $target, $reason = null, $text = null, $imageUrl = null)
+    private function result(Station $station, $threshold, $alerted, $target, $reason = null, $text = null, $topupText = null, $imageUrl = null)
     {
         return [
             'station_id' => $station->id,
@@ -911,7 +1048,8 @@ class StationCreditAlertService
             'target'     => $target,
             'reason'     => $reason,
             'text'       => $text,
-            // 空跑要看得出會不會附圖，否則得真的發一次才知道
+            // 空跑要看得出第二則長什麼樣、會不會附圖，否則得真的發一次才知道
+            'topup_text' => $topupText,
             'image_url'  => $imageUrl,
         ];
     }

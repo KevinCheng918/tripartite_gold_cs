@@ -95,7 +95,7 @@ class PaymentConfigController extends Controller
             'title'      => 'required|string|max:100',
             'content'    => 'required|string',
             'template'   => 'nullable|string',
-            // 餘點告警後面接的補點訊息，留空就不附加
+            // 餘點告警之後單獨發的第二則補點訊息，留空就不發
             'topup_template' => 'nullable|string|max:' . config('rules.TELEGRAM_TEMPLATE_MAX'),
             'image'      => 'nullable|image|max:5120',
             'sort_order' => 'nullable|integer',
@@ -126,7 +126,7 @@ class PaymentConfigController extends Controller
             'title'      => 'sometimes|string|max:100',
             'content'    => 'sometimes|string',
             'template'   => 'nullable|string',
-            // 餘點告警後面接的補點訊息，留空就不附加
+            // 餘點告警之後單獨發的第二則補點訊息，留空就不發
             'topup_template' => 'nullable|string|max:' . config('rules.TELEGRAM_TEMPLATE_MAX'),
             'image'      => 'nullable|image|max:5120',
             'status'     => 'sometimes|integer|in:0,1',
@@ -191,8 +191,8 @@ class PaymentConfigController extends Controller
     /**
      * Ajax 測試發送補點訊息
      *
-     * 發的是完整的「告警 + 補點訊息 + 圖」，而且**只發到內部支援群組** ——
-     * 測試不該打擾客戶。
+     * 發的是客戶實際會收到的那兩則（告警／補點訊息＋圖），
+     * 而且**只發到內部支援群組** —— 測試不該打擾客戶。
      *
      * @param PaymentConfig $config
      * @return \Illuminate\Http\JsonResponse
@@ -207,12 +207,38 @@ class PaymentConfigController extends Controller
             return response()->json(['message' => trans("payment_config.msg.test_topup_{$reason}")], 422);
         }
 
-        // 匯率未定或沒圖都不算失敗，但要講清楚這次送出去的少了什麼
-        $key = Arr::get($result, 'has_rate') === true
-            ? (Arr::get($result, 'has_image') === true ? 'test_topup_sent' : 'test_topup_sent_no_image')
-            : 'test_topup_sent_no_rate';
+        /*
+         * 匯率未定或沒圖都不算失敗，但要講清楚這次送出去的少了什麼。
+         *
+         * topup_sent 要先判：第二則沒送出的話，講「含補點訊息與圖片」是錯的。
+         */
+        $key = $this->testTopupMessageKey($result);
 
         return response()->json(['message' => trans("payment_config.msg.{$key}")]);
+    }
+
+    /**
+     * 測試發送的回報語系 key
+     *
+     * 四種情況各自要講對：第二則掛了、匯率未定（沒有第二則）、
+     * 有第二則但繳款設定沒圖、全都齊。
+     *
+     * @param array $result StationCreditAlertService::testTopupMessage() 的回傳
+     * @return string
+     */
+    private function testTopupMessageKey($result)
+    {
+        if (Arr::get($result, 'topup_sent') !== true) {
+            return 'test_topup_sent_alert_only';
+        }
+
+        if (Arr::get($result, 'has_rate') !== true) {
+            return 'test_topup_sent_no_rate';
+        }
+
+        return Arr::get($result, 'has_image') === true
+            ? 'test_topup_sent'
+            : 'test_topup_sent_no_image';
     }
 
     /**

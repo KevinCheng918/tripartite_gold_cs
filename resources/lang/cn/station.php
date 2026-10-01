@@ -12,6 +12,17 @@ return [
     'field_status'     => '状态',
     'field_telegram_chat_id' => 'Telegram Chat ID',
     'bot_groups_title'       => '机器人群组列表',
+
+    'action_topup_notice'  => '补点通知',
+
+    // 补点通知按钮 disable 时的说明，缺的栏位名要讲出来
+    'topup_notice_disabled' => '尚未设定 :missing，无法发送补点通知',
+    'topup_notice_missing'  => [
+        'api_url'           => 'API 网址',
+        'api_key'           => 'API 金钥',
+        'telegram_group_id' => 'Telegram 群组',
+    ],
+
     'field_credit_alert_threshold'       => '余点告警门槛',
     'credit_alert_threshold_placeholder' => '留空沿用全域设定',
     'credit_alert_threshold_hint'        => '这个站台的余点低于此数字就发告警。留空沿用缴款设定页的全域门槛，填 0 表示这个站台不告警',
@@ -59,8 +70,9 @@ return [
         // 手动补点通知
         'topup_notice_sent'            => '补点通知已发送给客户，当前点数 :credits',
         'topup_notice_above_threshold' => '点数高于门槛，仍依您的指示发送',
-        'topup_notice_no_rate'         => '今日汇率尚未决定，未附补点讯息',
-        'topup_notice_no_template'     => '此系统的缴款设定尚未填写补点讯息，未附补点讯息',
+        'topup_notice_no_rate'         => '今日汇率尚未决定，只发了余点告警那则',
+        'topup_notice_no_template'     => '此系统的缴款设定尚未填写补点讯息，只发了余点告警那则',
+        'topup_notice_topup_failed'    => '余点告警已送出，但补点讯息那则发送失败，详见 log',
         'topup_notice_no_group'        => '此站台未设定 Telegram 群组，没有地方可以发',
         'topup_notice_sync_failed'     => '点数同步失败，没有发送（避免送出过期的数字）',
         'topup_notice_send_failed'     => '发送失败，详见 log',

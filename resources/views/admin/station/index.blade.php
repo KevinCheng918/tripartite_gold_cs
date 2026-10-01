@@ -282,11 +282,7 @@
                                         <button class="btn btn-sm btn-outline-secondary js-sync-credits" data-id="{{ $station->id }}">
                                             <i class="fas fa-sync-alt me-1"></i>同步
                                         </button>
-                                        <button class="btn btn-sm btn-outline-secondary js-send-topup-notice"
-                                                data-id="{{ $station->id }}"
-                                                data-name="{{ $station->name }}">
-                                            <i class="fas fa-paper-plane me-1"></i>補點通知
-                                        </button>
+                                        @include('admin.station.partials.topup-notice-button', ['station' => $station])
                                         <button class="btn btn-sm btn-outline-secondary js-change-station-status"
                                                 data-id="{{ $station->id }}"
                                                 data-status="{{ $station->status }}">
@@ -380,11 +376,7 @@
                             <button class="btn btn-sm btn-outline-secondary js-sync-credits" data-id="{{ $station->id }}">
                                 <i class="fas fa-sync-alt me-1"></i>同步
                             </button>
-                            <button class="btn btn-sm btn-outline-secondary js-send-topup-notice"
-                                    data-id="{{ $station->id }}"
-                                    data-name="{{ $station->name }}">
-                                <i class="fas fa-paper-plane me-1"></i>補點通知
-                            </button>
+                            @include('admin.station.partials.topup-notice-button', ['station' => $station])
                             <button class="btn btn-sm btn-outline-secondary js-change-station-status"
                                     data-id="{{ $station->id }}"
                                     data-status="{{ $station->status }}">
@@ -766,7 +758,8 @@
                     <p class="mb-2">確定要發送補點通知給 <strong id="topup-notice-station"></strong> 嗎？</p>
                     <small class="text-muted">
                         會先同步點數，然後<strong>不論是否低於門檻都發送</strong>給客戶。<br>
-                        今日匯率尚未決定時不會附上補點訊息。
+                        客戶會收到兩則：餘點告警、補點訊息（附繳款圖）。<br>
+                        今日匯率尚未決定時只發餘點告警那一則。
                     </small>
                 </div>
                 <div class="modal-footer justify-content-center">

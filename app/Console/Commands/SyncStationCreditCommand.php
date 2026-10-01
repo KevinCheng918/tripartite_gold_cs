@@ -137,6 +137,10 @@ class SyncStationCreditCommand extends Command
     /**
      * 空跑時把訊息內容印出來，讓人確認公版套完長什麼樣
      *
+     * 給客戶的是兩則（告警／補點訊息），所以分段印並標上「第 N 則」——
+     * 併成一段印的話看不出客戶那邊會跳幾次通知，也看不出圖掛在哪一則上。
+     * 發到內部群組的只有一則，就不標序號。
+     *
      * @param array $results
      * @param bool  $dryRun
      * @return void
@@ -156,17 +160,25 @@ class SyncStationCreditCommand extends Command
 
             $station = Arr::get($row, 'station');
             $target = $this->targetLabel($row);
-
-            $image = Arr::get($row, 'image_url');
+            $topup = Arr::get($row, 'topup_text');
 
             $this->line('');
             $this->warn("── {$station} → {$target} ──");
 
-            if (filled($image)) {
-                $this->line("［附圖］{$image}");
+            if (blank($topup)) {
+                $this->line($text);
+
+                continue;
             }
 
+            $this->line('［第 1 則｜餘點告警］');
             $this->line($text);
+
+            $image = Arr::get($row, 'image_url');
+
+            $this->line('');
+            $this->line('［第 2 則｜補點訊息］' . (filled($image) ? "附圖 {$image}" : '無圖'));
+            $this->line($topup);
         }
     }
 

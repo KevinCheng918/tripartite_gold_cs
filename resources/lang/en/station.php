@@ -12,6 +12,17 @@ return [
     'field_status'     => 'Status',
     'field_telegram_chat_id' => 'Telegram Chat ID',
     'bot_groups_title'       => 'Bot Groups',
+
+    'action_topup_notice'  => 'Top-up Notice',
+
+    // Shown when the top-up notice button is disabled — name the missing fields
+    'topup_notice_disabled' => 'Cannot send a top-up notice: :missing not configured',
+    'topup_notice_missing'  => [
+        'api_url'           => 'API URL',
+        'api_key'           => 'API key',
+        'telegram_group_id' => 'Telegram group',
+    ],
+
     'field_credit_alert_threshold'       => 'Credit Alert Threshold',
     'credit_alert_threshold_placeholder' => 'Leave blank to use the global setting',
     'credit_alert_threshold_hint'        => 'Alert when this station\'s credit drops below this number. Leave blank to use the global threshold from Payment Config; set 0 to disable alerts for this station',
@@ -59,8 +70,9 @@ return [
         // Manual top-up notice
         'topup_notice_sent'            => 'Top-up notice sent to the customer. Current credit: :credits',
         'topup_notice_above_threshold' => 'credit is above the threshold, sent anyway as requested',
-        'topup_notice_no_rate'         => "today's rate is not decided yet, top-up message omitted",
-        'topup_notice_no_template'     => 'this system has no top-up message configured, so none was attached',
+        'topup_notice_no_rate'         => "today's rate is not decided yet, so only the credit alert went out",
+        'topup_notice_no_template'     => 'this system has no top-up message configured, so only the credit alert went out',
+        'topup_notice_topup_failed'    => 'the credit alert was sent, but the top-up message failed — see the log',
         'topup_notice_no_group'        => 'This station has no Telegram group configured',
         'topup_notice_sync_failed'     => 'Failed to sync credits — nothing was sent, to avoid showing a stale number',
         'topup_notice_send_failed'     => 'Failed to send — see the log',

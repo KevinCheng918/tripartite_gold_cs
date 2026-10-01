@@ -23,6 +23,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $note              備註
  * @property \Illuminate\Support\Carbon|null $synced_at         最後一次同步站台資訊的時間
  * @property \Illuminate\Support\Carbon|null $credit_alerted_at 最後一次送出餘點告警的時間
+ *
+ * @property-read array $topup_notice_blockers 發不了補點通知所缺的欄位名
  */
 class Station extends Model
 {
@@ -39,6 +41,32 @@ class Station extends Model
         'credit_alert_threshold' => 'float',
         'credit_alerted_at'      => 'datetime',
     ];
+
+    /**
+     * 發不了補點通知的原因：缺哪些設定
+     *
+     * 手動發送會先同步點數（要 `api_url` + `api_key`），再發到站台的
+     * Telegram 群組（要 `telegram_group_id`）—— 三個缺任何一個都走不完，
+     * 列表上的按鈕就該直接 disable，而不是讓人按下去才收到錯誤。
+     *
+     * 回傳的是**欄位名**而不是中文，文案由語系檔
+     * （`station.topup_notice_missing.*`）負責。
+     *
+     * @return array
+     */
+    public function getTopupNoticeBlockersAttribute()
+    {
+        $required = ['api_url', 'api_key', 'telegram_group_id'];
+        $missing = [];
+
+        foreach ($required as $field) {
+            if (blank($this->{$field})) {
+                $missing[] = $field;
+            }
+        }
+
+        return $missing;
+    }
 
     /**
      * 所屬系統

@@ -31,7 +31,7 @@ return [
     'alert_target_hint'      => '告警发到站台自己的 Telegram 群组；站台没设群组时会改发到内部支援群组，并标注「没有发给客户」提醒客服手动通知',
     'topup_field_template'   => '补点讯息',
     'topup_template_hint'    => '可用变量：{date} 今日日期、{rate} 今日汇率、{usdt} 补 50000 点所需的 USDT（无条件进位）、{content} 上面的缴款资讯。留空就不附加',
-    'topup_condition_hint'   => '这段会接在余点告警后面一起发给客户，但只有「今天的汇率已经决定」时才会附上 —— 汇率还没定就只发告警，因为客户也不知道要汇多少',
+    'topup_condition_hint'   => '这段会在余点告警之后单独发第二则给客户（图片也附在这则），但只有「今天的汇率已经决定」时才会发 —— 汇率还没定就只发告警，因为客户也不知道要汇多少',
     'topup_template_example' => "————————\n💰 {date} USDT 当前汇率 {rate}\n补 50000 点约需 {usdt} USDT\n\n{content}\n\n需要补点的话再麻烦告知我们，会立即为您处理 🙏",
     'alert_preview'          => '预览',
     'alert_preview_title'    => '客户会收到的内容',
@@ -44,7 +44,7 @@ return [
     'action_copy'   => '复制文案',
     'action_send'       => '发送通知',
     'action_test_topup' => '测试补点讯息',
-    'test_topup_hint'   => '把完整的余点告警＋补点讯息＋图片发到内部支援群组，不会发给客户',
+    'test_topup_hint'   => '把客户会收到的两则（余点告警、补点讯息＋图片）发到内部支援群组，不会发给客户',
 
     'msg' => [
         'created'       => '缴款设定已新增',
@@ -60,9 +60,10 @@ return [
         'no_telegram'   => '此站台未设定 Telegram 群组',
 
         // 余点告警设定
-        'test_topup_sent'              => '测试讯息已发到内部支援群组（含补点讯息与图片）',
-        'test_topup_sent_no_image'     => '测试讯息已发到内部支援群组。这笔缴款设定没有图片，所以没有附图',
-        'test_topup_sent_no_rate'      => '测试讯息已发到内部支援群组。今天的汇率还没决定，所以没有附上补点讯息',
+        'test_topup_sent'              => '两则测试讯息已发到内部支援群组（余点告警、补点讯息＋图片）',
+        'test_topup_sent_no_image'     => '两则测试讯息已发到内部支援群组。这笔缴款设定没有图片，所以补点讯息那则没有附图',
+        'test_topup_sent_no_rate'      => '测试讯息已发到内部支援群组。今天的汇率还没决定，所以只有余点告警那一则',
+        'test_topup_sent_alert_only'   => '余点告警那则已发到内部支援群组，但补点讯息那则发送失败，详见 log',
         'test_topup_no_template'       => '这笔缴款设定还没填补点讯息',
         'test_topup_no_support_group'  => '尚未设定内部支援群组，没有地方可以发',
         'test_topup_send_failed'       => '发送失败，详见 log',

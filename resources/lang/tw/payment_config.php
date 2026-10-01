@@ -31,7 +31,7 @@ return [
     'alert_target_hint'      => '告警發到站台自己的 Telegram 群組；站台沒設群組時會改發到內部支援群組，並標註「沒有發給客戶」提醒客服手動通知',
     'topup_field_template'   => '補點訊息',
     'topup_template_hint'    => '可用變數：{date} 今日日期、{rate} 今日匯率、{usdt} 補 50000 點所需的 USDT（無條件進位）、{content} 上面的繳款資訊。留空就不附加',
-    'topup_condition_hint'   => '這段會接在餘點告警後面一起發給客戶，但只有「今天的匯率已經決定」時才會附上 —— 匯率還沒定就只發告警，因為客戶也不知道要匯多少',
+    'topup_condition_hint'   => '這段會在餘點告警之後單獨發第二則給客戶（圖片也附在這則），但只有「今天的匯率已經決定」時才會發 —— 匯率還沒定就只發告警，因為客戶也不知道要匯多少',
     'topup_template_example' => "————————\n💰 {date} USDT 當前匯率 {rate}\n補 50000 點約需 {usdt} USDT\n\n{content}\n\n需要補點的話再麻煩告知我們，會立即為您處理 🙏",
     'alert_preview'          => '預覽',
     'alert_preview_title'    => '客戶會收到的內容',
@@ -44,7 +44,7 @@ return [
     'action_copy'   => '複製文案',
     'action_send'       => '發送通知',
     'action_test_topup' => '測試補點訊息',
-    'test_topup_hint'   => '把完整的餘點告警＋補點訊息＋圖片發到內部支援群組，不會發給客戶',
+    'test_topup_hint'   => '把客戶會收到的兩則（餘點告警、補點訊息＋圖片）發到內部支援群組，不會發給客戶',
 
     'msg' => [
         'created'       => '繳款設定已新增',
@@ -60,9 +60,10 @@ return [
         'no_telegram'   => '此站台未設定 Telegram 群組',
 
         // 餘點告警設定
-        'test_topup_sent'              => '測試訊息已發到內部支援群組（含補點訊息與圖片）',
-        'test_topup_sent_no_image'     => '測試訊息已發到內部支援群組。這筆繳款設定沒有圖片，所以沒有附圖',
-        'test_topup_sent_no_rate'      => '測試訊息已發到內部支援群組。今天的匯率還沒決定，所以沒有附上補點訊息',
+        'test_topup_sent'              => '兩則測試訊息已發到內部支援群組（餘點告警、補點訊息＋圖片）',
+        'test_topup_sent_no_image'     => '兩則測試訊息已發到內部支援群組。這筆繳款設定沒有圖片，所以補點訊息那則沒有附圖',
+        'test_topup_sent_no_rate'      => '測試訊息已發到內部支援群組。今天的匯率還沒決定，所以只有餘點告警那一則',
+        'test_topup_sent_alert_only'   => '餘點告警那則已發到內部支援群組，但補點訊息那則發送失敗，詳見 log',
         'test_topup_no_template'       => '這筆繳款設定還沒填補點訊息',
         'test_topup_no_support_group'  => '尚未設定內部支援群組，沒有地方可以發',
         'test_topup_send_failed'       => '發送失敗，詳見 log',

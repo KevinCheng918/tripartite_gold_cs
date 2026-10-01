@@ -31,7 +31,7 @@ return [
     'alert_target_hint'      => 'Alerts go to the station\'s own Telegram group. If the station has no group, the alert goes to the internal support group instead, flagged as not sent to the customer',
     'topup_field_template'   => 'Top-up Message',
     'topup_template_hint'    => "Variables: {date} today's date, {rate} today's rate, {usdt} USDT needed for 50,000 credits (rounded up), {content} the payment info above. Leave blank to omit",
-    'topup_condition_hint'   => "This is appended to the credit alert sent to the customer, but only when today's rate has been decided — otherwise just the alert goes out, since the customer wouldn't know how much to transfer",
+    'topup_condition_hint'   => "Sent to the customer as a second message right after the credit alert (the image is attached to this one), but only when today's rate has been decided — otherwise just the alert goes out, since the customer wouldn't know how much to transfer",
     'topup_template_example' => "————————\n💰 {date} USDT rate: {rate}\n50,000 credits ≈ {usdt} USDT\n\n{content}\n\nJust let us know if you'd like to top up and we'll take care of it right away 🙏",
     'alert_preview'          => 'Preview',
     'alert_preview_title'    => 'What the customer receives',
@@ -44,7 +44,7 @@ return [
     'action_copy'   => 'Copy Text',
     'action_send'       => 'Send Notice',
     'action_test_topup' => 'Test Top-up Message',
-    'test_topup_hint'   => 'Sends the full credit alert + top-up message + image to the internal support group. Customers never see it',
+    'test_topup_hint'   => 'Sends both messages the customer would receive (credit alert, then top-up message + image) to the internal support group. Customers never see it',
 
     'msg' => [
         'created'       => 'Payment config created',
@@ -60,9 +60,10 @@ return [
         'no_telegram'   => 'No Telegram group for this station',
 
         // Credit alert settings
-        'test_topup_sent'              => 'Test message sent to the internal support group (with top-up message and image)',
-        'test_topup_sent_no_image'     => 'Test message sent. This payment config has no image, so none was attached',
-        'test_topup_sent_no_rate'      => 'Test message sent. Today\'s rate is not decided yet, so the top-up message was omitted',
+        'test_topup_sent'              => 'Both test messages sent to the internal support group (credit alert, then top-up message with image)',
+        'test_topup_sent_no_image'     => 'Both test messages sent. This payment config has no image, so none was attached to the top-up message',
+        'test_topup_sent_no_rate'      => 'Test message sent. Today\'s rate is not decided yet, so only the credit alert went out',
+        'test_topup_sent_alert_only'   => 'The credit alert was sent to the internal support group, but the top-up message failed — see the log',
         'test_topup_no_template'       => 'This payment config has no top-up message yet',
         'test_topup_no_support_group'  => 'Internal support group is not configured',
         'test_topup_send_failed'       => 'Failed to send — see the log',
