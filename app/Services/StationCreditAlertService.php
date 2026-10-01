@@ -284,7 +284,7 @@ class StationCreditAlertService
             return ['ok' => false, 'reason' => 'no_template'];
         }
 
-        $station = $this->sampleStationFor($config);
+        $station = $this->testStation($config);
         $settings = $this->globalSettings();
 
         // 先把這個系統的設定塞進快取，topupMessage 就會拿到這一筆而不是重查
@@ -360,28 +360,29 @@ class StationCreditAlertService
     }
 
     /**
-     * 測試用的範例站台
+     * 測試用的假站台
      *
-     * 優先拿這個系統底下真實的站台（名稱與點數才像真的）。
-     * 一個都沒有就捏一筆 —— 測試不該因為「這個系統還沒有站台」就做不了。
+     * 名稱固定是「測試」、點數是 constants 裡的假值 ——
+     * **不拿任何真實站台的資料。**
+     *
+     * 測試訊息會進內部支援群組，真實客人的站台名稱與當下餘點出現在那裡，
+     * 看到的人得先分辨那是不是真的在告警；而要看某個客人的實際狀況，
+     * 站台列表的「補點通知」才是對的地方。
+     *
+     * `system_id` 要帶：`topupMessage()` 是靠它去 `$paymentConfigs`
+     * 拿這筆繳款設定的公版。
      *
      * @param \App\Models\PaymentConfig $config
      * @return Station
      */
-    private function sampleStationFor($config)
+    private function testStation($config)
     {
-        $station = $this->stationRepository->firstBySystem((int) $config->system_id);
+        $station = new Station();
+        $station->name = (string) config('constants.STATION.CREDIT_ALERT.TEST_STATION_NAME');
+        $station->system_id = $config->system_id;
+        $station->credits = (float) config('constants.STATION.CREDIT_ALERT.TEST_CREDITS');
 
-        if (filled($station)) {
-            return $station;
-        }
-
-        $sample = new Station();
-        $sample->name = (string) config('constants.STATION.CREDIT_ALERT.TEST_STATION_NAME');
-        $sample->system_id = $config->system_id;
-        $sample->credits = (float) config('constants.STATION.CREDIT_ALERT.TEST_CREDITS');
-
-        return $sample;
+        return $station;
     }
 
     /**

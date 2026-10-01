@@ -158,23 +158,6 @@ class StationRepository
     }
 
     /**
-     * 這個系統底下的第一個站台
-     *
-     * 繳款設定的測試發送用：拿真實站台的名稱與點數，訊息才像真的。
-     *
-     * @param int $systemId
-     * @return Station|null
-     */
-    public function firstBySystem($systemId)
-    {
-        return Station::query()
-            ->select(['id', 'system_id', 'name', 'credits', 'credit_alert_threshold', 'telegram_group_id'])
-            ->where('system_id', (int) $systemId)
-            ->orderBy('id')
-            ->first();
-    }
-
-    /**
      * 依 ID 查詢
      *
      * @param int $id
