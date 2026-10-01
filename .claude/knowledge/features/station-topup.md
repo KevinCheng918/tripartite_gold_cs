@@ -140,6 +140,11 @@ Telegram 通知也是直接轉發主站回傳的 `msg`。
 （change 事件），否則畫面會標著「本月」但日期已經被改成別的範圍。
 「重置」也會清掉標示 —— 它把日期還原成預設的本月，但那不是使用者按的。
 
+⚠ 深色模式的 `.active` 底色要自己補 —— `custom.css` 用
+`background: transparent !important` 把 `btn-outline-secondary` 鎖死，
+只加 class 在深色模式看不出哪顆被選中（淺色模式本來就有）。
+已補在 `custom.css`，詳見 [[feedback-ui-style]]。
+
 ## 相關 migration
 
 - `2026_08_17_000001_create_credit_topup_table.php` — 建表

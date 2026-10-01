@@ -657,6 +657,10 @@ a:hover { color: #85640a; }
 /* 按鈕 */
 [data-theme="dark"] .btn-outline-secondary, [data-theme="dark"] .btn.btn-outline-secondary { color: rgba(255,255,255,0.7) !important; border-color: rgba(212,175,55,0.3) !important; background: transparent !important; }
 [data-theme="dark"] .btn-outline-secondary:hover, [data-theme="dark"] .btn.btn-outline-secondary:hover { background-color: #d4af37 !important; color: #1a1200 !important; border-color: #d4af37 !important; }
+/* 選中態（.active）—— 上面那條用 background: transparent !important 把底色鎖死，
+   不補這條的話深色模式按了也看不出哪顆被選中（淺色模式在 :514 已經有了）。
+   用與 hover 相同的金色：滑開之後選中的那顆仍然是金底，分得出來 */
+[data-theme="dark"] .btn-outline-secondary.active, [data-theme="dark"] .btn.btn-outline-secondary.active { background-color: #d4af37 !important; color: #1a1200 !important; border-color: #d4af37 !important; box-shadow: none !important; }
 [data-theme="dark"] .btn-outline-primary, [data-theme="dark"] .btn.btn-outline-primary { color: #d4af37 !important; border-color: rgba(212,175,55,0.3) !important; background: transparent !important; }
 [data-theme="dark"] .btn-outline-primary:hover, [data-theme="dark"] .btn.btn-outline-primary:hover { background-color: #d4af37 !important; color: #1a1200 !important; border-color: #d4af37 !important; }
 [data-theme="dark"] .btn-outline-info, [data-theme="dark"] .btn.btn-outline-info { color: rgba(255,255,255,0.7) !important; border-color: rgba(212,175,55,0.3) !important; background: transparent !important; }

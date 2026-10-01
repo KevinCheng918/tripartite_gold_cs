@@ -68,6 +68,30 @@ for f in storage/framework/views/*.php; do php -l "$f" | grep -v 'No syntax erro
 
 確認 Modal 裡的「確定刪除」則用實心 `btn btn-danger`（`payment-config`、`finance` 等皆是）。
 
+## 按鈕的「選中」狀態（`.active`）
+
+深色模式下 `custom.css` 這條把底色鎖死了：
+
+```css
+[data-theme="dark"] .btn-outline-secondary { background: transparent !important; }
+```
+
+所以只加 `.active` **在深色模式看不出哪顆被選中** —— 淺色模式有
+（`.btn-outline-secondary.active` → 深色底白字），深色模式原本沒有，
+2026-10-01 在補點紀錄的日期快捷鈕踩到，已補進 `custom.css`：
+
+```css
+[data-theme="dark"] .btn-outline-secondary.active,
+[data-theme="dark"] .btn.btn-outline-secondary.active { background-color: #d4af37 !important; ... }
+```
+
+> ⚠ **在這個專案裡，凡是用 `!important` 鎖死的屬性，任何新的狀態樣式都要
+> 自己補一條權重更高的**，而且要補在被鎖的那條**之後**。
+> 同一類的坑：`btn-check:checked + .btn-outline-secondary`（見 [[station-topup]]）、
+> `.modal` 的 `align-items: flex-start !important`。
+>
+> 加任何「選中／啟用」狀態時，**兩個模式都要看過**。
+
 ## 訊息／確認 Modal 的 markup
 
 **不要用 `modal-dialog-centered`。** 它帶有 `min-height: calc(100% - 1rem)`，
