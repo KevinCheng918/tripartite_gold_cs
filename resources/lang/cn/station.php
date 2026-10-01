@@ -75,6 +75,8 @@ return [
     'topup_field_status'   => '状态',
     'topup_field_requester' => '申请人',
     'topup_field_note'     => '备注',
+    'topup_field_date_from' => '开始日期',
+    'topup_field_date_to'   => '结束日期',
     'topup_status_pending'   => '待审核',
     'topup_status_completed' => '已完成',
     'topup_status_rejected'  => '已拒绝',

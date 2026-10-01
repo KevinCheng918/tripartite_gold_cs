@@ -275,6 +275,120 @@
         push(input.value);
     }
 
+    /**
+     * 日期範圍快捷（今日／昨日／本週／上週／本月／上月）
+     *
+     * 每支都回 `{from, to}` 兩個 `YYYY-MM-DD` 字串，直接塞進
+     * `<input type="date">` 的 value。
+     *
+     * 放在共用檔而不是某一頁：日期範圍篩選到處都會用到（補點紀錄、財務、
+     * 出勤、登入紀錄…），各頁各寫一份週一怎麼算遲早會不一致。
+     *
+     * 「本週」「本月」都是**完整範圍**（週一到週日、1 號到月底），
+     * 跟補點紀錄原本的「預設本月」一致 —— 那支給的是 1 號到月底，
+     * 不是 1 號到今天。
+     *
+     * @type {{today: Function, yesterday: Function, thisWeek: Function,
+     *         lastWeek: Function, thisMonth: Function, lastMonth: Function}}
+     */
+    window.DateRange = (function () {
+        function pad(n) {
+            return (n < 10 ? '0' : '') + n;
+        }
+
+        /**
+         * 格式化成 YYYY-MM-DD
+         *
+         * ⚠ 用本地的 getFullYear/getMonth/getDate 自己組，**不要用
+         * toISOString()** —— 那會先轉成 UTC，台北時間當天上午 8 點以前
+         * 會變成前一天的日期。
+         *
+         * @param {Date} d
+         * @returns {string}
+         */
+        function format(d) {
+            return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+        }
+
+        /**
+         * 今天往前／後推幾天
+         *
+         * @param {number} days
+         * @returns {Date}
+         */
+        function shift(days) {
+            var d = new Date();
+
+            d.setDate(d.getDate() + days);
+
+            return d;
+        }
+
+        /**
+         * 今天距離本週一幾天（往前為負）
+         *
+         * getDay() 是 0=日 … 6=六，所以**週日要往前推 6 天**而不是 1 天 ——
+         * 以週一為一週之始，週日是這週的最後一天。
+         *
+         * @returns {number}
+         */
+        function mondayOffset() {
+            var day = new Date().getDay();
+
+            return day === 0 ? -6 : 1 - day;
+        }
+
+        /**
+         * 整月範圍
+         *
+         * @param {number} offset 0 = 本月，-1 = 上月
+         * @returns {{from: string, to: string}}
+         */
+        function monthRange(offset) {
+            var now = new Date();
+            var month = now.getMonth() + offset;
+
+            // new Date(y, m, 0) 給的是「m 月的前一天」，也就是上個月最後一天
+            return {
+                from: format(new Date(now.getFullYear(), month, 1)),
+                to: format(new Date(now.getFullYear(), month + 1, 0))
+            };
+        }
+
+        /**
+         * 整週範圍
+         *
+         * @param {number} weekOffset 0 = 本週，-1 = 上週
+         * @returns {{from: string, to: string}}
+         */
+        function weekRange(weekOffset) {
+            var start = mondayOffset() + (weekOffset * 7);
+
+            return { from: format(shift(start)), to: format(shift(start + 6)) };
+        }
+
+        /**
+         * 單一天的範圍（起訖同一天）
+         *
+         * @param {number} dayOffset 0 = 今天，-1 = 昨天
+         * @returns {{from: string, to: string}}
+         */
+        function dayRange(dayOffset) {
+            var day = format(shift(dayOffset));
+
+            return { from: day, to: day };
+        }
+
+        return {
+            today: function () { return dayRange(0); },
+            yesterday: function () { return dayRange(-1); },
+            thisWeek: function () { return weekRange(0); },
+            lastWeek: function () { return weekRange(-1); },
+            thisMonth: function () { return monthRange(0); },
+            lastMonth: function () { return monthRange(-1); }
+        };
+    })();
+
     window.TimeSelect = {
         /**
          * 掃描並初始化時間下拉

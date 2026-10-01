@@ -78,6 +78,8 @@ return [
     'topup_field_status'   => 'Status',
     'topup_field_requester' => 'Requester',
     'topup_field_note'     => 'Note',
+    'topup_field_date_from' => 'From',
+    'topup_field_date_to'   => 'To',
     'topup_status_pending'   => 'Pending',
     'topup_status_completed' => 'Completed',
     'topup_status_rejected'  => 'Rejected',

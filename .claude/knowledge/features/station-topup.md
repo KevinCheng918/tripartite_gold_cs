@@ -104,6 +104,42 @@ Telegram 通知也是直接轉發主站回傳的 `msg`。
   因為 `public/css/custom.css:658` 用 `!important` 把 `background: transparent` 鎖死了，
   Bootstrap 原生的選中底色權重不夠會被壓掉。詳見 `features/feedback-ui-style.md`。
 
+## 日期篩選的快捷鈕
+
+篩選區的「開始日期／結束日期」下面有六顆快捷鈕（今日、昨日、本週、上週、
+本月、上月），按下去直接帶入起訖並重新查詢，省掉再按一次搜尋。
+
+### 日期計算在 `common.js`，不在這一頁
+
+`window.DateRange`（`public/js/common.js`）提供這六種範圍，每支回
+`{from, to}` 兩個 `YYYY-MM-DD` 字串。放共用檔的理由：日期範圍篩選到處都會
+用到（財務、出勤、登入紀錄…），各頁各寫一份「本週怎麼算」遲早會不一致。
+
+**其他頁面要加同樣的快捷鈕，只需要放按鈕 + 綁 click，不要再寫一次日期計算。**
+語系也已經備好共用的 `common.date_range.*`（tw / cn / en）。
+
+規則：
+
+- 「本週」是**週一到週日**的完整一週，不是「週一到今天」
+- 「本月」是**1 號到月底**的完整一月 —— 這跟補點紀錄原本的預設值一致，
+  `initTopupDateDefaults()` 已經改成呼叫 `DateRange.thisMonth()`，
+  不再自己算一份
+- 以週一為一週之始，所以 `getDay()` 回 0（週日）時要往前推 **6** 天而不是 1 天
+
+### ⚠ 不要用 `toISOString()` 格式化日期
+
+`DateRange` 內部是用本地的 `getFullYear()` / `getMonth()` / `getDate()`
+自己組字串。`toISOString()` 會先轉成 UTC，**台北時間當天上午 8 點以前
+會變成前一天的日期** —— 早上九點按「今日」會查到昨天。
+
+同一類的坑見 [[2026-09-30-utc-timestamp-display]]。
+
+### 選中狀態
+
+按下的那顆會加 `active`；**手動改動任一個日期欄位就把 `active` 拿掉**
+（change 事件），否則畫面會標著「本月」但日期已經被改成別的範圍。
+「重置」也會清掉標示 —— 它把日期還原成預設的本月，但那不是使用者按的。
+
 ## 相關 migration
 
 - `2026_08_17_000001_create_credit_topup_table.php` — 建表

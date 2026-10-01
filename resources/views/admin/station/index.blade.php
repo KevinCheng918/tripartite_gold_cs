@@ -458,12 +458,28 @@
                     </div>
                     <div class="row g-3 mb-3">
                         <div class="col-md-3 col-6">
-                            <label class="form-label fw-bold">開始日期：</label>
+                            <label class="form-label fw-bold" for="topup-filter-date-from">{{ trans('station.topup_field_date_from') }}：</label>
                             <input type="date" class="form-control" id="topup-filter-date-from">
                         </div>
                         <div class="col-md-3 col-6">
-                            <label class="form-label fw-bold">結束日期：</label>
+                            <label class="form-label fw-bold" for="topup-filter-date-to">{{ trans('station.topup_field_date_to') }}：</label>
                             <input type="date" class="form-control" id="topup-filter-date-to">
+                        </div>
+                        {{-- 日期快捷：按下去直接帶入起訖並重新查詢，省掉再按一次搜尋 --}}
+                        <div class="col-12">
+                            <div class="d-flex flex-wrap gap-1">
+                                @foreach([
+                                    'today'      => 'today',
+                                    'yesterday'  => 'yesterday',
+                                    'thisWeek'   => 'this_week',
+                                    'lastWeek'   => 'last_week',
+                                    'thisMonth'  => 'this_month',
+                                    'lastMonth'  => 'last_month',
+                                ] as $range => $langKey)
+                                    <button type="button" class="btn btn-sm btn-outline-secondary js-topup-date-range"
+                                            data-range="{{ $range }}">{{ trans("common.date_range.{$langKey}") }}</button>
+                                @endforeach
+                            </div>
                         </div>
                     </div>
                     <div class="d-flex justify-content-end gap-2">
@@ -1255,14 +1271,16 @@ $(function () {
         return fixed.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
     }
 
-    // 預設本月日期
+    /*
+     * 預設本月。走 window.DateRange.thisMonth()（common.js）而不是自己算 ——
+     * 「本月」快捷鈕用的是同一支，各算一次遲早會一邊是「1 號到月底」、
+     * 一邊是「1 號到今天」。
+     */
     function initTopupDateDefaults() {
-        var now = new Date();
-        var y = now.getFullYear();
-        var m = ('0' + (now.getMonth() + 1)).slice(-2);
-        var lastDay = new Date(y, now.getMonth() + 1, 0).getDate();
-        $('#topup-filter-date-from').val(y + '-' + m + '-01');
-        $('#topup-filter-date-to').val(y + '-' + m + '-' + ('0' + lastDay).slice(-2));
+        var range = window.DateRange.thisMonth();
+
+        $('#topup-filter-date-from').val(range.from);
+        $('#topup-filter-date-to').val(range.to);
     }
     initTopupDateDefaults();
 
@@ -1532,6 +1550,28 @@ $(function () {
     // 搜尋
     $('#btn-topup-search').on('click', function () { loadTopupList(); });
 
+    // 日期快捷：帶入起訖後直接查，省掉再按一次搜尋
+    $('.js-topup-date-range').on('click', function () {
+        var build = window.DateRange[$(this).data('range')];
+
+        // data-range 打錯字時安靜跳過，不要讓整頁的 JS 掛掉
+        if (typeof build !== 'function') { return; }
+
+        var range = build();
+        $('#topup-filter-date-from').val(range.from);
+        $('#topup-filter-date-to').val(range.to);
+
+        $('.js-topup-date-range').removeClass('active');
+        $(this).addClass('active');
+
+        loadTopupList();
+    });
+
+    // 手動改日期後就不再對應任何快捷範圍，標示要跟著拿掉
+    $('#topup-filter-date-from, #topup-filter-date-to').on('change', function () {
+        $('.js-topup-date-range').removeClass('active');
+    });
+
     // 重置
     $('#btn-topup-reset').on('click', function () {
         $('#topup-filter-system').val('');
@@ -1540,6 +1580,7 @@ $(function () {
         $('#topup-filter-status').val('');
         $('#topup-filter-requester').val('');
         initTopupDateDefaults();
+        $('.js-topup-date-range').removeClass('active');
         loadTopupList();
     });
 

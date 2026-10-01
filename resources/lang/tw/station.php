@@ -87,6 +87,8 @@ return [
     'topup_field_status'   => '狀態',
     'topup_field_requester' => '申請人',
     'topup_field_note'     => '備註',
+    'topup_field_date_from' => '開始日期',
+    'topup_field_date_to'   => '結束日期',
     'topup_status_pending'   => '待審核',
     'topup_status_completed' => '已完成',
     'topup_status_rejected'  => '已拒絕',
