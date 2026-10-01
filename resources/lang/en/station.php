@@ -60,6 +60,7 @@ return [
         'topup_notice_sent'            => 'Top-up notice sent to the customer. Current credit: :credits',
         'topup_notice_above_threshold' => 'credit is above the threshold, sent anyway as requested',
         'topup_notice_no_rate'         => "today's rate is not decided yet, top-up message omitted",
+        'topup_notice_no_template'     => 'this system has no top-up message configured, so none was attached',
         'topup_notice_no_group'        => 'This station has no Telegram group configured',
         'topup_notice_sync_failed'     => 'Failed to sync credits — nothing was sent, to avoid showing a stale number',
         'topup_notice_send_failed'     => 'Failed to send — see the log',

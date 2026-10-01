@@ -195,6 +195,16 @@ class StationCreditAlertService
         $text = $this->renderAlert($settings['template'], $station->name, $credits, $threshold) . $topup;
         $imageUrl = $this->topupImage($station, $topup);
 
+        /*
+         * 補點訊息沒附上的原因要分開回報。
+         *
+         * 「匯率未定」與「這個系統沒填補點訊息」是兩件完全不同的事，
+         * 混成一句話會讓看的人去查錯地方 —— 匯率明明好好的，卻被告知匯率未定。
+         *
+         * 這兩個查詢都走快取（todayRate / paymentConfigs），不會多打 DB。
+         */
+        $config = $this->paymentConfigFor($station);
+
         try {
             $this->sendToStation($station, $text, $imageUrl);
         } catch (\Exception $e) {
@@ -225,12 +235,15 @@ class StationCreditAlertService
         ]);
 
         return [
-            'ok'        => true,
-            'reason'    => null,
-            'credits'   => $credits,
-            'below'     => $credits < $threshold,
-            'has_topup' => filled($topup),
-            'has_image' => filled($imageUrl),
+            'ok'           => true,
+            'reason'       => null,
+            'credits'      => $credits,
+            'below'        => $credits < $threshold,
+            'has_topup'    => filled($topup),
+            'has_image'    => filled($imageUrl),
+            // 沒附補點訊息時，這兩個才看得出是哪一邊缺
+            'has_rate'     => filled($this->todayRate()),
+            'has_template' => filled($config) && filled($config->topup_template),
         ];
     }
 
@@ -741,6 +754,8 @@ class StationCreditAlertService
          * 匯率報價訊息也是這樣顯示，同一個數字在兩個地方要長一樣。
          */
         return "\n\n" . strtr($config->topup_template, [
+            // 不補零的 10/1 而不是 10/01 —— 對客訊息習慣這樣寫
+            '{date}'    => now()->format('n/j'),
             '{rate}'    => NumberPresenter::trimZeros($rate, 4),
             '{usdt}'    => $this->usdtForBaseCredit($rate),
             '{content}' => (string) $config->content,

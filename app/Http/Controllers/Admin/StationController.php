@@ -222,8 +222,18 @@ class StationController extends Controller
             $notes[] = trans('station.msg.topup_notice_above_threshold');
         }
 
+        /*
+         * 沒附補點訊息時要講對原因。
+         *
+         * 「匯率未定」與「這個系統沒填補點訊息」是兩件不同的事 ——
+         * 一律回報成匯率問題的話，看的人會去查匯率，但匯率可能好好的。
+         */
         if (Arr::get($result, 'has_topup') !== true) {
-            $notes[] = trans('station.msg.topup_notice_no_rate');
+            if (Arr::get($result, 'has_template') !== true) {
+                $notes[] = trans('station.msg.topup_notice_no_template');
+            } elseif (Arr::get($result, 'has_rate') !== true) {
+                $notes[] = trans('station.msg.topup_notice_no_rate');
+            }
         }
 
         return response()->json([

@@ -60,6 +60,7 @@ return [
         'topup_notice_sent'            => '补点通知已发送给客户，当前点数 :credits',
         'topup_notice_above_threshold' => '点数高于门槛，仍依您的指示发送',
         'topup_notice_no_rate'         => '今日汇率尚未决定，未附补点讯息',
+        'topup_notice_no_template'     => '此系统的缴款设定尚未填写补点讯息，未附补点讯息',
         'topup_notice_no_group'        => '此站台未设定 Telegram 群组，没有地方可以发',
         'topup_notice_sync_failed'     => '点数同步失败，没有发送（避免送出过期的数字）',
         'topup_notice_send_failed'     => '发送失败，详见 log',
