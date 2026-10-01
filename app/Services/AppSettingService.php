@@ -41,6 +41,9 @@ class AppSettingService
     // 每日匯率報價（匯率頁維護）
     const KEY_DAILY_RATE_TEMPLATE = 'daily_rate.ask_template';
 
+    // 餘點告警後面接的補點訊息（繳款設定頁維護，今日匯率已定時才會附上）
+    const KEY_CREDIT_ALERT_TOPUP_TEMPLATE = 'station_credit.topup_template';
+
     // 站台餘點告警（繳款設定頁維護）
     const KEY_CREDIT_ALERT_TEMPLATE      = 'station_credit.alert_template';
     const KEY_CREDIT_ALERT_THRESHOLD     = 'station_credit.threshold';

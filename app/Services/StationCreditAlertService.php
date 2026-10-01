@@ -59,6 +59,7 @@ class StationCreditAlertService
     private $paymentConfigService;
     private $chatService;
     private $supportGroup;
+    private $dailyRateService;
 
     public function __construct(
         StationRepository $stationRepository,
@@ -68,7 +69,8 @@ class StationCreditAlertService
         AppSettingService $appSettingService,
         PaymentConfigService $paymentConfigService,
         TelegramChatService $chatService,
-        SupportGroupService $supportGroup
+        SupportGroupService $supportGroup,
+        DailyRateService $dailyRateService
     ) {
         $this->stationRepository = $stationRepository;
         $this->topupRepository = $topupRepository;
@@ -79,6 +81,8 @@ class StationCreditAlertService
         $this->paymentConfigService = $paymentConfigService;
         $this->chatService = $chatService;
         $this->supportGroup = $supportGroup;
+        // 補點訊息要帶今日匯率，匯率還沒定就不附
+        $this->dailyRateService = $dailyRateService;
     }
 
     /**
@@ -144,8 +148,23 @@ class StationCreditAlertService
                 AppSettingService::KEY_CREDIT_ALERT_COOLDOWN_DAYS,
                 (int) $defaults['COOLDOWN_DAYS']
             ),
-            'template' => $this->alertTemplate(),
+            'template'       => $this->alertTemplate(),
+            'topup_template' => $this->topupTemplate(),
         ];
+    }
+
+    /**
+     * 補點訊息的公版（繳款設定頁維護，沒設過就用 constants 的預設）
+     *
+     * @return string
+     */
+    public function topupTemplate()
+    {
+        $template = $this->appSettingService->get(AppSettingService::KEY_CREDIT_ALERT_TOPUP_TEMPLATE);
+
+        return filled($template)
+            ? $template
+            : (string) config('constants.STATION.CREDIT_ALERT.TOPUP_TEMPLATE');
     }
 
     /**
@@ -296,7 +315,8 @@ class StationCreditAlertService
             return $this->result($station, $threshold, false, null, self::SKIP_NO_TARGET);
         }
 
-        $text = $this->renderAlert($settings['template'], $station->name, $credits, $threshold);
+        $text = $this->renderAlert($settings['template'], $station->name, $credits, $threshold)
+            . $this->topupMessage($station);
 
         // 發到內部群組的兩種情境（沒設群組／有待審核）各自要先說明為什麼沒發給客戶
         if ($target !== self::TARGET_STATION) {
@@ -503,6 +523,32 @@ class StationCreditAlertService
         }
 
         return $this->supportGroup->isConfigured() ? self::TARGET_INTERNAL : null;
+    }
+
+    /**
+     * 餘點告警後面接的補點訊息
+     *
+     * ⚠ **只有今天的匯率已經決定時才附上。**
+     *
+     * 匯率還沒定（含凌晨到早上報價前、或報了還沒人回覆）就只發告警 ——
+     * 沒有匯率的補點訊息對客戶沒有意義，他不知道要匯多少台幣；
+     * 而附一個過期的昨日匯率更糟。
+     *
+     * @param Station $station
+     * @return string 不附時回空字串，直接接在告警後面不會多出空行
+     */
+    private function topupMessage(Station $station)
+    {
+        $rate = $this->dailyRateService->todayRate();
+
+        if (blank($rate)) {
+            return '';
+        }
+
+        return strtr($this->topupTemplate(), [
+            '{rate}'    => $this->formatCredits($rate),
+            '{station}' => $station->name,
+        ]);
     }
 
     /**

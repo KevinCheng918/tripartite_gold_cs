@@ -24,6 +24,9 @@ class UpdateAlertSettingRequest extends FormRequest
         return [
             'alert_template' => 'required|string|max:' . config('rules.TELEGRAM_TEMPLATE_MAX'),
 
+            // 補點訊息可以留空（不想附的話），所以是 nullable
+            'topup_template' => 'nullable|string|max:' . config('rules.TELEGRAM_TEMPLATE_MAX'),
+
             /*
              * 點數是 decimal(15,2)，門檻用 numeric 才能跟它對得起來。
              *
@@ -42,6 +45,9 @@ class UpdateAlertSettingRequest extends FormRequest
         return [
             'alert_template.required' => trans('payment_config.msg.alert_template_required'),
             'alert_template.max'      => trans('payment_config.msg.alert_template_max', [
+                'value' => config('rules.TELEGRAM_TEMPLATE_MAX'),
+            ]),
+            'topup_template.max'      => trans('payment_config.msg.topup_template_max', [
                 'value' => config('rules.TELEGRAM_TEMPLATE_MAX'),
             ]),
             'threshold.required'      => trans('payment_config.msg.alert_threshold_required'),
