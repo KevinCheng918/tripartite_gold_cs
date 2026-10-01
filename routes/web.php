@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AccountController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\DailyRateController;
 use App\Http\Controllers\Admin\LoginLogController;
 use App\Http\Controllers\Admin\ShiftController;
 use App\Http\Controllers\Admin\StationController;
@@ -279,6 +280,14 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/', [LoginLogController::class, 'index'])->middleware('can:login_log.view')->name('index');
         Route::get('/ajax-list', [LoginLogController::class, 'ajaxList'])->middleware('can:login_log.view')->name('ajax-list');
         Route::get('/ajax-my-log', [LoginLogController::class, 'ajaxMyLog'])->name('ajax-my-log');
+    });
+
+    // 每日匯率
+    Route::prefix('daily-rate')->name('daily-rate.')->group(function () {
+        Route::get('/', [DailyRateController::class, 'index'])->middleware('can:daily_rate.view')->name('index');
+        Route::post('/ajax-update-rate', [DailyRateController::class, 'ajaxUpdateRate'])->middleware('can:daily_rate.manage')->name('ajax-update-rate');
+        Route::post('/ajax-update-template', [DailyRateController::class, 'ajaxUpdateTemplate'])->middleware('can:daily_rate.manage')->name('ajax-update-template');
+        Route::post('/ajax-preview-template', [DailyRateController::class, 'ajaxPreviewTemplate'])->middleware('can:daily_rate.view')->name('ajax-preview-template');
     });
 
     // Web Push 訂閱

@@ -18,6 +18,7 @@ return [
         'leave_request' => '請假管理',
         'task_board' => '任務看板',
         'login_log' => '登入紀錄',
+        'daily_rate' => '每日匯率',
         'setting' => '全域設定',
     ],
     'dashboard' => [
@@ -101,6 +102,10 @@ return [
     'leave_request' => [
         'apply'  => '申請請假',
         'review' => '審核請假',
+    ],
+    'daily_rate' => [
+        'view'   => '檢視每日匯率',
+        'manage' => '設定匯率與公版',
     ],
     'task_board' => [
         'view'           => '檢視任務看板',

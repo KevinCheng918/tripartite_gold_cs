@@ -417,6 +417,109 @@ class DailyRateService
     }
 
     // ---------------------------------------------------------------
+    //  後台
+    // ---------------------------------------------------------------
+
+    /**
+     * 歷史報價（新的在前）
+     *
+     * @param int $perPage
+     * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
+     */
+    public function history($perPage = 30)
+    {
+        return $this->rateRepository->paginate($perPage);
+    }
+
+    /**
+     * 後台手動設定某一天的匯率
+     *
+     * 報錯了要能改，也可能某天 Telegram 那邊沒人回、直接在後台補。
+     * 那天還沒有紀錄就建一筆（例如補登過去某天）。
+     *
+     * @param string   $date Y-m-d
+     * @param float    $rate
+     * @param int|null $userId 操作者
+     * @return \App\Models\DailyRate
+     */
+    public function setRate($date, $rate, $userId = null)
+    {
+        $record = $this->rateRepository->firstOrCreateByDate($date);
+        $previous = $record->rate;
+
+        $this->rateRepository->update($record, [
+            'rate'       => (float) $rate,
+            'replied_by' => $userId,
+            'replied_at' => now(),
+        ]);
+
+        Log::info('後台手動設定匯率', [
+            'date'     => $date,
+            'rate'     => (float) $rate,
+            'previous' => $previous,
+            'user_id'  => $userId,
+        ]);
+
+        return $record;
+    }
+
+    /**
+     * 報價公版（後台沒設過就回 constants 的預設）
+     *
+     * @return string
+     */
+    public function askTemplate()
+    {
+        $template = $this->appSettingService->get(AppSettingService::KEY_DAILY_RATE_TEMPLATE);
+
+        return filled($template)
+            ? $template
+            : (string) config('constants.DAILY_RATE.ASK_TEMPLATE');
+    }
+
+    /**
+     * 存報價公版
+     *
+     * @param string   $template
+     * @param int|null $userId
+     * @return void
+     */
+    public function saveAskTemplate($template, $userId = null)
+    {
+        $this->appSettingService->put(AppSettingService::KEY_DAILY_RATE_TEMPLATE, $template, $userId);
+    }
+
+    /**
+     * 公版套用變數後的樣子（後台預覽用）
+     *
+     * 用今天那筆的實際數字；今天還沒報價就用市場現值試算，
+     * 讓人看得出「明天早上送出去會長怎樣」。
+     *
+     * @param string $template
+     * @return string
+     */
+    public function previewAskText($template)
+    {
+        $record = $this->rateRepository->findByDate(now()->toDateString());
+
+        if (blank($record) || blank($record->suggested_rate)) {
+            $market = $this->usdtRateService->getRateWithHistory();
+            $avgRate = (float) Arr::get($market, 'avg_rate', 0);
+
+            $record = new DailyRate([
+                'date'           => now()->toDateString(),
+                'reference_rate' => $avgRate > 0 ? $avgRate : null,
+                'suggested_rate' => $this->suggestFrom($avgRate) ?: null,
+            ]);
+            $record->date = now();
+        }
+
+        $previous = $this->rateRepository->latestDecided(now()->toDateString());
+
+        return $this->renderAskText($template, $record, $previous);
+    }
+
+    // ---------------------------------------------------------------
     //  文案
     // ---------------------------------------------------------------
 
@@ -431,12 +534,22 @@ class DailyRateService
      */
     private function buildAskText(DailyRate $record, $previous)
     {
-        $template = $this->appSettingService->get(AppSettingService::KEY_DAILY_RATE_TEMPLATE);
+        return $this->renderAskText($this->askTemplate(), $record, $previous);
+    }
 
-        if (blank($template)) {
-            $template = (string) config('constants.DAILY_RATE.ASK_TEMPLATE');
-        }
-
+    /**
+     * 把公版套上變數
+     *
+     * 跟 buildAskText 分開是為了讓後台預覽走同一支 ——
+     * 預覽看到的排版必須就是實際送出去的排版。
+     *
+     * @param string         $template
+     * @param DailyRate      $record
+     * @param DailyRate|null $previous
+     * @return string
+     */
+    private function renderAskText($template, DailyRate $record, $previous)
+    {
         return strtr($template, [
             '{date}'           => $record->date->format('Y/m/d'),
             '{reference}'      => filled($record->reference_rate) ? $this->format($record->reference_rate) : '取不到',

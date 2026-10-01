@@ -1,7 +1,7 @@
 # 每日匯率報價
 
-> 狀態：**後端已完成，管理頁施工中**。待跑 migration、待建題庫那一題、
-> 待需求方提供正式公版。
+> 狀態：**已完成**。上線前還要做三件事：跑 migration、跑
+> `DailyRateQuickReplySeeder` 建題庫那一題、把正式公版貼進匯率頁。
 
 每天早上 9 點在內部支援群組報匯率，由自己人回覆決定當日對客報價；
 沒回就每 30 分鐘提醒並 tag 主管；客人在匯率還沒定下來時問，先請他稍候。
@@ -192,6 +192,31 @@ floor(3229 / 10) / 10 = 32.2      // ← 報價變成 32.2，少報 0.1
 | `app/Services/AutoReplyService.php` | 送出答案前攔截匯率題 |
 | `config/constants.php` | 報價訊息、提醒訊息、對客的「稍後回覆」文案 |
 | 題庫 | 建一題匯率題並標 `import_key` |
+
+## 匯率頁（後台）
+
+`admin/daily-rate`，權限 `daily_rate.view` / `daily_rate.manage`。
+
+- **今日匯率**：大字顯示，還沒決定時會說明「客人問會先請他稍候」
+- **歷史**：每天一列，含 4H 均價、建議值、誰決定的、提醒了幾次
+- **手動修改**：平常匯率從 Telegram 回覆決定，這裡用來改錯或補登
+  （可以補過去的日期，但擋未來 —— 明天的匯率要等明天早上報）
+- **報價公版**：改完可以預覽。預覽走後端的 `previewAskText()`，
+  **看到的排版就是實際送出去的** —— 變數替換只有一份實作（`renderAskText()`）
+
+公版存 `app_setting` 的 `daily_rate.ask_template`，沒設定過就用
+`constants.DAILY_RATE.ASK_TEMPLATE`。
+
+## 上線前要做的三件事
+
+1. `php artisan migrate`
+2. `php artisan db:seed --class=DailyRateQuickReplySeeder` —— 建題庫那一題。
+   已經建過的不會覆蓋，題目與答案的文字之後可以隨意潤飾
+   （認的是 `import_key`，不是文字）
+3. 把正式公版貼進匯率頁
+
+另外 **內部支援群組必須先設定**（`auto_reply.support_chat_id`），
+否則 9 點的報價送不出去，只會記一筆 warning。
 
 ## 相關
 

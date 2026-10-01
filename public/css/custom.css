@@ -838,6 +838,19 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .badge.bg-primary { background: rgba(99,102,241,0.15) !important; color: #a5b4fc !important; }
 [data-theme="dark"] .badge.bg-secondary { background: rgba(255,255,255,0.1) !important; color: rgba(255,255,255,0.7) !important; }
 
+/* 每日匯率：今日那個大數字 */
+.dr-today-rate {
+    font-size: 2rem;
+    font-weight: 600;
+    line-height: 1.2;
+}
+/* 還沒決定時不要用大數字的氣勢，縮小並轉成提示色 */
+.dr-today-pending {
+    font-size: 1.25rem;
+    color: #a67c00;
+}
+[data-theme="dark"] .dr-today-pending { color: #d4af37; }
+
 /* 繳款設定：內容框與公版框
    淺色樣式原本寫在 blade 的 inline style，深色只在下面覆寫 ——
    改 class 就得同時翻兩個檔案，所以把淺色也收進來，blade 只掛 class */

@@ -18,6 +18,7 @@ return [
         'leave_request' => '请假管理',
         'task_board' => '任务看板',
         'login_log' => '登录记录',
+        'daily_rate' => '每日汇率',
         'setting' => '全局设置',
     ],
     'dashboard' => [
@@ -101,6 +102,10 @@ return [
     'leave_request' => [
         'apply'  => '申请请假',
         'review' => '审核请假',
+    ],
+    'daily_rate' => [
+        'view'   => '查看每日汇率',
+        'manage' => '设定汇率与公版',
     ],
     'task_board' => [
         'view'           => '查看任务看板',

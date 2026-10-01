@@ -162,6 +162,14 @@ return [
         ],
     ],
 
+    'daily_rate' => [
+        'label' => 'permission.group.daily_rate',
+        'keywords' => [
+            'daily_rate.view'   => 'permission.daily_rate.view',
+            'daily_rate.manage' => 'permission.daily_rate.manage',
+        ],
+    ],
+
     'task_board' => [
         'label' => 'permission.group.task_board',
         'keywords' => [

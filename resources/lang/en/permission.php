@@ -18,6 +18,7 @@ return [
         'leave_request' => 'Leave Management',
         'task_board' => 'Task Board',
         'login_log' => 'Login Log',
+        'daily_rate' => 'Daily Rate',
         'setting' => 'Global Settings',
     ],
     'dashboard' => [
@@ -101,6 +102,10 @@ return [
     'leave_request' => [
         'apply'  => 'Apply for leave',
         'review' => 'Review leave requests',
+    ],
+    'daily_rate' => [
+        'view'   => 'View daily rate',
+        'manage' => 'Set rate & template',
     ],
     'task_board' => [
         'view'           => 'View task board',

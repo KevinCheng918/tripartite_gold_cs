@@ -299,6 +299,14 @@
                                 </a>
                             </li>
                             @endif
+                            @if(Auth::user()->hasPermission('daily_rate.view'))
+                            <li>
+                                <a href="{{ route('admin.daily-rate.index') }}" class="{{ request()->routeIs('admin.daily-rate.*') ? 'mm-active' : '' }}">
+                                    <i class="metismenu-icon fas fa-money-bill-trend-up"></i>
+                                    {{ trans('daily_rate.nav_label') }}
+                                </a>
+                            </li>
+                            @endif
                             @if(Auth::user()->hasPermission('telegram_chat.broadcast'))
                             <li>
                                 <a href="{{ route('admin.telegram-broadcast.index') }}" class="{{ request()->routeIs('admin.telegram-broadcast.*') ? 'mm-active' : '' }}">
