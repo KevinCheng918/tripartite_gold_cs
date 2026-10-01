@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Station;
+use App\Repositories\CreditTopupRepository;
 use App\Repositories\StationRepository;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
@@ -47,7 +48,11 @@ class StationCreditAlertService
     /** @var string 發送目標：內部支援群組（站台沒設群組時的退路） */
     const TARGET_INTERNAL = 'internal';
 
+    /** @var string 發送目標：內部支援群組（有補點單還沒審核，改催自己人） */
+    const TARGET_INTERNAL_PENDING = 'internal_pending';
+
     private $stationRepository;
+    private $topupRepository;
     private $stationService;
     private $mainSystemApi;
     private $appSettingService;
@@ -57,6 +62,7 @@ class StationCreditAlertService
 
     public function __construct(
         StationRepository $stationRepository,
+        CreditTopupRepository $topupRepository,
         StationService $stationService,
         MainSystemApiService $mainSystemApi,
         AppSettingService $appSettingService,
@@ -65,6 +71,7 @@ class StationCreditAlertService
         SupportGroupService $supportGroup
     ) {
         $this->stationRepository = $stationRepository;
+        $this->topupRepository = $topupRepository;
         $this->stationService = $stationService;
         // 只有空跑會直接用它（不寫 DB）；正常跑一律走 StationService::syncInfo()
         $this->mainSystemApi = $mainSystemApi;
@@ -271,19 +278,30 @@ class StationCreditAlertService
             return $this->result($station, $threshold, false, null, self::SKIP_COOLDOWN);
         }
 
-        $target = $this->targetFor($station);
+        /*
+         * 已經有補點單在等審核的話，客戶該做的都做了 ——
+         * 再發「請補充點數」是在催一件他已經做完的事，真正卡住的是我們還沒審核。
+         */
+        $pendingTopups = $this->topupRepository->countPendingByStation($station->id);
+        $target = $this->targetFor($station, $pendingTopups);
 
         if (blank($target)) {
             Log::warning('站台餘點低於門檻，但沒有可發送的群組', [
-                'station_id' => $station->id,
-                'station'    => $station->name,
-                'credits'    => $credits,
+                'station_id'     => $station->id,
+                'station'        => $station->name,
+                'credits'        => $credits,
+                'pending_topups' => $pendingTopups,
             ]);
 
             return $this->result($station, $threshold, false, null, self::SKIP_NO_TARGET);
         }
 
         $text = $this->renderAlert($settings['template'], $station->name, $credits, $threshold);
+
+        // 發到內部群組的兩種情境（沒設群組／有待審核）各自要先說明為什麼沒發給客戶
+        if ($target !== self::TARGET_STATION) {
+            $text = $this->internalPrefix($station, $target, $pendingTopups) . $text;
+        }
 
         if ($dryRun) {
             return $this->result($station, $threshold, false, $target, null, $text);
@@ -304,10 +322,15 @@ class StationCreditAlertService
     private function send(Station $station, $threshold, $target, $text)
     {
         try {
-            if ($target === self::TARGET_INTERNAL) {
-                $this->sendToInternal($station, $text);
-            } else {
+            /*
+             * 只有 TARGET_STATION 會送到客戶那邊，其餘（沒設群組的退路、
+             * 有補點單待審核）一律進內部群組 —— 說明的前綴在 handleStation
+             * 就依 target 組好了，這裡只負責送。
+             */
+            if ($target === self::TARGET_STATION) {
                 $this->sendToStation($station, $text);
+            } else {
+                $this->supportGroup->send($text);
             }
         } catch (\Exception $e) {
             Log::error('站台餘點告警發送失敗', [
@@ -357,25 +380,6 @@ class StationCreditAlertService
             (string) config('constants.STATION.CREDIT_ALERT.SENDER_NAME'),
             ['mark_replied' => false, 'is_auto' => true]
         );
-    }
-
-    /**
-     * 發到內部支援群組（站台沒設群組時的退路）
-     *
-     * 前面加一段說明，否則客服會以為客戶已經收到了。
-     *
-     * @param Station $station
-     * @param string  $text
-     * @return void
-     */
-    private function sendToInternal(Station $station, $text)
-    {
-        $prefix = $this->paymentConfigService->renderTemplate(
-            (string) config('constants.STATION.CREDIT_ALERT.INTERNAL_PREFIX'),
-            ['station' => $station->name]
-        );
-
-        $this->supportGroup->send("{$prefix}{$text}");
     }
 
     // ---------------------------------------------------------------
@@ -477,19 +481,52 @@ class StationCreditAlertService
     /**
      * 這則告警要發到哪裡
      *
-     * 站台有自己的群組就發給客戶；沒有的話退到內部支援群組，
-     * 讓客服知道要手動通知。兩邊都沒有就沒得發。
+     * 1. **有補點單在等審核** → 內部群組。客戶已經申請了，再催他沒有意義，
+     *    該催的是我們自己去審核。內部群組沒設定就不發 —— 這種情況**不會**
+     *    退回去發給客戶，那正是要避免的事
+     * 2. 站台有自己的群組 → 發給客戶
+     * 3. 沒有群組 → 退到內部群組，讓客服手動通知
+     * 4. 都沒有 → 沒得發
      *
      * @param Station $station
+     * @param int     $pendingTopups 這個站台還沒審核的補點單數
      * @return string|null
      */
-    private function targetFor(Station $station)
+    private function targetFor(Station $station, $pendingTopups = 0)
     {
+        if ($pendingTopups > 0) {
+            return $this->supportGroup->isConfigured() ? self::TARGET_INTERNAL_PENDING : null;
+        }
+
         if (filled($station->telegram_group_id)) {
             return self::TARGET_STATION;
         }
 
         return $this->supportGroup->isConfigured() ? self::TARGET_INTERNAL : null;
+    }
+
+    /**
+     * 發到內部群組時，前面那段「為什麼沒發給客戶」的說明
+     *
+     * 用 strtr 而不是 PaymentConfigService::renderTemplate() ——
+     * 這段是系統內部文案（客服不會去後台改它），不需要繳款公版那一整組變數，
+     * 也不該為了 {count} 去汙染那邊的變數清單。
+     *
+     * @param Station $station
+     * @param string  $target
+     * @param int     $pendingTopups
+     * @return string
+     */
+    private function internalPrefix(Station $station, $target, $pendingTopups)
+    {
+        $key = $target === self::TARGET_INTERNAL_PENDING
+            ? 'INTERNAL_PENDING_PREFIX'
+            : 'INTERNAL_PREFIX';
+
+        return strtr((string) config("constants.STATION.CREDIT_ALERT.{$key}"), [
+            '{station}' => $station->name,
+            '{count}'   => $pendingTopups,
+        ]);
     }
 
     // ---------------------------------------------------------------

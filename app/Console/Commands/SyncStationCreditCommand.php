@@ -155,9 +155,7 @@ class SyncStationCreditCommand extends Command
             }
 
             $station = Arr::get($row, 'station');
-            $target = Arr::get($row, 'target') === StationCreditAlertService::TARGET_INTERNAL
-                ? '內部支援群組'
-                : '站台群組';
+            $target = $this->targetLabel($row);
 
             $this->line('');
             $this->warn("── {$station} → {$target} ──");
@@ -234,6 +232,31 @@ class SyncStationCreditCommand extends Command
     }
 
     /**
+     * 發送目標的說明文字
+     *
+     * 抽出來是因為兩個地方都要印，而且每多一種 target 就得兩邊都改 ——
+     * 漏掉一邊的話，新的 target 會被當成「站台群組」顯示，
+     * 看起來像是發給了客戶（實際上沒有）。
+     *
+     * @param array $row
+     * @return string
+     */
+    private function targetLabel($row)
+    {
+        $target = Arr::get($row, 'target');
+
+        if ($target === StationCreditAlertService::TARGET_INTERNAL_PENDING) {
+            return '內部支援群組（有補點單待審核）';
+        }
+
+        if ($target === StationCreditAlertService::TARGET_INTERNAL) {
+            return '內部支援群組';
+        }
+
+        return '站台群組';
+    }
+
+    /**
      * 單一站台的結果說明
      *
      * @param array $row
@@ -241,9 +264,7 @@ class SyncStationCreditCommand extends Command
      */
     private function statusLabel($row)
     {
-        $target = Arr::get($row, 'target') === StationCreditAlertService::TARGET_INTERNAL
-            ? '內部支援群組'
-            : '站台群組';
+        $target = $this->targetLabel($row);
 
         if (Arr::get($row, 'alerted') === true) {
             return "已告警 → {$target}";
