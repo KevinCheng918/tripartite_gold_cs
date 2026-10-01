@@ -157,8 +157,15 @@ class SyncStationCreditCommand extends Command
             $station = Arr::get($row, 'station');
             $target = $this->targetLabel($row);
 
+            $image = Arr::get($row, 'image_url');
+
             $this->line('');
             $this->warn("── {$station} → {$target} ──");
+
+            if (filled($image)) {
+                $this->line("［附圖］{$image}");
+            }
+
             $this->line($text);
         }
     }

@@ -52,6 +52,28 @@ class StationCreditAlertService
     /** @var string 發送目標：內部支援群組（有補點單還沒審核，改催自己人） */
     const TARGET_INTERNAL_PENDING = 'internal_pending';
 
+    /**
+     * 今日匯率
+     *
+     * 一輪告警會掃過所有站台，但「今天的匯率」只有一個 —— 每站各查一次是
+     * 白做工。查一次記著，整輪共用。
+     *
+     * ⚠ 初始值是 **false** 不是 null：`null` 是合法結果（今天還沒決定匯率），
+     * 用 null 當「還沒查過」會變成每次都重查。
+     *
+     * @var float|null|false
+     */
+    private $todayRate = false;
+
+    /**
+     * 系統 id => 繳款設定
+     *
+     * 同一個系統底下的站台共用同一筆繳款設定，不必每個站台都去查一次。
+     *
+     * @var array
+     */
+    private $paymentConfigs = [];
+
     private $stationRepository;
     private $topupRepository;
     private $stationService;
@@ -301,19 +323,21 @@ class StationCreditAlertService
             return $this->result($station, $threshold, false, null, self::SKIP_NO_TARGET);
         }
 
-        $text = $this->renderAlert($settings['template'], $station->name, $credits, $threshold)
-            . $this->topupMessage($station);
+        $topup = $this->topupMessage($station);
+        $text = $this->renderAlert($settings['template'], $station->name, $credits, $threshold) . $topup;
 
         // 發到內部群組的兩種情境（沒設群組／有待審核）各自要先說明為什麼沒發給客戶
         if ($target !== self::TARGET_STATION) {
             $text = $this->internalPrefix($station, $target, $pendingTopups) . $text;
         }
 
+        $imageUrl = $this->topupImage($station, $topup);
+
         if ($dryRun) {
-            return $this->result($station, $threshold, false, $target, null, $text);
+            return $this->result($station, $threshold, false, $target, null, $text, $imageUrl);
         }
 
-        return $this->send($station, $threshold, $target, $text);
+        return $this->send($station, $threshold, $target, $text, $imageUrl);
     }
 
     /**
@@ -325,16 +349,19 @@ class StationCreditAlertService
      * @param string  $text
      * @return array
      */
-    private function send(Station $station, $threshold, $target, $text)
+    private function send(Station $station, $threshold, $target, $text, $imageUrl = null)
     {
         try {
             /*
              * 只有 TARGET_STATION 會送到客戶那邊，其餘（沒設群組的退路、
              * 有補點單待審核）一律進內部群組 —— 說明的前綴在 handleStation
              * 就依 target 組好了，這裡只負責送。
+             *
+             * 圖只跟著給客戶的那則走：內部群組是要客服去處理事情，
+             * 再附一張付款地址圖沒有幫助。
              */
             if ($target === self::TARGET_STATION) {
-                $this->sendToStation($station, $text);
+                $this->sendToStation($station, $text, $imageUrl);
             } else {
                 $this->supportGroup->send($text);
             }
@@ -370,7 +397,7 @@ class StationCreditAlertService
      * @param string  $text
      * @return void
      */
-    private function sendToStation(Station $station, $text)
+    private function sendToStation(Station $station, $text, $imageUrl = null)
     {
         /*
          * mark_replied = false：這是系統主動發的通知，
@@ -384,7 +411,7 @@ class StationCreditAlertService
             $text,
             null,
             (string) config('constants.STATION.CREDIT_ALERT.SENDER_NAME'),
-            ['mark_replied' => false, 'is_auto' => true]
+            ['mark_replied' => false, 'is_auto' => true, 'image_url' => $imageUrl]
         );
     }
 
@@ -525,7 +552,7 @@ class StationCreditAlertService
      */
     private function topupMessage(Station $station)
     {
-        $rate = $this->dailyRateService->todayRate();
+        $rate = $this->todayRate();
 
         if (blank($rate)) {
             return '';
@@ -553,6 +580,34 @@ class StationCreditAlertService
             '{usdt}'    => $this->usdtForBaseCredit($rate),
             '{content}' => (string) $config->content,
         ]);
+    }
+
+    /**
+     * 補點訊息要附的圖
+     *
+     * 就是繳款設定的那張圖（付款地址、二次確認提醒之類），
+     * 跟虛擬機繳費通知用的是同一張、同一個欄位。
+     *
+     * **只有真的附了補點訊息時才給圖** —— 單獨一張付款地址圖配著
+     * 「點數不足」的告警，客戶會看不懂那張圖在幹嘛。
+     *
+     * @param Station $station
+     * @param string  $topupText topupMessage() 的結果，空字串表示沒附補點訊息
+     * @return string|null
+     */
+    private function topupImage(Station $station, $topupText)
+    {
+        if (blank($topupText)) {
+            return null;
+        }
+
+        $config = $this->paymentConfigFor($station);
+
+        if (blank($config) || blank($config->image)) {
+            return null;
+        }
+
+        return asset('storage/' . $config->image);
     }
 
     /**
@@ -599,7 +654,31 @@ class StationCreditAlertService
             return null;
         }
 
-        return $this->paymentConfigService->getActiveBySystem((int) $station->system_id)->first();
+        $systemId = (int) $station->system_id;
+
+        // 用 array_key_exists 而不是 isset：查過但沒設定時存的是 null，
+        // isset 會判成「沒查過」而每次重查
+        if (!array_key_exists($systemId, $this->paymentConfigs)) {
+            $this->paymentConfigs[$systemId] = $this->paymentConfigService
+                ->getActiveBySystem($systemId)
+                ->first();
+        }
+
+        return $this->paymentConfigs[$systemId];
+    }
+
+    /**
+     * 今日匯率（整輪只查一次）
+     *
+     * @return float|null
+     */
+    private function todayRate()
+    {
+        if ($this->todayRate === false) {
+            $this->todayRate = $this->dailyRateService->todayRate();
+        }
+
+        return $this->todayRate;
     }
 
     /**
@@ -641,7 +720,7 @@ class StationCreditAlertService
      * @param string|null $text    告警內容（dry-run 預覽用）
      * @return array
      */
-    private function result(Station $station, $threshold, $alerted, $target, $reason = null, $text = null)
+    private function result(Station $station, $threshold, $alerted, $target, $reason = null, $text = null, $imageUrl = null)
     {
         return [
             'station_id' => $station->id,
@@ -652,6 +731,8 @@ class StationCreditAlertService
             'target'     => $target,
             'reason'     => $reason,
             'text'       => $text,
+            // 空跑要看得出會不會附圖，否則得真的發一次才知道
+            'image_url'  => $imageUrl,
         ];
     }
 
