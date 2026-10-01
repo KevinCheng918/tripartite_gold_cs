@@ -85,11 +85,48 @@ per-station 的門檻覆寫在 `station.credit_alert_threshold`，填在站台�
 | 情境 | 處理 |
 |---|---|
 | API 掛掉 / 逾時 / 回非成功狀態 | `syncInfo()` 回 `null` → **跳過，絕不拿上次的舊點數判斷** |
+| **站台不收費** | 餘點不會被扣，發告警只會讓客戶困惑 → 跳過（見下） |
 | 站台與內部群組都沒設 | 記 warning 後跳過 |
 | 站台停用 / 凍結 | `getForCreditSync()` 只撈 `status=1` |
 | **啟用中但沒設 api_url / api_key** | 在 SQL 就被篩掉 → 另外撈出來印訊息 + 記 warning（見下） |
 | 連日低於門檻 | 冷卻天數控制 |
 | 發送噴錯 | 逐站 try/catch，**不寫 `credit_alerted_at`**，下一輪會重試 |
+
+### 不收費的站台不告警
+
+判斷依據是主系統 API 回的兩個開關 —— 站台詳細資訊頁把費率顯示成「不收費」
+用的也是同一組（見 `station/index.blade.php` 的 `depositRateText` / `withdrawRateText`）：
+
+| 欄位 | 意思 |
+|---|---|
+| `withholding_system` | 代收的手續費由系統代扣 |
+| `withdraw_withholding_system` | 代付的手續費由系統代扣 |
+
+**代扣才會消耗系統餘點。** 兩邊都不代扣的站台，餘點根本不會減少，
+對它發「點數不足將導致系統自動停用後台」只會讓客戶困惑。
+
+- 只要**有一邊**收費就要告警 —— 餘點是共用的，一邊扣就會見底
+- 代付另外看 `withdraw`：代付功能本身沒開啟時，它的代扣開關沒有意義
+
+⚠ 判斷用的是 **API 剛回的 `$info`**，不是 `$station->settings` ——
+後者在空跑時沒有被更新，會是上一次同步的舊值。
+
+#### 「明確不收費」與「API 沒給這個欄位」要分開
+
+`isCharged()` 對空陣列會回 `false`，也就是**沒有收費資訊時當作不收費**
+（寧可漏報也不要誤發給客戶）。但這帶來一個風險：主系統哪天改了欄位名或
+版本不同，**每個站台**都會被判成不收費，整個告警功能就靜默失效了。
+
+所以 `hasChargeInfo()` 用 `Arr::has()` 區分兩者 —— 要分的是「key 存不存在」，
+不是「值是不是空」。明確設成 `false` 的站台 key 是存在的，那是正常的不收費；
+key 整個不見才記 warning：
+
+```
+local.WARNING: 主系統 API 沒有回收費設定，無法判斷是否該告警
+{"station_id":2,"station":"LV","keys":["admin_credit","system_rate", ...]}
+```
+
+`keys` 一起記下來，方便對照主系統到底回了什麼。
 
 ### 「沒設 API」跟「跳過」不是同一件事
 

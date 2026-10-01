@@ -30,6 +30,7 @@ class SyncStationCreditCommand extends Command
     /** @var array 跳過原因對應的說明文字 */
     private const REASON_LABELS = [
         StationCreditAlertService::SKIP_SYNC_FAILED     => '主系統 API 沒回資料，跳過（不拿舊點數判斷）',
+        StationCreditAlertService::SKIP_NOT_CHARGED     => '不收費，餘點不會被扣',
         StationCreditAlertService::SKIP_ABOVE_THRESHOLD => '點數充足',
         StationCreditAlertService::SKIP_COOLDOWN        => '冷卻期內，不重複告警',
         StationCreditAlertService::SKIP_NO_TARGET       => '沒有可發送的群組（站台與內部支援群組都沒設）',

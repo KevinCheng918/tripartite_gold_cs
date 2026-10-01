@@ -26,6 +26,9 @@ class StationCreditAlertService
     /** @var string 跳過原因：主系統 API 沒回資料 */
     const SKIP_SYNC_FAILED = 'sync_failed';
 
+    /** @var string 跳過原因：這個站台不收費，系統餘點不會被扣 */
+    const SKIP_NOT_CHARGED = 'not_charged';
+
     /** @var string 跳過原因：點數還在門檻之上 */
     const SKIP_ABOVE_THRESHOLD = 'above_threshold';
 
@@ -235,6 +238,31 @@ class StationCreditAlertService
             $station->credits = $credits;
         }
 
+        /*
+         * 不收費的站台不告警。
+         *
+         * 判斷放在點數算完之後而不是更前面：這樣結果表格上仍看得到它有多少點，
+         * 只是標明「不收費」—— 短路省下的只是兩個 Arr::get，不值得犧牲可讀性。
+         */
+        if (!$this->isCharged($info)) {
+            /*
+             * 「欄位明確是 false」與「API 根本沒回這個欄位」都會走到這裡，
+             * 但後者是另一回事 —— 主系統改了欄位名或版本不同的話，
+             * **每個站台**都會被判成不收費，整個告警功能就靜默失效了。
+             *
+             * 所以這種情況記一筆，不要讓它無聲無息。
+             */
+            if (!$this->hasChargeInfo($info)) {
+                Log::warning('主系統 API 沒有回收費設定，無法判斷是否該告警', [
+                    'station_id' => $station->id,
+                    'station'    => $station->name,
+                    'keys'       => array_keys($info),
+                ]);
+            }
+
+            return $this->result($station, $threshold, false, null, self::SKIP_NOT_CHARGED);
+        }
+
         if ($credits >= $threshold) {
             return $this->result($station, $threshold, false, null, self::SKIP_ABOVE_THRESHOLD);
         }
@@ -353,6 +381,56 @@ class StationCreditAlertService
     // ---------------------------------------------------------------
     //  判斷
     // ---------------------------------------------------------------
+
+    /**
+     * 這個站台會不會扣系統餘點（也就是「有沒有收費」）
+     *
+     * 站台詳細資訊頁把費率顯示成「不收費」的依據就是這兩個開關
+     * （見 station/index.blade.php 的 depositRateText / withdrawRateText）：
+     *
+     * | 欄位 | 意思 |
+     * |---|---|
+     * | `withholding_system`          | 代收的手續費由系統代扣 |
+     * | `withdraw_withholding_system` | 代付的手續費由系統代扣 |
+     *
+     * 代扣才會消耗系統餘點。兩邊都不代扣的站台，餘點根本不會減少 ——
+     * 對它發「點數不足將導致系統自動停用後台」只會讓客戶困惑。
+     *
+     * 只要有一邊收費就要告警（餘點是共用的，一邊扣就會見底）。
+     * 代付另外看 `withdraw`：代付功能本身沒開啟時，它的代扣開關沒有意義。
+     *
+     * ⚠ 判斷用的是 API 剛回的 `$info`，不是 `$station->settings` ——
+     * 後者在空跑時沒有被更新，會是上一次同步的舊值。
+     *
+     * @param array $info 主系統 API 回的 data 區塊
+     * @return bool
+     */
+    private function isCharged($info)
+    {
+        if ((bool) Arr::get($info, 'withholding_system') === true) {
+            return true;
+        }
+
+        $withdrawEnabled = (bool) Arr::get($info, 'withdraw');
+
+        return $withdrawEnabled && (bool) Arr::get($info, 'withdraw_withholding_system') === true;
+    }
+
+    /**
+     * API 的回傳裡到底有沒有收費設定
+     *
+     * 用 `Arr::has()` 而不是 `filled()` —— 要分的是「key 存不存在」，
+     * 不是「值是不是空」。明確設成 `false` 的站台 key 是存在的，
+     * 那是正常的「不收費」；key 整個不見才是 API 層面的問題。
+     *
+     * @param array $info
+     * @return bool
+     */
+    private function hasChargeInfo($info)
+    {
+        return Arr::has($info, 'withholding_system')
+            || Arr::has($info, 'withdraw_withholding_system');
+    }
 
     /**
      * 這個站台適用的門檻
