@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Station;
+use App\Presenters\NumberPresenter;
 use App\Repositories\CreditTopupRepository;
 use App\Repositories\StationRepository;
 use Illuminate\Support\Arr;
@@ -530,9 +531,9 @@ class StationCreditAlertService
             return '';
         }
 
-        $template = $this->topupTemplateFor($station);
+        $config = $this->paymentConfigFor($station);
 
-        if (blank($template)) {
+        if (blank($config) || blank($config->topup_template)) {
             return '';
         }
 
@@ -542,33 +543,63 @@ class StationCreditAlertService
          * 公版是客服在表單裡打的，不會（也不該要求他們）自己在開頭留空行 ——
          * 不加的話補點訊息會直接黏在告警的最後一行後面。
          */
-        return "\n\n" . strtr($template, [
-            '{rate}'    => $this->formatCredits($rate),
-            '{station}' => $station->name,
+        /*
+         * 匯率用 trimZeros 而不是 formatCredits：
+         * 點數固定兩位小數（16390.94），匯率則是去尾零（30.5 而不是 30.50）——
+         * 匯率報價訊息也是這樣顯示，同一個數字在兩個地方要長一樣。
+         */
+        return "\n\n" . strtr($config->topup_template, [
+            '{rate}'    => NumberPresenter::trimZeros($rate, 4),
+            '{usdt}'    => $this->usdtForBaseCredit($rate),
+            '{content}' => (string) $config->content,
         ]);
     }
 
     /**
-     * 這個站台所屬系統的補點訊息公版
+     * 補一筆基準點數需要多少 USDT
      *
-     * 跟著繳款設定走（payment_config.topup_template）而不是全域一份 ——
-     * **不同系統的收款方式不一樣**，補點訊息要講的匯款資訊自然也不同。
+     * 基準是 `constants.STATION.CREDIT_ALERT.TOPUP_USDT_BASE`（預設 50000 點）。
      *
-     * 同一個系統有多筆繳款設定時取第一筆啟用的，與繳款通知的取法一致
+     * **無條件進位到整數** —— 進位的那個零頭是我們這邊收，
+     * 四捨五入會讓一半的情況少收。例：
+     *
+     *     50000 / 31.9 = 1567.398…  →  1568
+     *     50000 / 32   = 1562.5     →  1563
+     *     50000 / 25   = 2000       →  2000（整除就不動）
+     *
+     * @param float $rate 今日匯率
+     * @return string
+     */
+    private function usdtForBaseCredit($rate)
+    {
+        $base = (float) config('constants.STATION.CREDIT_ALERT.TOPUP_USDT_BASE');
+
+        if ($rate <= 0 || $base <= 0) {
+            return '—';
+        }
+
+        return (string) (int) ceil($base / $rate);
+    }
+
+    /**
+     * 這個站台所屬系統的繳款設定
+     *
+     * 補點訊息跟著繳款設定走而不是全域一份 —— **不同系統的收款方式不一樣**，
+     * 要講的匯款資訊自然也不同。
+     *
+     * 同一個系統有多筆時取第一筆啟用的，與繳款通知的取法一致
      * （見 VmController::ajaxSendPaymentNotice）。
      *
      * @param Station $station
-     * @return string|null 沒設定、或這個系統沒有繳款設定時回 null（就不附加）
+     * @return \App\Models\PaymentConfig|null
      */
-    private function topupTemplateFor(Station $station)
+    private function paymentConfigFor(Station $station)
     {
         if (blank($station->system_id)) {
             return null;
         }
 
-        $config = $this->paymentConfigService->getActiveBySystem((int) $station->system_id)->first();
-
-        return filled($config) ? $config->topup_template : null;
+        return $this->paymentConfigService->getActiveBySystem((int) $station->system_id)->first();
     }
 
     /**
