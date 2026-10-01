@@ -72,6 +72,15 @@ return [
     'ignore_wrong_hint'     => 'username 填错不会有任何错误讯息，只是不会生效。可以看讯息上有没有出现「不自动回覆」标签来确认',
     'ignore_hint'           => '名单里的人发言时，讯息照常收、照常通知，只是系统不会自动回覆，需要人工处理',
 
+    // 后台帐号一律不自动回覆（唯读区块）
+    'staff_section'         => '内部人员（所有对话自动套用）',
+    'staff_readonly'        => '唯读',
+    'staff_hint'            => '这份名单跟着帐号管理走，不在这里增减。状态为「正常」的帐号才会被屏蔽，锁定与停用的不算',
+    'staff_permanent_hint'  => '系统已记下这个人的 Telegram 身分，他改掉 username 也认得',
+    'staff_empty'           => '目前没有帐号填写 Telegram 帐号',
+    'staff_missing'         => '这 :count 个帐号还没填 Telegram 帐号，他们发言不会被屏蔽：:names',
+    'staff_missing_action'  => '请到帐号管理补上',
+
     'msg' => [
         'required'         => '此栏位为必填',
         'group_not_found'  => '群组不存在',

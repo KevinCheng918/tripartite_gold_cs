@@ -56,6 +56,11 @@
 同一天還修了另一個同類問題：[[2026-09-30-btn-outline-info-light-mode]]
 （只補了深色模式、漏掉淺色模式）。兩件事是一體兩面。
 
+> ⚠️ **後記（2026-10-01）**：上面診斷出的「`.bg-light` 缺深色配對」當時沒有補，
+> 只替題庫頁自訂了 `.qr-badge` 繞過去 —— 剩下三處 `badge bg-light text-muted`
+> 原封不動，後來在對話視窗的「不自動回覆」標籤上又被看到一次。
+> 配對規則已補在 `custom.css`，見 [[2026-10-01-badge-bg-light-dark-mode]]。
+
 ## 異動檔案
 
 - `public/css/app.css` — `.qr-badge` / `.qr-badge--phrasing`

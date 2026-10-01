@@ -838,6 +838,23 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .badge.bg-primary { background: rgba(99,102,241,0.15) !important; color: #a5b4fc !important; }
 [data-theme="dark"] .badge.bg-secondary { background: rgba(255,255,255,0.1) !important; color: rgba(255,255,255,0.7) !important; }
 
+/*
+ * bg-light 的深色配對（補的是「白底亮字」那個洞）
+ *
+ * `.badge.bg-light text-muted` 是專案裡中性小標籤的通用寫法：訊息上的
+ * 「不自動回覆」、忽略名單的「手動」、題庫與快速回覆面板的句數。
+ *
+ * 深色模式下 `.text-muted` 被改成白色 40%，而 `.bg-light` 原本只有
+ * `.tg-group-item` / `.qr-category-item` 兩個特例有覆寫 ——
+ * 其餘一律維持白底，配上亮灰字等於整顆標籤消失。
+ *
+ * 顏色沿用上面 `.bg-secondary` 那條，中性標籤在深色模式該長一樣。
+ * 特異性（attr + 2 class）高於 `[data-theme="dark"] .text-muted`，
+ * 所以 color 吃得到，不必再去動那四個使用點。
+ */
+[data-theme="dark"] .badge.bg-light { background: rgba(255,255,255,0.1) !important; color: rgba(255,255,255,0.7) !important; }
+[data-theme="dark"] .badge.bg-light.border { border-color: rgba(255,255,255,0.18) !important; }
+
 /* 每日匯率：今日那個大數字 */
 .dr-today-rate {
     font-size: 2rem;

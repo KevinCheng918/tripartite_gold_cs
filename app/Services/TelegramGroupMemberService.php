@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\TelegramGroupMember;
+use App\Presenters\TelegramUsernamePresenter;
 use App\Repositories\TelegramGroupMemberRepository;
 use Carbon\Carbon;
 use Illuminate\Support\Arr;
@@ -250,40 +251,50 @@ class TelegramGroupMemberService
     }
 
     /**
-     * 取得這個對話的忽略名單顯示名稱
+     * 取得這個對話「不自動回覆」的顯示名稱
      *
      * 訊息上的灰色標籤用的 —— 訊息本身沒有存發話者 ID（不動大表），
      * 只能拿顯示名稱去比。對方改名後標籤會不準，但那只是視覺提示；
      * 要不要自動回覆是收訊當下用 ID／username 判的，一定準。
      *
-     * @param int $groupId
+     * 兩個來源都要標，否則客服會看到「我方同事發言卻沒自動回、也沒標籤」
+     * 而以為系統壞了：
+     *
+     *   1. 這個對話自己的忽略名單
+     *   2. `$staffUsernames`（後台帳號那份全域名單）在名冊上對到的人
+     *
+     * @param int   $groupId
+     * @param array $staffUsernames 已正規化的 username；空的就只看這個對話
      * @return array
      */
-    public function getIgnoredNames($groupId)
+    public function getIgnoredNames($groupId, array $staffUsernames = [])
     {
-        return $this->memberRepository->getIgnoredNames($groupId)
-            ->pluck('display_name')
-            ->values()
-            ->all();
+        $names = $this->memberRepository->getIgnoredNames($groupId)->pluck('display_name');
+
+        if (filled($staffUsernames)) {
+            $names = $names->merge(
+                $this->memberRepository->getNamesByUsernames($groupId, $staffUsernames)
+                    ->pluck('display_name')
+            );
+        }
+
+        // 同一個人可能兩邊都在（同事又被手動加進這個對話的名單）
+        return $names->unique()->values()->all();
     }
 
     /**
      * username 正規化：去掉開頭的 @、轉小寫
      *
-     * 存跟比對都走這一支，否則 `@Abc` 與 `abc` 會被當成兩個人。
+     * 實作在 TelegramUsernamePresenter —— StaffIgnoreService 也要同一套規則，
+     * 兩邊各寫一份只要分岔一次就會開始漏人。這裡保留這支方法是因為
+     * 既有呼叫端（Controller、本類別）都是走它。
      *
      * @param string|null $username
      * @return string|null
      */
     public function normalizeUsername($username)
     {
-        if (blank($username)) {
-            return null;
-        }
-
-        $normalized = mb_strtolower(ltrim(trim($username), '@'));
-
-        return filled($normalized) ? $normalized : null;
+        return TelegramUsernamePresenter::normalize($username);
     }
 
     /**

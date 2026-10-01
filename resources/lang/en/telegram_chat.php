@@ -72,6 +72,15 @@ return [
     'ignore_wrong_hint'     => 'A wrong username produces no error, it simply will not take effect. Check whether the "No auto-reply" tag appears on their messages',
     'ignore_hint'           => 'Messages from excluded members are still received and still notify you. Only the automatic reply is skipped, so they need a manual response',
 
+    // Staff accounts are never auto-replied to (read-only section)
+    'staff_section'         => 'Internal staff (applies to every conversation)',
+    'staff_readonly'        => 'Read-only',
+    'staff_hint'            => 'This list follows Account Management and cannot be edited here. Only accounts in Normal status are excluded — Locked and Deactivated ones are not',
+    'staff_permanent_hint'  => 'Their Telegram ID is on record, so they stay recognised even after changing username',
+    'staff_empty'           => 'No account has a Telegram username yet',
+    'staff_missing'         => ':count account(s) have no Telegram username, so they will not be excluded: :names',
+    'staff_missing_action'  => 'Please fill it in under Account Management',
+
     'msg' => [
         'required'         => 'Required',
         'group_not_found'  => 'Group not found',

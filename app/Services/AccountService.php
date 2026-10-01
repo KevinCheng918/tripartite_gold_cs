@@ -16,10 +16,13 @@ use Illuminate\Support\Facades\DB;
 class AccountService
 {
     private $userRepository;
+    private $staffIgnoreService;
 
-    public function __construct(UserRepository $userRepository)
+    public function __construct(UserRepository $userRepository, StaffIgnoreService $staffIgnoreService)
     {
         $this->userRepository = $userRepository;
+        // 帳號的 Telegram 身分與狀態一變，「後台帳號不自動回覆」的名單要跟著變
+        $this->staffIgnoreService = $staffIgnoreService;
     }
 
     /**
@@ -124,9 +127,25 @@ class AccountService
             $attributes['telegram_username'] = filled($username) ? $username : null;
         }
 
-        return DB::transaction(function () use ($user, $attributes) {
+        $updated = DB::transaction(function () use ($user, $attributes) {
             return $this->userRepository->update($user, $attributes);
         });
+
+        /*
+         * 清掉「後台帳號不自動回覆」的名單快取。
+         *
+         * 這支是唯一會動 `telegram_username` 與 `status` 的地方 —— 不清的話，
+         * 剛填好 Telegram 帳號的同事最久要等快取過期（10 分鐘）才會被屏蔽，
+         * 剛停用的人也還會被繼續屏蔽。
+         *
+         * 不去比對「這次有沒有真的改到那兩個欄位」：判斷的成本比
+         * 一次 Cache::forget 還高，而帳號編輯本來就不是高頻動作。
+         *
+         * 放在 transaction 之後 —— 要先確定真的寫進去了才讓名單重讀。
+         */
+        $this->staffIgnoreService->forgetCache();
+
+        return $updated;
     }
 
     /**

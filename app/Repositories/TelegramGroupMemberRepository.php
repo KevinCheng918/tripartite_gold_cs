@@ -56,6 +56,33 @@ class TelegramGroupMemberRepository
     }
 
     /**
+     * 名冊上指定 username 的那些人的顯示名稱
+     *
+     * 「後台帳號一律不自動回覆」的灰標籤用的：那份名單存的是 username，
+     * 而訊息上只有顯示名稱，要先在名冊裡把兩者對起來。
+     *
+     * 名冊存的 username 已經正規化過（小寫、不含 @），所以傳進來的也要是
+     * 正規化後的值 —— 呼叫端走 TelegramUsernamePresenter。
+     *
+     * @param int   $groupId
+     * @param array $usernames 已正規化
+     * @return Collection
+     */
+    public function getNamesByUsernames($groupId, array $usernames)
+    {
+        if (blank($usernames)) {
+            return new Collection();
+        }
+
+        return TelegramGroupMember::query()
+            ->select(['display_name'])
+            ->where('telegram_group_id', $groupId)
+            ->whereIn('username', $usernames)
+            ->whereNotNull('display_name')
+            ->get();
+    }
+
+    /**
      * 取得這個對話已忽略的成員（Modal 用，含設定者）
      *
      * @param int $groupId

@@ -19,6 +19,9 @@
     // 「發言過的人」整批留著，搜尋框就在這批裡過濾，不為了搜尋再打一次後端
     var recentMembers = [];
     var recentDays = 30;
+    // 後台帳號那份全域名單（唯讀）與認不出身分的帳號
+    var staffMembers = [];
+    var staffMissing = [];
 
     T.openIgnorePanel = function (groupId) {
         if (!groupId) { return; }
@@ -41,6 +44,8 @@
             .then(function (body) {
                 recentMembers = body.recent || [];
                 recentDays = body.recent_days || recentDays;
+                staffMembers = body.staff || [];
+                staffMissing = body.staff_missing || [];
                 render(body.ignored || []);
             })
             .catch(function () {
@@ -59,6 +64,8 @@
             '<div class="alert alert-light border py-2 mb-3" style="font-size:0.8125rem">' +
             '<i class="fas fa-info-circle me-1 text-muted"></i>' + T.escapeHtml(T.i18n.ignore_hint) +
             '</div>' +
+
+            buildStaffHtml() +
 
             '<div class="fw-bold mb-2" style="font-size:0.875rem">' +
             T.escapeHtml(T.i18n.ignore_section_ignored) + '</div>' +
@@ -89,6 +96,59 @@
 
         setBody(html);
         bindEvents();
+    }
+
+    /**
+     * 內部人員（後台帳號）唯讀區塊
+     *
+     * 擺在最上面：它是全域生效的，先讓人知道「這些人本來就不會被自動回」，
+     * 下面那份每對話名單才是要手動維護的部分。
+     *
+     * 這一段沒有任何按鈕 —— 名單跟著帳號管理走。不標清楚的話，客服會以為
+     * 下面的「恢復」能把同事放回自動回覆的範圍。
+     *
+     * @return {string}
+     */
+    function buildStaffHtml() {
+        var chips = staffMembers.length
+            ? staffMembers.map(function (s) {
+                // 已回填 Telegram ID 的人改掉 username 也認得，標出來讓人知道哪些最穩
+                var permanent = s.has_user_id
+                    ? '<i class="fas fa-fingerprint ms-1" title="' +
+                      T.escapeHtml(T.i18n.staff_permanent_hint) + '"></i>'
+                    : '';
+
+                return '<span class="badge bg-light text-muted border" ' +
+                    'style="font-size:0.75rem;font-weight:400">' +
+                    T.escapeHtml(s.nickname) +
+                    (s.username ? ' <span class="text-muted">' + T.escapeHtml(s.username) + '</span>' : '') +
+                    permanent + '</span>';
+            }).join('')
+            : '<span class="text-muted" style="font-size:0.8125rem">' +
+              T.escapeHtml(T.i18n.staff_empty) + '</span>';
+
+        var missing = staffMissing.length
+            ? '<div class="alert alert-warning py-2 mt-2 mb-0" style="font-size:0.75rem">' +
+              '<i class="fas fa-exclamation-triangle me-1"></i>' +
+              T.escapeHtml(T.i18n.staff_missing
+                  .replace(':count', staffMissing.length)
+                  .replace(':names', staffMissing.join('、'))) +
+              ' <strong>' + T.escapeHtml(T.i18n.staff_missing_action) + '</strong>' +
+              '</div>'
+            : '';
+
+        return '<div class="border rounded-3 p-3 mb-4">' +
+            '<div class="d-flex align-items-center justify-content-between mb-2">' +
+            '<span class="fw-bold" style="font-size:0.875rem">' +
+            T.escapeHtml(T.i18n.staff_section) + '</span>' +
+            '<span class="badge bg-light text-muted border" style="font-size:0.6875rem;font-weight:400">' +
+            T.escapeHtml(T.i18n.staff_readonly) + '</span>' +
+            '</div>' +
+            '<div class="d-flex flex-wrap gap-1 mb-2">' + chips + '</div>' +
+            '<div class="text-muted" style="font-size:0.75rem">' +
+            T.escapeHtml(T.i18n.staff_hint) + '</div>' +
+            missing +
+            '</div>';
     }
 
     /**

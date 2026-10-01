@@ -277,6 +277,9 @@ class UserRepository
      * Telegram 那邊傳來的 username 不帶 @，而後台可能填成 `@name` 或 `name`，
      * 所以兩邊都去掉 @ 再比。大小寫不敏感 —— Telegram 的 username 本來就是。
      *
+     * 帶 `telegram_user_id` 是給 StaffIgnoreService 的回填用的：
+     * 它要判斷這筆有沒有補過 ID，少了這欄會每次都重寫一遍。
+     *
      * @param string|null $username
      * @return User|null
      */
@@ -289,9 +292,60 @@ class UserRepository
         }
 
         return User::query()
-            ->select(['id', 'nickname', 'telegram_username', 'level', 'status'])
+            ->select(['id', 'nickname', 'telegram_username', 'telegram_user_id', 'level', 'status'])
             ->whereRaw('LOWER(TRIM(LEADING "@" FROM telegram_username)) = ?', [mb_strtolower($clean)])
             ->first();
+    }
+
+    /**
+     * 不自動回覆的後台帳號（有 Telegram 身分的那些）
+     *
+     * 「後台帳號一律不自動回覆」的名單來源。只撈**正常狀態**的帳號 ——
+     * 鎖定（可登入但不能報班）與停用都不在內，離職或停權的人發言時
+     * 系統照常自動回覆。
+     *
+     * 條件是「有 username **或**有回填過的 ID」：回填過 ID 的人即使後來
+     * 把 username 清空，仍然認得出來。
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getTelegramIdentitiesForAutoReply()
+    {
+        return User::query()
+            ->select(['id', 'nickname', 'telegram_username', 'telegram_user_id'])
+            ->where('status', config('constants.USER.STATUS.NORMAL'))
+            ->where(function ($query) {
+                $query->where(function ($sub) {
+                    $sub->whereNotNull('telegram_username')
+                        ->where('telegram_username', '!=', '');
+                })->orWhereNotNull('telegram_user_id');
+            })
+            ->orderBy('nickname')
+            ->get();
+    }
+
+    /**
+     * 正常狀態、但認不出 Telegram 身分的帳號
+     *
+     * 面板要列出來提醒去補 —— 這些人在客戶群組發言時不會被屏蔽，
+     * 系統會把他們當成客人來自動回覆。
+     *
+     * 回填過 ID 的人即使沒填 username 也認得出來，所以不算在內。
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getMissingTelegramIdentity()
+    {
+        return User::query()
+            ->select(['id', 'nickname'])
+            ->where('status', config('constants.USER.STATUS.NORMAL'))
+            ->whereNull('telegram_user_id')
+            ->where(function ($query) {
+                $query->whereNull('telegram_username')
+                    ->orWhere('telegram_username', '');
+            })
+            ->orderBy('nickname')
+            ->get();
     }
 
     /**

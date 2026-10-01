@@ -64,6 +64,17 @@ return [
         ],
 
         /*
+         * 後台帳號一律不自動回覆（見 StaffIgnoreService）
+         *
+         * 跟上面的 IGNORE 分開：那個是每個對話一份名單（key 帶 group_id），
+         * 這個是全域共用的一份（固定 key）。兩者並存，任一命中就不自動回。
+         */
+        'STAFF_IGNORE' => [
+            'CACHE_KEY'     => 'tg_staff_ignore_keys',
+            'CACHE_SECONDS' => 600,
+        ],
+
+        /*
          * 客人只傳媒體沒打字時，寫進 content 的替代文字。
          *
          * 刻意不放語系檔：這會存進資料庫成為訊息紀錄的一部分，

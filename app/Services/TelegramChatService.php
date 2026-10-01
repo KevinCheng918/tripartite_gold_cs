@@ -28,6 +28,7 @@ class TelegramChatService
     private $sharedFileRepository;
     private $ticketRepository;
     private $memberService;
+    private $staffIgnoreService;
     private $progressService;
 
     public function __construct(
@@ -38,6 +39,7 @@ class TelegramChatService
         SharedFileRepository $sharedFileRepository,
         AutoReplyTicketRepository $ticketRepository,
         TelegramGroupMemberService $memberService,
+        StaffIgnoreService $staffIgnoreService,
         AutoReplyProgressService $progressService
     ) {
         $this->telegramRepository = $telegramRepository;
@@ -47,6 +49,8 @@ class TelegramChatService
         $this->sharedFileRepository = $sharedFileRepository;
         $this->ticketRepository = $ticketRepository;
         $this->memberService = $memberService;
+        // 後台帳號的全域屏蔽；與 memberService 的每對話名單並存
+        $this->staffIgnoreService = $staffIgnoreService;
         $this->progressService = $progressService;
     }
 
@@ -333,9 +337,16 @@ class TelegramChatService
         // 自動回覆丟佇列處理：Claude Code CLI 要跑數秒到數十秒，
         // webhook 同步等下去會逾時，Telegram 會重送而造成重複回覆
         //
-        // isAutoReplyOn() 是欄位判斷，排在忽略名單查詢前面 ——
-        // 沒開自動回覆的對話完全不會去讀名單
-        if ($group->isAutoReplyOn() && filled($rawText) && !$this->memberService->isIgnored($group->id, $from)) {
+        /*
+         * 三個判斷的順序是刻意的，由便宜到貴：
+         *
+         * 1. isAutoReplyOn()  欄位判斷，沒開自動回覆的對話什麼名單都不讀
+         * 2. isStaff()        後台帳號名單，**所有對話共用同一個快取 key**
+         * 3. isIgnored()      每個對話一個 key，命中 2 就不必再去碰它
+         */
+        if ($group->isAutoReplyOn() && filled($rawText)
+            && !$this->staffIgnoreService->isStaff($from)
+            && !$this->memberService->isIgnored($group->id, $from)) {
             AutoReplyJob::dispatch($group->id, $rawText, $msg->id);
         }
     }

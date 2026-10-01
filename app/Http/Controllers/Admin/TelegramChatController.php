@@ -9,11 +9,13 @@ use App\Http\Requests\TelegramChat\SendFileRequest;
 use App\Http\Requests\TelegramChat\ToggleAutoReplyRequest;
 use App\Http\Requests\TelegramChat\ToggleIgnoreMemberRequest;
 use App\Http\Resources\GroupMemberResource;
+use App\Http\Resources\StaffIgnoreResource;
 use App\Http\Resources\TelegramMessageResource;
 use App\Services\AutoReplyService;
 use App\Services\ImageUploadService;
 use App\Services\QuickReplyService;
 use App\Services\SharedFileService;
+use App\Services\StaffIgnoreService;
 use App\Services\TelegramChatService;
 use App\Services\TelegramGroupMemberService;
 use Illuminate\Http\Request;
@@ -35,6 +37,7 @@ class TelegramChatController extends Controller
     private $imageUploadService;
     private $autoReplyService;
     private $memberService;
+    private $staffIgnoreService;
 
     public function __construct(
         TelegramChatService $chatService,
@@ -42,7 +45,8 @@ class TelegramChatController extends Controller
         QuickReplyService $quickReplyService,
         ImageUploadService $imageUploadService,
         AutoReplyService $autoReplyService,
-        TelegramGroupMemberService $memberService
+        TelegramGroupMemberService $memberService,
+        StaffIgnoreService $staffIgnoreService
     ) {
         $this->chatService = $chatService;
         $this->sharedFileService = $sharedFileService;
@@ -50,6 +54,7 @@ class TelegramChatController extends Controller
         $this->imageUploadService = $imageUploadService;
         $this->autoReplyService = $autoReplyService;
         $this->memberService = $memberService;
+        $this->staffIgnoreService = $staffIgnoreService;
     }
 
     /**
@@ -108,11 +113,20 @@ class TelegramChatController extends Controller
 
         $panel = $this->memberService->getPanel($params['group_id']);
 
+        /*
+         * 後台帳號那份全域名單一起回 —— 它是「誰不會被自動回覆」的另一半，
+         * 分到兩個地方只會讓客服找不到。面板上是唯讀的，不開修改端點。
+         */
+        $staff = $this->staffIgnoreService->getPanel();
+
         return response()->json([
             'ignored' => GroupMemberResource::collection($panel['ignored']),
             'recent'  => GroupMemberResource::collection($panel['recent']),
             // 清單標題要寫「近 N 天」，天數是後端設定的，不讓前端自己寫死一份
             'recent_days' => (int) config('constants.TELEGRAM.IGNORE.RECENT_DAYS'),
+            'staff' => StaffIgnoreResource::collection($staff['staff']),
+            // 認不出 Telegram 身分的帳號：面板要提醒去補，否則他們發言會被當成客人
+            'staff_missing' => $staff['missing']->pluck('nickname')->values()->all(),
         ]);
     }
 
@@ -193,10 +207,19 @@ class TelegramChatController extends Controller
         // 點進對話自動標為已讀
         $this->chatService->markAsRead($groupId);
 
-        // 被設為不自動回覆的人，訊息上要標出來讓客服知道這則要自己回。
-        // 跟著訊息一起回，不另開路由 —— 標籤是狀態揭露，沒有管理權限的人也該看得到
+        /*
+         * 被設為不自動回覆的人，訊息上要標出來讓客服知道這則要自己回。
+         * 跟著訊息一起回，不另開路由 —— 標籤是狀態揭露，沒有管理權限的人也該看得到。
+         *
+         * 兩份名單都要標：這個對話自己的，以及後台帳號那份全域的。
+         */
+        $ignoredNames = $this->memberService->getIgnoredNames(
+            $groupId,
+            $this->staffIgnoreService->usernames()
+        );
+
         return TelegramMessageResource::collection($messages)
-            ->additional(['ignored_names' => $this->memberService->getIgnoredNames($groupId)]);
+            ->additional(['ignored_names' => $ignoredNames]);
     }
 
     /**

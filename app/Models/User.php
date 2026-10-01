@@ -24,6 +24,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property int         $level             身份（見 constants.USER.LEVEL）
  * @property string|null $telegram_nickname Telegram 對話署名，簽在客戶訊息結尾
  * @property string|null $telegram_username Telegram 帳號（不含 @），內部群組提醒時用來 tag 本人
+ * @property int|null    $telegram_user_id  Telegram 使用者 ID，首次比對命中時自動回填（見 StaffIgnoreService）
  * @property string|null $deleted_at        軟刪除時間
  */
 class User extends Authenticatable
