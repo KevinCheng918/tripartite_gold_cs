@@ -111,6 +111,15 @@ per-station 的門檻覆寫在 `station.credit_alert_threshold`，填在站台�
 ⚠ 判斷用的是 **API 剛回的 `$info`**，不是 `$station->settings` ——
 後者在空跑時沒有被更新，會是上一次同步的舊值。
 
+> ⚠ **布林設定不能用 `filled()` 判斷。**
+>
+> 專案規則是「空值判斷一律 `filled`/`blank`」，但布林是例外 ——
+> `filled(false)` 是 **`true`**（`blank()` 對 bool 一律回 `false`），
+> 拿它當開關會把「關閉」讀成「開啟」。這類值一律 `(bool)` cast 後直接判斷。
+>
+> 同一個坑的另一面：`filled(0)` 也是 `true`、`blank(0)` 是 `false` ——
+> 門檻填 `0` 能被當成「這站不告警」就是靠這個行為（見 `thresholdFor()`）。
+
 #### 「明確不收費」與「API 沒給這個欄位」要分開
 
 `isCharged()` 對空陣列會回 `false`，也就是**沒有收費資訊時當作不收費**

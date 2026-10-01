@@ -407,13 +407,19 @@ class StationCreditAlertService
      */
     private function isCharged($info)
     {
-        if ((bool) Arr::get($info, 'withholding_system') === true) {
+        if ((bool) Arr::get($info, 'withholding_system')) {
             return true;
         }
 
+        /*
+         * 不能用 filled() 判斷這幾個值 —— `filled(false)` 是 **true**
+         * （blank 對 bool 一律回 false），拿它當開關會把「關閉」讀成「開啟」。
+         * 布林設定一律 (bool) cast 後直接判斷。
+         */
         $withdrawEnabled = (bool) Arr::get($info, 'withdraw');
+        $withdrawCharged = (bool) Arr::get($info, 'withdraw_withholding_system');
 
-        return $withdrawEnabled && (bool) Arr::get($info, 'withdraw_withholding_system') === true;
+        return $withdrawEnabled && $withdrawCharged;
     }
 
     /**
