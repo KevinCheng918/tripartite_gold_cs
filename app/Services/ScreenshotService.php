@@ -139,9 +139,73 @@ class ScreenshotService
             return null;
         }
 
+        $this->crop($target, Arr::get($options, 'crop'));
+
         Log::info('截圖完成', ['url' => $url, 'path' => $relative, 'bytes' => filesize($target)]);
 
         return $relative;
+    }
+
+    /**
+     * 裁出想要的那一塊
+     *
+     * headless Chrome 的 CLI 截圖沒辦法指定元素，只能截整個視窗再裁。
+     * 所以座標是對著特定視窗寬度量出來的，**換了尺寸或對方改版就要重新校正**。
+     *
+     * 裁切失敗（座標超出範圍、GD 讀不到檔）就保留原圖 ——
+     * 送一張沒裁好的圖，總比整個截圖作廢好。
+     *
+     * @param string     $path 圖檔絕對路徑，會就地覆寫
+     * @param array|null $crop X / Y / WIDTH / HEIGHT，null 表示不裁
+     * @return void
+     */
+    private function crop($path, $crop)
+    {
+        if (blank($crop) || !extension_loaded('gd')) {
+            return;
+        }
+
+        $source = @imagecreatefrompng($path);
+
+        if ($source === false) {
+            Log::warning('截圖裁切失敗：讀不到圖檔', ['path' => $path]);
+
+            return;
+        }
+
+        $rect = [
+            'x'      => (int) Arr::get($crop, 'X', 0),
+            'y'      => (int) Arr::get($crop, 'Y', 0),
+            'width'  => (int) Arr::get($crop, 'WIDTH', 0),
+            'height' => (int) Arr::get($crop, 'HEIGHT', 0),
+        ];
+
+        // 超出原圖範圍的話 imagecrop 會回出乎意料的結果，先夾在邊界內
+        $rect['width'] = min($rect['width'], imagesx($source) - $rect['x']);
+        $rect['height'] = min($rect['height'], imagesy($source) - $rect['y']);
+
+        if ($rect['width'] <= 0 || $rect['height'] <= 0) {
+            Log::warning('截圖裁切範圍無效，保留原圖', [
+                'crop'   => $crop,
+                'source' => imagesx($source) . 'x' . imagesy($source),
+            ]);
+            imagedestroy($source);
+
+            return;
+        }
+
+        $cropped = imagecrop($source, $rect);
+
+        if ($cropped === false) {
+            Log::warning('截圖裁切失敗，保留原圖', ['crop' => $rect]);
+            imagedestroy($source);
+
+            return;
+        }
+
+        imagepng($cropped, $path);
+        imagedestroy($cropped);
+        imagedestroy($source);
     }
 
     /**

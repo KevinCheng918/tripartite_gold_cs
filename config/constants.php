@@ -167,9 +167,28 @@ return [
         'SCREENSHOT' => [
             'ENABLED' => true,
             'URL'     => 'https://max.maicoin.com/trading/usdttwd',
-            'WIDTH'   => 1440,
-            'HEIGHT'  => 900,
+
+            // 視窗尺寸。改這個就要重新校正下面的 CROP —— 版面是跟著寬度跑的
+            'WIDTH'   => 1920,
+            'HEIGHT'  => 1080,
             'WAIT_MS' => 10000,
+
+            /*
+             * 只要 K 線圖那一塊：從 USDT/TWD 標題列到成交量圖底部，
+             * 不要右邊的成交明細、掛單簿與下單面板。
+             *
+             * CLI 截圖沒辦法指定元素，只能截整個視窗再裁。這幾個值是對著
+             * 1920×1080 量出來的，**換了 WIDTH/HEIGHT 或 MAX 改版就要重新校正** ——
+             * 用匯率頁的「測試截圖」按鈕看效果最快。
+             *
+             * 設成 null 就不裁切，直接送整張。
+             */
+            'CROP' => [
+                'X'      => 0,
+                'Y'      => 60,
+                'WIDTH'  => 1035,
+                'HEIGHT' => 660,
+            ],
         ],
 
         'ASK_TEMPLATE' => "💱 <b>{date} 匯率報價</b>\n\n"

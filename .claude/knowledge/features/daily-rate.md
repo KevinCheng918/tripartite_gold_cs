@@ -229,6 +229,24 @@ x86_64 Linux 裝 `google-chrome-stable` 就能用。但開發機（Apple Silicon
 `command -v` 也找得到，卻完全不能用。實際跑一次 `--version`，
 輸出要符合 `/(chrome|chromium)\s+\d+\./` 才算數。
 
+### 只要 K 線圖那一塊
+
+需求方要的是 MAX 畫面左邊那張 K 線圖（含成交量），不要右邊的成交明細、
+掛單簿與下單面板。
+
+**CLI 截圖沒辦法指定元素**，只能截整個視窗再裁。所以
+`constants.DAILY_RATE.SCREENSHOT.CROP` 是對著 **1920×1080** 量出來的：
+
+```
+X=0  Y=60  WIDTH=1035  HEIGHT=660
+```
+
+⚠ **改了 WIDTH/HEIGHT 或 MAX 改版就要重新校正** —— 版面是跟著視窗寬度跑的。
+校正最快的方式是按匯率頁的「測試截圖」看結果。設成 `null` 就不裁、送整張。
+
+裁切失敗（座標超界、GD 讀不到檔）一律**保留原圖**：送一張沒裁好的，
+總比整個截圖作廢好。
+
 ### 幾個實作上的點
 
 - **不看 exit code**：headless Chrome 常常截圖成功卻回非 0（GPU、字型、

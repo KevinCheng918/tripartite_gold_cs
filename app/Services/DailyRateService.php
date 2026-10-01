@@ -199,6 +199,8 @@ class DailyRateService
             'width'   => Arr::get($config, 'WIDTH'),
             'height'  => Arr::get($config, 'HEIGHT'),
             'wait_ms' => Arr::get($config, 'WAIT_MS'),
+            // 只要 K 線圖那塊，不要右邊的成交明細與下單面板
+            'crop'    => Arr::get($config, 'CROP'),
             'prefix'  => 'rate',
         ]);
     }
