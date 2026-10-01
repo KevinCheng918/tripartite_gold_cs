@@ -302,7 +302,7 @@
                             @if(Auth::user()->hasPermission('daily_rate.view'))
                             <li>
                                 <a href="{{ route('admin.daily-rate.index') }}" class="{{ request()->routeIs('admin.daily-rate.*') ? 'mm-active' : '' }}">
-                                    <i class="metismenu-icon fas fa-money-bill-trend-up"></i>
+                                    <i class="metismenu-icon fas fa-exchange-alt"></i>
                                     {{ trans('daily_rate.nav_label') }}
                                 </a>
                             </li>

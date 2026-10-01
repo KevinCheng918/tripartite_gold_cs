@@ -1,7 +1,8 @@
 @extends('layouts.app')
 
 @section('title', trans('daily_rate.page_title'))
-@section('icon', 'money-bill-trend-up')
+{{-- 這版 Font Awesome 沒有 money-bill-trend-up（FA6 才有），用 exchange-alt --}}
+@section('icon', 'exchange-alt')
 @section('subtitle', trans('daily_rate.subtitle'))
 
 @section('content')
@@ -83,7 +84,9 @@
                     <tbody>
                         @forelse($rates as $row)
                             <tr>
-                                <td>{{ $row->date->format('Y-m-d') }}<span class="text-muted small ms-1">{{ $row->date->isoFormat('(dd)') }}</span></td>
+                                {{-- 用 DatePresenter 而不是 isoFormat：沒設 Carbon locale 的話
+                                     isoFormat 會吐英文星期，而且格式要跟出勤那邊一致 --}}
+                                <td>{{ \App\Presenters\DatePresenter::withWeekday($row->date) }}</td>
                                 <td class="text-end">
                                     @if(filled($row->rate))
                                         <strong>{{ rtrim(rtrim(number_format($row->rate, 4, '.', ''), '0'), '.') }}</strong>

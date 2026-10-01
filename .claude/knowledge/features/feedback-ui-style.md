@@ -68,6 +68,33 @@ for f in storage/framework/views/*.php; do php -l "$f" | grep -v 'No syntax erro
 
 確認 Modal 裡的「確定刪除」則用實心 `btn btn-danger`（`payment-config`、`finance` 等皆是）。
 
+## ⚠ Font Awesome 是 **5**，不是 6
+
+`public/vendors/architect-ui/vendors/@fortawesome/fontawesome-free/`。
+用到 FA6 才有的名稱**不會報錯，只會顯示成空白**——
+側邊欄就會變成一個沒有圖示的項目。
+
+2026-10-01 一口氣踩到三個（全是同一批改動加的）：
+
+| 寫錯的（FA6） | 這個專案要用（FA5） |
+|---|---|
+| `fa-money-bill-trend-up` | `fa-exchange-alt`（匯率／兌換） |
+| `fa-triangle-exclamation` | `fa-exclamation-triangle` |
+| `fa-circle-info` | `fa-info-circle` |
+
+規律很明顯：**FA6 把名詞放前面、修飾語放後面，FA5 相反**。
+憑印象寫很容易寫成 FA6 的版本（網路上的範例多半是 FA6）。
+
+加圖示前先確認它存在：
+
+```bash
+grep -c '\.fa-你要用的名稱:' public/vendors/architect-ui/vendors/@fortawesome/fontawesome-free/css/all.min.css
+```
+
+> 掃描全專案的寫法見下。注意 `fa-chevron-` 這種字串拼接
+> （`'fa-chevron-' + (isCollapsed ? 'right' : 'down')`）與 tinymce 的
+> emoji 資料（`fa-1f1e6`）都會被誤抓成「不存在的圖示」，不是真的壞掉。
+
 ## 按鈕的「選中」狀態（`.active`）
 
 深色模式下 `custom.css` 這條把底色鎖死了：

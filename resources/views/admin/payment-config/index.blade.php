@@ -20,7 +20,7 @@
              role="button" data-bs-toggle="collapse" data-bs-target="#pc-alert-section"
              aria-expanded="false" aria-controls="pc-alert-section">
             <div>
-                <strong><i class="fas fa-triangle-exclamation me-1"></i>{{ trans('payment_config.alert_section_title') }}</strong>
+                <strong><i class="fas fa-exclamation-triangle me-1"></i>{{ trans('payment_config.alert_section_title') }}</strong>
                 <small class="text-muted d-none d-md-inline ms-2">{{ trans('payment_config.alert_section_subtitle') }}</small>
             </div>
             <i class="fas fa-chevron-down"></i>
@@ -56,7 +56,7 @@
                 </div>
 
                 <div class="alert alert-info mt-3 mb-0 py-2">
-                    <small><i class="fas fa-circle-info me-1"></i>{{ trans('payment_config.alert_target_hint') }}</small>
+                    <small><i class="fas fa-info-circle me-1"></i>{{ trans('payment_config.alert_target_hint') }}</small>
                 </div>
 
                 <div class="d-flex gap-2 mt-3">
