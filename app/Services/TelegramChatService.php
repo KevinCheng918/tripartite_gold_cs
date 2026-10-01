@@ -341,11 +341,12 @@ class TelegramChatService
          * 三個判斷的順序是刻意的，由便宜到貴：
          *
          * 1. isAutoReplyOn()  欄位判斷，沒開自動回覆的對話什麼名單都不讀
-         * 2. isStaff()        後台帳號名單，**所有對話共用同一個快取 key**
+         * 2. isStaff()        後台帳號名單，**所有對話共用同一個快取 key**；
+         *                     認出是同事後才會去讀該對話的放行例外
          * 3. isIgnored()      每個對話一個 key，命中 2 就不必再去碰它
          */
         if ($group->isAutoReplyOn() && filled($rawText)
-            && !$this->staffIgnoreService->isStaff($from)
+            && !$this->staffIgnoreService->isStaff($from, $group->id)
             && !$this->memberService->isIgnored($group->id, $from)) {
             AutoReplyJob::dispatch($group->id, $rawText, $msg->id);
         }

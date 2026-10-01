@@ -13,7 +13,14 @@
     var T = window.TgChat;
     if (!T) { return; }
 
-    var ACTION = { IGNORE: 'ignore', ADD: 'add', RESTORE: 'restore' };
+    // 後兩個是內部人員在這個對話的例外，帶 user_id 而不是 member_id
+    var ACTION = {
+        IGNORE: 'ignore',
+        ADD: 'add',
+        RESTORE: 'restore',
+        STAFF_ALLOW: 'staff_allow',
+        STAFF_BLOCK: 'staff_block',
+    };
 
     var currentGroupId = null;
     // 「發言過的人」整批留著，搜尋框就在這批裡過濾，不為了搜尋再打一次後端
@@ -110,22 +117,10 @@
      * @return {string}
      */
     function buildStaffHtml() {
-        var chips = staffMembers.length
-            ? staffMembers.map(function (s) {
-                // 已回填 Telegram ID 的人改掉 username 也認得，標出來讓人知道哪些最穩
-                var permanent = s.has_user_id
-                    ? '<i class="fas fa-fingerprint ms-1" title="' +
-                      T.escapeHtml(T.i18n.staff_permanent_hint) + '"></i>'
-                    : '';
-
-                return '<span class="badge bg-light text-muted border" ' +
-                    'style="font-size:0.75rem;font-weight:400">' +
-                    T.escapeHtml(s.nickname) +
-                    (s.username ? ' <span class="text-muted">' + T.escapeHtml(s.username) + '</span>' : '') +
-                    permanent + '</span>';
-            }).join('')
-            : '<span class="text-muted" style="font-size:0.8125rem">' +
-              T.escapeHtml(T.i18n.staff_empty) + '</span>';
+        var rows = staffMembers.length
+            ? staffMembers.map(buildStaffRow).join('')
+            : '<div class="text-muted" style="font-size:0.8125rem">' +
+              T.escapeHtml(T.i18n.staff_empty) + '</div>';
 
         var missing = staffMissing.length
             ? '<div class="alert alert-warning py-2 mt-2 mb-0" style="font-size:0.75rem">' +
@@ -138,16 +133,53 @@
             : '';
 
         return '<div class="border rounded-3 p-3 mb-4">' +
-            '<div class="d-flex align-items-center justify-content-between mb-2">' +
-            '<span class="fw-bold" style="font-size:0.875rem">' +
-            T.escapeHtml(T.i18n.staff_section) + '</span>' +
-            '<span class="badge bg-light text-muted border" style="font-size:0.6875rem;font-weight:400">' +
-            T.escapeHtml(T.i18n.staff_readonly) + '</span>' +
-            '</div>' +
-            '<div class="d-flex flex-wrap gap-1 mb-2">' + chips + '</div>' +
+            '<div class="fw-bold mb-2" style="font-size:0.875rem">' +
+            T.escapeHtml(T.i18n.staff_section) + '</div>' +
+            '<div class="mb-2">' + rows + '</div>' +
             '<div class="text-muted" style="font-size:0.75rem">' +
             T.escapeHtml(T.i18n.staff_hint) + '</div>' +
             missing +
+            '</div>';
+    }
+
+    /**
+     * 內部人員的一列（勾選框）
+     *
+     * ⚠ 勾選框與後端的 allowed 是**反向**的：
+     * 勾 = 不自動回覆（沒有放行紀錄），取消勾 = allowed（這個對話會回他）。
+     * 預設全勾，所以 checked = !allowed。
+     *
+     * @param {Object} s
+     * @return {string}
+     */
+    function buildStaffRow(s) {
+        // 已回填 Telegram ID 的人改掉 username 也認得，標出來讓人知道哪些最穩
+        var permanent = s.has_user_id
+            ? '<i class="fas fa-fingerprint text-muted ms-1" title="' +
+              T.escapeHtml(T.i18n.staff_permanent_hint) + '"></i>'
+            : '';
+
+        // 被打開的那幾筆要說明是誰的決定 —— 比照忽略名單的「某某於某時設定」
+        var meta = '';
+        if (s.allowed) {
+            meta = '<div class="text-muted" style="font-size:0.75rem">' +
+                T.escapeHtml(T.i18n.staff_allowed_label) + '；' +
+                T.escapeHtml(T.i18n.staff_allowed_by
+                    .replace(':name', s.allowed_by || T.i18n.ignore_deleted_user)
+                    .replace(':time', window.formatDateTime(s.allowed_at))) +
+                '</div>';
+        }
+
+        return '<div class="form-check py-1 mb-0">' +
+            '<input class="form-check-input js-tg-staff-toggle" type="checkbox" ' +
+            'id="tg-staff-' + s.id + '" data-id="' + s.id + '"' +
+            (s.allowed ? '' : ' checked') + '>' +
+            '<label class="form-check-label" for="tg-staff-' + s.id + '" style="font-size:0.875rem">' +
+            T.escapeHtml(s.nickname) +
+            (s.username ? ' <span class="text-muted">' + T.escapeHtml(s.username) + '</span>' : '') +
+            permanent +
+            '</label>' +
+            meta +
             '</div>';
     }
 
@@ -231,6 +263,26 @@
             });
         });
 
+        /*
+         * 內部人員的勾選框。取消勾 = 特別打開（允許自動回覆他），勾回去 = 收回。
+         *
+         * 失敗時要把勾選狀態還原 —— 不還原的話畫面會顯示成功了，
+         * 但後端其實沒改，客服會以為設定生效。
+         */
+        document.querySelectorAll('.js-tg-staff-toggle').forEach(function (box) {
+            box.addEventListener('change', function () {
+                var userId = parseInt(box.dataset.id, 10);
+                var checked = box.checked;
+
+                send({
+                    action: checked ? ACTION.STAFF_BLOCK : ACTION.STAFF_ALLOW,
+                    user_id: userId,
+                }, function (ok) {
+                    if (!ok) { box.checked = !checked; }
+                });
+            });
+        });
+
         var addBtn = document.getElementById('tg-ignore-add');
         if (addBtn) {
             addBtn.addEventListener('click', function () {
@@ -284,7 +336,14 @@
      *
      * @param {Object} payload
      */
-    function send(payload) {
+    /**
+     * 送出名單異動
+     *
+     * @param {Object}   payload
+     * @param {Function} [done] 收到結果後呼叫，參數為成功與否 ——
+     *                          勾選框要靠它在失敗時還原狀態
+     */
+    function send(payload, done) {
         payload.group_id = currentGroupId;
 
         T.apiFetch('/admin/telegram-chat/ajax-toggle-ignore', {
@@ -298,9 +357,11 @@
                     T.loadMessages(currentGroupId, function () {});
                 }
                 showMessage((body && body.message) || T.i18n.msg.ignore_added, false);
+                if (done) { done(true); }
             })
             .catch(function (body) {
                 showMessage(pickError(body), true);
+                if (done) { done(false); }
             });
     }
 

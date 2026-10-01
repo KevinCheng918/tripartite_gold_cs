@@ -60,6 +60,15 @@ return [
                 'IGNORE'  => 'ignore',  // 把名冊上的人設為不自動回覆
                 'ADD'     => 'add',     // 用 username 手動加入
                 'RESTORE' => 'restore', // 恢復自動回覆
+
+                /*
+                 * 內部員工在這個對話的例外（帶 user_id，不是 member_id）。
+                 *
+                 * ALLOW = 特別打開（這個對話會自動回覆他）
+                 * BLOCK = 收回放行，回到預設的不自動回覆
+                 */
+                'STAFF_ALLOW' => 'staff_allow',
+                'STAFF_BLOCK' => 'staff_block',
             ],
         ],
 
@@ -72,6 +81,9 @@ return [
         'STAFF_IGNORE' => [
             'CACHE_KEY'     => 'tg_staff_ignore_keys',
             'CACHE_SECONDS' => 600,
+
+            // 「這個對話特別打開了哪些同事」—— 逐對話一個 key，所以是 prefix
+            'ALLOW_CACHE_PREFIX' => 'tg_staff_allow_',
         ],
 
         /*

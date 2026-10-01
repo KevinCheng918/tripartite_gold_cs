@@ -325,6 +325,23 @@ class UserRepository
     }
 
     /**
+     * 回填 Telegram ID 用的精簡查詢
+     *
+     * 不用 `find()`：那支的 select 是 `LIST_COLUMNS`（**沒有 `telegram_user_id`**），
+     * 讀出來的屬性會是 null，回填就會判斷成「還沒補過」而每則訊息重寫一次；
+     * 它還會 eager load `permissions`，對這件事完全是白撈。
+     *
+     * @param int $id
+     * @return User|null
+     */
+    public function findForTelegramBackfill($id)
+    {
+        return User::query()
+            ->select(['id', 'telegram_user_id'])
+            ->find($id);
+    }
+
+    /**
      * 正常狀態、但認不出 Telegram 身分的帳號
      *
      * 面板要列出來提醒去補 —— 這些人在客戶群組發言時不會被屏蔽，

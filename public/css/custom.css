@@ -630,6 +630,18 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .input-group-text { background: rgba(212,175,55,0.15) !important; color: #d4c9a8 !important; border-color: rgba(212,175,55,0.2) !important; }
 [data-theme="dark"] .form-control-plaintext { color: #d4af37 !important; }
 
+/*
+ * 勾選框／單選鈕的深色配對（未勾選那半）
+ *
+ * `.form-check-input:checked` 的金色是兩種模式共用的，但**未勾選**的狀態
+ * 原本沒有深色覆寫 —— Bootstrap 預設是白底淺灰框，在暗底上是一塊突兀的白方塊。
+ *
+ * 用 `:not(:checked)` 而不是直接寫 `.form-check-input`：後者的特異性與
+ * `.form-check-input:checked` 相同（都是兩個 class 層級），而它在這個檔案
+ * 更後面，會把 checked 的金色底蓋掉。
+ */
+[data-theme="dark"] .form-check-input:not(:checked) { background-color: rgba(255,255,255,0.05) !important; border-color: rgba(212,175,55,0.3) !important; }
+
 /* Modal */
 [data-theme="dark"] .modal-content { background: #1a1a1a !important; color: #e0e0e0 !important; border-color: rgba(212,175,55,0.3) !important; box-shadow: 0 0 20px rgba(212,175,55,0.15) !important; }
 [data-theme="dark"] .modal-header { border-color: rgba(255,255,255,0.08) !important; }

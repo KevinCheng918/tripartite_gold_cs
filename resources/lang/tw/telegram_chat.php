@@ -73,14 +73,15 @@ return [
     'ignore_wrong_hint'     => 'username 填錯不會有任何錯誤訊息，只是不會生效。可以看訊息上有沒有出現「不自動回覆」標籤來確認',
     'ignore_hint'           => '名單裡的人發言時，訊息照常收、照常通知，只是系統不會自動回覆，需要人工處理',
 
-    // 後台帳號一律不自動回覆（唯讀區塊）
-    'staff_section'         => '內部人員（所有對話自動套用）',
-    'staff_readonly'        => '唯讀',
-    'staff_hint'            => '這份名單跟著帳號管理走，不在這裡增減。狀態為「正常」的帳號才會被屏蔽，鎖定與停用的不算',
+    // 後台帳號預設不自動回覆，可在這個對話個別打開
+    'staff_section'         => '內部人員（預設都不自動回覆）',
+    'staff_hint'            => '名單跟著帳號管理走，不在這裡增減。打勾＝不自動回覆（預設），取消打勾＝這個對話會自動回覆他。狀態為「正常」的帳號才算，鎖定與停用的不在名單內',
     'staff_permanent_hint'  => '系統已記下這個人的 Telegram 身分，他改掉 username 也認得',
     'staff_empty'           => '目前沒有帳號填寫 Telegram 帳號',
     'staff_missing'         => '這 :count 個帳號還沒填 Telegram 帳號，他們發言不會被屏蔽：:names',
     'staff_missing_action'  => '請到帳號管理補上',
+    'staff_allowed_by'      => ':name 於 :time 打開',
+    'staff_allowed_label'   => '這個對話會自動回覆他',
 
     'msg' => [
         'required'         => '此欄位為必填',
@@ -109,6 +110,9 @@ return [
         'note_too_long'          => '備註過長',
         'ignore_added'           => '已設為不自動回覆',
         'ignore_restored'        => '已恢復自動回覆',
+        'staff_not_found'        => '找不到這個帳號',
+        'staff_allowed'         => '已打開，這個對話會自動回覆他',
+        'staff_blocked'         => '已收回，這個對話不會自動回覆他',
         'ignore_failed'          => '設定失敗',
         'ignore_load_failed'     => '名單載入失敗',
     ],

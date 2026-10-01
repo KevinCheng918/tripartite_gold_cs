@@ -72,14 +72,15 @@ return [
     'ignore_wrong_hint'     => 'A wrong username produces no error, it simply will not take effect. Check whether the "No auto-reply" tag appears on their messages',
     'ignore_hint'           => 'Messages from excluded members are still received and still notify you. Only the automatic reply is skipped, so they need a manual response',
 
-    // Staff accounts are never auto-replied to (read-only section)
-    'staff_section'         => 'Internal staff (applies to every conversation)',
-    'staff_readonly'        => 'Read-only',
-    'staff_hint'            => 'This list follows Account Management and cannot be edited here. Only accounts in Normal status are excluded — Locked and Deactivated ones are not',
+    // Staff accounts are excluded by default; can be opened per conversation
+    'staff_section'         => 'Internal staff (excluded by default)',
+    'staff_hint'            => 'The list follows Account Management and cannot be edited here. Checked = no auto-reply (default); unchecked = this conversation will auto-reply to them. Only accounts in Normal status count — Locked and Deactivated ones are not on the list',
     'staff_permanent_hint'  => 'Their Telegram ID is on record, so they stay recognised even after changing username',
     'staff_empty'           => 'No account has a Telegram username yet',
     'staff_missing'         => ':count account(s) have no Telegram username, so they will not be excluded: :names',
     'staff_missing_action'  => 'Please fill it in under Account Management',
+    'staff_allowed_by'      => 'Opened by :name on :time',
+    'staff_allowed_label'   => 'This conversation will auto-reply to them',
 
     'msg' => [
         'required'         => 'Required',
@@ -108,6 +109,9 @@ return [
         'note_too_long'          => 'Note is too long',
         'ignore_added'           => 'Excluded from auto-reply',
         'ignore_restored'        => 'Auto-reply restored',
+        'staff_not_found'        => 'Account not found',
+        'staff_allowed'         => 'Opened — this conversation will auto-reply to them',
+        'staff_blocked'         => 'Closed — this conversation will not auto-reply to them',
         'ignore_failed'          => 'Failed to save',
         'ignore_load_failed'     => 'Failed to load the list',
     ],

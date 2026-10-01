@@ -72,14 +72,15 @@ return [
     'ignore_wrong_hint'     => 'username 填错不会有任何错误讯息，只是不会生效。可以看讯息上有没有出现「不自动回覆」标签来确认',
     'ignore_hint'           => '名单里的人发言时，讯息照常收、照常通知，只是系统不会自动回覆，需要人工处理',
 
-    // 后台帐号一律不自动回覆（唯读区块）
-    'staff_section'         => '内部人员（所有对话自动套用）',
-    'staff_readonly'        => '唯读',
-    'staff_hint'            => '这份名单跟着帐号管理走，不在这里增减。状态为「正常」的帐号才会被屏蔽，锁定与停用的不算',
+    // 后台帐号预设不自动回覆，可在这个对话个别打开
+    'staff_section'         => '内部人员（预设都不自动回覆）',
+    'staff_hint'            => '名单跟着帐号管理走，不在这里增减。打勾＝不自动回覆（预设），取消打勾＝这个对话会自动回覆他。状态为「正常」的帐号才算，锁定与停用的不在名单内',
     'staff_permanent_hint'  => '系统已记下这个人的 Telegram 身分，他改掉 username 也认得',
     'staff_empty'           => '目前没有帐号填写 Telegram 帐号',
     'staff_missing'         => '这 :count 个帐号还没填 Telegram 帐号，他们发言不会被屏蔽：:names',
     'staff_missing_action'  => '请到帐号管理补上',
+    'staff_allowed_by'      => ':name 于 :time 打开',
+    'staff_allowed_label'   => '这个对话会自动回覆他',
 
     'msg' => [
         'required'         => '此栏位为必填',
@@ -108,6 +109,9 @@ return [
         'note_too_long'          => '备注过长',
         'ignore_added'           => '已设为不自动回覆',
         'ignore_restored'        => '已恢复自动回覆',
+        'staff_not_found'        => '找不到这个帐号',
+        'staff_allowed'         => '已打开，这个对话会自动回覆他',
+        'staff_blocked'         => '已收回，这个对话不会自动回覆他',
         'ignore_failed'          => '设定失败',
         'ignore_load_failed'     => '名单载入失败',
     ],

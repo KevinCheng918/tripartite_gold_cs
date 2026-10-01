@@ -114,17 +114,19 @@ class TelegramChatController extends Controller
         $panel = $this->memberService->getPanel($params['group_id']);
 
         /*
-         * 後台帳號那份全域名單一起回 —— 它是「誰不會被自動回覆」的另一半，
-         * 分到兩個地方只會讓客服找不到。面板上是唯讀的，不開修改端點。
+         * 後台帳號那份名單一起回 —— 它是「誰不會被自動回覆」的另一半，
+         * 分到兩個地方只會讓客服找不到。
+         *
+         * 每一列帶這個對話的放行狀態（預設不放行），客服可以逐一打開。
          */
-        $staff = $this->staffIgnoreService->getPanel();
+        $staff = $this->staffIgnoreService->getPanel($params['group_id']);
 
         return response()->json([
             'ignored' => GroupMemberResource::collection($panel['ignored']),
             'recent'  => GroupMemberResource::collection($panel['recent']),
             // 清單標題要寫「近 N 天」，天數是後端設定的，不讓前端自己寫死一份
             'recent_days' => (int) config('constants.TELEGRAM.IGNORE.RECENT_DAYS'),
-            'staff' => StaffIgnoreResource::collection($staff['staff']),
+            'staff' => StaffIgnoreResource::collectionWithAllows($staff['staff'], $staff['allows']),
             // 認不出 Telegram 身分的帳號：面板要提醒去補，否則他們發言會被當成客人
             'staff_missing' => $staff['missing']->pluck('nickname')->values()->all(),
         ]);
@@ -144,6 +146,25 @@ class TelegramChatController extends Controller
         $action = Arr::get($params, 'action');
 
         try {
+            /*
+             * 內部員工的例外先判 —— 它帶的是 user_id（後台帳號），
+             * 跟下面那些以名冊 member_id 為鍵的動作是兩套東西。
+             */
+            if ($action === $actions['STAFF_ALLOW'] || $action === $actions['STAFF_BLOCK']) {
+                $userId = (int) Arr::get($params, 'user_id', 0);
+                $allow = $action === $actions['STAFF_ALLOW'];
+
+                $allow
+                    ? $this->staffIgnoreService->allow($groupId, $userId, (int) Auth::id())
+                    : $this->staffIgnoreService->block($groupId, $userId, (int) Auth::id());
+
+                return response()->json([
+                    'message' => trans($allow
+                        ? 'telegram_chat.msg.staff_allowed'
+                        : 'telegram_chat.msg.staff_blocked'),
+                ]);
+            }
+
             if ($action === $actions['RESTORE']) {
                 $this->memberService->restore($groupId, (int) Arr::get($params, 'member_id', 0));
 
@@ -211,11 +232,14 @@ class TelegramChatController extends Controller
          * 被設為不自動回覆的人，訊息上要標出來讓客服知道這則要自己回。
          * 跟著訊息一起回，不另開路由 —— 標籤是狀態揭露，沒有管理權限的人也該看得到。
          *
-         * 兩份名單都要標：這個對話自己的，以及後台帳號那份全域的。
+         * 兩份名單都要標：這個對話自己的，以及後台帳號那份。
+         *
+         * 後者要扣掉這個對話特別打開的同事 —— 他現在會被自動回覆，
+         * 再標「不自動回覆」就是標錯（扣除在 ignoredUsernames() 裡做）。
          */
         $ignoredNames = $this->memberService->getIgnoredNames(
             $groupId,
-            $this->staffIgnoreService->usernames()
+            $this->staffIgnoreService->ignoredUsernames($groupId)
         );
 
         return TelegramMessageResource::collection($messages)

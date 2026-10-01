@@ -15,13 +15,14 @@
 | 項目 | 決定 |
 |------|------|
 | 生效範圍 | **全域自動生效**：所有客戶對話一律不自動回覆名單內的人 |
+| 例外 | **可在單一對話「特別打開」某個同事**，只對那個對話生效（見下方專節） |
 | 與既有名單的關係 | **兩份並存**，任一份命中就不自動回覆。每對話的名單仍可加客戶方的工程師、PM |
 | 名單內容 | **動態跟著帳號走**：判斷時直接比對 `user` 表，新增帳號自動生效、帳號移除自動失效，沒有人要維護 |
 | 哪些帳號算 | **只有 `status = NORMAL`**。鎖定（LOCK）與停用（DEACTIVATE）都**不算** |
 | 沒填 Telegram 帳號的人 | **不改必填**，但在名單面板明確列出「這些帳號還沒填，發言不會被屏蔽」 |
 | 改掉 username 就失效 | **做回填**：首次用 username 命中時把 Telegram ID 記到帳號上，之後以 ID 為主 |
 | 忽略程度 | 同 [[ignore-member]]：**只擋自動回覆**，訊息照常存、照常推播、照常算未讀 |
-| 權限 | **不新增 keyword**，沿用 `telegram_chat.ignore_manage`（這塊是唯讀展示） |
+| 權限 | **不新增 keyword**，沿用 `telegram_chat.ignore_manage` |
 
 ## 兩個比對鍵：ID 優先、username 備援
 
@@ -86,7 +87,7 @@ username 對上  → 是同事，順便把 ID 回填上去（見下一節）
 
 ```php
 if ($group->isAutoReplyOn() && filled($rawText)
-    && !$this->staffIgnoreService->isStaff($from)
+    && !$this->staffIgnoreService->isStaff($from, $group->id)
     && !$this->memberService->isIgnored($group->id, $from)) {
     AutoReplyJob::dispatch($group->id, $rawText, $msg->id);
 }
@@ -95,7 +96,8 @@ if ($group->isAutoReplyOn() && filled($rawText)
 三個判斷的順序是刻意的，由便宜到貴：
 
 1. `isAutoReplyOn()` — 欄位判斷，沒開自動回覆的對話什麼都不查
-2. `isStaff()` — **一份全域共用快取**，所有對話共用同一個 key
+2. `isStaff()` — **一份全域共用快取**，所有對話共用同一個 key；
+   認出是同事之後才會去讀該對話的放行例外
 3. `isIgnored()` — 每個對話一個 key，命中 2 就不必再去碰它
 
 ## 名單怎麼取
@@ -115,9 +117,12 @@ select id, nickname, telegram_username, telegram_user_id
 條件是「有 username **或**有回填過的 ID」：回填過 ID 的人即使後來把
 username 清空，仍然認得出來。
 
-只取四個欄位（**不是 `SELECT *`**）。快取存的是**兩組純陣列**
-（`ids` / `usernames`）而不是 Model 集合 —— 序列化 Model 會把整個物件寫進快取，
-而比對只需要那兩組值。
+只取四個欄位（**不是 `SELECT *`**）。快取存的是**兩組映射**
+（`telegram_user_id => user_id`、`username => user_id`）而不是 Model 集合 ——
+序列化 Model 會把整個物件寫進快取，而比對只需要這兩組對應關係。
+
+映射而不是單純清單，是為了讓命中的瞬間就知道「是哪個同事」，
+接著才判斷得了該對話的放行例外。
 
 快取 key 固定一個（`TELEGRAM.STAFF_IGNORE.CACHE_KEY`，不帶參數），
 TTL 600 秒。失效點：
@@ -141,27 +146,12 @@ TTL 600 秒。失效點：
 不另開頁面、不另開路由 —— 那個 Modal 就是「誰不會被自動回覆」的管理入口，
 全域名單是同一個問題的另一半，分到兩個地方只會讓人找不到。
 
-最上面加一塊**唯讀**區塊：
+最上面加一塊勾選清單（版面與互動細節見下方「每對話的例外」專節）：
 
-```
-┌──────────────────────────────────────────────────────┐
-│ 內部人員（所有對話自動套用）                    唯讀 │
-│  [王小明 @wang 🔒] [李大華 @lee] [陳工程 @chen 🔒]   │
-│                                                      │
-│  這份名單跟著帳號管理走，不在這裡增減。狀態為「正常」 │
-│  的帳號才會被屏蔽，鎖定與停用的不算                   │
-│                                                      │
-│  ⚠ 這 3 個帳號還沒填 Telegram 帳號，他們發言不會被   │
-│    屏蔽：張三、李四、王五   請到帳號管理補上          │
-└──────────────────────────────────────────────────────┘
-```
-
-- 擺**最上面**：它全域生效，先讓人知道「這些人本來就不會被自動回」，
-  下面那份每對話名單才是要手動維護的部分
+- 擺**最上面**：它全域生效，先讓人知道「這些人預設都不會被自動回」，
+  下面那份每對話名單才是用來加客戶方人員的
 - 資料併在既有的 `ajax-ignore-members` 回傳裡（多兩個 key：`staff`、`staff_missing`），
-  不為了唯讀區塊再開一條路由
-- 「唯讀」要標清楚：下面每對話名單的「恢復」按鈕**解不開**全域屏蔽，
-  不說明的話客服會以為按鈕壞了
+  不為了這個區塊再開一條路由
 - 🔒（`fa-fingerprint`）= 已回填 Telegram ID，這個人改掉 username 也認得。
   hover 有說明
 - `StaffIgnoreResource` **不回 `telegram_user_id` 本身**，只回
@@ -185,6 +175,144 @@ TTL 600 秒。失效點：
 ⚠ 只比對**名冊上有的人**。同事如果從沒在這個對話發言過，名冊裡沒有他，
 標籤就不會出現 —— 但他一發言 `touch()` 就會寫進名冊，所以實際上只差第一則。
 
+## 每對話的例外：特別打開某個同事
+
+> **狀態：已實作，待跑 `telegram_group_staff_allow` 的 migration。**
+
+需求：**預設把內部員工都忽略，除非有特別打開。** 全域屏蔽仍是預設值，
+客服可以在**某一個對話**把某個同事放回自動回覆的範圍。
+
+### 為什麼不沿用名冊的 `ignored` 欄位
+
+`telegram_group_member.ignored` 的語意是「客服手動把這個人加進忽略名單」，
+而這裡要記的是**反向的例外**：「這個同事在這個對話被特別放行」。
+
+兩者混在同一個 bool 上會變成「沒有紀錄時代表什麼」說不清楚 ——
+對一般人是「不忽略」，對同事卻是「忽略」。
+
+更關鍵的是**鍵不一樣**：名冊以 Telegram 身分為鍵，而且**人要發言過才在名冊上**。
+客服想預先打開一個還沒在這個對話講過話的同事時，根本沒有列可以標。
+
+### 新表 `telegram_group_staff_allow`
+
+以**後台帳號 id** 為鍵，不依賴名冊：
+
+| 欄位 | 說明 |
+|------|------|
+| `telegram_group_id` | 哪個對話（`cascadeOnDelete`） |
+| `user_id` | 哪個同事（FK `user`，**`cascadeOnDelete`**） |
+| `allowed_by` | 誰打開的（FK `user`，`nullOnDelete`，欄位 nullable） |
+| `allowed_at` | 什麼時候打開的 |
+| unique | `(telegram_group_id, user_id)` |
+
+**有列 = 特別打開**（這個對話會自動回覆他），沒列 = 預設忽略。
+用「存在與否」表達狀態，不再多一個 bool —— 多一個 bool 就會有「有列但 false」
+這種跟「沒列」意思相同的狀態，白白多一種要處理的情況。
+
+`user_id` 用 `cascadeOnDelete` 而不是 `nullOnDelete`：帳號沒了，放行紀錄也該消失。
+留著會變成一筆指向不存在的人的放行，而 `user_id` 又可能被新帳號重用 ——
+那就等於默默放行了另一個人。
+
+寫入用 `firstOrCreate`（unique 索引擋重複），收回直接**刪列**。
+
+### 判斷邏輯
+
+`isStaff()` 多收一個 `$groupId`，並拆成「認人」與「看例外」兩步：
+
+```php
+public function isStaff(array $from, $groupId)
+{
+    $userId = $this->matchUserId($from);   // 命中回 user_id（含 ID 回填），否則 null
+
+    if (blank($userId)) {
+        return false;
+    }
+
+    // 這個對話特別打開了他 → 不屏蔽，照常自動回覆
+    return !in_array($userId, $this->allowedUserIds($groupId), true);
+}
+```
+
+為此**名單快取從兩組清單改成兩組映射**：
+
+```
+ids       : [telegram_user_id => user_id]
+usernames : [username         => user_id]
+```
+
+命中時直接拿到 `user_id`，不必再回頭查 `user` 表。
+
+例外清單另外快取（key 帶 `group_id`：`ALLOW_CACHE_PREFIX`），
+異動時清掉該對話的 key —— 與既有忽略名單的快取策略一致。
+
+判斷順序不變（`isAutoReplyOn()` → `isStaff()` → `isIgnored()`）；
+例外查詢只在「已經確定是同事」之後才發生，**一般客人的訊息不會碰到它**。
+
+### ⚠ 回填不能用 `UserRepository::find()`
+
+`find()` 的 select 是 `LIST_COLUMNS`，**裡面沒有 `telegram_user_id`** ——
+讀出來的屬性是 null，回填就會判斷成「還沒補過」而**每則訊息重寫一次**
+（而且它還 eager load `permissions`，對這件事是白撈）。
+
+所以另開 `findForTelegramBackfill()`，只 select `id` + `telegram_user_id`。
+
+這個坑是改寫回填時才發現的 —— 原本的實作直接取 `$user->telegram_user_id`
+看起來很自然，但那一欄根本沒被撈出來。
+
+### UI
+
+內部人員區塊從唯讀 chips 改成**勾選清單**：
+
+```
+內部人員（預設都不自動回覆）
+  ☑ 王小明 @wang 🔒          ← 勾 = 不自動回覆（預設）
+  ☐ 李大華 @lee
+       這個對話會自動回覆他；陳工程 於 10/02 14:30 打開
+  ☑ 陳工程 @chen 🔒
+
+  名單跟著帳號管理走，不在這裡增減。打勾＝不自動回覆（預設），
+  取消打勾＝這個對話會自動回覆他。狀態為「正常」的帳號才算…
+
+  ⚠ 這 2 個帳號還沒填 Telegram 帳號，他們發言不會被屏蔽：張三、李四
+```
+
+⚠ **勾選框與後端的 `allowed` 是反向的**：勾 = 沒有放行紀錄（不自動回覆），
+取消勾 = `allowed`。所以 `checked = !allowed`，預設全勾。
+
+- 被打開的那幾筆顯示**誰打開的、什麼時候** —— 比照忽略名單的
+  「某某於某時設定」，客服需要知道這是誰的決定
+- 送出失敗時**把勾選狀態還原**（`send()` 多收一個 callback）——
+  不還原的話畫面顯示成功了、後端其實沒改，客服會以為設定生效
+- 沒填 Telegram 帳號的同事照舊只列在警告列，**不給勾選框** ——
+  他根本認不出來，給了勾選框等於謊稱有效
+
+`StaffIgnoreResource` 多三個欄位（`allowed` / `allowed_by` / `allowed_at`）。
+放行資訊由外部傳入（`collectionWithAllows()`），**不在 Resource 裡查 DB** ——
+一列查一次就是 N+1。
+
+### 順手補的深色模式缺口
+
+這個 UI 會出現一整排 checkbox，而 `.form-check-input` **未勾選**那半
+在深色模式沒有覆寫（Bootstrap 預設白底淺灰框，暗底上是突兀的白方塊）。
+
+補 `[data-theme="dark"] .form-check-input:not(:checked)`。用 `:not(:checked)`
+而不是直接寫 `.form-check-input`：後者與 `.form-check-input:checked` 特異性相同，
+而它在檔案更後面，會把 checked 的金色底蓋掉。
+
+（這是 `.badge.bg-light` 之後同一類的第四個缺口，見
+[[2026-10-01-badge-bg-light-dark-mode]]。）
+
+### 後端其他改動
+
+- `ajax-toggle-ignore` 多兩個 action：`staff_allow` / `staff_block`，
+  帶 `user_id` 而不是 `member_id`。路由與權限都沿用既有的
+  `telegram_chat.ignore_manage`
+- `ToggleIgnoreMemberRequest` 的 `user_id` 用
+  `required_if:action,staff_allow,staff_block` + `exists:user,id`
+- `usernames()` 改名 `ignoredUsernames($groupId)`，並**扣掉該對話的例外** ——
+  被打開的同事會被自動回覆，訊息上再標「不自動回覆」就是標錯。
+  扣除是兩份已快取清單的差集，不多打 DB
+
 ## 邊界情況
 
 - **內部支援群組**不受影響 —— 它本來就不走自動回覆這條路
@@ -200,6 +328,11 @@ TTL 600 秒。失效點：
   `status = NORMAL`，所以不會被屏蔽。之後恢復正常狀態立刻又認得
 - **反問流程**：系統反問後若是同事回了「1」，不會被當成客人的回答 —— 與
   [[ignore-member]] 同一道判斷，自然成立
+- **被打開的同事**：那個對話會把他當一般客人處理（會自動回覆、灰標籤不出現），
+  其他對話完全不受影響
+- **被打開的同事帳號被刪**：放行紀錄跟著刪（`cascadeOnDelete`）——
+  不留著指向不存在的人的放行
+- **對話被刪除**：放行紀錄跟著走（`telegram_group_id` 也是 `cascadeOnDelete`）
 
 ## 異動檔案
 
@@ -210,7 +343,10 @@ TTL 600 秒。失效點：
 | Migration | `2026_10_02_000001_add_telegram_user_id_to_user_table.php`（`user` 加一欄 + index） |
 | Service | `app/Services/StaffIgnoreService.php`（`isStaff()`、名單快取、ID 回填、面板資料） |
 | Presenter | `app/Presenters/TelegramUsernamePresenter.php`（username 正規化，兩邊共用） |
-| Resource | `app/Http/Resources/StaffIgnoreResource.php`（唯讀名單，只回 `has_user_id` 不回 ID） |
+| Resource | `app/Http/Resources/StaffIgnoreResource.php`（名單一列，只回 `has_user_id` 不回 ID） |
+| Migration | `2026_10_02_000002_create_telegram_group_staff_allow_table.php`（每對話的放行例外） |
+| Model | `app/Models/TelegramGroupStaffAllow.php` |
+| Repository | `app/Repositories/TelegramGroupStaffAllowRepository.php`（`allow()` / `block()` / 比對用的 id 清單） |
 
 ### 修改
 
@@ -219,11 +355,13 @@ TTL 600 秒。失效點：
 | `app/Services/TelegramChatService.php` | dispatch 前多一道 `isStaff()`，排在每對話名單之前 |
 | `app/Services/TelegramGroupMemberService.php` | `normalizeUsername()` 改委派 Presenter；`getIgnoredNames()` 接 `$staffUsernames` 並去重 |
 | `app/Services/AccountService.php` | 注入 `StaffIgnoreService`，`update()` 後清名單快取 |
-| `app/Repositories/UserRepository.php` | `getTelegramIdentitiesForAutoReply()`、`getMissingTelegramIdentity()`；`findByTelegramUsername()` 的 select 加 `telegram_user_id` |
+| `app/Repositories/UserRepository.php` | `getTelegramIdentitiesForAutoReply()`、`getMissingTelegramIdentity()`、`findForTelegramBackfill()`；`findByTelegramUsername()` 的 select 加 `telegram_user_id` |
 | `app/Repositories/TelegramGroupMemberRepository.php` | `getNamesByUsernames()` |
 | `app/Http/Controllers/Admin/TelegramChatController.php` | `ajaxIgnoreMembers` 多回 `staff` / `staff_missing`；`ajaxMessages` 的 `ignored_names` 併入全域那批 |
 | `app/Models/User.php` | `telegram_user_id` 的 PHPDoc |
-| `config/constants.php` | `TELEGRAM.STAFF_IGNORE`（快取 key 與秒數） |
+| `config/constants.php` | `TELEGRAM.STAFF_IGNORE`（快取 key、秒數、放行清單的 key prefix）；`IGNORE.ACTION` 加 `staff_allow` / `staff_block` |
+| `app/Http/Requests/TelegramChat/ToggleIgnoreMemberRequest.php` | `user_id` 的 `required_if` + `exists:user,id` |
+| `public/css/custom.css` | `.form-check-input:not(:checked)` 的深色配對 |
 | `resources/lang/{tw,cn,en}/telegram_chat.php` | 區塊標題、唯讀說明、未填提醒、永久識別的 hover 說明 |
 | `public/js/telegram-chat/ignore-member.js` | `buildStaffHtml()` 唯讀區塊 |
 | `config/changelog.php` | 一筆 |
@@ -234,13 +372,17 @@ TTL 600 秒。失效點：
 
 ## 上線注意
 
-- **migration 已跑**（2026-10-02）
+- **第一階段的 migration 已跑**（`telegram_user_id`，2026-10-02）
+- ⚠ **`telegram_group_staff_allow` 的 migration 還沒跑** —— 沒跑之前，
+  收訊判斷與面板都會噴 `Table ... doesn't exist`
 - **同事要去帳號管理填 Telegram 帳號**，沒填的人認不出來。面板的警告列
   就是在講這件事 —— 目前本機只有兩個帳號，兩個都還沒填
 - ID 是**第一次發言時**才回填的，所以剛上線時大家都還只有 username ——
   這段期間改 username 仍會失效
 
-## 實測結果（2026-10-02）
+## 實測結果
+
+### 第一階段：全域屏蔽與 ID 回填（2026-10-02）
 
 驗證腳本全程包在 transaction 裡並 rollback，**沒有留下任何資料變更**
 （事後逐欄確認還原：`telegram_user_id` / `telegram_username` / `status`
@@ -275,6 +417,23 @@ TTL 600 秒。失效點：
   `TelegramChatController` 四個都解得出來（建構子多了參數，grep 確認
   沒有別處手動 `new`）
 - **尚未實測**：真的從 Telegram 發一則訊息走完 webhook（要同事先填好帳號）
+
+### 第二階段：每對話的例外（待驗）
+
+跑完 `telegram_group_staff_allow` 的 migration 後要驗這幾項：
+
+| 情境 | 預期 |
+|---|---|
+| 沒有任何放行紀錄 | 同事照舊被屏蔽（行為與第一階段相同） |
+| 打開某個同事 | 那個對話 `isStaff()` 回 false，**其他對話仍 true** |
+| 收回放行 | 回到屏蔽 |
+| 連點兩次打開 | 只有一列（unique + `firstOrCreate`） |
+| 灰標籤 | 被打開的同事不出現「不自動回覆」標籤 |
+| 面板 | 勾選狀態正確（`checked = !allowed`）、顯示誰打開的 |
+| 送出失敗 | 勾選框還原成原狀 |
+
+已完成的驗證：全檔 `php -l`、`ignore-member.js` 容器內 `node --check`、
+`StaffIgnoreService` 與 `TelegramGroupStaffAllowRepository` 的 DI 解析。
 
 ## 相關
 
