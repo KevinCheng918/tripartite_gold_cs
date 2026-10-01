@@ -94,7 +94,7 @@ class CheckDailyRateCommand extends Command
                 'Chrome 執行檔',
                 filled($chrome),
                 (string) $chrome,
-                'apt-get install -y google-chrome-stable（沒有就只發文字）'
+                $this->installHint('chrome') . '（沒有就只發文字）'
             ),
             $this->optional(
                 '中文字型',
@@ -102,12 +102,58 @@ class CheckDailyRateCommand extends Command
                 "{$fonts} 個",
                 $fonts === -1
                     ? '沒有 fc-list 指令，無法判斷'
-                    : 'apt-get install -y fonts-noto-cjk（沒有的話圖上中文是方框）'
+                    : $this->installHint('font') . '（沒有的話圖上中文是方框）'
             ),
 
             // 這項沒辦法從 PHP 內部確認，只能提醒
             ['排程有在跑', '？', 'crontab 要有 schedule:run（所有排程功能共用，不只匯率）'],
         ];
+    }
+
+    /**
+     * 依這台機器的套件管理器給安裝指令
+     *
+     * 原本一律寫 apt-get，但正式機是 RHEL 系（沒有 apt-get），
+     * 照著打會跑不動。偵測一次就不用每台機器問一遍。
+     *
+     * Chrome 在 RHEL 系沒有官方 repo，直接裝 rpm 比較省事。
+     *
+     * @param string $what chrome 或 font
+     * @return string
+     */
+    private function installHint($what)
+    {
+        $redhat = file_exists('/etc/redhat-release');
+        $installer = $redhat
+            ? (filled($this->which('dnf')) ? 'dnf' : 'yum')
+            : 'apt-get';
+
+        if ($what === 'chrome') {
+            return $redhat
+                ? "sudo {$installer} install -y https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm"
+                : "sudo {$installer} install -y google-chrome-stable";
+        }
+
+        return $redhat
+            ? "sudo {$installer} install -y google-noto-sans-cjk-ttc-fonts"
+            : "sudo {$installer} install -y fonts-noto-cjk";
+    }
+
+    /**
+     * 這個指令存在嗎
+     *
+     * @param string $command
+     * @return string|null
+     */
+    private function which($command)
+    {
+        foreach (['/usr/bin/', '/usr/local/bin/', '/bin/'] as $dir) {
+            if (is_executable($dir . $command)) {
+                return $dir . $command;
+            }
+        }
+
+        return null;
     }
 
     /**
