@@ -1,8 +1,6 @@
 # 後台帳號一律不自動回覆（內部人員名單）
 
-> **狀態：已實作，待跑 migration。**
-> `php artisan migrate`（只有 `user` 表 ALTER 加一欄，`user` 是小表）。
-> 沒跑之前面板與收訊判斷都會噴 `Unknown column 'telegram_user_id'`。
+> **狀態：已完成，migration 已跑、全分支實測通過（2026-10-02）。**
 
 ## 目標
 
@@ -226,7 +224,7 @@ TTL 600 秒。失效點：
 | `app/Http/Controllers/Admin/TelegramChatController.php` | `ajaxIgnoreMembers` 多回 `staff` / `staff_missing`；`ajaxMessages` 的 `ignored_names` 併入全域那批 |
 | `app/Models/User.php` | `telegram_user_id` 的 PHPDoc |
 | `config/constants.php` | `TELEGRAM.STAFF_IGNORE`（快取 key 與秒數） |
-| `resources/lang/{tw,cn,en}/telegram_chat.php` | 區塊標題、唯讀說明、未填提醒、永久識別 |
+| `resources/lang/{tw,cn,en}/telegram_chat.php` | 區塊標題、唯讀說明、未填提醒、永久識別的 hover 說明 |
 | `public/js/telegram-chat/ignore-member.js` | `buildStaffHtml()` 唯讀區塊 |
 | `config/changelog.php` | 一筆 |
 
@@ -236,23 +234,47 @@ TTL 600 秒。失效點：
 
 ## 上線注意
 
-- **要跑 migration**：`php artisan migrate`。沒跑之前面板與收訊判斷都會噴
-  `Unknown column 'telegram_user_id'`
-- 改了 `config/constants.php` → 容器內要跑 `php artisan optimize`
+- **migration 已跑**（2026-10-02）
 - **同事要去帳號管理填 Telegram 帳號**，沒填的人認不出來。面板的警告列
-  就是在講這件事
+  就是在講這件事 —— 目前本機只有兩個帳號，兩個都還沒填
 - ID 是**第一次發言時**才回填的，所以剛上線時大家都還只有 username ——
   這段期間改 username 仍會失效
 
-## 驗證到哪
+## 實測結果（2026-10-02）
+
+驗證腳本全程包在 transaction 裡並 rollback，**沒有留下任何資料變更**
+（事後逐欄確認還原：`telegram_user_id` / `telegram_username` / `status`
+都回到原值，名單筆數回到 0）。
+
+| 情境 | 預期 | 實測 |
+|---|---|---|
+| 名單為空（本機現況） | false | ✅ false |
+| 客人（不在名單） | false | ✅ false |
+| 發話者沒有 username | false | ✅ false |
+| `@Test_Staff_User` 命中（含 `@`、大寫） | true | ✅ true |
+| └ 回填 `telegram_user_id` | 寫入 | ✅ `8123456789` |
+| 改掉 username 後用舊 username | false | ✅ false |
+| 改掉 username 後用同一個 ID | true | ✅ true |
+| 清空 username、只剩 ID | true | ✅ true |
+| 帳號**停用** | false | ✅ false |
+| 帳號**鎖定** | false | ✅ false |
+| 面板 staff / missing | 1 筆 / `[localCS01]` | ✅ 相符 |
+| `usernames()`（灰標籤用） | 正規化後小寫 | ✅ `["mixedcase_name"]` |
+
+最後一項很關鍵：`usernames()` 回的是**正規化後**的值，而名冊
+（`telegram_group_member.username`）存的也是正規化後的值 ——
+兩邊格式一致，`getNamesByUsernames()` 的 `whereIn` 才比得到。
+任一邊忘記正規化，灰標籤就會整排不出現。
+
+其他驗證：
 
 - 全檔 `php -l`；`ignore-member.js` 容器內 `node --check`
 - `TelegramUsernamePresenter`：`" @AbC "` → `abc`、`@` → null、
-  `normalizeAll(["@Ming","ming","","Lee"])` → `["ming","lee"]`（去重、濾空）
+  `normalizeAll(["@Ming","ming","","Lee"])` → `["ming","lee"]`（去重濾空）
 - DI 解析：`StaffIgnoreService`、`TelegramChatService`、`AccountService`、
-  `TelegramChatController` 四個都解得出來（建構子多了參數，要確認沒有別處
-  手動 `new` —— grep 過，沒有）
-- **尚未驗證**：`isStaff()` 的實際命中與回填，要等 migration 跑完才測得到
+  `TelegramChatController` 四個都解得出來（建構子多了參數，grep 確認
+  沒有別處手動 `new`）
+- **尚未實測**：真的從 Telegram 發一則訊息走完 webhook（要同事先填好帳號）
 
 ## 相關
 
