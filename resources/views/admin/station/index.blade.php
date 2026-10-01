@@ -466,8 +466,9 @@
                             <input type="date" class="form-control" id="topup-filter-date-to">
                         </div>
                         {{-- 日期快捷：按下去直接帶入起訖並重新查詢，省掉再按一次搜尋 --}}
-                        <div class="col-12">
-                            <div class="d-flex flex-wrap gap-1">
+                        <div class="col-12 mt-2">
+                            {{-- gap-2 而不是 gap-1：六顆小按鈕排在一起，0.25rem 會黏成一條 --}}
+                            <div class="d-flex flex-wrap gap-2">
                                 @foreach([
                                     'today'      => 'today',
                                     'yesterday'  => 'yesterday',
