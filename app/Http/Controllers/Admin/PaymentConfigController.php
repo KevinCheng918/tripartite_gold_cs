@@ -95,6 +95,8 @@ class PaymentConfigController extends Controller
             'title'      => 'required|string|max:100',
             'content'    => 'required|string',
             'template'   => 'nullable|string',
+            // 餘點告警後面接的補點訊息，留空就不附加
+            'topup_template' => 'nullable|string|max:' . config('rules.TELEGRAM_TEMPLATE_MAX'),
             'image'      => 'nullable|image|max:5120',
             'sort_order' => 'nullable|integer',
         ]);
@@ -124,6 +126,8 @@ class PaymentConfigController extends Controller
             'title'      => 'sometimes|string|max:100',
             'content'    => 'sometimes|string',
             'template'   => 'nullable|string',
+            // 餘點告警後面接的補點訊息，留空就不附加
+            'topup_template' => 'nullable|string|max:' . config('rules.TELEGRAM_TEMPLATE_MAX'),
             'image'      => 'nullable|image|max:5120',
             'status'     => 'sometimes|integer|in:0,1',
             'sort_order' => 'nullable|integer',
@@ -228,10 +232,9 @@ class PaymentConfigController extends Controller
 
         try {
             $this->appSettingService->putMany([
-                AppSettingService::KEY_CREDIT_ALERT_TEMPLATE       => Arr::get($params, 'alert_template'),
-                AppSettingService::KEY_CREDIT_ALERT_TOPUP_TEMPLATE => Arr::get($params, 'topup_template'),
-                AppSettingService::KEY_CREDIT_ALERT_THRESHOLD      => Arr::get($params, 'threshold'),
-                AppSettingService::KEY_CREDIT_ALERT_COOLDOWN_DAYS  => Arr::get($params, 'cooldown_days'),
+                AppSettingService::KEY_CREDIT_ALERT_TEMPLATE      => Arr::get($params, 'alert_template'),
+                AppSettingService::KEY_CREDIT_ALERT_THRESHOLD     => Arr::get($params, 'threshold'),
+                AppSettingService::KEY_CREDIT_ALERT_COOLDOWN_DAYS => Arr::get($params, 'cooldown_days'),
             ], Auth::id());
 
             return response()->json(['message' => trans('payment_config.msg.alert_saved')]);

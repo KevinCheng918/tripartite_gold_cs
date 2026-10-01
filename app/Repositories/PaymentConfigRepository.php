@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Collection;
 class PaymentConfigRepository
 {
     private const COLUMNS = [
-        'id', 'system_id', 'title', 'content', 'template',
+        'id', 'system_id', 'title', 'content', 'template', 'topup_template',
         'image', 'status', 'sort_order', 'created_at',
     ];
 

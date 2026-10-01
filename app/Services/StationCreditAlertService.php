@@ -148,23 +148,8 @@ class StationCreditAlertService
                 AppSettingService::KEY_CREDIT_ALERT_COOLDOWN_DAYS,
                 (int) $defaults['COOLDOWN_DAYS']
             ),
-            'template'       => $this->alertTemplate(),
-            'topup_template' => $this->topupTemplate(),
+            'template' => $this->alertTemplate(),
         ];
-    }
-
-    /**
-     * 補點訊息的公版（繳款設定頁維護，沒設過就用 constants 的預設）
-     *
-     * @return string
-     */
-    public function topupTemplate()
-    {
-        $template = $this->appSettingService->get(AppSettingService::KEY_CREDIT_ALERT_TOPUP_TEMPLATE);
-
-        return filled($template)
-            ? $template
-            : (string) config('constants.STATION.CREDIT_ALERT.TOPUP_TEMPLATE');
     }
 
     /**
@@ -545,10 +530,45 @@ class StationCreditAlertService
             return '';
         }
 
-        return strtr($this->topupTemplate(), [
+        $template = $this->topupTemplateFor($station);
+
+        if (blank($template)) {
+            return '';
+        }
+
+        /*
+         * 前面補兩個換行當分隔。
+         *
+         * 公版是客服在表單裡打的，不會（也不該要求他們）自己在開頭留空行 ——
+         * 不加的話補點訊息會直接黏在告警的最後一行後面。
+         */
+        return "\n\n" . strtr($template, [
             '{rate}'    => $this->formatCredits($rate),
             '{station}' => $station->name,
         ]);
+    }
+
+    /**
+     * 這個站台所屬系統的補點訊息公版
+     *
+     * 跟著繳款設定走（payment_config.topup_template）而不是全域一份 ——
+     * **不同系統的收款方式不一樣**，補點訊息要講的匯款資訊自然也不同。
+     *
+     * 同一個系統有多筆繳款設定時取第一筆啟用的，與繳款通知的取法一致
+     * （見 VmController::ajaxSendPaymentNotice）。
+     *
+     * @param Station $station
+     * @return string|null 沒設定、或這個系統沒有繳款設定時回 null（就不附加）
+     */
+    private function topupTemplateFor(Station $station)
+    {
+        if (blank($station->system_id)) {
+            return null;
+        }
+
+        $config = $this->paymentConfigService->getActiveBySystem((int) $station->system_id)->first();
+
+        return filled($config) ? $config->topup_template : null;
     }
 
     /**

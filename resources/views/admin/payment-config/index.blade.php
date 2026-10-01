@@ -53,15 +53,6 @@
                                   @if(!Auth::user()->hasPermission('payment_config.manage')) disabled @endif>{{ $alertSetting['template'] }}</textarea>
                         <small class="text-muted">{{ trans('payment_config.alert_template_hint') }}</small>
                     </div>
-                    <div class="col-12">
-                        <label class="form-label fw-bold" for="pc-topup-template">{{ trans('payment_config.topup_field_template') }}</label>
-                        <textarea class="form-control" id="pc-topup-template" rows="4"
-                                  @if(!Auth::user()->hasPermission('payment_config.manage')) disabled @endif>{{ $alertSetting['topup_template'] }}</textarea>
-                        <small class="text-muted">{{ trans('payment_config.topup_template_hint') }}</small>
-                        <div class="alert alert-info mt-2 mb-0 py-2">
-                            <small><i class="fas fa-info-circle me-1"></i>{{ trans('payment_config.topup_condition_hint') }}</small>
-                        </div>
-                    </div>
                 </div>
 
                 <div class="alert alert-info mt-3 mb-0 py-2">
@@ -131,6 +122,7 @@
                                 data-title="{{ $config->title }}"
                                 data-content="{{ $config->content }}"
                                 data-template="{{ $config->template }}"
+                                data-topup-template="{{ $config->topup_template }}"
                                 data-status="{{ $config->status }}"
                                 data-sort="{{ $config->sort_order }}">
                             <i class="fas fa-edit me-1"></i>{{ trans('payment_config.action_edit') }}
@@ -196,6 +188,14 @@
                             <label class="form-label">{{ trans('payment_config.field_template') }}</label>
                             <textarea id="config-template" class="form-control" rows="5" placeholder="{{ trans('payment_config.template_example') }}"></textarea>
                             <small class="text-muted">{{ trans('payment_config.template_hint') }}</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{{ trans('payment_config.topup_field_template') }}</label>
+                            <textarea id="config-topup-template" class="form-control" rows="4" placeholder="{{ trans('payment_config.topup_template_example') }}"></textarea>
+                            <small class="text-muted">{{ trans('payment_config.topup_template_hint') }}</small>
+                            <div class="alert alert-info mt-2 mb-0 py-2">
+                                <small><i class="fas fa-info-circle me-1"></i>{{ trans('payment_config.topup_condition_hint') }}</small>
+                            </div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('payment_config.field_image') }}</label>
@@ -284,6 +284,7 @@ $(function () {
         $('#config-title').val($btn.data('title'));
         $('#config-content').val($btn.data('content'));
         $('#config-template').val($btn.data('template'));
+        $('#config-topup-template').val($btn.data('topup-template'));
         $('#config-sort').val($btn.data('sort'));
         $('#config-image').val('');
         $('#modal-payment-config .modal-title').text('{{ trans("payment_config.action_edit") }}');
@@ -301,6 +302,7 @@ $(function () {
         formData.append('title', $('#config-title').val());
         formData.append('content', $('#config-content').val());
         formData.append('template', $('#config-template').val());
+        formData.append('topup_template', $('#config-topup-template').val());
         formData.append('sort_order', $('#config-sort').val());
 
         var imageFile = document.getElementById('config-image').files[0];
@@ -399,7 +401,7 @@ $(function () {
 
     $('#btn-pc-alert-save').on('click', function () {
         var $btn = $(this);
-        var $fields = $('#pc-alert-threshold, #pc-alert-cooldown, #pc-alert-template, #pc-topup-template');
+        var $fields = $('#pc-alert-threshold, #pc-alert-cooldown, #pc-alert-template');
 
         // 存檔中鎖住欄位，避免等回傳的空檔又被改掉
         $btn.prop('disabled', true);
@@ -411,7 +413,6 @@ $(function () {
             headers: { 'X-CSRF-TOKEN': csrfToken },
             data: {
                 alert_template: $('#pc-alert-template').val(),
-                topup_template: $('#pc-topup-template').val(),
                 threshold: $('#pc-alert-threshold').val(),
                 cooldown_days: $('#pc-alert-cooldown').val()
             },
