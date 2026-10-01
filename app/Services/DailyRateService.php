@@ -696,16 +696,25 @@ class DailyRateService
          * yesterday_rate 欄位仍然留著：它是報價當下的快照，供事後查歷史，
          * 只是渲染訊息時不依賴它。
          */
-        $previousRate = filled($previous) ? $previous->rate : null;
+        /*
+         * 完全沒有上次報價時（第一次啟用、或之前都沒人回覆），
+         * 把提到它的那幾行整行拿掉 —— 留著會變成
+         * 「上次報價（—）：無」這種半截訊息，看的人會以為壞了。
+         *
+         * 公版是客服自己維護的，不該要求他們去處理「沒有上次報價」這種情況。
+         */
+        if (blank($previous)) {
+            $template = preg_replace('/^[^\n]*\{yesterday[^\n]*\n?/m', '', $template);
+        }
 
         return strtr($template, [
             '{date}'      => $record->date->format('Y/m/d'),
             '{reference}' => filled($record->reference_rate) ? $this->format($record->reference_rate) : '取不到',
             '{suggested}' => filled($record->suggested_rate) ? $this->format($record->suggested_rate) : '取不到',
-            '{yesterday}' => filled($previousRate) ? $this->format($previousRate) : '無',
             // 完整年月日。上次報價未必是昨天（週末沒人回、或隔了幾天），
             // 只給月日的話看的人得自己想是哪一年、差了多久
-            '{yesterday_date}' => filled($previous) ? $previous->date->format('Y/m/d') : '—',
+            '{yesterday}'      => filled($previous) ? $this->format($previous->rate) : '',
+            '{yesterday_date}' => filled($previous) ? $previous->date->format('Y/m/d') : '',
         ]);
     }
 
