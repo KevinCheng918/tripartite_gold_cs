@@ -4,6 +4,7 @@ namespace App\Repositories;
 
 use App\Models\DailyRate;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * 每日匯率 Repository
@@ -16,6 +17,19 @@ class DailyRateRepository
         'ask_message_id', 'asked_at', 'replied_by', 'replied_at',
         'remind_count', 'last_reminded_at',
     ];
+
+    /**
+     * 資料表建好了沒
+     *
+     * 給上線前檢查用（`rate:check`）—— migration 還沒跑的話，
+     * 整個功能的任何查詢都會直接噴 SQL 錯誤。
+     *
+     * @return bool
+     */
+    public function tableExists()
+    {
+        return Schema::hasTable((new DailyRate())->getTable());
+    }
 
     /**
      * 查某一天

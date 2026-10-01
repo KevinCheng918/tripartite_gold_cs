@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Models\DailyRate;
 use App\Repositories\DailyRateRepository;
+use App\Repositories\QuickReplyRepository;
 use App\Repositories\UserRepository;
+use HeadlessChromium\BrowserFactory;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
@@ -29,6 +31,7 @@ class DailyRateService
     private const CAPTION_MAX = 1024;
 
     private $rateRepository;
+    private $quickReplyRepository;
     private $usdtRateService;
     private $supportGroup;
     private $userRepository;
@@ -37,6 +40,7 @@ class DailyRateService
 
     public function __construct(
         DailyRateRepository $rateRepository,
+        QuickReplyRepository $quickReplyRepository,
         UsdtRateService $usdtRateService,
         SupportGroupService $supportGroup,
         UserRepository $userRepository,
@@ -44,6 +48,8 @@ class DailyRateService
         ScreenshotService $screenshotService
     ) {
         $this->rateRepository = $rateRepository;
+        // 只有上線檢查用得到：確認題庫的匯率題建了沒
+        $this->quickReplyRepository = $quickReplyRepository;
         $this->usdtRateService = $usdtRateService;
         $this->supportGroup = $supportGroup;
         $this->userRepository = $userRepository;
@@ -571,6 +577,33 @@ class DailyRateService
         }
 
         return ['ok' => true, 'binary' => $this->screenshotService->binaryPath()];
+    }
+
+    /**
+     * 上線前置條件的狀態
+     *
+     * 給 `rate:check` 用。這裡只回「是什麼狀態」，顯示文字與該怎麼修
+     * 由 Command 決定 —— 同一份狀態之後要搬到後台頁面也不用改這裡。
+     *
+     * @return array{table: bool, group: bool, item: bool, template: bool,
+     *     chrome: string|null, fonts: int, package: bool}
+     */
+    public function readiness()
+    {
+        return [
+            // 必要：缺了功能完全不會動
+            'table'    => $this->rateRepository->tableExists(),
+            'group'    => $this->supportGroup->isConfigured(),
+            'item'     => filled($this->quickReplyRepository->findItemByImportKey(
+                (string) config('constants.DAILY_RATE.QUICK_REPLY_KEY')
+            )),
+            'package'  => class_exists(BrowserFactory::class),
+
+            // 選用：缺了只是沒有圖／用預設公版，報價照常
+            'template' => filled($this->appSettingService->get(AppSettingService::KEY_DAILY_RATE_TEMPLATE)),
+            'chrome'   => $this->screenshotService->binaryPath(),
+            'fonts'    => $this->screenshotService->chineseFontCount(),
+        ];
     }
 
     /**

@@ -96,6 +96,32 @@ class ScreenshotService
     }
 
     /**
+     * 系統裝了幾個中文字型
+     *
+     * 純 CLI 的伺服器通常一個都沒有 —— 要截的網站是中文的話，
+     * 沒字型截出來會是一排方框，**而且不會有任何錯誤訊息**，
+     * 只會得到一張看起來很正常但全是豆腐塊的圖。
+     *
+     * @return int 沒有 fc-list 指令時回 -1（無法判斷，不要謊報成「有」）
+     */
+    public function chineseFontCount()
+    {
+        try {
+            $process = new Process(['fc-list', ':lang=zh']);
+            $process->setTimeout(10);
+            $process->run();
+        } catch (\Exception $e) {
+            return -1;
+        }
+
+        if (!$process->isSuccessful()) {
+            return -1;
+        }
+
+        return count(array_filter(explode("\n", trim($process->getOutput()))));
+    }
+
+    /**
      * 截一張圖
      *
      * 有給 selector 就只截那個元素，沒給就截整個視窗。

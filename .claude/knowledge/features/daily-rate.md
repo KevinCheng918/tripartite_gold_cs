@@ -271,6 +271,37 @@ X=0  Y=60  WIDTH=1035  HEIGHT=660
 
 「立即報價」會覆蓋今天已經報過的那則，所以有確認視窗。
 
+## `rate:check`：一次看清楚還缺什麼
+
+```bash
+php artisan rate:check
+```
+
+在要部署的那台機器上跑。純檢查、不改任何東西、不發訊息，隨時可以跑。
+
+分兩種：
+
+| | 缺了會怎樣 |
+|---|---|
+| **必要**（資料表、內部群組、題庫題目、chrome-php 套件） | 功能完全不會動 |
+| **選用**（Chrome、中文字型、自訂公版） | 只是沒有圖／用預設公版，報價照常 |
+
+狀態由 `DailyRateService::readiness()` 判斷，Command 只負責排版與
+「該怎麼修」的文案 —— 之後要搬到後台頁面也不用動 Service。
+
+### ⚠ 中文字型
+
+純 CLI 的伺服器通常一個中文字型都沒有。MAX 的介面是中文的 ——
+沒字型截出來會是**一排方框**，而且**不會有任何錯誤訊息**，
+只會得到一張看起來很正常但全是豆腐塊的圖。
+
+```bash
+apt-get install -y fonts-noto-cjk
+```
+
+`chineseFontCount()` 用 `fc-list :lang=zh` 數。沒有 `fc-list` 指令時回 `-1`
+當作「無法判斷」，不謊報成 0 —— 免得在沒有 fontconfig 的環境被誤導。
+
 ## 上線前要做的三件事
 
 1. `php artisan migrate`
