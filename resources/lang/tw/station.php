@@ -64,6 +64,14 @@ return [
         'update_failed' => '站台更新失敗',
         'sync_success'  => '點數同步成功',
         'sync_failed'   => '點數同步失敗（API 未設定或連線異常）',
+
+        // 手動補點通知
+        'topup_notice_sent'            => '補點通知已發送給客戶，當前點數 :credits',
+        'topup_notice_above_threshold' => '點數高於門檻，仍依您的指示發送',
+        'topup_notice_no_rate'         => '今日匯率尚未決定，未附補點訊息',
+        'topup_notice_no_group'        => '此站台未設定 Telegram 群組，沒有地方可以發',
+        'topup_notice_sync_failed'     => '點數同步失敗，沒有發送（避免送出過期的數字）',
+        'topup_notice_send_failed'     => '發送失敗，詳見 log',
     ],
 
     // 補點

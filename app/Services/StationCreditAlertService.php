@@ -154,6 +154,87 @@ class StationCreditAlertService
     }
 
     /**
+     * 手動發送補點通知給客戶
+     *
+     * 站台列表那顆按鈕。跟每天的自動告警差在：
+     *
+     * | | 自動 | 手動 |
+     * |---|---|---|
+     * | 點數高於門檻 | 不發 | **照發** |
+     * | 冷卻期內 | 不發 | **照發** |
+     * | 有補點單待審核 | 改發內部群組 | **照發給客戶** |
+     * | 站台沒設群組 | 退到內部群組 | **擋下來並說明** |
+     *
+     * 自動流程的那些保護是為了「不要亂吵客戶」；手動是人按的，
+     * 按的人知道自己要做什麼，不該替他擋。只有「沒有群組」會擋 ——
+     * 那不是判斷問題，是真的沒地方發。
+     *
+     * 會先同步一次點數，訊息裡的數字才是當下的。
+     *
+     * @param Station  $station
+     * @param int|null $userId 操作者，記 log 用
+     * @return array{ok: bool, reason: string|null, credits: float|null,
+     *     below: bool, has_topup: bool, has_image: bool}
+     */
+    public function sendManual(Station $station, $userId = null)
+    {
+        if (blank($station->telegram_group_id)) {
+            return ['ok' => false, 'reason' => 'no_group'];
+        }
+
+        // 先同步，訊息裡的點數才是當下的；同步不到就不要發一個過期的數字
+        if (blank($this->stationService->syncInfo($station))) {
+            return ['ok' => false, 'reason' => 'sync_failed'];
+        }
+
+        $settings = $this->globalSettings();
+        $threshold = $this->thresholdFor($station, $settings['threshold']);
+        $credits = (float) $station->credits;
+
+        $topup = $this->topupMessage($station);
+        $text = $this->renderAlert($settings['template'], $station->name, $credits, $threshold) . $topup;
+        $imageUrl = $this->topupImage($station, $topup);
+
+        try {
+            $this->sendToStation($station, $text, $imageUrl);
+        } catch (\Exception $e) {
+            Log::error('手動補點通知發送失敗', [
+                'station_id' => $station->id,
+                'station'    => $station->name,
+                'error'      => $e->getMessage(),
+            ]);
+
+            return ['ok' => false, 'reason' => 'send_failed'];
+        }
+
+        /*
+         * 手動發了也要記 credit_alerted_at。
+         *
+         * 不記的話，明天早上的自動告警會再發一次同樣的東西 ——
+         * 對客戶來說那是重複打擾，他分不出一個是人按的、一個是排程。
+         */
+        $this->stationRepository->update($station, ['credit_alerted_at' => now()]);
+
+        Log::info('手動補點通知已送出', [
+            'station_id' => $station->id,
+            'station'    => $station->name,
+            'credits'    => $credits,
+            'threshold'  => $threshold,
+            'below'      => $credits < $threshold,
+            'user_id'    => $userId,
+        ]);
+
+        return [
+            'ok'        => true,
+            'reason'    => null,
+            'credits'   => $credits,
+            'below'     => $credits < $threshold,
+            'has_topup' => filled($topup),
+            'has_image' => filled($imageUrl),
+        ];
+    }
+
+    /**
      * 測試發送：把這筆繳款設定的補點訊息發到內部支援群組
      *
      * 發的是**完整的告警 + 補點訊息 + 圖**，不是只有補點訊息那一段 ——

@@ -282,6 +282,11 @@
                                         <button class="btn btn-sm btn-outline-secondary js-sync-credits" data-id="{{ $station->id }}">
                                             <i class="fas fa-sync-alt me-1"></i>同步
                                         </button>
+                                        <button class="btn btn-sm btn-outline-secondary js-send-topup-notice"
+                                                data-id="{{ $station->id }}"
+                                                data-name="{{ $station->name }}">
+                                            <i class="fas fa-paper-plane me-1"></i>補點通知
+                                        </button>
                                         <button class="btn btn-sm btn-outline-secondary js-change-station-status"
                                                 data-id="{{ $station->id }}"
                                                 data-status="{{ $station->status }}">
@@ -374,6 +379,11 @@
                             </button>
                             <button class="btn btn-sm btn-outline-secondary js-sync-credits" data-id="{{ $station->id }}">
                                 <i class="fas fa-sync-alt me-1"></i>同步
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary js-send-topup-notice"
+                                    data-id="{{ $station->id }}"
+                                    data-name="{{ $station->name }}">
+                                <i class="fas fa-paper-plane me-1"></i>補點通知
                             </button>
                             <button class="btn btn-sm btn-outline-secondary js-change-station-status"
                                     data-id="{{ $station->id }}"
@@ -748,6 +758,25 @@
     </div>
 
     {{-- 訊息 Modal --}}
+    {{-- 手動補點通知的確認：這會真的發給客戶 --}}
+    <div class="modal fade" id="modal-topup-notice-confirm" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-body text-center py-4">
+                    <p class="mb-2">確定要發送補點通知給 <strong id="topup-notice-station"></strong> 嗎？</p>
+                    <small class="text-muted">
+                        會先同步點數，然後<strong>不論是否低於門檻都發送</strong>給客戶。<br>
+                        今日匯率尚未決定時不會附上補點訊息。
+                    </small>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="btn-confirm-topup-notice">確定發送</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="modal-station-msg" tabindex="-1">
         <div class="modal-dialog modal-sm">
             <div class="modal-content">
@@ -1000,6 +1029,43 @@ $(function () {
     });
 
     // 同步點數
+    /*
+     * 手動補點通知：這會真的發訊息給客戶，所以要先確認。
+     * 跟「同步」不一樣 —— 同步只是更新數字，按錯了沒有外部影響。
+     */
+    var topupNoticeId = null;
+    $('.js-send-topup-notice').on('click', function () {
+        topupNoticeId = $(this).data('id');
+        $('#topup-notice-station').text($(this).data('name'));
+        showBsModal('modal-topup-notice-confirm');
+    });
+
+    $('#btn-confirm-topup-notice').on('click', function () {
+        if (!topupNoticeId) { return; }
+
+        var $btn = $(this);
+        $btn.prop('disabled', true);
+
+        $.ajax({
+            url: '/admin/stations/ajax-send-topup-notice/' + topupNoticeId,
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            success: function (body) {
+                hideBsModal(document.getElementById('modal-topup-notice-confirm'));
+                showMessage(body.message || '補點通知已發送');
+                // 有同步點數，關掉訊息後重整才看得到新數字
+                $('#modal-station-msg').off('hidden.bs.modal.reload').on('hidden.bs.modal.reload', function () {
+                    location.reload();
+                });
+            },
+            error: function (xhr) {
+                hideBsModal(document.getElementById('modal-topup-notice-confirm'));
+                showMessage((xhr.responseJSON && xhr.responseJSON.message) || '發送失敗');
+            },
+            complete: function () { $btn.prop('disabled', false); }
+        });
+    });
+
     $('.js-sync-credits').on('click', function () {
         var id = $(this).data('id');
         var $btn = $(this);

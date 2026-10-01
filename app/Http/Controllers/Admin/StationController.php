@@ -4,14 +4,17 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\CreditTopupResource;
+use App\Presenters\NumberPresenter;
 use App\Http\Resources\StationResource;
 use App\Models\CreditTopup;
 use App\Models\Station;
 use App\Repositories\UserRepository;
 use App\Services\CreditTopupService;
 use App\Services\ImageUploadService;
+use App\Services\StationCreditAlertService;
 use App\Services\StationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
@@ -24,17 +27,21 @@ class StationController extends Controller
     private $topupService;
     private $imageUploadService;
     private $userRepository;
+    private $creditAlertService;
 
     public function __construct(
         StationService $stationService,
         CreditTopupService $topupService,
         ImageUploadService $imageUploadService,
-        UserRepository $userRepository
+        UserRepository $userRepository,
+        StationCreditAlertService $creditAlertService
     ) {
         $this->stationService = $stationService;
         $this->topupService = $topupService;
         $this->imageUploadService = $imageUploadService;
         $this->userRepository = $userRepository;
+        // 手動發送補點通知
+        $this->creditAlertService = $creditAlertService;
     }
 
     /**
@@ -186,6 +193,44 @@ class StationController extends Controller
 
             return response()->json(['message' => trans('station.msg.sync_failed')], 500);
         }
+    }
+
+    /**
+     * Ajax 手動發送補點通知給客戶
+     *
+     * 會先同步點數，然後**不管有沒有低於門檻都發**。
+     * 自動告警的那些保護（門檻、冷卻、有待審核就改發內部）是為了不要亂吵客戶，
+     * 手動是人按的，不該替他擋。
+     *
+     * @param Station $station
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxSendTopupNotice(Station $station)
+    {
+        $result = $this->creditAlertService->sendManual($station, Auth::id());
+
+        if (Arr::get($result, 'ok') !== true) {
+            $reason = (string) Arr::get($result, 'reason');
+
+            return response()->json(['message' => trans("station.msg.topup_notice_{$reason}")], 422);
+        }
+
+        // 把這次實際送出的狀況講清楚：點數、有沒有低於門檻、補點訊息附了沒
+        $notes = [];
+
+        if (Arr::get($result, 'below') !== true) {
+            $notes[] = trans('station.msg.topup_notice_above_threshold');
+        }
+
+        if (Arr::get($result, 'has_topup') !== true) {
+            $notes[] = trans('station.msg.topup_notice_no_rate');
+        }
+
+        return response()->json([
+            'message' => trans('station.msg.topup_notice_sent', [
+                'credits' => NumberPresenter::trimZeros(Arr::get($result, 'credits'), 2),
+            ]) . (filled($notes) ? '（' . implode('、', $notes) . '）' : ''),
+        ]);
     }
 
     /**
