@@ -550,12 +550,26 @@ class DailyRateService
      */
     private function renderAskText($template, DailyRate $record, $previous)
     {
+        /*
+         * 上次報價的「金額」與「日期」都從 $previous 取，不要一個讀
+         * $record->yesterday_rate、一個讀 $previous->date ——
+         * 那兩個在實際發送時剛好一致（ask() 前一行才把快照寫進去），
+         * 但預覽沒有那一步，就會變成「上次報價（2026/09/28）：無」，
+         * 日期有、金額卻空著。
+         *
+         * yesterday_rate 欄位仍然留著：它是報價當下的快照，供事後查歷史，
+         * 只是渲染訊息時不依賴它。
+         */
+        $previousRate = filled($previous) ? $previous->rate : null;
+
         return strtr($template, [
-            '{date}'           => $record->date->format('Y/m/d'),
-            '{reference}'      => filled($record->reference_rate) ? $this->format($record->reference_rate) : '取不到',
-            '{suggested}'      => filled($record->suggested_rate) ? $this->format($record->suggested_rate) : '取不到',
-            '{yesterday}'      => filled($record->yesterday_rate) ? $this->format($record->yesterday_rate) : '無',
-            '{yesterday_date}' => filled($previous) ? $previous->date->format('m/d') : '—',
+            '{date}'      => $record->date->format('Y/m/d'),
+            '{reference}' => filled($record->reference_rate) ? $this->format($record->reference_rate) : '取不到',
+            '{suggested}' => filled($record->suggested_rate) ? $this->format($record->suggested_rate) : '取不到',
+            '{yesterday}' => filled($previousRate) ? $this->format($previousRate) : '無',
+            // 完整年月日。上次報價未必是昨天（週末沒人回、或隔了幾天），
+            // 只給月日的話看的人得自己想是哪一年、差了多久
+            '{yesterday_date}' => filled($previous) ? $previous->date->format('Y/m/d') : '—',
         ]);
     }
 
