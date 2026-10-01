@@ -42,7 +42,9 @@ return [
     'action_edit'   => '编辑',
     'action_delete' => '删除',
     'action_copy'   => '复制文案',
-    'action_send'   => '发送通知',
+    'action_send'       => '发送通知',
+    'action_test_topup' => '测试补点讯息',
+    'test_topup_hint'   => '把完整的余点告警＋补点讯息＋图片发到内部支援群组，不会发给客户',
 
     'msg' => [
         'created'       => '缴款设定已新增',
@@ -58,6 +60,13 @@ return [
         'no_telegram'   => '此站台未设定 Telegram 群组',
 
         // 余点告警设定
+        'test_topup_sent'              => '测试讯息已发到内部支援群组（含补点讯息与图片）',
+        'test_topup_sent_no_image'     => '测试讯息已发到内部支援群组。这笔缴款设定没有图片，所以没有附图',
+        'test_topup_sent_no_rate'      => '测试讯息已发到内部支援群组。今天的汇率还没决定，所以没有附上补点讯息',
+        'test_topup_no_template'       => '这笔缴款设定还没填补点讯息',
+        'test_topup_no_support_group'  => '尚未设定内部支援群组，没有地方可以发',
+        'test_topup_send_failed'       => '发送失败，详见 log',
+
         'alert_saved'              => '告警设定已储存',
         'alert_save_failed'        => '告警设定储存失败',
         'alert_template_required'  => '请填写告警公版',

@@ -154,6 +154,90 @@ class StationCreditAlertService
     }
 
     /**
+     * 測試發送：把這筆繳款設定的補點訊息發到內部支援群組
+     *
+     * 發的是**完整的告警 + 補點訊息 + 圖**，不是只有補點訊息那一段 ——
+     * 補點訊息的意義在於接在告警後面，單獨看看不出實際效果。
+     *
+     * 一律發內部群組，不會送到客戶那邊。
+     *
+     * @param \App\Models\PaymentConfig $config
+     * @return array{ok: bool, reason: string|null, has_rate: bool, has_image: bool}
+     */
+    public function testTopupMessage($config)
+    {
+        if (!$this->supportGroup->isConfigured()) {
+            return ['ok' => false, 'reason' => 'no_support_group'];
+        }
+
+        if (blank($config->topup_template)) {
+            return ['ok' => false, 'reason' => 'no_template'];
+        }
+
+        $station = $this->sampleStationFor($config);
+        $settings = $this->globalSettings();
+
+        // 先把這個系統的設定塞進快取，topupMessage 就會拿到這一筆而不是重查
+        $this->paymentConfigs[(int) $config->system_id] = $config;
+
+        $topup = $this->topupMessage($station);
+        $rate = $this->todayRate();
+
+        $text = (string) config('constants.STATION.CREDIT_ALERT.TEST_PREFIX')
+            . $this->renderAlert($settings['template'], $station->name, (float) $station->credits, $settings['threshold'])
+            . $topup;
+
+        if (blank($topup)) {
+            // 匯率還沒決定時補一句，免得看的人以為補點訊息壞了
+            $text .= (string) config('constants.STATION.CREDIT_ALERT.TEST_NO_RATE_NOTE');
+        }
+
+        $imageUrl = $this->topupImage($station, $topup);
+
+        $sent = filled($imageUrl)
+            ? $this->supportGroup->sendPhoto($imageUrl, $text)
+            : $this->supportGroup->send($text);
+
+        if (blank(Arr::get($sent, 'result'))) {
+            Log::error('補點訊息測試發送失敗', ['config_id' => $config->id, 'response' => $sent]);
+
+            return ['ok' => false, 'reason' => 'send_failed'];
+        }
+
+        return [
+            'ok'        => true,
+            'reason'    => null,
+            'has_rate'  => filled($rate),
+            'has_image' => filled($imageUrl),
+        ];
+    }
+
+    /**
+     * 測試用的範例站台
+     *
+     * 優先拿這個系統底下真實的站台（名稱與點數才像真的）。
+     * 一個都沒有就捏一筆 —— 測試不該因為「這個系統還沒有站台」就做不了。
+     *
+     * @param \App\Models\PaymentConfig $config
+     * @return Station
+     */
+    private function sampleStationFor($config)
+    {
+        $station = $this->stationRepository->firstBySystem((int) $config->system_id);
+
+        if (filled($station)) {
+            return $station;
+        }
+
+        $sample = new Station();
+        $sample->name = (string) config('constants.STATION.CREDIT_ALERT.TEST_STATION_NAME');
+        $sample->system_id = $config->system_id;
+        $sample->credits = (float) config('constants.STATION.CREDIT_ALERT.TEST_CREDITS');
+
+        return $sample;
+    }
+
+    /**
      * 全域告警設定（繳款設定頁維護，沒設過就用 constants 的預設）
      *
      * @return array{threshold:float, cooldown_days:int, template:string}

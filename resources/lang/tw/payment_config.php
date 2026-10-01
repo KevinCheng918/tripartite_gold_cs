@@ -42,7 +42,9 @@ return [
     'action_edit'   => '編輯',
     'action_delete' => '刪除',
     'action_copy'   => '複製文案',
-    'action_send'   => '發送通知',
+    'action_send'       => '發送通知',
+    'action_test_topup' => '測試補點訊息',
+    'test_topup_hint'   => '把完整的餘點告警＋補點訊息＋圖片發到內部支援群組，不會發給客戶',
 
     'msg' => [
         'created'       => '繳款設定已新增',
@@ -58,6 +60,13 @@ return [
         'no_telegram'   => '此站台未設定 Telegram 群組',
 
         // 餘點告警設定
+        'test_topup_sent'              => '測試訊息已發到內部支援群組（含補點訊息與圖片）',
+        'test_topup_sent_no_image'     => '測試訊息已發到內部支援群組。這筆繳款設定沒有圖片，所以沒有附圖',
+        'test_topup_sent_no_rate'      => '測試訊息已發到內部支援群組。今天的匯率還沒決定，所以沒有附上補點訊息',
+        'test_topup_no_template'       => '這筆繳款設定還沒填補點訊息',
+        'test_topup_no_support_group'  => '尚未設定內部支援群組，沒有地方可以發',
+        'test_topup_send_failed'       => '發送失敗，詳見 log',
+
         'alert_saved'              => '告警設定已儲存',
         'alert_save_failed'        => '告警設定儲存失敗',
         'alert_template_required'  => '請填寫告警公版',

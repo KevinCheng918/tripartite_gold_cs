@@ -127,6 +127,13 @@
                                 data-sort="{{ $config->sort_order }}">
                             <i class="fas fa-edit me-1"></i>{{ trans('payment_config.action_edit') }}
                         </button>
+                        @if(filled($config->topup_template))
+                            <button class="btn btn-sm btn-outline-secondary js-test-topup"
+                                    data-id="{{ $config->id }}"
+                                    title="{{ trans('payment_config.test_topup_hint') }}">
+                                <i class="fas fa-paper-plane me-1"></i>{{ trans('payment_config.action_test_topup') }}
+                            </button>
+                        @endif
                         <button class="btn btn-sm btn-outline-secondary js-delete-config" data-id="{{ $config->id }}" data-title="{{ $config->title }}" data-system="{{ $config->system ? $config->system->name : '-' }}">
                             <i class="fas fa-trash me-1"></i>{{ trans('payment_config.action_delete') }}
                         </button>
@@ -355,6 +362,25 @@ $(function () {
                 hideBsModal(document.getElementById('modal-pc-confirm'));
                 showMessage((xhr.responseJSON && xhr.responseJSON.message) || '刪除失敗');
             }
+        });
+    });
+
+    // 測試補點訊息：只發到內部支援群組，客戶收不到，所以不用確認視窗
+    $('.js-test-topup').on('click', function () {
+        var $btn = $(this);
+        $btn.prop('disabled', true);
+
+        $.ajax({
+            url: '/admin/payment-config/ajax-test-topup/' + $btn.data('id'),
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            success: function (body) {
+                showMessage(body.message || '已發送');
+            },
+            error: function (xhr) {
+                showMessage((xhr.responseJSON && xhr.responseJSON.message) || '發送失敗');
+            },
+            complete: function () { $btn.prop('disabled', false); }
         });
     });
 

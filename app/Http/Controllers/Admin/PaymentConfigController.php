@@ -189,6 +189,33 @@ class PaymentConfigController extends Controller
     }
 
     /**
+     * Ajax 測試發送補點訊息
+     *
+     * 發的是完整的「告警 + 補點訊息 + 圖」，而且**只發到內部支援群組** ——
+     * 測試不該打擾客戶。
+     *
+     * @param PaymentConfig $config
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxTestTopup(PaymentConfig $config)
+    {
+        $result = $this->creditAlertService->testTopupMessage($config);
+
+        if (Arr::get($result, 'ok') !== true) {
+            $reason = (string) Arr::get($result, 'reason');
+
+            return response()->json(['message' => trans("payment_config.msg.test_topup_{$reason}")], 422);
+        }
+
+        // 匯率未定或沒圖都不算失敗，但要講清楚這次送出去的少了什麼
+        $key = Arr::get($result, 'has_rate') === true
+            ? (Arr::get($result, 'has_image') === true ? 'test_topup_sent' : 'test_topup_sent_no_image')
+            : 'test_topup_sent_no_rate';
+
+        return response()->json(['message' => trans("payment_config.msg.{$key}")]);
+    }
+
+    /**
      * Ajax 渲染模板文案
      *
      * @param Request $request

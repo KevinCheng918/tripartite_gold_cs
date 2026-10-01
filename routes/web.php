@@ -194,6 +194,8 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::post('/ajax-render-template', [PaymentConfigController::class, 'ajaxRenderTemplate'])->middleware('can:payment_config.view')->name('ajax-render-template');
         // 站台餘點告警的公版與門檻（全站台共用一份，存 app_setting）
         Route::post('/ajax-alert-setting', [PaymentConfigController::class, 'ajaxUpdateAlertSetting'])->middleware('can:payment_config.manage')->name('ajax-alert-setting');
+        // 補點訊息測試發送：會真的發訊息（到內部群組），所以要 manage
+        Route::post('/ajax-test-topup/{config}', [PaymentConfigController::class, 'ajaxTestTopup'])->middleware('can:payment_config.manage')->name('ajax-test-topup');
     });
 
     // 任務看板
