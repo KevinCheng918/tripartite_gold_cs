@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Contracts\AutoReplyMatcher;
 use App\Models\TelegramGroup;
 use App\Repositories\QuickReplyRepository;
+use App\Repositories\StationRepository;
 use App\Repositories\TelegramRepository;
 use App\Services\AutoReply\AnswerSplitter;
 use Illuminate\Support\Arr;
@@ -46,6 +47,8 @@ class AutoReplyService
     private $supportService;
     private $appSettingService;
     private $dailyRateService;
+    private $stationRepository;
+    private $paymentConfigService;
     private $splitter;
 
     public function __construct(
@@ -56,6 +59,8 @@ class AutoReplyService
         AutoReplySupportService $supportService,
         AppSettingService $appSettingService,
         DailyRateService $dailyRateService,
+        StationRepository $stationRepository,
+        PaymentConfigService $paymentConfigService,
         AnswerSplitter $splitter
     ) {
         $this->matcher = $matcher;
@@ -66,6 +71,9 @@ class AutoReplyService
         $this->appSettingService = $appSettingService;
         // 只有匯率題用得到：答案每天不同，送出前要換成當日報價
         $this->dailyRateService = $dailyRateService;
+        // 同上 —— 匯率已決定時要改發補點訊息，得先從對話反查站台所屬的系統
+        $this->stationRepository = $stationRepository;
+        $this->paymentConfigService = $paymentConfigService;
         $this->splitter = $splitter;
     }
 
@@ -555,9 +563,143 @@ class AutoReplyService
          * 第一次對話會連續兩個開頭問候 —— 承接句一個、模板一個。
          * 開頭交給模型、答案用題庫原文，本來就不需要中間那層。
          */
+        /*
+         * 匯率題有自己的送法：今天的匯率已經決定時，直接給完整的補點訊息
+         * （含繳款圖）而不是只回一句報價 —— 客人問匯率通常就是要補點。
+         *
+         * 不適用時回 false，就走下面的一般路徑（匯率未定 → 「稍後為您確認」）。
+         */
+        if ($this->isRateItem($item) && $this->sendRateTopup($group, $opening)) {
+            $this->telegramRepository->updateAutoReplyState($group, $item->id);
+
+            return;
+        }
+
         // 命中答案沒有冷卻 —— 客人重複問同一件事，就重複回答
         $this->send($group, $this->joinOpening($opening, $this->resolveAnswer($item)), true);
         $this->telegramRepository->updateAutoReplyState($group, $item->id);
+    }
+
+    /**
+     * 這是不是匯率那一題
+     *
+     * @param mixed $item
+     * @return bool
+     */
+    private function isRateItem($item)
+    {
+        return $item->import_key === config('constants.DAILY_RATE.QUICK_REPLY_KEY');
+    }
+
+    /**
+     * 客人問匯率、而今天的匯率已經決定 —— 直接發補點訊息（含繳款圖）
+     *
+     * 補點訊息公版本身就帶 `{rate}`，所以匯率資訊沒有消失，客人還多拿到
+     * 「補 N 點要多少 USDT」與匯款資訊，省掉一輪往返。
+     *
+     * 三種情況退回原本的報匯率（回 false）：
+     *
+     * | 情況 | 為什麼 |
+     * |---|---|
+     * | 匯率還沒決定 | `customerAnswer()` 會回「稍後為您確認」，那是對的 |
+     * | 這個對話找不到對應站台 | 不知道該用哪一筆繳款設定 |
+     * | 站台所屬系統沒填補點訊息 | 沒東西可發 |
+     *
+     * 後兩種是**靜默退回** —— 客人還是得到有用的答案（匯率），只是少了匯款資訊。
+     * 但要記 info log，否則「為什麼這個群組沒收到補點訊息」查不出來。
+     *
+     * ⚠ 整段包 try/catch：這是**附帶的加值**，查詢或組裝噴錯時退回報匯率就好，
+     * 不能讓客人連匯率都問不到（同 StationCreditAlertService 的那條教訓）。
+     *
+     * @param TelegramGroup $group
+     * @param string|null   $opening 承接句
+     * @return bool 有沒有發出去
+     */
+    private function sendRateTopup(TelegramGroup $group, $opening)
+    {
+        try {
+            $rate = $this->dailyRateService->todayRate();
+
+            if (blank($rate)) {
+                return false;
+            }
+
+            $station = $this->stationRepository->findByTelegramGroupId($group->id);
+
+            if (blank($station) || blank($station->system_id)) {
+                Log::info('客人問匯率：這個對話找不到對應站台，改回報匯率', [
+                    'group_id' => $group->id,
+                ]);
+
+                return false;
+            }
+
+            $config = $this->paymentConfigService
+                ->getActiveBySystem((int) $station->system_id)
+                ->first();
+
+            $topup = $this->paymentConfigService->buildTopupMessage($config, $rate);
+            $text = Arr::get($topup, 'text');
+
+            if (blank($text)) {
+                Log::info('客人問匯率：這個系統沒填補點訊息，改回報匯率', [
+                    'group_id'  => $group->id,
+                    'station'   => $station->name,
+                    'system_id' => $station->system_id,
+                ]);
+
+                return false;
+            }
+
+            $this->sendWithImage(
+                $group,
+                $this->joinOpening($opening, $text),
+                Arr::get($topup, 'image_url')
+            );
+
+            return true;
+        } catch (\Exception $e) {
+            Log::error('客人問匯率：組補點訊息失敗，改回報匯率', [
+                'group_id' => $group->id,
+                'error'    => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
+     * 送一則帶圖的回覆（不分段）
+     *
+     * ⚠ 刻意**不經過 splitter** —— 補點訊息公版本來就是設計成一則，
+     * 而分段之後圖只能掛在其中一則上，文字與圖就被拆開了。
+     *
+     * @param TelegramGroup $group
+     * @param string        $content
+     * @param string|null   $imageUrl
+     * @return void
+     */
+    private function sendWithImage(TelegramGroup $group, $content, $imageUrl)
+    {
+        try {
+            $this->chatService->sendReply(
+                $group->id,
+                $content,
+                null,
+                config('constants.AUTO_REPLY.SENDER_NAME'),
+                [
+                    'mark_replied' => true,
+                    'signature'    => config('constants.AUTO_REPLY.SIGNATURE'),
+                    'is_auto'      => true,
+                    'image_url'    => $imageUrl,
+                ]
+            );
+        } catch (\Exception $e) {
+            Log::error('自動回覆送出失敗（帶圖）', [
+                'group_id' => $group->id,
+                'error'    => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -572,7 +714,12 @@ class AutoReplyService
      */
     private function resolveAnswer($item)
     {
-        if ($item->import_key === config('constants.DAILY_RATE.QUICK_REPLY_KEY')) {
+        /*
+         * 走到這裡的匯率題一定是「沒辦法發補點訊息」的那幾種
+         * （匯率未定、找不到站台、沒填公版）—— 見 sendRateTopup()。
+         * customerAnswer() 會依匯率有沒有決定回報價或「稍後為您確認」。
+         */
+        if ($this->isRateItem($item)) {
             return $this->dailyRateService->customerAnswer();
         }
 

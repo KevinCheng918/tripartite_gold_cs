@@ -117,6 +117,98 @@ AI 比對照常進行（準度沿用現有機制、不改 prompt），
 > `$item->import_key === 'system.usdt_rate'`。
 > 這樣比對邏輯完全不用動，只換內容。
 
+### 匯率已決定時直接發補點訊息（2026-10-02 上線）
+
+客人問匯率時，**匯率已決定就直接發補點訊息（含繳款圖片）**，不是只回一句報價。
+客人問匯率通常就是要補點 —— 直接給完整的匯款資訊，省掉一輪往返。
+
+補點訊息公版本身帶 `{rate}`，所以匯率資訊沒有消失，客人還多拿到
+「補 N 點要多少 USDT」與匯款資訊：
+
+```
+好的，為您查詢
+
+————————
+💰 10/2 USDT 當前匯率 32.95
+補 50000 點約需 1518 USDT
+
+（繳款資訊）
+```
+（附繳款設定的圖）
+
+### 組裝抽出來共用，查詢各自保留
+
+補點訊息的組裝搬到 **`PaymentConfigService::buildTopupMessage($config, $rate)`**，
+回 `['text' => ..., 'image_url' => ...]`。餘點告警的第二則與這裡都呼叫它 ——
+**共用的價值在於組出來的訊息一字不差**。
+
+⚠ 那一支**只組裝、不查詢**。查詢策略兩邊天差地遠，硬要統一只會兩邊都不合用：
+
+| | 餘點告警 | 客人問匯率 |
+|---|---|---|
+| 情境 | 一輪掃過所有站台 | 單次請求 |
+| 匯率 | 整輪快取（`$todayRate`） | 查了就用 |
+| 繳款設定 | 按 system_id 快取（`$paymentConfigs`） | 查一次 |
+
+`StationCreditAlertService` 原本的 `topupMessage()` + `topupImage()` 併成
+一支 `topupFor($station)`（查詢 + 委派組裝）—— 原本後者要吃前者的結果當參數
+才知道「有沒有要附圖」，兩支永遠得成對呼叫，拆開沒有好處。
+`usdtForBaseCredit()` 也跟著搬進 `PaymentConfigService`。
+
+### 攔截點從 resolveAnswer 上移
+
+原本在 `AutoReplyService::resolveAnswer()`，但那一支**只能回字串**而這次要附圖。
+改到 `replyWithItem()`：
+
+```php
+if ($this->isRateItem($item) && $this->sendRateTopup($group, $opening)) {
+    $this->telegramRepository->updateAutoReplyState($group, $item->id);
+
+    return;
+}
+// 不適用就走原本的一般路徑
+```
+
+`sendRateTopup()` 回 false 時退回原路徑，有三種：
+
+| 情況 | 回什麼 |
+|---|---|
+| 匯率還沒決定 | 「今日匯率稍後為您確認」（`customerAnswer()`，行為不變） |
+| 這個對話找不到對應站台 | 報匯率 + 記 info log |
+| 站台所屬系統沒填補點訊息 | 報匯率 + 記 info log |
+
+後兩種**靜默退回**：客人還是得到有用的答案，只是少了匯款資訊。
+但一定要記 log，否則「為什麼這個群組沒收到補點訊息」查不出來。
+
+⚠ `sendRateTopup()` 整段包 try/catch —— 這是**附帶的加值**，查詢或組裝噴錯時
+退回報匯率就好，不能讓客人連匯率都問不到（同
+[[2026-10-02-rate-failure-blocks-credit-alert]] 的教訓）。
+
+### ⚠ 這一則不分段
+
+`AutoReplyService::send()` 會先過 `AnswerSplitter` 分段，但補點訊息走
+**`sendWithImage()`，刻意不分段**：公版本來就是設計成一則，而分段後圖只能掛在
+其中一則上，文字與圖就被拆開了。
+
+### 新增的反查
+
+`StationRepository::findByTelegramGroupId()` —— 客人問匯率時手上只有
+`telegram_group_id`，要從它找到站台所屬的系統才知道該用哪一筆繳款設定。
+這個反查原本不存在（`telegram_group_id` 是站台身上的欄位，之前只有正向查）。
+
+### 實測（2026-10-02，15 項全過）
+
+攔在 `sendReply()` 之前檢查送出的內容與圖，transaction + rollback：
+
+| 情境 | 結果 |
+|---|---|
+| 匯率已決定 + 有公版 → 只送一則、含匯率/USDT/繳款資訊/承接句、**有附圖** | ✅ |
+| 送出的文字與圖**與餘點告警第二則完全相同** | ✅ |
+| 系統沒填補點訊息 → 退回報匯率、沒有圖 | ✅ |
+| 對話找不到站台 → 退回報匯率 | ✅ |
+| 匯率未定 → 「稍後為您確認」、沒有圖 | ✅ |
+| 一般題目（非匯率）→ 照送題庫原文 | ✅ |
+
 ## 需求方已確認（2026-10-01）
 
 1. **「回好」= 採用建議報價**（由 4H 均價算出，見下）

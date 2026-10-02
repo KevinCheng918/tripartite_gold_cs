@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Station;
-use App\Presenters\NumberPresenter;
 use App\Repositories\CreditTopupRepository;
 use App\Repositories\StationRepository;
 use Illuminate\Support\Arr;
@@ -233,9 +232,10 @@ class StationCreditAlertService
         $threshold = $this->thresholdFor($station, $settings['threshold']);
         $credits = (float) $station->credits;
 
-        $topup = $this->topupMessage($station);
+        $topup = $this->topupFor($station);
+        $topupText = Arr::get($topup, 'text');
+        $imageUrl = Arr::get($topup, 'image_url');
         $text = $this->renderAlert($settings['template'], $station->name, $credits, $threshold);
-        $imageUrl = $this->topupImage($station, $topup);
 
         /*
          * 補點訊息沒附上的原因要分開回報。
@@ -260,7 +260,7 @@ class StationCreditAlertService
         }
 
         // 第二則補點訊息失敗不算整體失敗 —— 告警已經發出去了，理由見 sendTopup()
-        $topupSent = $this->sendTopup($station, $topup, $imageUrl);
+        $topupSent = $this->sendTopup($station, $topupText, $imageUrl);
 
         /*
          * 記 credit_alerted_at 只是**留一筆紀錄**（最後一次告警是什麼時候）。
@@ -277,7 +277,7 @@ class StationCreditAlertService
             'threshold'  => $threshold,
             'below'      => $credits < $threshold,
             // 兩個一起看才讀得懂：沒有第二則時 topup_sent 本來就是 true
-            'has_topup'  => filled($topup),
+            'has_topup'  => filled($topupText),
             'topup_sent' => $topupSent,
             'user_id'    => $userId,
         ]);
@@ -287,7 +287,7 @@ class StationCreditAlertService
             'reason'       => null,
             'credits'      => $credits,
             'below'        => $credits < $threshold,
-            'has_topup'    => filled($topup),
+            'has_topup'    => filled($topupText),
             'has_image'    => filled($imageUrl),
             // 告警送出了但第二則掛了 —— 按的人要知道客戶只收到一半
             'topup_sent'   => $topupSent,
@@ -323,17 +323,18 @@ class StationCreditAlertService
         $station = $this->testStation($config);
         $settings = $this->globalSettings();
 
-        // 先把這個系統的設定塞進快取，topupMessage 就會拿到這一筆而不是重查
+        // 先把這個系統的設定塞進快取，topupFor 就會拿到這一筆而不是重查
         $this->paymentConfigs[(int) $config->system_id] = $config;
 
-        $topup = $this->topupMessage($station);
+        $topup = $this->topupFor($station);
+        $topupText = Arr::get($topup, 'text');
         $rate = $this->todayRate();
 
         // 第一則：告警。不附圖，跟客戶收到的一樣
         $text = (string) config('constants.STATION.CREDIT_ALERT.TEST_PREFIX')
             . $this->renderAlert($settings['template'], $station->name, (float) $station->credits, $settings['threshold']);
 
-        if (blank($topup)) {
+        if (blank($topupText)) {
             // 匯率還沒決定時補一句，免得看的人以為補點訊息壞了
             $text .= (string) config('constants.STATION.CREDIT_ALERT.TEST_NO_RATE_NOTE');
         }
@@ -349,14 +350,14 @@ class StationCreditAlertService
         /*
          * 第二則：補點訊息（附圖）。
          *
-         * 匯率未定時 $topup 是空的，這則就不存在 —— 這不是失敗，
+         * 匯率未定時文字是空的，這則就不存在 —— 這不是失敗，
          * 客戶在同樣情況下也只會收到告警那一則。
          */
-        $imageUrl = $this->topupImage($station, $topup);
+        $imageUrl = Arr::get($topup, 'image_url');
         $topupSent = true;
 
-        if (filled($topup)) {
-            $topupSent = $this->sendTopupToSupportGroup($config, $topup, $imageUrl);
+        if (filled($topupText)) {
+            $topupSent = $this->sendTopupToSupportGroup($config, $topupText, $imageUrl);
         }
 
         return [
@@ -405,7 +406,7 @@ class StationCreditAlertService
      * 看到的人得先分辨那是不是真的在告警；而要看某個客人的實際狀況，
      * 站台列表的「補點通知」才是對的地方。
      *
-     * `system_id` 要帶：`topupMessage()` 是靠它去 `$paymentConfigs`
+     * `system_id` 要帶：`topupFor()` 是靠它去 `$paymentConfigs`
      * 拿這筆繳款設定的公版。
      *
      * @param \App\Models\PaymentConfig $config
@@ -583,7 +584,8 @@ class StationCreditAlertService
             return $this->result($station, $threshold, false, null, self::SKIP_NO_TARGET);
         }
 
-        $topup = $this->topupMessage($station);
+        $topup = $this->topupFor($station);
+        $topupText = Arr::get($topup, 'text');
         $text = $this->renderAlert($settings['template'], $station->name, $credits, $threshold);
 
         /*
@@ -598,7 +600,7 @@ class StationCreditAlertService
         if ($target !== self::TARGET_STATION) {
             $text = $this->internalPrefix($station, $target, $pendingTopups)
                 . $text
-                . $this->topupSuffix($topup);
+                . $this->topupSuffix($topupText);
 
             if ($dryRun) {
                 return $this->result($station, $threshold, false, $target, null, $text);
@@ -607,13 +609,13 @@ class StationCreditAlertService
             return $this->send($station, $threshold, $target, $text);
         }
 
-        $imageUrl = $this->topupImage($station, $topup);
+        $imageUrl = Arr::get($topup, 'image_url');
 
         if ($dryRun) {
-            return $this->result($station, $threshold, false, $target, null, $text, $topup, $imageUrl);
+            return $this->result($station, $threshold, false, $target, null, $text, $topupText, $imageUrl);
         }
 
-        return $this->send($station, $threshold, $target, $text, $topup, $imageUrl);
+        return $this->send($station, $threshold, $target, $text, $topupText, $imageUrl);
     }
 
     /**
@@ -865,104 +867,32 @@ class StationCreditAlertService
     }
 
     /**
-     * 餘點告警之後那則補點訊息
+     * 這個站台要發的補點訊息（文字 + 要附的圖）
      *
-     * ⚠ **只有今天的匯率已經決定時才發。**
+     * 查詢在這裡（走整輪快取）、組裝交給 `PaymentConfigService::buildTopupMessage()`
+     * —— 客人問匯率時也是用那一支組，兩邊組出來的訊息才會一字不差。
      *
-     * 匯率還沒定（含凌晨到早上報價前、或報了還沒人回覆）就只發告警 ——
-     * 沒有匯率的補點訊息對客戶沒有意義，他不知道要匯多少台幣；
-     * 而附一個過期的昨日匯率更糟。
+     * ⚠ **只有今天的匯率已經決定時才有內容。** 匯率還沒定（含凌晨到早上報價前、
+     * 或報了還沒人回覆）就只發告警 —— 沒有匯率的補點訊息對客戶沒有意義。
      *
-     * 回傳的是**不帶前後分隔的純文字**：它自己就是一則訊息。
-     * 併成一則發（內部群組）時才需要分隔，那是 topupSuffix() 的事。
+     * 回傳的文字**不帶前後分隔**：它自己就是一則訊息。併成一則發（內部群組）
+     * 時才需要分隔，那是 topupSuffix() 的事。
      *
-     * @param Station $station
-     * @return string 不發時回空字串
-     */
-    private function topupMessage(Station $station)
-    {
-        $rate = $this->todayRate();
-
-        if (blank($rate)) {
-            return '';
-        }
-
-        $config = $this->paymentConfigFor($station);
-
-        if (blank($config) || blank($config->topup_template)) {
-            return '';
-        }
-
-        /*
-         * 匯率用 trimZeros 而不是 formatCredits：
-         * 點數固定兩位小數（16390.94），匯率則是去尾零（30.5 而不是 30.50）——
-         * 匯率報價訊息也是這樣顯示，同一個數字在兩個地方要長一樣。
-         */
-        return strtr($config->topup_template, [
-            // 不補零的 10/1 而不是 10/01 —— 對客訊息習慣這樣寫
-            '{date}'    => now()->format('n/j'),
-            '{rate}'    => NumberPresenter::trimZeros($rate, 4),
-            '{usdt}'    => $this->usdtForBaseCredit($rate),
-            '{content}' => (string) $config->content,
-        ]);
-    }
-
-    /**
-     * 補點訊息要附的圖
-     *
-     * 就是繳款設定的那張圖（付款地址、二次確認提醒之類），
-     * 跟虛擬機繳費通知用的是同一張、同一個欄位。
-     *
-     * **圖只掛在補點訊息那則上，餘點告警那則不附。** 告警講的是
-     * 「你的點數快沒了」，配一張付款地址圖客戶會看不懂那張圖在幹嘛；
-     * 真的要匯款的資訊在第二則，圖跟著它才有意義。
-     *
-     * 所以沒有補點訊息（匯率未定／沒填公版）時就沒有圖 —— 沒有那一則。
+     * **圖只掛在補點訊息那則上，餘點告警那則不附。** 告警講的是「你的點數快沒了」，
+     * 配一張付款地址圖客戶會看不懂那張圖在幹嘛；真要匯款的資訊在第二則，
+     * 圖跟著它才有意義。所以沒有第二則時自然也沒有圖。
      *
      * @param Station $station
-     * @param string  $topupText topupMessage() 的結果，空字串表示沒附補點訊息
-     * @return string|null
+     * @return array{text: string, image_url: string|null}
      */
-    private function topupImage(Station $station, $topupText)
+    private function topupFor(Station $station)
     {
-        if (blank($topupText)) {
-            return null;
-        }
-
-        $config = $this->paymentConfigFor($station);
-
-        if (blank($config) || blank($config->image)) {
-            return null;
-        }
-
-        return asset('storage/' . $config->image);
+        return $this->paymentConfigService->buildTopupMessage(
+            $this->paymentConfigFor($station),
+            $this->todayRate()
+        );
     }
 
-    /**
-     * 補一筆基準點數需要多少 USDT
-     *
-     * 基準是 `constants.STATION.CREDIT_ALERT.TOPUP_USDT_BASE`（預設 50000 點）。
-     *
-     * **無條件進位到整數** —— 進位的那個零頭是我們這邊收，
-     * 四捨五入會讓一半的情況少收。例：
-     *
-     *     50000 / 31.9 = 1567.398…  →  1568
-     *     50000 / 32   = 1562.5     →  1563
-     *     50000 / 25   = 2000       →  2000（整除就不動）
-     *
-     * @param float $rate 今日匯率
-     * @return string
-     */
-    private function usdtForBaseCredit($rate)
-    {
-        $base = (float) config('constants.STATION.CREDIT_ALERT.TOPUP_USDT_BASE');
-
-        if ($rate <= 0 || $base <= 0) {
-            return '—';
-        }
-
-        return (string) (int) ceil($base / $rate);
-    }
 
     /**
      * 這個站台所屬系統的繳款設定

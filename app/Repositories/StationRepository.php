@@ -158,6 +158,26 @@ class StationRepository
     }
 
     /**
+     * 依 Telegram 群組反查站台
+     *
+     * 客人在對話裡問匯率時用的：手上只有 `telegram_group_id`，要從它找到
+     * 站台所屬的系統，才知道該用哪一筆繳款設定組補點訊息。
+     *
+     * 只取組訊息需要的欄位。一個群組理論上只對一個站台
+     * （`telegram_group_id` 是站台身上的欄位），多對一時取第一筆。
+     *
+     * @param int $groupId
+     * @return Station|null
+     */
+    public function findByTelegramGroupId($groupId)
+    {
+        return Station::query()
+            ->select(['id', 'system_id', 'name', 'telegram_group_id'])
+            ->where('telegram_group_id', (int) $groupId)
+            ->first();
+    }
+
+    /**
      * 依 ID 查詢
      *
      * @param int $id
