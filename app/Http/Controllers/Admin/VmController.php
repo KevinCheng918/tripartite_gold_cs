@@ -12,6 +12,7 @@ use App\Models\VmBilling;
 use App\Models\VmServer;
 use App\Services\StationService;
 use App\Services\TelegramChatService;
+use App\Services\VmPaymentNoticeService;
 use App\Services\VmService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -24,15 +25,19 @@ use Illuminate\Support\Facades\Log;
 class VmController extends Controller
 {
     private $vmService;
+    private $noticeService;
     private $chatService;
     private $stationService;
 
     public function __construct(
         VmService $vmService,
+        VmPaymentNoticeService $noticeService,
         TelegramChatService $chatService,
         StationService $stationService
     ) {
         $this->vmService = $vmService;
+        // 手動發送與每天 09:30 的自動發送共用同一份文案組裝
+        $this->noticeService = $noticeService;
         $this->chatService = $chatService;
         $this->stationService = $stationService;
     }
@@ -260,7 +265,7 @@ class VmController extends Controller
              * 文案與圖都交給 VmService 組 —— 每天 09:30 的自動發送走同一支，
              * 兩邊各寫一份的話，改了文案規則只會改到一邊。
              */
-            $notice = $this->vmService->renderPaymentNotice((int) $params['system_id'], [
+            $notice = $this->noticeService->renderPaymentNotice((int) $params['system_id'], [
                 'station'  => $params['station'],
                 'amount'   => $params['amount'],
                 'month'    => $params['month'],

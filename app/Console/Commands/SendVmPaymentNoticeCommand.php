@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Services\VmService;
+use App\Services\VmPaymentNoticeService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
@@ -33,21 +33,21 @@ class SendVmPaymentNoticeCommand extends Command
 
     /** @var array 跳過原因對應的說明文字 */
     private const REASON_LABELS = [
-        VmService::SKIP_NO_STATION  => '這台主機沒綁站台，查不到繳款設定（已轉報內部群組）',
-        VmService::SKIP_NO_CONFIG   => '這個系統沒有啟用中的繳款設定（已轉報內部群組）',
-        VmService::SKIP_NO_TARGET   => '沒有可發送的群組（站台與內部支援群組都沒設）',
-        VmService::SKIP_SEND_FAILED => '發送失敗，明天會再發一次',
+        VmPaymentNoticeService::SKIP_NO_STATION  => '這台主機沒綁站台，查不到繳款設定（已轉報內部群組）',
+        VmPaymentNoticeService::SKIP_NO_CONFIG   => '這個系統沒有啟用中的繳款設定（已轉報內部群組）',
+        VmPaymentNoticeService::SKIP_NO_TARGET   => '沒有可發送的群組（站台與內部支援群組都沒設）',
+        VmPaymentNoticeService::SKIP_SEND_FAILED => '發送失敗，明天會再發一次',
         // 走到這個原因表示有沒被接住的例外，是要修的 bug —— 詳情在 log
-        VmService::SKIP_ERROR       => '處理時發生錯誤，已跳過這一筆（詳見 log）',
+        VmPaymentNoticeService::SKIP_ERROR       => '處理時發生錯誤，已跳過這一筆（詳見 log）',
     ];
 
-    private $vmService;
+    private $noticeService;
 
-    public function __construct(VmService $vmService)
+    public function __construct(VmPaymentNoticeService $noticeService)
     {
         parent::__construct();
 
-        $this->vmService = $vmService;
+        $this->noticeService = $noticeService;
     }
 
     /**
@@ -61,7 +61,7 @@ class SendVmPaymentNoticeCommand extends Command
             $this->warn('── 空跑模式：不會送出任何訊息 ──');
         }
 
-        $results = $this->vmService->sendPaymentNotices([
+        $results = $this->noticeService->sendPaymentNotices([
             'dry_run'    => $dryRun,
             'billing_id' => $this->option('billing'),
         ]);
@@ -171,7 +171,7 @@ class SendVmPaymentNoticeCommand extends Command
      */
     private function targetLabel($row)
     {
-        return Arr::get($row, 'target') === VmService::TARGET_STATION
+        return Arr::get($row, 'target') === VmPaymentNoticeService::TARGET_STATION
             ? '站台群組'
             : '內部支援群組';
     }

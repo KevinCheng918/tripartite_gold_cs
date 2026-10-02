@@ -40,6 +40,12 @@
 
 ## 每天 09:30 自動發繳款通知（2026-10-02 上線）
 
+> 程式在 **`VmPaymentNoticeService`**，不在 `VmService`。
+> 那邊管主機與帳單的 CRUD，這邊管「什麼時候、要跟誰、用什麼內容收錢」——
+> 兩件事會各自長大，混在一起時 `VmService` 有一半篇幅在講通知
+> （600 多行，拆完回到 249 行）。形狀比照 `StationCreditAlertService`
+> 獨立於 `StationService`。
+
 繳款通知原本要客服到帳務紀錄一筆一筆按「發送通知」。現在排程自動發，
 **一直發到客戶繳費為止**。
 
@@ -78,7 +84,7 @@ USDT/TWD 4H 均價（`VmService::uploadProof()`），用途是事後對帳，
 
 ### 文案組裝與手動發送共用
 
-`VmService::renderPaymentNotice($systemId, $vars)` → `['text', 'image_url']`。
+`VmPaymentNoticeService::renderPaymentNotice($systemId, $vars)` → `['text', 'image_url']`。
 
 這段原本**寫在 `VmController::ajaxSendPaymentNotice()` 裡**，排程要用同一套，
 所以抽到 Service —— 兩邊各寫一份的話，改了文案規則只會改到一邊。
@@ -196,6 +202,7 @@ Controller 改成呼叫它之後 `PaymentConfigService` 在那裡已經沒有使
 - `app/Services/VmService.php`
 - `app/Console/Commands/GenerateVmBilling.php` — `vm:generate-billing`，Kernel 每月 1 號 00:00
 - `app/Console/Commands/SendVmPaymentNoticeCommand.php` — `vm:send-payment-notice`，Kernel 每天 09:30；`--dry-run` / `--billing=`
+- `app/Services/VmPaymentNoticeService.php` — 繳款通知的文案組裝與自動發送
 
 ### Request
 - `app/Http/Requests/Vm/*`
