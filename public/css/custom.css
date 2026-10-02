@@ -851,6 +851,36 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .badge.bg-secondary { background: rgba(255,255,255,0.1) !important; color: rgba(255,255,255,0.7) !important; }
 
 /*
+ * 文字語意色的深色配對
+ *
+ * Bootstrap 原生的 `.text-success` 是 #198754（深綠），在深色模式的
+ * 暗底（#1a1a1a）上對比不足，字幾乎糊在背景裡。
+ *
+ * 用的地方不少（消耗品餘額、各種狀態標記），所以一次補齊四個，
+ * 色票沿用下面 badge 那組 —— 同一個語意在站上該是同一個顏色。
+ */
+[data-theme="dark"] .text-success { color: #34d399 !important; }
+[data-theme="dark"] .text-danger { color: #f87171 !important; }
+[data-theme="dark"] .text-warning { color: #fbbf24 !important; }
+[data-theme="dark"] .text-info { color: #a5b4fc !important; }
+
+/*
+ * Alert 的深色配對
+ *
+ * Bootstrap 的 alert 是「淺底深字」，在深色模式下會變成一塊突兀的亮色。
+ * 字本身看得見，但整頁就那一塊是白的。
+ *
+ * 全專案有七個地方在用（出勤、繳款設定、題庫、群發、消耗品、
+ * 客服對話的兩支 js），所以補在這裡一次解決。
+ */
+[data-theme="dark"] .alert-success { background: rgba(16,185,129,0.12) !important; color: #34d399 !important; border-color: rgba(16,185,129,0.3) !important; }
+[data-theme="dark"] .alert-danger { background: rgba(239,68,68,0.12) !important; color: #f87171 !important; border-color: rgba(239,68,68,0.3) !important; }
+[data-theme="dark"] .alert-warning { background: rgba(245,158,11,0.12) !important; color: #fbbf24 !important; border-color: rgba(245,158,11,0.3) !important; }
+[data-theme="dark"] .alert-info { background: rgba(99,102,241,0.12) !important; color: #a5b4fc !important; border-color: rgba(99,102,241,0.3) !important; }
+/* alert-light 原本就是白底 —— 深色模式要整個換掉，不然是純白一塊 */
+[data-theme="dark"] .alert-light { background: rgba(255,255,255,0.05) !important; color: #d4c9a8 !important; border-color: rgba(255,255,255,0.12) !important; }
+
+/*
  * bg-light 的深色配對（補的是「白底亮字」那個洞）
  *
  * `.badge.bg-light text-muted` 是專案裡中性小標籤的通用寫法：訊息上的
