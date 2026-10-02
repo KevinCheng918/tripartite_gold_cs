@@ -43,10 +43,26 @@ class StaffManageController extends Controller
      */
     public function index()
     {
-        $staffList = $this->userRepository->getAllCsUsers();
+        /*
+         * 兩種人進得來，看到的分頁不一樣：
+         *
+         *   staff_manage.view            人員管理、設備管理、消耗品
+         *   staff_manage.consumable_log  只有消耗品
+         *
+         * 路由上沒有掛 can: —— 只勾了 consumable_log 的內勤也要進得來登記
+         * 自己的消耗品，不該為此給他「看全公司到職日與設備」的權限。
+         */
+        $canViewStaff = Auth::user()->hasPermission('staff_manage.view');
+
+        if (!$canViewStaff && !$this->canLogConsumable()) {
+            abort(403);
+        }
 
         return view('admin.staff-manage.index', [
-            'staffList' => $staffList,
+            // 沒有 view 的人進來只有消耗品分頁，人員清單也不必查
+            'staffList'      => $canViewStaff ? $this->userRepository->getAllCsUsers() : collect(),
+            'canViewStaff'   => $canViewStaff,
+            'canViewConsumable' => true,
         ]);
     }
 
@@ -98,6 +114,10 @@ class StaffManageController extends Controller
      */
     public function ajaxConsumableOverview(Request $request)
     {
+        if (!$this->canSeeConsumable()) {
+            abort(403);
+        }
+
         $params = ['user_id' => $request->input('user_id')];
 
         return response()->json([
@@ -127,6 +147,10 @@ class StaffManageController extends Controller
      */
     public function ajaxConsumableRecords(Request $request)
     {
+        if (!$this->canSeeConsumable()) {
+            abort(403);
+        }
+
         $params = [
             // 沒有 view_all 的人一律只拿得到自己的，不管他送什麼 user_id 上來
             'user_id'   => $this->scopedUserId($request->input('user_id')),
@@ -237,6 +261,29 @@ class StaffManageController extends Controller
         }
 
         return Auth::user()->hasPermission('staff_manage.edit');
+    }
+
+    /**
+     * 看得到消耗品分頁嗎
+     *
+     * 這兩個端點沒有掛 `can:` middleware（index 要讓只有 consumable_log 的
+     * 人也進得來），所以範圍判斷在這裡。
+     *
+     * @return bool
+     */
+    private function canSeeConsumable()
+    {
+        return Auth::user()->hasPermission('staff_manage.view') || $this->canLogConsumable();
+    }
+
+    /**
+     * 登記得了自己的消耗品嗎
+     *
+     * @return bool
+     */
+    private function canLogConsumable()
+    {
+        return Auth::user()->hasPermission('staff_manage.consumable_log');
     }
 
     /**

@@ -633,4 +633,12 @@
             if (!state.loaded) { load(); }
         });
     }
+
+    /*
+     * ⚠ 沒有 staff_manage.view 的人進來時，消耗品**就是預設分頁** ——
+     * 那時 shown.bs.tab 根本不會觸發，只靠上面那個監聽會永遠不載入。
+     */
+    if (root.classList.contains('active')) {
+        load();
+    }
 })();

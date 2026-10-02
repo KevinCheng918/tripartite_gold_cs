@@ -13,6 +13,8 @@
 
     {{-- Tab 切換 --}}
     <ul class="nav nav-tabs mb-3">
+        {{-- 沒有 staff_manage.view 的人只看得到消耗品，那時它就是預設分頁 --}}
+        @if($canViewStaff)
         <li class="nav-item">
             <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-staff">
                 <i class="fas fa-users me-1"></i>{{ trans('staff_manage.tab_staff') }}
@@ -23,8 +25,9 @@
                 <i class="fas fa-laptop me-1"></i>{{ trans('staff_manage.tab_equipment') }}
             </button>
         </li>
+        @endif
         <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-consumable" id="tab-btn-consumable">
+            <button class="nav-link {{ $canViewStaff ? '' : 'active' }}" data-bs-toggle="tab" data-bs-target="#tab-consumable" id="tab-btn-consumable">
                 {{-- fa-boxes 而不是 fa-boxes-stacked：專案是 Font Awesome 5.15，後者是 FA6 才有的 --}}
                 <i class="fas fa-boxes me-1"></i>{{ trans('staff_manage.tab_consumable') }}
             </button>
@@ -33,6 +36,7 @@
 
     <div class="tab-content">
         {{-- 人員管理 Tab --}}
+        @if($canViewStaff)
         <div class="tab-pane fade show active" id="tab-staff">
             <div class="main-card mb-3 card">
                 <div class="card-header d-flex align-items-center justify-content-between">
@@ -246,7 +250,9 @@
             這頁的其他分頁把 JS 寫在 blade 的 @section('scripts') 內，
             但 PROMPTS 要求 JS 分到 public/js，新的就不跟進了。
         --}}
-        <div class="tab-pane fade" id="tab-consumable"
+        @endif{{-- end canViewStaff --}}
+
+        <div class="tab-pane fade {{ $canViewStaff ? '' : 'show active' }}" id="tab-consumable"
              data-i18n='@json(trans("staff_manage"), JSON_HEX_APOS | JSON_HEX_QUOT)'
              data-me="{{ Auth::id() }}"
              data-can-edit="{{ Auth::user()->hasPermission('staff_manage.edit') ? 1 : 0 }}"
@@ -1037,7 +1043,13 @@ $(function () {
         renderEqTable(staffData); renderEqCards(staffData);
     });
 
+    /*
+     * 沒有 staff_manage.view 的人只看得到消耗品分頁 —— 人員與設備的
+     * DOM 根本不存在，而 ajax-list 也會回 403。整套不要啟動。
+     */
+    @if($canViewStaff)
     loadList();
+    @endif
 });
 </script>
 <script src="{{ asset('js/staff-manage-consumable.js') }}?v={{ filemtime(public_path('js/staff-manage-consumable.js')) }}"></script>

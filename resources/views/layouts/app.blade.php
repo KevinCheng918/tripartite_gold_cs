@@ -242,7 +242,8 @@
                             @endif
                             @if(Auth::check())
                             <li class="app-sidebar__heading">內務管理</li>
-                            @if(Auth::user()->hasPermission('staff_manage.view'))
+                            {{-- 只勾了「登記自己的消耗品」的內勤也要看得到入口 --}}
+                            @if(Auth::user()->hasPermission('staff_manage.view') || Auth::user()->hasPermission('staff_manage.consumable_log'))
                             <li>
                                 <a href="{{ route('admin.staff-manage.index') }}" class="{{ request()->routeIs('admin.staff-manage.*') ? 'mm-active' : '' }}">
                                     <i class="metismenu-icon fas fa-id-card"></i>
