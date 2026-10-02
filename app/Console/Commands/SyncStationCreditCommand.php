@@ -35,6 +35,8 @@ class SyncStationCreditCommand extends Command
         StationCreditAlertService::SKIP_COOLDOWN        => '冷卻期內，不重複告警',
         StationCreditAlertService::SKIP_NO_TARGET       => '沒有可發送的群組（站台與內部支援群組都沒設）',
         StationCreditAlertService::SKIP_SEND_FAILED     => '發送失敗，下一輪會重試',
+        // 走到這個原因表示有沒被接住的例外，是要修的 bug —— 詳情在 log
+        StationCreditAlertService::SKIP_ERROR           => '處理時發生錯誤，已跳過這一站（詳見 log）',
     ];
 
     private $alertService;

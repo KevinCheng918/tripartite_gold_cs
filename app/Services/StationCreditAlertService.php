@@ -23,8 +23,14 @@ use Illuminate\Support\Facades\Log;
  *
  * ⚠ 這個服務會直接發訊息給客戶，誤報的代價比漏報高。所以：
  *   1. API 失敗（syncInfo 回 null）就跳過，**絕不拿上一次的舊點數判斷**
- *   2. 每個站台各自 try/catch，一站發送失敗不影響其他站台
+ *   2. 每個站台各自 try/catch，一站出錯不影響其他站台（在 run() 的迴圈裡）
  *   3. 發送成功才寫 credit_alerted_at，失敗的下一輪會重試
+ *
+ * ⚠ **補點訊息的任何問題都不能影響告警本身。** 告警是「你的點數快沒了」，
+ * 補點訊息只是附帶的「要補的話這樣匯款」—— 匯率查不到、繳款設定查不到，
+ * 最多就是少發第二則，絕不該讓第一則也發不出去。
+ * 所以 todayRate() 與 paymentConfigFor() 各自 try/catch，失敗一律當成
+ * 「沒有」而不是往上拋。
  */
 class StationCreditAlertService
 {
@@ -45,6 +51,14 @@ class StationCreditAlertService
 
     /** @var string 跳過原因：發送時噴錯 */
     const SKIP_SEND_FAILED = 'send_failed';
+
+    /**
+     * @var string 跳過原因：這個站台處理到一半噴了預期外的錯
+     *
+     * 最後防線。走到這裡表示有沒被接住的例外，**那是要修的 bug**，
+     * 但它只能毀掉這一個站台，不能讓整輪告警中斷。
+     */
+    const SKIP_ERROR = 'error';
 
     /** @var string 發送目標：站台自己的群組 */
     const TARGET_STATION = 'station';
@@ -137,7 +151,29 @@ class StationCreditAlertService
         $results = [];
 
         foreach ($stations as $station) {
-            $results[] = $this->handleStation($station, $settings, $dryRun);
+            /*
+             * 每個站台各自 try/catch —— 這是**最後防線**。
+             *
+             * 一個站台處理到一半噴錯（匯率、繳款設定、主系統 API、Telegram…）
+             * 不能讓迴圈中斷，否則後面的站台全部收不到告警：
+             * 一個不相關的小問題就讓整個功能靜默失效，而點數用完客戶的後台
+             * 真的會被停用。
+             *
+             * 走到這個 catch 表示有沒被接住的例外，那是要修的 bug ——
+             * 所以記 error 而不是 warning，並在結果表標成「處理時發生錯誤」。
+             */
+            try {
+                $results[] = $this->handleStation($station, $settings, $dryRun);
+            } catch (\Exception $e) {
+                Log::error('站台餘點告警處理失敗，跳過這個站台', [
+                    'station_id' => $station->id,
+                    'station'    => $station->name,
+                    'error'      => $e->getMessage(),
+                ]);
+
+                $threshold = $this->thresholdFor($station, $settings['threshold']);
+                $results[] = $this->result($station, $threshold, false, null, self::SKIP_ERROR);
+            }
         }
 
         return $results;
@@ -961,6 +997,10 @@ class StationCreditAlertService
      * 同一個系統有多筆時取第一筆啟用的，與繳款通知的取法一致
      * （見 VmController::ajaxSendPaymentNotice）。
      *
+     * ⚠ 查不到就當成「這個系統沒設定」，理由同 todayRate()：
+     * 繳款設定只影響第二則補點訊息，不該連告警一起拖下水。
+     * 失敗也寫進快取（存 null），整輪不會每站重試一次失敗的查詢。
+     *
      * @param Station $station
      * @return \App\Models\PaymentConfig|null
      */
@@ -975,9 +1015,18 @@ class StationCreditAlertService
         // 用 array_key_exists 而不是 isset：查過但沒設定時存的是 null，
         // isset 會判成「沒查過」而每次重查
         if (!array_key_exists($systemId, $this->paymentConfigs)) {
-            $this->paymentConfigs[$systemId] = $this->paymentConfigService
-                ->getActiveBySystem($systemId)
-                ->first();
+            try {
+                $this->paymentConfigs[$systemId] = $this->paymentConfigService
+                    ->getActiveBySystem($systemId)
+                    ->first();
+            } catch (\Exception $e) {
+                Log::error('查詢繳款設定失敗，這個系統的站台只發告警、不附補點訊息', [
+                    'system_id' => $systemId,
+                    'error'     => $e->getMessage(),
+                ]);
+
+                $this->paymentConfigs[$systemId] = null;
+            }
         }
 
         return $this->paymentConfigs[$systemId];
@@ -986,12 +1035,30 @@ class StationCreditAlertService
     /**
      * 今日匯率（整輪只查一次）
      *
+     * ⚠ **查不到就當成「還沒決定」，絕不往上拋。**
+     *
+     * 匯率只決定「要不要附第二則補點訊息」。它查爆了（表不存在、連線中斷、
+     * 欄位對不上…）如果讓例外往上走，整輪告警就跟著中斷 —— 變成
+     * 「匯率有問題」害得「所有站台都收不到餘點告警」，而後者才是會讓
+     * 客戶後台被停用的那件事。
+     *
+     * 失敗時把 `$todayRate` 設成 null（而不是留著 false）——
+     * 這樣整輪不會每個站台都重試一次失敗的查詢。
+     *
      * @return float|null
      */
     private function todayRate()
     {
         if ($this->todayRate === false) {
-            $this->todayRate = $this->dailyRateService->todayRate();
+            try {
+                $this->todayRate = $this->dailyRateService->todayRate();
+            } catch (\Exception $e) {
+                Log::error('查詢今日匯率失敗，本輪一律只發告警、不附補點訊息', [
+                    'error' => $e->getMessage(),
+                ]);
+
+                $this->todayRate = null;
+            }
         }
 
         return $this->todayRate;
