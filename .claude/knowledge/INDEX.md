@@ -62,6 +62,7 @@
 | [bugfix/2026-10-02-rate-failure-blocks-credit-alert.md](bugfix/2026-10-02-rate-failure-blocks-credit-alert.md) | 匯率查不到時整輪餘點告警跟著不發：取補點訊息與 `run()` 迴圈都沒 try/catch，而 docblock 卻聲稱有（附三個「告警不發」的正常原因） |
 | [bugfix/2026-10-02-remove-credit-alert-cooldown.md](bugfix/2026-10-02-remove-credit-alert-cooldown.md) | 手動按過補點通知，隔天 10 點就不告警：手動發送也寫 `credit_alerted_at`，被冷卻期吃掉 —— 冷卻期整個移除 |
 | [bugfix/2026-10-02-fontawesome-6-icon.md](bugfix/2026-10-02-fontawesome-6-icon.md) | 消耗品分頁的兩個版面問題：FA6 的 icon 名稱在 FA5 不存在；tab-pane 插在 `.tab-content` 外導致人員統計跑進來（附數巢狀深度的驗法） |
+| [bugfix/2026-10-02-btn-link-white-block.md](bugfix/2026-10-02-btn-link-white-block.md) | 圖示鈕在深色模式變白方塊：病根是 `app.css` 把 `background:#fff` 塞進 Bootstrap 尺寸 class `.btn-sm`，淺色模式也錯只是看不出來（附「先問淺色模式那裡是什麼顏色」的排查順序） |
 | [bugfix/2026-09-30-btn-outline-info-light-mode.md](bugfix/2026-09-30-btn-outline-info-light-mode.md) | 登入紀錄按鈕在淺色模式滑上去沒反應：`btn-outline-info` 只補了深色模式那一半 |
 | [bugfix/2026-09-29-session-expired-silent.md](bugfix/2026-09-29-session-expired-silent.md) | session 過期只跳「CSRF token mismatch.」：8 支 apiFetch 都沒處理 401/419，加 AuthGuard 統一攔截 + 15 分鐘心跳 + 打卡不再假成功 |
 | [bugfix/2026-09-29-broadcast-js-syntax-error.md](bugfix/2026-09-29-broadcast-js-syntax-error.md) | broadcast.js 有兩個孤兒 `});`，語法錯誤讓群發頁的 JS 整份不執行（從 `9474c2d` 起一直壞著） |

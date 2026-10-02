@@ -373,6 +373,28 @@ h6, .h6 { font-size: 1rem; font-weight: 600; color: #212529; }
 /* 按鈕文字 */
 .btn { font-size: 0.9375rem; font-weight: 500; }
 .btn-sm { font-size: 0.8125rem; }
+/*
+ * btn-link 是「純文字／圖示」按鈕 —— 不該有底色與外框。
+ *
+ * app.css 的 `.btn-sm`（註解寫「JS 使用的舊 class」）帶了
+ * `background: #fff` 與 `border: 1px solid #dee2e6`，而 app.css 在
+ * custom.css **之後**載入，於是 `btn btn-sm btn-link` 會被畫成白底灰框的
+ * 方塊 —— 淺色模式下底色與卡片同色不易察覺，深色模式下就是一塊白方塊。
+ *
+ * 用 `.btn.btn-link`（兩個 class）壓過 `.btn-sm`（一個 class），不必動
+ * app.css 那條全站 28 個檔案在用的舊規則。全站五處 `btn-sm btn-link`
+ * 一次全好（消耗品、共用檔案、題庫、客服快速回覆）。
+ *
+ * 只處理底色與框，不碰 color —— 這些按鈕都搭 `text-muted`／`text-danger`，
+ * 文字色自有深色配對，在這裡設色只會打到它們。
+ */
+.btn.btn-link,
+.btn.btn-link:hover,
+.btn.btn-link:focus {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+}
 /* 所有 btn 大小統一 */
 .btn.btn-primary,
 .btn.btn-secondary,
