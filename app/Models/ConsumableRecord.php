@@ -11,15 +11,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * 領用（進）與使用（出）共用一張表，方向由 `type` 決定 ——
  * `quantity` 永遠是正數。
  *
+ * 品項直接存名稱（`item_name`），沒有品項表 —— 登記時自己打。
+ *
  * @property int         $id
- * @property int         $user_id            哪個內勤
- * @property int         $consumable_item_id 哪個品項
- * @property int         $type               1=領用, 2=使用
- * @property int         $quantity           數量（正數）
- * @property string      $happened_at        領用／使用的日期
- * @property string|null $purpose            用途（使用時必填）
- * @property string|null $note               備註
- * @property int|null    $created_by         誰登記的
+ * @property int         $user_id     哪個內勤
+ * @property string      $item_name   品項名稱
+ * @property int         $type        1=領用, 2=使用
+ * @property int         $quantity    數量（正數）
+ * @property string      $happened_at 領用／使用的日期
+ * @property string|null $note        備註
+ * @property int|null    $created_by  誰登記的
  */
 class ConsumableRecord extends Model
 {
@@ -27,12 +28,11 @@ class ConsumableRecord extends Model
     protected $guarded = ['id'];
 
     protected $casts = [
-        'user_id'            => 'integer',
-        'consumable_item_id' => 'integer',
-        'type'               => 'integer',
-        'quantity'           => 'integer',
-        'created_by'         => 'integer',
-        'happened_at'        => 'date',
+        'user_id'     => 'integer',
+        'type'        => 'integer',
+        'quantity'    => 'integer',
+        'created_by'  => 'integer',
+        'happened_at' => 'date',
     ];
 
     /**
@@ -53,17 +53,6 @@ class ConsumableRecord extends Model
     public function user()
     {
         return $this->belongsTo(User::class)->select(['id', 'account', 'nickname', 'level']);
-    }
-
-    /**
-     * 品項
-     *
-     * @return BelongsTo
-     */
-    public function item()
-    {
-        return $this->belongsTo(ConsumableItem::class, 'consumable_item_id')
-            ->select(['id', 'name', 'unit', 'status']);
     }
 
     /**

@@ -9,13 +9,14 @@ use Illuminate\Support\Facades\Schema;
  *
  * 內勤的消耗品進出：領用（進）與使用（出）。
  *
- * **一張表就夠，不拆成領用／使用兩張** —— 兩者只差一個方向，拆開的話
- * 「列出某人某品項的所有異動」要查兩次再合併排序，餘額也要兩次 SUM
- * 各寫一份篩選條件。
+ * **只有這一張表。** 品項不另外建清單 —— 登記時直接打名稱（卡片、SIM 卡…），
+ * 想記什麼就記什麼，不必先去後台建一筆再回來登記。
  *
- * ⚠ **沒有餘額欄位。** 剩餘一律由
- * `SUM(領用) - SUM(使用)` 算出來 —— 存一份餘額就有兩份真相，
- * 補登或修改歷史紀錄時一定會不同步。
+ * **領用與使用也不拆兩張** —— 兩者只差一個方向，拆開的話「列出某人某品項的
+ * 所有異動」要查兩次再合併排序，餘額也要兩次 SUM 各寫一份篩選條件。
+ *
+ * ⚠ **沒有餘額欄位。** 剩餘一律由 `SUM(領用) - SUM(使用)` 算出來 ——
+ * 存一份餘額就有兩份真相，補登或修改歷史紀錄時一定會不同步。
  */
 class CreateConsumableRecordTable extends Migration
 {
@@ -36,11 +37,13 @@ class CreateConsumableRecordTable extends Migration
                 ->comment('哪個內勤');
 
             /*
-             * restrictOnDelete：有紀錄的品項不准刪 —— 刪了之後那些流水會變成
-             * 「不知道是什麼東西的 10 張」。要停用請改 status。
+             * 品項直接存名稱，不另外開一張品項表。
+             *
+             * 代價是打錯字會分裂成兩個品項（「卡片」與「卡 片」各自算餘額）——
+             * 換來的是登記時不用先去建品項。前端會把這個人用過的名稱列成建議
+             * 清單，一般情況點一下就好。
              */
-            $table->foreignId('consumable_item_id')->constrained('consumable_item')->restrictOnDelete()
-                ->comment('哪個品項');
+            $table->string('item_name', 50)->comment('品項名稱，登記時自己打');
 
             $table->tinyInteger('type')->comment('1=領用（進）, 2=使用（出）');
 
@@ -56,7 +59,7 @@ class CreateConsumableRecordTable extends Migration
              */
             $table->date('happened_at')->comment('領用／使用的日期');
 
-            $table->string('purpose', 255)->nullable()->comment('用途，使用時必填、領用時留空');
+            // 只有一個備註欄（原本還分「用途」與「備註」，需求方確認用不到）
             $table->string('note', 255)->nullable()->comment('備註');
 
             // 分得出是本人登記還是管理者代登記；帳號被刪時顯示「已離職人員」
@@ -66,7 +69,7 @@ class CreateConsumableRecordTable extends Migration
             $table->timestamps();
 
             // 餘額查詢是「某人某品項的所有紀錄」，這是最主要的存取路徑
-            $table->index(['user_id', 'consumable_item_id'], 'consumable_record_user_item_index');
+            $table->index(['user_id', 'item_name'], 'consumable_record_user_item_index');
             $table->index('happened_at', 'consumable_record_happened_index');
         });
     }

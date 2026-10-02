@@ -3,13 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Consumable\StoreItemRequest;
 use App\Http\Requests\Consumable\StoreRecordRequest;
 use App\Http\Requests\StaffManage\UpdateStaffRequest;
-use App\Http\Resources\ConsumableItemResource;
 use App\Http\Resources\ConsumableRecordResource;
 use App\Http\Resources\StaffResource;
-use App\Models\ConsumableItem;
 use App\Models\ConsumableRecord;
 use App\Models\User;
 use App\Repositories\UserRepository;
@@ -92,7 +89,7 @@ class StaffManageController extends Controller
     // ---------------------------------------------------------------
 
     /**
-     * Ajax 消耗品總覽（每人每品項的領用／使用／剩餘）與品項清單
+     * Ajax 消耗品總覽（每人每品項的領用／使用／剩餘）與品項建議清單
      *
      * 一次給完整資料，搜尋與篩選在前端做 —— 與這頁另外兩個分頁同一個模式。
      *
@@ -105,7 +102,8 @@ class StaffManageController extends Controller
 
         return response()->json([
             'balances' => $this->consumableService->getOverview($this->scopedUserId(Arr::get($params, 'user_id'))),
-            'items'    => ConsumableItemResource::collection($this->consumableService->listItems()),
+            // 登記時的建議清單 —— 就是大家已經打過的名稱，不限制只能選這些
+            'item_names' => $this->consumableService->listItemNames(),
             // 前端要知道「我是誰」才能決定哪幾筆可以改（沒有管理權限時只能動自己的）
             'me'       => (int) Auth::id(),
             'can_edit' => Auth::user()->hasPermission('staff_manage.edit'),
@@ -124,8 +122,8 @@ class StaffManageController extends Controller
     {
         $params = [
             // 沒有 view_all 的人一律只拿得到自己的，不管他送什麼 user_id 上來
-            'user_id'            => $this->scopedUserId($request->input('user_id')),
-            'consumable_item_id' => $request->input('consumable_item_id'),
+            'user_id'   => $this->scopedUserId($request->input('user_id')),
+            'item_name' => $request->input('item_name'),
         ];
 
         return ConsumableRecordResource::collection($this->consumableService->listRecords($params));
@@ -139,7 +137,7 @@ class StaffManageController extends Controller
      */
     public function ajaxConsumableStore(StoreRecordRequest $request)
     {
-        $params = $request->params();
+        $params = $request->validated();
 
         if (!$this->canManage(Arr::get($params, 'user_id'))) {
             return response()->json(['message' => trans('staff_manage.msg.consumable_forbidden')], 403);
@@ -150,7 +148,7 @@ class StaffManageController extends Controller
 
             return response()->json(['message' => trans('staff_manage.msg.consumable_saved')]);
         } catch (\RuntimeException $e) {
-            // 餘額不足、品項停用 —— 都是使用者看得懂且能自己處理的狀況
+            // 餘額不足 —— 使用者看得懂且能自己處理的狀況
             return response()->json(['message' => $e->getMessage()], 422);
         } catch (\Exception $e) {
             Log::error('消耗品登記失敗', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
@@ -168,7 +166,7 @@ class StaffManageController extends Controller
      */
     public function ajaxConsumableUpdate(StoreRecordRequest $request, ConsumableRecord $record)
     {
-        $params = $request->params();
+        $params = $request->validated();
 
         // 改到別人身上、或改別人的紀錄，都要有管理權限
         if (!$this->canManage($record->user_id) || !$this->canManage(Arr::get($params, 'user_id'))) {
@@ -209,67 +207,6 @@ class StaffManageController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         } catch (\Exception $e) {
             Log::error('消耗品刪除失敗', ['error' => $e->getMessage(), 'record_id' => $record->id]);
-
-            return response()->json(['message' => trans('staff_manage.msg.consumable_failed')], 500);
-        }
-    }
-
-    /**
-     * Ajax 新增品項
-     *
-     * @param StoreItemRequest $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function ajaxConsumableItemStore(StoreItemRequest $request)
-    {
-        try {
-            $this->consumableService->createItem($request->validated());
-
-            return response()->json(['message' => trans('staff_manage.msg.consumable_item_saved')]);
-        } catch (\Exception $e) {
-            Log::error('消耗品品項新增失敗', ['error' => $e->getMessage()]);
-
-            return response()->json(['message' => trans('staff_manage.msg.consumable_failed')], 500);
-        }
-    }
-
-    /**
-     * Ajax 修改品項
-     *
-     * @param StoreItemRequest $request
-     * @param ConsumableItem   $item
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function ajaxConsumableItemUpdate(StoreItemRequest $request, ConsumableItem $item)
-    {
-        try {
-            $this->consumableService->updateItem($item, $request->validated());
-
-            return response()->json(['message' => trans('staff_manage.msg.consumable_item_saved')]);
-        } catch (\Exception $e) {
-            Log::error('消耗品品項修改失敗', ['error' => $e->getMessage(), 'item_id' => $item->id]);
-
-            return response()->json(['message' => trans('staff_manage.msg.consumable_failed')], 500);
-        }
-    }
-
-    /**
-     * Ajax 刪除品項
-     *
-     * @param ConsumableItem $item
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function ajaxConsumableItemDelete(ConsumableItem $item)
-    {
-        try {
-            $this->consumableService->deleteItem($item);
-
-            return response()->json(['message' => trans('staff_manage.msg.consumable_item_deleted')]);
-        } catch (\RuntimeException $e) {
-            // 已經有流水的品項不准刪，請改成停用
-            return response()->json(['message' => $e->getMessage()], 422);
-        } catch (\Exception $e) {
-            Log::error('消耗品品項刪除失敗', ['error' => $e->getMessage(), 'item_id' => $item->id]);
 
             return response()->json(['message' => trans('staff_manage.msg.consumable_failed')], 500);
         }

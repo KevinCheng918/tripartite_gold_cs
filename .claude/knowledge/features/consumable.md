@@ -1,9 +1,9 @@
 # 消耗品管理（內勤）
 
-> **狀態：已實作，17 項流程驗證全過（2026-10-02）。**
+> **狀態：已實作，16 項流程驗證全過（2026-10-02）。migration 已跑。**
 >
 > 上線前要做：**替每個內勤勾 `staff_manage.consumable_log`**、
-> 主管勾 `staff_manage.consumable_view_all`，然後先建品項。
+> 主管勾 `staff_manage.consumable_view_all`。品項不用先建 —— 登記時直接打。
 
 內勤人員會領到消耗品（例如一次發 10 張卡片），用掉之後要知道**誰在什麼時候
 領了多少、用掉多少、還剩幾張**。
@@ -12,10 +12,11 @@
 
 | 項目 | 決定 |
 |------|------|
-| 品項 | **多品項，可自己維護**（卡片、SIM 卡…），加新的不用改程式 |
-| 使用紀錄誰登記 | **每個人登記自己的**；管理者可以改別人的 |
+| 品項 | **登記時直接打名稱**，不建清單、不限制選項（2026-10-02 改） |
+| 誰登記 | **每個人登記自己的**（領用與使用都是）；管理者可以改別人的 |
+| 誰看得到 | 自己只看得到自己的；**主管以上**才看得到所有人 |
 | 追蹤粒度 | **只記數量**，不追到卡號 |
-| 要記的欄位 | 日期、數量、用途 |
+| 要記的欄位 | 日期、數量、**備註**（原本還有「用途」，確認用不到） |
 | 位置 | 內勤管理頁新增第三個分頁（現有：人員名單、設備管理） |
 
 ## 跟現有「設備管理」不一樣
@@ -28,36 +29,37 @@
 
 ## 資料設計
 
-### `consumable_item`（品項）
-
-| 欄位 | 說明 |
-|---|---|
-| `name` | 品項名稱（卡片、SIM 卡） |
-| `unit` | 單位（張、個、片），純顯示用 |
-| `status` | 1=啟用 / 0=停用。停用的不能再登記，但舊紀錄還看得到 |
-| `sort_order` | 排序 |
-| `note` | 備註 |
-
-### `consumable_record`（流水）
+### 只有一張表 `consumable_record`
 
 | 欄位 | 說明 |
 |---|---|
 | `user_id` | 哪個內勤（FK `user`，`cascadeOnDelete`） |
-| `consumable_item_id` | 哪個品項（FK，`restrictOnDelete` —— 有紀錄的品項不准刪，改停用） |
+| `item_name` | **品項名稱，登記時自己打**（沒有品項表） |
 | `type` | 1=領用（進）/ 2=使用（出） |
 | `quantity` | 數量，正整數（方向由 `type` 決定，**不存負數**） |
 | `happened_at` | **日期**（date）。可以補登過去的，不用 `created_at` |
-| `purpose` | 用途。使用時必填、領用時留空 |
-| `note` | 備註 |
-| `created_by` | 誰登記的（FK `user`，`nullOnDelete`）—— 分得出本人登記或管理者代登記 |
-| index | `(user_id, consumable_item_id)`、`happened_at` |
+| `note` | 備註（原本還有「用途」，需求方確認用不到） |
+| `created_by` | 誰登記的（FK `user`，`nullOnDelete`）—— 分得出本人或代登記 |
+| index | `(user_id, item_name)`、`happened_at` |
 
-### 為什麼是一張流水表而不是兩張
+### 為什麼品項不開一張表
 
-領用與使用只差一個方向。拆兩張表的話：
+原本設計了 `consumable_item`（品項清單 + 啟用狀態 + 單位），需求方試用後
+改成「登記時直接輸入」—— **不想為了記一筆消耗品先去建一個品項**。
 
-- 「列出某人某品項的所有異動」要查兩次再合併排序
-- 餘額要兩次 SUM 相減，而且兩邊的篩選條件得各寫一份
+代價是打錯字會分裂成兩個品項（「卡片」與「卡 片」各自算餘額）。
+緩解的方式有兩個，都不限制使用者：
+
+- `ConsumableService::normalizeItemName()` 去頭尾空白、把中間連續空白縮成一個。
+  **只做到這個程度** —— 再多（全半形轉換、大小寫統一）就會開始改變使用者
+  打的東西，那不是這個欄位該做的事
+- 前端把已經用過的名稱放進 `<datalist>` 當建議，點一下就好；但輸入框本身
+  不限制，打新的就是新的品項
+
+### 為什麼領用與使用也不拆兩張
+
+兩者只差一個方向。拆開的話「列出某人某品項的所有異動」要查兩次再合併排序，
+餘額也要兩次 SUM 各寫一份篩選條件。
 
 一張表加 `type` 就夠了，`quantity` 一律存正數、方向交給 `type` ——
 **存負數會讓「這個人用了幾張」這種統計必須先判斷正負**，容易算錯。
@@ -68,33 +70,43 @@
 剩餘 = SUM(type=領用 的 quantity) - SUM(type=使用 的 quantity)
 ```
 
+依「使用者 + 品項名稱」分組，在 SQL 裡用 `CASE WHEN` 一次掃描拿到進與出。
+
 **不另外存餘額欄位。** 存了就有兩份真相，補登或修改歷史紀錄時一定會不同步。
-這張表的量級是「人數 × 品項 × 每月幾筆」，SUM 很便宜；真的慢了再加快取。
 
 ## 畫面
 
 內勤管理頁第三個分頁「消耗品」：
 
 ```
-人員：[全部 ▾]   品項：[全部 ▾]                      [品項管理] [登記]
+人員：[全部 ▾]   品項：[全部 ▾]                              [登記]
 
 ┌─────────────────────────────────────────────────┐
 │ 王小明                                           │
-│   卡片     領用 10   已用 3    剩餘 7           │
-│   SIM 卡   領用 2    已用 0    剩餘 2           │
-│ 李大華                                           │
-│   卡片     領用 10   已用 10   剩餘 0  ⚠        │
+│   卡片      領用 15   已用 3    剩餘 12          │
+│   SIM 卡    領用 2    已用 0    剩餘 2           │
 └─────────────────────────────────────────────────┘
 
 點一列展開那個人該品項的流水：
-  10/02  使用  2 張   客戶A開站    （王小明 登記）
-  09/28  使用  1 張   測試用       （王小明 登記）
-  09/01  領用  10 張               （管理者 登記）
+  10/02  使用  3   客戶A開站      （王小明 登記）
+  09/01  領用  10                 （管理者 登記）
 ```
 
 - 剩餘 0 標黃、**負數標紅**（理論上不該發生，見下面的邊界）
-- 搜尋／排序比照現有兩個分頁：**後端一次給完整清單、前端篩選**
+- 登記視窗的品項是**輸入框 + `<datalist>` 建議**，不是下拉 ——
+  可以打新的
+- 從展開中的那一組按「登記」時，品項會先帶好 —— 多半就是要登記它
+- 搜尋／篩選比照現有兩個分頁：**後端一次給完整清單、前端篩選**
   （見 [[staff-manage]]，那頁本來就是這個模式）
+
+### ⚠ 列的識別用索引，不要把品項名稱塞進 `data-*`
+
+品項名稱是使用者自己打的字串，裡面可能有引號或 CSS 選擇器的特殊字元 ——
+當成 `querySelector` 的條件會直接壞掉。所以 DOM 上掛的是 `data-idx`，
+對照 `state.visible` 取回那一列。
+
+「展開中的是哪一組」則存 `{ userId, itemName }` 而不是索引 ——
+篩選一改索引就變，但「展開的是誰的哪個品項」不該變。
 
 ## 權限
 
@@ -143,12 +155,12 @@
 
 | 類型 | 檔案 |
 |------|------|
-| Migration | `2026_10_02_000003_create_consumable_item_table`、`..._000004_create_consumable_record_table` |
-| Model | `app/Models/ConsumableItem.php`、`app/Models/ConsumableRecord.php` |
+| Migration | `2026_10_02_000004_create_consumable_record_table`（**只有一張表**） |
+| Model | `app/Models/ConsumableRecord.php` |
 | Repository | `app/Repositories/ConsumableRepository.php` |
 | Service | `app/Services/ConsumableService.php`（餘額計算與三種檢查） |
-| Request | `app/Http/Requests/Consumable/StoreRecordRequest.php`、`StoreItemRequest.php` |
-| Resource | `app/Http/Resources/ConsumableRecordResource.php`、`ConsumableItemResource.php` |
+| Request | `app/Http/Requests/Consumable/StoreRecordRequest.php` |
+| Resource | `app/Http/Resources/ConsumableRecordResource.php` |
 | 前端 | `public/js/staff-manage-consumable.js` |
 
 ⚠ 前端**獨立成 js 檔**而不是寫在 blade 的 `@section('scripts')` 裡 ——
@@ -160,12 +172,12 @@ telegram-chat）。
 
 | 檔案 | 內容 |
 |------|------|
-| `app/Http/Controllers/Admin/StaffManageController.php` | 消耗品的 8 個 ajax 端點、`canManage()`、`scopedUserId()` |
+| `app/Http/Controllers/Admin/StaffManageController.php` | 消耗品的 5 個 ajax 端點、`canManage()`、`scopedUserId()` |
 | `app/Repositories/UserRepository.php` | `getNamesByIds()`（見下方的坑） |
 | `routes/web.php` | `staff-manage` 群組下的 `ajax-consumable-*` |
 | `config/permissionMap.php` | `staff_manage.consumable_log`、`staff_manage.consumable_view_all` |
-| `config/constants.php` | `CONSUMABLE`（type、status、長度與數量上限） |
-| `resources/lang/{tw,cn,en}/staff_manage.php` | 分頁標題、欄位、訊息（各 58 個 key） |
+| `config/constants.php` | `CONSUMABLE`（type、備註長度與數量上限） |
+| `resources/lang/{tw,cn,en}/staff_manage.php` | 分頁標題、欄位、訊息（各 37 個 key） |
 | `resources/lang/{tw,cn,en}/permission.php` | 兩個新權限的名稱 |
 | `resources/views/admin/staff-manage/index.blade.php` | 第三個分頁 + 載入 js |
 | `config/changelog.php` | 一筆 |
@@ -189,28 +201,28 @@ telegram-chat）。
 2. 容器內 `php artisan optimize`（改了 route 與 permissionMap）
 3. 帳號管理替**每個內勤**勾 `staff_manage.consumable_log`
 4. 主管以上另外勾 `staff_manage.consumable_view_all`（沒勾就只看得到自己的）
-5. 先建品項（卡片…），才登記得了領用
 
-## 實測（2026-10-02，17 項全過）
+品項不用先建 —— 登記時直接打名稱。
+
+## 實測（2026-10-02，16 項全過）
 
 transaction + rollback，跑完一整個生命週期：
 
 | 情境 | 結果 |
 |---|---|
-| 領用 10 → 領用 10／已用 0／剩餘 10 | ✅ |
-| 使用 3 → 剩餘 7 | ✅ |
-| 想用 100（只剩 7） | ✅ 擋下，訊息帶出「目前剩餘 7」 |
-| 把使用 3 改成 5 → 剩餘 5 | ✅ |
-| 想改成 20 | ✅ 擋下（排除自己那筆後重算） |
-| 刪掉領用 10（已用掉 5） | ✅ 擋下，說明「會短少 5」 |
-| 先刪使用、再刪領用 | ✅ 剩餘回到 10 → 歸零 |
-| 停用的品項登記新紀錄 | ✅ 擋下 |
-| 刪除有紀錄的品項 | ✅ 擋下，叫人改成停用 |
-| 兩個人的總覽／只看自己 | ✅ 2 列／1 列 |
-| rollback 後兩張表歸零 | ✅ |
+| 領用 10 張「卡片」→ 剩餘 10 | ✅ |
+| 使用 3 張、備註存進去 → 剩餘 7 | ✅ |
+| **再打一個沒見過的品項「SIM 卡」** → 兩個品項、建議清單兩筆 | ✅ |
+| **打成「 卡片 」（前後空白）** → 併進同一個品項、沒有變成第三個 | ✅ |
+| 想用 100 張（只剩 12） | ✅ 擋下，帶出「目前剩餘 12」 |
+| 把使用 3 改成 50 | ✅ 擋下（排除自己那筆後重算） |
+| 刪掉其中一筆領用（還有另一筆撐著） | ✅ 刪得掉，剩餘正確 |
+| 再刪第二筆領用（會短少 3） | ✅ 擋下並說明 |
+| 兩個人的總覽／只看自己 | ✅ |
+| rollback 後歸零 | ✅ |
 
 **尚未實測**：瀏覽器上的互動（分頁切換才載入、展開流水、登記 modal、
-品項管理）—— 那些要實際開頁面點。
+datalist 建議）—— 那些要實際開頁面點。
 
 ## 相關
 

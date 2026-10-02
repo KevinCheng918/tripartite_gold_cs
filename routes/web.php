@@ -235,7 +235,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         /*
          * 消耗品。
          *
-         * 看是 view、登記是 consumable_log（每個內勤都要勾）、品項維護是 edit。
+         * 看是 view、登記是 consumable_log（每個內勤都要勾）。
          *
          * ⚠ 登記／修改／刪除掛 consumable_log 而不是 edit —— 本人要動得了
          * 自己的。「這筆是不是我的」擋在 Controller 的 canManage()，
@@ -247,9 +247,6 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::put('/ajax-consumable-update/{record}', [StaffManageController::class, 'ajaxConsumableUpdate'])->middleware('can:staff_manage.consumable_log')->name('ajax-consumable-update');
         Route::delete('/ajax-consumable-delete/{record}', [StaffManageController::class, 'ajaxConsumableDelete'])->middleware('can:staff_manage.consumable_log')->name('ajax-consumable-delete');
 
-        Route::post('/ajax-consumable-item-store', [StaffManageController::class, 'ajaxConsumableItemStore'])->middleware('can:staff_manage.edit')->name('ajax-consumable-item-store');
-        Route::put('/ajax-consumable-item-update/{item}', [StaffManageController::class, 'ajaxConsumableItemUpdate'])->middleware('can:staff_manage.edit')->name('ajax-consumable-item-update');
-        Route::delete('/ajax-consumable-item-delete/{item}', [StaffManageController::class, 'ajaxConsumableItemDelete'])->middleware('can:staff_manage.edit')->name('ajax-consumable-item-delete');
     });
 
     // 快速回覆題庫管理
