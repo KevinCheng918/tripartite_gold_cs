@@ -569,7 +569,7 @@ class AutoReplyService
          *
          * 不適用時回 false，就走下面的一般路徑（匯率未定 → 「稍後為您確認」）。
          */
-        if ($this->isRateItem($item) && $this->sendRateTopup($group, $opening)) {
+        if ($this->isRateItem($item) && $this->sendRateTopup($group)) {
             $this->telegramRepository->updateAutoReplyState($group, $item->id);
 
             return;
@@ -611,11 +611,18 @@ class AutoReplyService
      * ⚠ 整段包 try/catch：這是**附帶的加值**，查詢或組裝噴錯時退回報匯率就好，
      * 不能讓客人連匯率都問不到（同 StationCreditAlertService 的那條教訓）。
      *
+     * ⚠ **這一則不加 AI 承接句。** 承接句的內容不可控，實際上出現過
+     * 「關於匯率的部分我這邊確認一下～」接著下一行就給出完整答案 ——
+     * 說要去確認、卻又立刻回答，客人看了會覺得前後矛盾。
+     *
+     * 補點訊息本身就是完整的答案（日期、匯率、換算、匯款資訊），
+     * 不需要前導句。要加招呼語的話請加在繳款設定的補點訊息公版開頭，
+     * 那是客服寫得了、看得到的地方。
+     *
      * @param TelegramGroup $group
-     * @param string|null   $opening 承接句
      * @return bool 有沒有發出去
      */
-    private function sendRateTopup(TelegramGroup $group, $opening)
+    private function sendRateTopup(TelegramGroup $group)
     {
         try {
             $rate = $this->dailyRateService->todayRate();
@@ -651,11 +658,7 @@ class AutoReplyService
                 return false;
             }
 
-            $this->sendWithImage(
-                $group,
-                $this->joinOpening($opening, $text),
-                Arr::get($topup, 'image_url')
-            );
+            $this->sendWithImage($group, $text, Arr::get($topup, 'image_url'));
 
             return true;
         } catch (\Exception $e) {
