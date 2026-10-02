@@ -44,6 +44,14 @@ class Kernel extends ConsoleKernel
          */
         $schedule->command('rate:remind')->everyThirtyMinutes()->between('09:30', '23:59')->withoutOverlapping();
 
+        /*
+         * 每日上午 9:30 發虛擬機繳款通知 —— 未收的給客戶、待審核的催內部審核。
+         *
+         * 排在匯率報價（09:00）之後、餘點告警（10:00）之前：三則對客訊息
+         * 錯開時間，客戶不會在同一分鐘收到一串。
+         */
+        $schedule->command('vm:send-payment-notice')->dailyAt('09:30')->withoutOverlapping();
+
         // 每日上午 10 點同步各站台系統餘點，低於門檻發告警
         // withoutOverlapping：逐站打主系統 API，站台多的時候可能跑超過一輪
         $schedule->command('station:sync-credit')->dailyAt('10:00')->withoutOverlapping();

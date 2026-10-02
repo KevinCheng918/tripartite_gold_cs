@@ -10,11 +10,11 @@ use App\Http\Resources\VmBillingResource;
 use App\Http\Resources\VmServerResource;
 use App\Models\VmBilling;
 use App\Models\VmServer;
-use App\Services\PaymentConfigService;
 use App\Services\StationService;
 use App\Services\TelegramChatService;
 use App\Services\VmService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
@@ -24,18 +24,15 @@ use Illuminate\Support\Facades\Log;
 class VmController extends Controller
 {
     private $vmService;
-    private $paymentConfigService;
     private $chatService;
     private $stationService;
 
     public function __construct(
         VmService $vmService,
-        PaymentConfigService $paymentConfigService,
         TelegramChatService $chatService,
         StationService $stationService
     ) {
         $this->vmService = $vmService;
-        $this->paymentConfigService = $paymentConfigService;
         $this->chatService = $chatService;
         $this->stationService = $stationService;
     }
@@ -259,34 +256,28 @@ class VmController extends Controller
         ]);
 
         try {
-            $configs = $this->paymentConfigService->getActiveBySystem((int) $params['system_id']);
-
-            if ($configs->isEmpty()) {
-                return response()->json(['message' => trans('payment_config.msg.no_config')], 422);
-            }
-
-            $config = $configs->first();
-            $template = filled($config->template) ? $config->template : $config->content;
-            $text = $this->paymentConfigService->renderTemplate($template, [
+            /*
+             * 文案與圖都交給 VmService 組 —— 每天 09:30 的自動發送走同一支，
+             * 兩邊各寫一份的話，改了文案規則只會改到一邊。
+             */
+            $notice = $this->vmService->renderPaymentNotice((int) $params['system_id'], [
                 'station'  => $params['station'],
                 'amount'   => $params['amount'],
                 'month'    => $params['month'],
-                'due_date' => $params['due_date'] ?? '',
-                'content'  => $config->content,
+                'due_date' => Arr::get($params, 'due_date', ''),
             ]);
 
-            $imageUrl = null;
-            if (filled($config->image)) {
-                $imageUrl = asset("storage/{$config->image}");
+            if (blank(Arr::get($notice, 'text'))) {
+                return response()->json(['message' => trans('payment_config.msg.no_config')], 422);
             }
 
             // mark_replied = false：這是系統通知，不該把客戶還在等的提問標記成已回覆
             $this->chatService->sendReply(
                 (int) $params['group_id'],
-                $text,
+                Arr::get($notice, 'text'),
                 Auth::id(),
                 Auth::user()->nickname,
-                ['image_url' => $imageUrl, 'mark_replied' => false]
+                ['image_url' => Arr::get($notice, 'image_url'), 'mark_replied' => false]
             );
 
             return response()->json(['message' => trans('payment_config.msg.sent')]);

@@ -38,6 +38,110 @@
 >
 > 新增狀態分支時記得檢查：**這個狀態下該看得到的東西是不是也跟著消失了**。
 
+## 每天 09:30 自動發繳款通知（2026-10-02 上線）
+
+繳款通知原本要客服到帳務紀錄一筆一筆按「發送通知」。現在排程自動發，
+**一直發到客戶繳費為止**。
+
+`vm:send-payment-notice`，Kernel `dailyAt('09:30')->withoutOverlapping()` ——
+排在匯率報價（09:00）之後、餘點告警（10:00）之前，三則對客訊息錯開時間。
+
+### 發送對象與條件
+
+| `paid` | 狀態 | 發給誰 | 發什麼 |
+|---|---|---|---|
+| 0 | 未收 | **客戶**（站台群組） | 繳款通知（繳款設定的文案 + 繳款圖） |
+| 2 | 待審核 | **內部群組** | 催我方審核（不附圖） |
+| 1 | 已收 | 不發 | — |
+
+未收的額外條件（`VmRepository::getBillingsForNotice()`）：
+
+- `due_date <= 今天 + DAYS_AHEAD`（2 天）—— **沒有下界**，逾期會一直發
+- `vm_server.power_status = ON` —— 關機不發
+- `vm_server.status = ACTIVE` —— 停用通常代表這台不服務了，還去收錢會出事
+
+**待審核的只看 `paid = 2`，沒有其他條件**
+（`getPendingBillingsForReminder()`）—— 客戶已經付錢了，證明擺著沒人審核
+本身就是問題，跟應收日剩幾天、主機關不關機都無關。
+
+### 完全不碰匯率
+
+虛擬機收的是 **USDT**，而 `vm_billing.amount` 就是客戶要付的數字，直接用。
+
+`vm_billing.exchange_rate` 不要碰：那是**客戶上傳繳款證明當下**記的
+USDT/TWD 4H 均價（`VmService::uploadProof()`），用途是事後對帳，
+跟「要通知他付多少」無關。
+
+通知文案也沒有匯率變數 —— 繳款設定的公版只有 `{station}` / `{amount}` /
+`{month}` / `{due_date}` / `{content}`。這跟餘點告警的補點訊息不一樣，
+那邊才需要匯率。
+
+### 文案組裝與手動發送共用
+
+`VmService::renderPaymentNotice($systemId, $vars)` → `['text', 'image_url']`。
+
+這段原本**寫在 `VmController::ajaxSendPaymentNotice()` 裡**，排程要用同一套，
+所以抽到 Service —— 兩邊各寫一份的話，改了文案規則只會改到一邊。
+Controller 改成呼叫它之後 `PaymentConfigService` 在那裡已經沒有使用點，
+一併從建構子移除。
+
+**文案是每個系統各自一份**：`payment_config` 依 `station.system_id` 取第一筆
+啟用的，公版留空就退回「繳款資訊」本身（沿用手動發送原本的行為）。
+
+### 四種退路
+
+| 情況 | 發到哪 | `reason` |
+|---|---|---|
+| 站台有群組 | 客戶 | — |
+| 站台沒設群組 | 內部群組（前綴說明為什麼沒發給客戶 + 原本要發的內容） | — |
+| 主機沒綁站台 | 內部群組（說明查不到繳款設定） | `no_station` |
+| 這個系統沒有啟用中的繳款設定 | 內部群組（說明去補設定） | `no_config` |
+| 內部群組也沒設定 | 不發，記 warning | `no_target` |
+
+每一筆各自 try/catch（`SKIP_ERROR`）—— 一筆噴錯不能讓整輪中斷，否則一個
+不相關的小問題就讓所有客戶都收不到通知（見
+[[2026-10-02-rate-failure-blocks-credit-alert]]）。
+
+### ⚠ 刻意沒有防重複
+
+一天跑一次（排程 + `withoutOverlapping()`）。**手動再跑一次就是再發一次** ——
+需求方確認過的行為，所以沒有 `notified_at` 之類的欄位。
+
+### ⚠ 一個客戶同一天可能收到多則
+
+每筆未繳帳單各發一則。客戶有兩個月沒繳就會收到兩則（本機實測就是這樣：
+2026-08 與 2026-10 各一則）。目前**不合併** —— 如果要合併成一則，
+那是另一次需求。
+
+### 踩到的坑：select 沒帶的欄位讀出來是 null
+
+催審核訊息要顯示「上傳時間」，第一版直接用 `$billing->updated_at` ——
+結果印出「上傳時間：—」。因為 `VmRepository::BILLING_COLUMNS` **沒有
+`updated_at`**，沒 select 的欄位讀出來是 null **而且不會報錯**。
+
+`getPendingBillingsForReminder()` 改成
+`array_merge(self::BILLING_COLUMNS, ['updated_at'])`。
+
+> 這跟 [[ignore-staff]] 的 `find()` 缺 `telegram_user_id` 是同一類錯誤。
+> **用一個欄位之前先確認它在 select 清單裡** —— 這種錯不會噴錯，
+> 只會讓訊息默默少一塊。
+
+### 實測（2026-10-02）
+
+空跑（完全唯讀）跑出兩筆真實帳單，文案與圖都正確套用。
+其餘分支用 transaction + rollback 造資料，**19 項全過**：
+
+| 情境 | 結果 |
+|---|---|
+| 待審核 → 催內部審核、不附圖、內容是催審核 | ✅ |
+| 待審核 + 關機 + 停用 → **仍然照催** | ✅ |
+| 未收 + 關機 → 根本不被撈出來 | ✅ |
+| 未收 + 停用 → 也不被撈出來 | ✅ |
+| 站台沒設群組 → 內部群組 + 前綴 + 原本要發的內容 | ✅ |
+| 主機沒綁站台 → `no_station` + 說明 | ✅ |
+| 內部群組也沒設 → `no_target`、不發 | ✅ |
+| rollback 後四個欄位全部還原 | ✅ |
+
 ## 站台可搜尋（2026-09-07）
 
 新增／編輯 modal 的站台從 `<select>` 改為「文字輸入 + 隱藏 id + 可篩選清單」。
@@ -91,6 +195,7 @@
 - `app/Http/Controllers/Admin/VmController.php`
 - `app/Services/VmService.php`
 - `app/Console/Commands/GenerateVmBilling.php` — `vm:generate-billing`，Kernel 每月 1 號 00:00
+- `app/Console/Commands/SendVmPaymentNoticeCommand.php` — `vm:send-payment-notice`，Kernel 每天 09:30；`--dry-run` / `--billing=`
 
 ### Request
 - `app/Http/Requests/Vm/*`

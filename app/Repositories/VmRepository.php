@@ -233,6 +233,64 @@ class VmRepository
     }
 
     /**
+     * 每天自動發繳款通知要撈的帳單（未收的）
+     *
+     * 四個條件：
+     *   1. `paid = UNPAID` —— 已收的不發；待審核的走
+     *      `getPendingBillingsForReminder()`，那是催自己人審核
+     *   2. `due_date <= 今天 + $daysAhead` —— 應收日前幾天開始發。
+     *      **沒有下界**，所以逾期的會一直發到客戶繳費為止
+     *   3. 主機開機中 —— 關機的不發
+     *   4. 主機啟用中 —— 停用通常代表這台已經不服務了，還去收錢會出事
+     *
+     * @param int $daysAhead 提前幾天開始發
+     * @return Collection
+     */
+    public function getBillingsForNotice($daysAhead)
+    {
+        return VmBilling::query()
+            ->select(self::BILLING_COLUMNS)
+            ->with(['vmServer.station'])
+            ->where('paid', config('constants.VM.BILLING.UNPAID'))
+            ->whereDate('due_date', '<=', now()->addDays((int) $daysAhead)->toDateString())
+            ->whereHas('vmServer', function ($query) {
+                $query->where('power_status', config('constants.VM.POWER.ON'))
+                    ->where('status', config('constants.VM.STATUS.ACTIVE'));
+            })
+            ->orderBy('due_date')
+            ->get();
+    }
+
+    /**
+     * 待審核的帳單（催我方審核用）
+     *
+     * ⚠ **只看 `paid = PENDING`，沒有其他條件。**
+     *
+     * 客戶已經付款並上傳證明了，證明擺著沒人審核本身就是問題 ——
+     * 跟應收日還剩幾天、主機是不是關機或停用都無關。
+     *
+     * @return Collection
+     */
+    public function getPendingBillingsForReminder()
+    {
+        return VmBilling::query()
+            /*
+             * 這裡多撈 `updated_at` —— 催審核訊息要顯示「上傳時間」，而
+             * `BILLING_COLUMNS` 沒有這一欄。沒 select 的欄位讀出來是 null
+             * 且**不會報錯**，訊息就會默默變成「上傳時間：—」。
+             *
+             * 沒有專門記上傳時刻的欄位，`uploadProof()` 寫入 proof_image 時
+             * `updated_at` 會跟著更新，審核前通常不會有別的更新，
+             * 所以它是夠準的近似值。
+             */
+            ->select(array_merge(self::BILLING_COLUMNS, ['updated_at']))
+            ->with(['vmServer.station'])
+            ->where('paid', config('constants.VM.BILLING.PENDING'))
+            ->orderBy('due_date')
+            ->get();
+    }
+
+    /**
      * 更新帳單
      *
      * @param VmBilling $billing
