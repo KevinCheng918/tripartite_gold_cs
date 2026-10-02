@@ -44,7 +44,6 @@ class AppSettingService
     // 站台餘點告警（繳款設定頁維護）
     const KEY_CREDIT_ALERT_TEMPLATE      = 'station_credit.alert_template';
     const KEY_CREDIT_ALERT_THRESHOLD     = 'station_credit.threshold';
-    const KEY_CREDIT_ALERT_COOLDOWN_DAYS = 'station_credit.cooldown_days';
 
     /*
      * 對客話術（tpl_*）2026-09-30 隨著「對客話術」頁一起移除。

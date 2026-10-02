@@ -119,7 +119,6 @@ return [
         // 這裡的值只是「還沒設定過」時的預設
         'CREDIT_ALERT' => [
             'THRESHOLD'     => 30000,
-            'COOLDOWN_DAYS' => 1,
 
             // 發送者暱稱。告警是系統主動發的，不掛客服個人名字
             'SENDER_NAME' => '系統',

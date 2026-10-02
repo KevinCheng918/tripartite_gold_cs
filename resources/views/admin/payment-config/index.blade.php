@@ -37,17 +37,7 @@
                                @if(!Auth::user()->hasPermission('payment_config.manage')) disabled @endif>
                         <small class="text-muted">{{ trans('payment_config.alert_threshold_hint') }}</small>
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label fw-bold" for="pc-alert-cooldown">{{ trans('payment_config.alert_field_cooldown') }}</label>
-                        <div class="input-group">
-                            <input type="number" step="1" min="0" max="365" class="form-control" id="pc-alert-cooldown"
-                                   value="{{ $alertSetting['cooldown_days'] }}"
-                                   @if(!Auth::user()->hasPermission('payment_config.manage')) disabled @endif>
-                            <span class="input-group-text">天</span>
-                        </div>
-                        <small class="text-muted">{{ trans('payment_config.alert_cooldown_hint') }}</small>
-                    </div>
-                    <div class="col-md-6">
+                    <div class="col-md-9">
                         <label class="form-label fw-bold" for="pc-alert-template">{{ trans('payment_config.alert_field_template') }}</label>
                         <textarea class="form-control" id="pc-alert-template" rows="5"
                                   @if(!Auth::user()->hasPermission('payment_config.manage')) disabled @endif>{{ $alertSetting['template'] }}</textarea>
@@ -427,7 +417,7 @@ $(function () {
 
     $('#btn-pc-alert-save').on('click', function () {
         var $btn = $(this);
-        var $fields = $('#pc-alert-threshold, #pc-alert-cooldown, #pc-alert-template');
+        var $fields = $('#pc-alert-threshold, #pc-alert-template');
 
         // 存檔中鎖住欄位，避免等回傳的空檔又被改掉
         $btn.prop('disabled', true);
@@ -439,8 +429,7 @@ $(function () {
             headers: { 'X-CSRF-TOKEN': csrfToken },
             data: {
                 alert_template: $('#pc-alert-template').val(),
-                threshold: $('#pc-alert-threshold').val(),
-                cooldown_days: $('#pc-alert-cooldown').val()
+                threshold: $('#pc-alert-threshold').val()
             },
             success: function (body) {
                 showMessage(body.message || '{{ trans("payment_config.msg.alert_saved") }}');

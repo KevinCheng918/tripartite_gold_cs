@@ -32,7 +32,6 @@ class SyncStationCreditCommand extends Command
         StationCreditAlertService::SKIP_SYNC_FAILED     => '主系統 API 沒回資料，跳過（不拿舊點數判斷）',
         StationCreditAlertService::SKIP_NOT_CHARGED     => '不收費，餘點不會被扣',
         StationCreditAlertService::SKIP_ABOVE_THRESHOLD => '點數充足',
-        StationCreditAlertService::SKIP_COOLDOWN        => '冷卻期內，不重複告警',
         StationCreditAlertService::SKIP_NO_TARGET       => '沒有可發送的群組（站台與內部支援群組都沒設）',
         StationCreditAlertService::SKIP_SEND_FAILED     => '發送失敗，下一輪會重試',
         // 走到這個原因表示有沒被接住的例外，是要修的 bug —— 詳情在 log

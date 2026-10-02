@@ -24,7 +24,11 @@ use Illuminate\Support\Facades\Log;
  * ⚠ 這個服務會直接發訊息給客戶，誤報的代價比漏報高。所以：
  *   1. API 失敗（syncInfo 回 null）就跳過，**絕不拿上一次的舊點數判斷**
  *   2. 每個站台各自 try/catch，一站出錯不影響其他站台（在 run() 的迴圈裡）
- *   3. 發送成功才寫 credit_alerted_at，失敗的下一輪會重試
+ *
+ * ⚠ **沒有冷卻期。** 只要低於門檻，每天 10 點都會通知 —— 點數不足是個
+ * 持續存在的狀態，不是一次性事件，客戶補點之前每天提醒一次才合理。
+ * `credit_alerted_at` 仍然會寫，但**只作紀錄、不參與判斷**
+ * （見 [[2026-10-02-remove-credit-alert-cooldown]]）。
  *
  * ⚠ **補點訊息的任何問題都不能影響告警本身。** 告警是「你的點數快沒了」，
  * 補點訊息只是附帶的「要補的話這樣匯款」—— 匯率查不到、繳款設定查不到，
@@ -42,9 +46,6 @@ class StationCreditAlertService
 
     /** @var string 跳過原因：點數還在門檻之上 */
     const SKIP_ABOVE_THRESHOLD = 'above_threshold';
-
-    /** @var string 跳過原因：距上次告警還在冷卻期內 */
-    const SKIP_COOLDOWN = 'cooldown';
 
     /** @var string 跳過原因：站台沒設群組，內部支援群組也沒設 */
     const SKIP_NO_TARGET = 'no_target';
@@ -201,7 +202,6 @@ class StationCreditAlertService
      * | | 自動 | 手動 |
      * |---|---|---|
      * | 點數高於門檻 | 不發 | **照發** |
-     * | 冷卻期內 | 不發 | **照發** |
      * | 有補點單待審核 | 改發內部群組 | **照發給客戶** |
      * | 站台沒設群組 | 退到內部群組 | **擋下來並說明** |
      *
@@ -263,10 +263,10 @@ class StationCreditAlertService
         $topupSent = $this->sendTopup($station, $topup, $imageUrl);
 
         /*
-         * 手動發了也要記 credit_alerted_at。
+         * 記 credit_alerted_at 只是**留一筆紀錄**（最後一次告警是什麼時候）。
          *
-         * 不記的話，明天早上的自動告警會再發一次同樣的東西 ——
-         * 對客戶來說那是重複打擾，他分不出一個是人按的、一個是排程。
+         * 它曾經會擋掉隔天的自動告警 —— 前一天按過這顆按鈕，隔天 10 點就
+         * 被冷卻期吃掉。冷卻期已經移除，手動按不再影響排程。
          */
         $this->stationRepository->update($station, ['credit_alerted_at' => now()]);
 
@@ -424,7 +424,7 @@ class StationCreditAlertService
     /**
      * 全域告警設定（繳款設定頁維護，沒設過就用 constants 的預設）
      *
-     * @return array{threshold:float, cooldown_days:int, template:string}
+     * @return array{threshold:float, template:string}
      */
     public function globalSettings()
     {
@@ -434,10 +434,6 @@ class StationCreditAlertService
             'threshold' => $this->appSettingService->getFloat(
                 AppSettingService::KEY_CREDIT_ALERT_THRESHOLD,
                 (float) $defaults['THRESHOLD']
-            ),
-            'cooldown_days' => $this->appSettingService->getInt(
-                AppSettingService::KEY_CREDIT_ALERT_COOLDOWN_DAYS,
-                (int) $defaults['COOLDOWN_DAYS']
             ),
             'template' => $this->alertTemplate(),
         ];
@@ -569,10 +565,6 @@ class StationCreditAlertService
             return $this->result($station, $threshold, false, null, self::SKIP_ABOVE_THRESHOLD);
         }
 
-        if ($this->inCooldown($station, $settings['cooldown_days'])) {
-            return $this->result($station, $threshold, false, null, self::SKIP_COOLDOWN);
-        }
-
         /*
          * 已經有補點單在等審核的話，客戶該做的都做了 ——
          * 再發「請補充點數」是在催一件他已經做完的事，真正卡住的是我們還沒審核。
@@ -666,6 +658,7 @@ class StationCreditAlertService
             ? $this->sendTopup($station, $topupText, $imageUrl)
             : null;
 
+        // 只是紀錄「最後一次告警的時間」—— 沒有冷卻期，不參與任何判斷
         $this->stationRepository->update($station, ['credit_alerted_at' => now()]);
 
         $context = [
@@ -842,23 +835,6 @@ class StationCreditAlertService
         return filled($station->credit_alert_threshold)
             ? (float) $station->credit_alert_threshold
             : $globalThreshold;
-    }
-
-    /**
-     * 是否還在冷卻期內（上次告警沒過幾天，先不重複發）
-     *
-     * @param Station $station
-     * @param int     $cooldownDays
-     * @return bool
-     */
-    private function inCooldown(Station $station, $cooldownDays)
-    {
-        if (blank($station->credit_alerted_at) || $cooldownDays <= 0) {
-            return false;
-        }
-
-        // addDays() 會改到原本那個 Carbon 物件，一定要先 copy()
-        return $station->credit_alerted_at->copy()->addDays($cooldownDays)->isFuture();
     }
 
     /**

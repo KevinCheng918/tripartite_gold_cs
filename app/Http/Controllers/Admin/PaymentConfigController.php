@@ -287,7 +287,6 @@ class PaymentConfigController extends Controller
             $this->appSettingService->putMany([
                 AppSettingService::KEY_CREDIT_ALERT_TEMPLATE      => Arr::get($params, 'alert_template'),
                 AppSettingService::KEY_CREDIT_ALERT_THRESHOLD     => Arr::get($params, 'threshold'),
-                AppSettingService::KEY_CREDIT_ALERT_COOLDOWN_DAYS => Arr::get($params, 'cooldown_days'),
             ], Auth::id());
 
             return response()->json(['message' => trans('payment_config.msg.alert_saved')]);
