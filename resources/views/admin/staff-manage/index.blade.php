@@ -25,7 +25,8 @@
         </li>
         <li class="nav-item">
             <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-consumable" id="tab-btn-consumable">
-                <i class="fas fa-boxes-stacked me-1"></i>{{ trans('staff_manage.tab_consumable') }}
+                {{-- fa-boxes 而不是 fa-boxes-stacked：專案是 Font Awesome 5.15，後者是 FA6 才有的 --}}
+                <i class="fas fa-boxes me-1"></i>{{ trans('staff_manage.tab_consumable') }}
             </button>
         </li>
     </ul>
@@ -237,8 +238,6 @@
                 </div>
             </div>
         </div>
-    </div>
-
         {{-- 消耗品 Tab --}}
         {{--
             整個分頁的 HTML 由 public/js/staff-manage-consumable.js 畫出來。
