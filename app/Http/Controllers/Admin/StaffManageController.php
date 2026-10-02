@@ -104,6 +104,13 @@ class StaffManageController extends Controller
             'balances' => $this->consumableService->getOverview($this->scopedUserId(Arr::get($params, 'user_id'))),
             // 登記時的建議清單 —— 就是大家已經打過的名稱，不限制只能選這些
             'item_names' => $this->consumableService->listItemNames(),
+            /*
+             * 可以登記給誰。
+             *
+             * ⚠ **不能從 balances 推導** —— 那只有「已經有紀錄的人」，
+             * 一筆紀錄都還沒有時下拉會是空的，第一筆就登記不了。
+             */
+            'users' => $this->consumableUsers(),
             // 前端要知道「我是誰」才能決定哪幾筆可以改（沒有管理權限時只能動自己的）
             'me'       => (int) Auth::id(),
             'can_edit' => Auth::user()->hasPermission('staff_manage.edit'),
@@ -230,6 +237,54 @@ class StaffManageController extends Controller
         }
 
         return Auth::user()->hasPermission('staff_manage.edit');
+    }
+
+    /**
+     * 消耗品可以登記給誰
+     *
+     * 重用「人員管理」分頁那一支（`level != ADMIN`）而不是另寫一個條件 ——
+     * **「人員管理看得到誰」就該是「消耗品登記得了誰」**，條件只有一份，
+     * 日後改「誰算內勤」只要改一個地方。
+     *
+     * 多撈了幾個用不到的欄位（到職日、設備），但內勤就幾十個人，
+     * 比起讓同一個條件散落兩處划算得多。
+     *
+     * 沒有 `consumable_view_all` 的人只拿得到自己 —— 他本來也只能登記自己的。
+     *
+     * @return array 每筆：id, nickname
+     */
+    private function consumableUsers()
+    {
+        $users = $this->canViewAll()
+            ? $this->userRepository->getAllCsUsersWithDetail()
+            : $this->userRepository->getNamesByIds([(int) Auth::id()]);
+
+        $list = $users->map(function ($user) {
+            return ['id' => (int) $user->id, 'nickname' => $user->nickname];
+        })->values()->all();
+
+        /*
+         * ⚠ 自己一定要在清單裡。
+         *
+         * 「人員管理」的範圍是 `level != ADMIN` —— **管理者自己不在裡面**。
+         * 不補的話他會選不到自己，等於登記不了自己的消耗品，而
+         * canManage() 明明允許任何人動自己的。
+         */
+        $meId = (int) Auth::id();
+
+        foreach ($list as $user) {
+            if (Arr::get($user, 'id') === $meId) {
+                return $list;
+            }
+        }
+
+        $me = $this->userRepository->getNamesByIds([$meId])->first();
+
+        if (filled($me)) {
+            array_unshift($list, ['id' => $meId, 'nickname' => $me->nickname]);
+        }
+
+        return $list;
     }
 
     /**

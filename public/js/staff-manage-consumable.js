@@ -32,6 +32,7 @@
         loaded: false,
         balances: [],
         itemNames: [],   // 已經用過的品項名稱，當輸入建議
+        users: [],       // 可以登記給誰（後端給，不是從 balances 推導）
         canViewAll: false,
         filterUser: '',
         filterItem: '',
@@ -54,6 +55,7 @@
             .then(function (body) {
                 state.balances = body.balances || [];
                 state.itemNames = body.item_names || [];
+                state.users = body.users || [];
                 state.canViewAll = !!body.can_view_all;
                 state.loaded = true;
                 renderToolbar();
@@ -76,8 +78,8 @@
         if (state.canViewAll) {
             html += '<select class="form-select form-select-sm w-auto" id="consumable-filter-user">' +
                 '<option value="">' + esc(I18N.consumable_all_users) + '</option>' +
-                uniqueUsers().map(function (u) {
-                    return '<option value="' + u.id + '">' + esc(u.name) + '</option>';
+                state.users.map(function (u) {
+                    return '<option value="' + u.id + '">' + esc(u.nickname) + '</option>';
                 }).join('') +
                 '</select>';
         }
@@ -274,8 +276,8 @@
 
     function openRecordModal(record) {
         var userOptions = CAN_EDIT
-            ? uniqueUsers().map(function (u) {
-                return '<option value="' + u.id + '">' + esc(u.name) + '</option>';
+            ? state.users.map(function (u) {
+                return '<option value="' + u.id + '">' + esc(u.nickname) + '</option>';
             }).join('')
             : '';
 
@@ -446,23 +448,16 @@
     //  小工具
     // ---------------------------------------------------------------
 
-    function uniqueUsers() {
-        var seen = {};
-        var list = [];
-
-        state.balances.forEach(function (b) {
-            if (seen[b.user_id]) { return; }
-            seen[b.user_id] = true;
-            list.push({ id: b.user_id, name: b.user_name });
-        });
-
-        return list;
-    }
-
+    /**
+     * 自己的名字（沒有管理權限時，登記視窗的人員欄顯示它）
+     *
+     * 從 state.users 取而不是 balances —— 後者只有「已經有紀錄的人」，
+     * 第一次登記時那裡還是空的。
+     */
     function myName() {
-        var mine = state.balances.filter(function (b) { return b.user_id === ME; })[0];
+        var mine = state.users.filter(function (u) { return u.id === ME; })[0];
 
-        return mine ? mine.user_name : '';
+        return mine ? mine.nickname : '';
     }
 
     function setBody(html) {
