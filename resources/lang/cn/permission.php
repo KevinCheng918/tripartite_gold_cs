@@ -85,6 +85,10 @@ return [
     'staff_manage' => [
         'view' => '查看内部管理',
         'edit' => '编辑员工资料',
+        // 每个内勤都要勾，否则登记不了自己的消耗品
+        'consumable_log' => '登记自己的消耗品',
+        // 给主管以上；没有这个权限的人只看得到自己的
+        'consumable_view_all' => '查看所有人的消耗品',
     ],
     'project' => [
         'view' => '查看项目管理',

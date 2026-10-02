@@ -85,6 +85,10 @@ return [
     'staff_manage' => [
         'view' => 'View staff management',
         'edit' => 'Edit staff info',
+        // Every back-office account needs this, otherwise they cannot log their own consumables
+        'consumable_log' => 'Record own consumables',
+        // For supervisors and above; without it a user only sees their own
+        'consumable_view_all' => "View everyone's consumables",
     ],
     'project' => [
         'view' => 'View projects',

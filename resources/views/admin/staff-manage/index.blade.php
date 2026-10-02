@@ -23,6 +23,11 @@
                 <i class="fas fa-laptop me-1"></i>{{ trans('staff_manage.tab_equipment') }}
             </button>
         </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-consumable" id="tab-btn-consumable">
+                <i class="fas fa-boxes-stacked me-1"></i>{{ trans('staff_manage.tab_consumable') }}
+            </button>
+        </li>
     </ul>
 
     <div class="tab-content">
@@ -233,6 +238,32 @@
             </div>
         </div>
     </div>
+
+        {{-- 消耗品 Tab --}}
+        {{--
+            整個分頁的 HTML 由 public/js/staff-manage-consumable.js 畫出來。
+
+            設定走 data-* 傳給 JS（比照 telegram-chat 的做法）：
+            這頁的其他分頁把 JS 寫在 blade 的 @section('scripts') 內，
+            但 PROMPTS 要求 JS 分到 public/js，新的就不跟進了。
+        --}}
+        <div class="tab-pane fade" id="tab-consumable"
+             data-i18n='@json(trans("staff_manage"), JSON_HEX_APOS | JSON_HEX_QUOT)'
+             data-me="{{ Auth::id() }}"
+             data-can-edit="{{ Auth::user()->hasPermission('staff_manage.edit') ? 1 : 0 }}"
+             data-can-log="{{ Auth::user()->hasPermission('staff_manage.consumable_log') ? 1 : 0 }}">
+            <div class="main-card mb-3 card">
+                <div class="card-body">
+                    <div id="consumable-toolbar" class="d-flex flex-wrap gap-2 align-items-center mb-3"></div>
+                    <div class="text-muted mb-3" style="font-size:0.8125rem">
+                        <i class="fas fa-info-circle me-1"></i>{{ trans('staff_manage.consumable_hint') }}
+                    </div>
+                    <div id="consumable-body">
+                        <div class="text-center text-muted py-4"><i class="fas fa-spinner fa-spin"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
     </div>{{-- end tab-content --}}
 
@@ -1010,4 +1041,5 @@ $(function () {
     loadList();
 });
 </script>
+<script src="{{ asset('js/staff-manage-consumable.js') }}?v={{ filemtime(public_path('js/staff-manage-consumable.js')) }}"></script>
 @endsection

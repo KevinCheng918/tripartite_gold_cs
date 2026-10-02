@@ -85,6 +85,10 @@ return [
     'staff_manage' => [
         'view' => '檢視內部管理',
         'edit' => '編輯員工資料',
+        // 每個內勤都要勾，否則登記不了自己的消耗品
+        'consumable_log' => '登記自己的消耗品',
+        // 給主管以上；沒有這個權限的人只看得到自己的
+        'consumable_view_all' => '檢視所有人的消耗品',
     ],
     'project' => [
         'view' => '檢視專案管理',

@@ -118,6 +118,22 @@ return [
         'keywords' => [
             'staff_manage.view' => 'permission.staff_manage.view',
             'staff_manage.edit' => 'permission.staff_manage.edit',
+            /*
+             * 登記自己的消耗品領用／使用。**每個內勤都要勾**，
+             * 不然他們連自己用掉幾張卡都登記不了。
+             *
+             * 跟 edit 分開：edit 是「能改別人的、能維護品項」，那是管理者的事。
+             */
+            'staff_manage.consumable_log' => 'permission.staff_manage.consumable_log',
+
+            /*
+             * 看**所有人**的消耗品。沒有這個權限的人只看得到自己的 ——
+             * 範圍限制在 Controller 強制套用，不是靠前端不顯示。
+             *
+             * 給主管以上。用 keyword 而不是判 `level <= LEADER`：
+             * 權限一律由 permissionMap 控制，寫死身份會讓權限表看不出全貌。
+             */
+            'staff_manage.consumable_view_all' => 'permission.staff_manage.consumable_view_all',
         ],
     ],
 

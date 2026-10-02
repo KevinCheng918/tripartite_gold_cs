@@ -325,6 +325,32 @@ class UserRepository
     }
 
     /**
+     * 依 id 取暱稱（純粹要個名字顯示時用）
+     *
+     * ⚠ 不要拿 `getMentionableByIds()` 當這件事用 —— 那支是為「內部群組
+     * tag 人」寫的：排除工程、只取正常狀態、而且**必須有 telegram_username**。
+     * 用它查人名會莫名其妙漏掉一整批人。
+     *
+     * 這支**不加任何狀態條件**：已經離職或停用的人，他留下的紀錄仍然要顯示
+     * 得出是誰。
+     *
+     * @param array $ids
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getNamesByIds($ids)
+    {
+        if (blank($ids)) {
+            return new \Illuminate\Database\Eloquent\Collection();
+        }
+
+        return User::query()
+            ->select(['id', 'account', 'nickname', 'level'])
+            ->whereIn('id', $ids)
+            ->orderBy('nickname')
+            ->get();
+    }
+
+    /**
      * 回填 Telegram ID 用的精簡查詢
      *
      * 不用 `find()`：那支的 select 是 `LIST_COLUMNS`（**沒有 `telegram_user_id`**），
