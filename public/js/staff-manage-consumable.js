@@ -42,6 +42,16 @@
          */
         expanded: null,
         visible: [],     // 這次畫出來的列，給 data-idx 對照用
+        /*
+         * 流水明細的快取，key 見 detailKey()。
+         *
+         * 總覽載完後會在背景把流水一次撈回來填進這裡，所以展開一列通常
+         * 不必等網路 —— 以前每次展開都打一次 API，收合再展開又打一次，
+         * 明細只有幾筆也要轉一下圈。
+         *
+         * 任何寫入後 load() 會整個清掉重撈，不會拿到舊資料。
+         */
+        details: {},
     };
 
     // ---------------------------------------------------------------
@@ -50,6 +60,9 @@
 
     function load() {
         setBody('<div class="text-center text-muted py-4"><i class="fas fa-spinner fa-spin"></i></div>');
+
+        // 重撈總覽代表資料變了，舊的明細快取一律作廢
+        state.details = {};
 
         apiGet('/admin/staff-manage/ajax-consumable-overview')
             .then(function (body) {
@@ -60,10 +73,72 @@
                 state.loaded = true;
                 renderToolbar();
                 render();
+                /*
+                 * 總覽畫完才預取流水，而且不 return 這個 promise ——
+                 * 它只是把明細先準備好，不該讓進頁的人多等。
+                 */
+                prefetchDetails();
             })
             .catch(function () {
                 setBody('<div class="text-center text-danger py-4">' + esc(MSG.action_failed) + '</div>');
             });
+    }
+
+    /**
+     * 背景把流水一次撈回來，分組填進 state.details
+     *
+     * 不帶任何條件 —— 後端會依權限決定給全部還是只給自己（`scopedUserId`），
+     * 總覽本來也是全量給前端、篩選在前端做，這裡同一個模式。
+     *
+     * 失敗了不報錯也不影響畫面：展開時 loadDetail() 會自己去打單筆，
+     * 退回成原本的行為而已。
+     */
+    function prefetchDetails() {
+        apiGet('/admin/staff-manage/ajax-consumable-records')
+            .then(function (body) {
+                var records = (body && body.data) || [];
+
+                // 後端已按日期與 id 倒序，分組時保持原順序就是對的順序
+                records.forEach(function (r) {
+                    var key = detailKey(r.user_id, r.item_name);
+
+                    if (!state.details[key]) { state.details[key] = []; }
+
+                    state.details[key].push(r);
+                });
+
+                /*
+                 * 空的那幾組也要記起來，不然「這個品項沒有流水」會被當成
+                 * 「還沒載入」，每次展開都白打一次 API。
+                 */
+                state.balances.forEach(function (b) {
+                    var key = detailKey(b.user_id, b.item_name);
+
+                    if (!state.details[key]) { state.details[key] = []; }
+                });
+
+                // 預取回來之前就展開的那列還在轉圈，補畫上去
+                state.visible.forEach(function (b, idx) {
+                    if (isExpanded(b)) { loadDetail(idx); }
+                });
+            })
+            .catch(function () {
+                // 預取失敗不打擾使用者，展開時會各自重打
+            });
+    }
+
+    /**
+     * 明細快取的 key
+     *
+     * 品項名稱是使用者自己打的字串，分隔符用 `\u0000`（NUL）—— 它不可能
+     * 出現在使用者打的名稱裡，所以兩段永遠切得開。
+     *
+     * @param {number} userId
+     * @param {string} itemName
+     * @returns {string}
+     */
+    function detailKey(userId, itemName) {
+        return String(userId) + '\u0000' + itemName;
     }
 
     /**
@@ -210,6 +285,21 @@
 
         if (!row || !box) { return; }
 
+        var key = detailKey(row.user_id, row.item_name);
+        var cached = state.details[key];
+
+        /*
+         * 預取已經拿到這一組了 —— 直接畫完收工，不要先閃一下轉圈。
+         *
+         * 空陣列也算載過（代表這個品項沒有流水），所以這裡只能判
+         * 有沒有這個 key，不能判長度。
+         */
+        if (cached) {
+            paintDetail(box, cached);
+
+            return;
+        }
+
         box.innerHTML = '<div class="text-muted py-2" style="font-size:0.8125rem">' +
             '<i class="fas fa-spinner fa-spin me-1"></i></div>';
 
@@ -218,21 +308,33 @@
             .then(function (body) {
                 var records = (body && body.data) || [];
 
-                box.innerHTML = buildDetail(records);
-
-                /*
-                 * 把這批紀錄掛在 DOM 節點上，編輯時直接拿得到整筆 ——
-                 * 不然按編輯只有一個 id，還要再打一次 API 才知道原本的值。
-                 */
-                box.__records = {};
-                records.forEach(function (r) { box.__records[r.id] = r; });
-
-                bindDetail(box);
+                // 收合再展開就不必再打一次
+                state.details[key] = records;
+                paintDetail(box, records);
             })
             .catch(function () {
                 box.innerHTML = '<div class="text-danger py-2" style="font-size:0.8125rem">' +
                     esc(MSG.action_failed) + '</div>';
             });
+    }
+
+    /**
+     * 把一組流水畫進展開區
+     *
+     * @param {HTMLElement} box     `.js-consumable-detail`
+     * @param {Array}       records 這一組的流水，由新到舊
+     */
+    function paintDetail(box, records) {
+        box.innerHTML = buildDetail(records);
+
+        /*
+         * 把這批紀錄掛在 DOM 節點上，編輯時直接拿得到整筆 ——
+         * 不然按編輯只有一個 id，還要再打一次 API 才知道原本的值。
+         */
+        box.__records = {};
+        records.forEach(function (r) { box.__records[r.id] = r; });
+
+        bindDetail(box);
     }
 
     function buildDetail(records) {
