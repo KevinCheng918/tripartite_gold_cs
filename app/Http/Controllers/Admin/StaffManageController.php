@@ -255,36 +255,27 @@ class StaffManageController extends Controller
      */
     private function consumableUsers()
     {
-        $users = $this->canViewAll()
-            ? $this->userRepository->getAllCsUsersWithDetail()
-            : $this->userRepository->getNamesByIds([(int) Auth::id()]);
-
-        $list = $users->map(function ($user) {
-            return ['id' => (int) $user->id, 'nickname' => $user->nickname];
-        })->values()->all();
-
         /*
-         * ⚠ 自己一定要在清單裡。
+         * ⚠ **ADMIN 一律排除，連登入者自己是 ADMIN 也不例外** —— 需求方明確
+         * 要求「不能有 admin」。管理者不領消耗品，他只是幫別人登記。
          *
-         * 「人員管理」的範圍是 `level != ADMIN` —— **管理者自己不在裡面**。
-         * 不補的話他會選不到自己，等於登記不了自己的消耗品，而
-         * canManage() 明明允許任何人動自己的。
+         * 看得到所有人時直接用「人員管理」那一支（`level != ADMIN`）；
+         * 只看得到自己時，自己是 ADMIN 就回空清單。
          */
-        $meId = (int) Auth::id();
-
-        foreach ($list as $user) {
-            if (Arr::get($user, 'id') === $meId) {
-                return $list;
-            }
+        if ($this->canViewAll()) {
+            return $this->userRepository->getAllCsUsersWithDetail()
+                ->map(function ($user) {
+                    return ['id' => (int) $user->id, 'nickname' => $user->nickname];
+                })->values()->all();
         }
 
-        $me = $this->userRepository->getNamesByIds([$meId])->first();
+        $me = $this->userRepository->getNamesByIds([(int) Auth::id()])->first();
 
-        if (filled($me)) {
-            array_unshift($list, ['id' => $meId, 'nickname' => $me->nickname]);
+        if (blank($me) || (int) $me->level === (int) config('constants.USER.LEVEL.ADMIN')) {
+            return [];
         }
 
-        return $list;
+        return [['id' => (int) $me->id, 'nickname' => $me->nickname]];
     }
 
     /**
