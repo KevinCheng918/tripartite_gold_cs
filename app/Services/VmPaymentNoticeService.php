@@ -244,7 +244,13 @@ class VmPaymentNoticeService
                 '{month}'   => $month,
             ]) . Arr::get($notice, 'text');
 
-            return $this->sendInternalOnly($billing, 'unpaid', null, $text, $dryRun);
+            /*
+             * 繳款圖一起附上 —— 客服要拿這則去手動通知客戶，
+             * 而圖是「這個系統的」那一張，不是通用的。
+             */
+            return $this->sendInternalOnly(
+                $billing, 'unpaid', null, $text, $dryRun, Arr::get($notice, 'image_url')
+            );
         }
 
         if ($dryRun) {
@@ -311,18 +317,32 @@ class VmPaymentNoticeService
     }
 
     /**
-     * 只發內部支援群組（不附圖）
+     * 只發內部支援群組
      *
-     * 內部群組是要客服去處理事情，附一張付款地址圖沒有幫助。
+     * 站台沒設群組時客服要拿著這則去手動通知客戶，所以**該系統的繳款圖片
+     * 要一起附上** —— 不然客服還得自己去繳款設定翻一次圖，而且可能翻錯系統的。
+     * 做法與補點訊息的 `StationCreditAlertService::sendTopupToSupportGroup()` 一致。
      *
-     * @param VmBilling $billing
-     * @param string                 $kind
-     * @param string|null            $reason 為什麼沒發給客戶（純催審核時是 null）
-     * @param string                 $text
-     * @param bool                   $dryRun
+     * 沒有圖可附的情況（主機沒綁站台、系統沒有啟用中的繳款設定）本來就查不到
+     * 設定，`$imageUrl` 會是 null，退回純文字。
+     *
+     * ⚠ 催審核那條（`kind = pending`）刻意不傳圖：客戶已經付款上傳證明了，
+     * 要催的是我方去審核，附付款地址圖沒有幫助。
+     *
+     * ⚠ Telegram 的圖說上限 1024 字，**超過會整則失敗**。文案是客服自己在
+     * 繳款設定裡寫的，加上開頭那段說明後若超過上限，這則就會發不出去 ——
+     * 補點訊息那邊是同樣的條件，兩邊要一起處理才有意義（見
+     * [[2026-10-03-internal-notice-payment-image]]）。
+     *
+     * @param VmBilling   $billing
+     * @param string      $kind
+     * @param string|null $reason 為什麼沒發給客戶（純催審核時是 null）
+     * @param string      $text
+     * @param bool        $dryRun
+     * @param string|null $imageUrl 該系統的繳款圖片，null 就只發文字
      * @return array
      */
-    private function sendInternalOnly($billing, $kind, $reason, $text, $dryRun)
+    private function sendInternalOnly($billing, $kind, $reason, $text, $dryRun, $imageUrl = null)
     {
         if (!$this->supportGroup->isConfigured()) {
             Log::warning('虛擬機繳款通知沒有可發送的群組', [
@@ -331,25 +351,31 @@ class VmPaymentNoticeService
                 'reason'     => $reason,
             ]);
 
-            return $this->noticeResult($billing, $kind, null, self::SKIP_NO_TARGET, $text);
+            return $this->noticeResult($billing, $kind, null, self::SKIP_NO_TARGET, $text, $imageUrl);
         }
 
         if ($dryRun) {
-            return $this->noticeResult($billing, $kind, self::TARGET_INTERNAL, $reason, $text);
+            return $this->noticeResult($billing, $kind, self::TARGET_INTERNAL, $reason, $text, $imageUrl);
         }
 
         try {
-            $this->supportGroup->send($text);
+            // 有圖就當圖說發出去，客服一則訊息就看到文案與繳款圖
+            if (filled($imageUrl)) {
+                $this->supportGroup->sendPhoto($imageUrl, $text);
+            } else {
+                $this->supportGroup->send($text);
+            }
         } catch (\Exception $e) {
             Log::error('虛擬機繳款通知發送失敗（內部群組）', [
                 'billing_id' => $billing->id,
+                'has_image'  => filled($imageUrl),
                 'error'      => $e->getMessage(),
             ]);
 
-            return $this->noticeResult($billing, $kind, self::TARGET_INTERNAL, self::SKIP_SEND_FAILED, $text);
+            return $this->noticeResult($billing, $kind, self::TARGET_INTERNAL, self::SKIP_SEND_FAILED, $text, $imageUrl);
         }
 
-        return $this->noticeResult($billing, $kind, self::TARGET_INTERNAL, $reason, $text);
+        return $this->noticeResult($billing, $kind, self::TARGET_INTERNAL, $reason, $text, $imageUrl);
     }
 
     /**

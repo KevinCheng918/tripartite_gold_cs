@@ -584,29 +584,46 @@ class StationCreditAlertService
             return $this->result($station, $threshold, false, null, self::SKIP_NO_TARGET);
         }
 
-        $topup = $this->topupFor($station);
+        /*
+         * 待審核那則不帶補點訊息，所以**連查都不用查** —— 省掉今日匯率
+         * 與繳款設定兩次查詢。這也讓那則完全不受匯率查不到的影響。
+         */
+        $topup = $target === self::TARGET_INTERNAL_PENDING ? [] : $this->topupFor($station);
         $topupText = Arr::get($topup, 'text');
         $text = $this->renderAlert($settings['template'], $station->name, $credits, $threshold);
 
         /*
-         * 發到內部群組時併成一則，而且不附圖。
-         *
-         * 內部群組那則是「這個站台快沒點了，但沒發給客戶」的轉知 ——
-         * 客服要的是一眼看完整件事，拆成兩則只是讓同一件事在群組裡響兩次。
-         * 圖同理：客服要做的是去設群組或去審核補點單，不是照著付款地址匯款。
+         * 發到內部群組時併成一則 —— 客服要的是一眼看完整件事，
+         * 拆成兩則只是讓同一件事在群組裡響兩次。
          *
          * 前綴（沒設群組／有待審核）要擺在最前面，說明為什麼沒發給客戶。
+         *
+         * 但「沒設群組」與「有待審核」要的東西不一樣，見下面兩段。
          */
         if ($target !== self::TARGET_STATION) {
-            $text = $this->internalPrefix($station, $target, $pendingTopups)
-                . $text
-                . $this->topupSuffix($topupText);
+            $text = $this->internalPrefix($station, $target, $pendingTopups) . $text;
 
-            if ($dryRun) {
-                return $this->result($station, $threshold, false, $target, null, $text);
+            /*
+             * 沒設群組時，客服要拿這則去**手動通知客戶繳款** ——
+             * 所以補點訊息與該系統的繳款圖都要給他，一則訊息就能轉發出去。
+             *
+             * 待審核時不給：客戶已經申請補點了，客服要做的是去後台審核，
+             * 不是照著匯率匯款。那則只要說清楚「哪個站台、剩多少點、
+             * 幾筆沒審核」就夠了（需求方 2026-10-03 指定）。
+             */
+            $withTopup = $target === self::TARGET_INTERNAL;
+
+            if ($withTopup) {
+                $text .= $this->topupSuffix($topupText);
             }
 
-            return $this->send($station, $threshold, $target, $text);
+            $internalImage = $withTopup ? Arr::get($topup, 'image_url') : null;
+
+            if ($dryRun) {
+                return $this->result($station, $threshold, false, $target, null, $text, null, $internalImage);
+            }
+
+            return $this->send($station, $threshold, $target, $text, null, $internalImage);
         }
 
         $imageUrl = Arr::get($topup, 'image_url');
@@ -626,7 +643,9 @@ class StationCreditAlertService
      * @param string      $target
      * @param string      $text      告警那則（內部群組的已含前綴與補點訊息）
      * @param string|null $topupText 補點訊息，當成第二則發；只有發給客戶時才有
-     * @param string|null $imageUrl  補點訊息要附的圖
+     * @param string|null $imageUrl  繳款圖。發客戶時掛在第二則（補點訊息）上，
+     *                               發內部群組時掛在併成的那一則上 ——
+     *                               兩者互斥，因為 target 只會是其中一種
      * @return array
      */
     private function send(Station $station, $threshold, $target, $text, $topupText = null, $imageUrl = null)
@@ -636,9 +655,14 @@ class StationCreditAlertService
              * 只有 TARGET_STATION 會送到客戶那邊，其餘（沒設群組的退路、
              * 有補點單待審核）一律進內部群組 —— 說明的前綴在 handleStation
              * 就依 target 組好了，這裡只負責送。
+             *
+             * 內部群組有圖的情況只有一種：沒設群組，客服要拿這則去手動
+             * 通知客戶繳款。待審核那則不給圖，$imageUrl 會是 null。
              */
             if ($target === self::TARGET_STATION) {
                 $this->sendToStation($station, $text);
+            } elseif (filled($imageUrl)) {
+                $this->supportGroup->sendPhoto($imageUrl, $text);
             } else {
                 $this->supportGroup->send($text);
             }
@@ -647,11 +671,12 @@ class StationCreditAlertService
                 'station_id' => $station->id,
                 'station'    => $station->name,
                 'target'     => $target,
+                'has_image'  => filled($imageUrl),
                 'error'      => $e->getMessage(),
             ]);
 
             // 不寫 credit_alerted_at —— 沒送出去就不該被冷卻擋住，下一輪要能重試
-            return $this->result($station, $threshold, false, $target, self::SKIP_SEND_FAILED, $text);
+            return $this->result($station, $threshold, false, $target, self::SKIP_SEND_FAILED, $text, $topupText, $imageUrl);
         }
 
         // 補點訊息是獨立的第二則，只發給客戶（內部群組已經併在上面那則裡）
