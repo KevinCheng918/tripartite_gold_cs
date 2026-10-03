@@ -148,10 +148,10 @@ class ScreenshotService
         $target = Storage::disk('public')->path($relative);
 
         $browser = null;
-        $userDataDir = $this->makeUserDataDir();
+        $work = $this->makeWorkDir();
 
         try {
-            $browser = $this->createBrowser($binary, $options, $userDataDir);
+            $browser = $this->createBrowser($binary, $options, $work);
             $this->shoot($browser, $url, $target, $options);
         } catch (\Throwable $e) {
             /*
@@ -172,7 +172,7 @@ class ScreenshotService
             }
 
             // 要等 Chrome 關掉才能刪，不然它還握著裡面的檔案
-            $this->removeUserDataDir($userDataDir);
+            $this->removeWorkDir($work);
         }
 
         if (!file_exists($target) || filesize($target) === 0) {
@@ -213,23 +213,47 @@ class ScreenshotService
     // ---------------------------------------------------------------
 
     /**
-     * 這次要用的 user data 目錄
+     * 這次截圖的工作目錄
      *
-     * ⚠ **不能讓套件自己挑。** 不指定時 chrome-php 會在
-     * `sys_get_temp_dir()` 下建暫存目錄，而用 apache / php-fpm 帳號跑時
-     * 那裡可能不可寫（家目錄 `/usr/share/httpd` 不可寫、`TMPDIR` 沒設、
-     * 或被 `open_basedir` 擋住），Chrome 會直接以
-     * `Failed to create headless user data directory` 起不來。
+     * ⚠ **用 apache / php-fpm 帳號跑時，光給 `--user-data-dir` 不夠。**
+     * 正式機實際噴的是：
      *
-     * 每次開一個唯一子目錄而不是共用一個 —— Chrome 會對 profile 上鎖，
-     * 共用的話兩張圖同時截就會卡住。
+     * ```
+     * mkdir: cannot create directory '/usr/share/httpd/.local': Permission denied
+     * touch: cannot touch '/usr/share/httpd/.local/share/applications/mimeapps.list': No such file...
+     * chrome_crashpad_handler: --database is required
+     * ```
      *
-     * 建不起來時回 null（讓套件走它的預設），不讓截圖直接死在這 ——
+     * 三件不同的事，`--user-data-dir` 一件都管不到：
+     *
+     * 1. `/usr/share/httpd` 是 apache 的家目錄，**不可寫**。`mkdir`／`touch`
+     *    這種錯誤格式是 **shell 腳本**噴的 —— Linux 的 `google-chrome-stable`
+     *    是個 wrapper script，啟動前會做 desktop integration。它碰的是
+     *    `$HOME`，不是 profile 目錄。只有換掉 `HOME` 才有用。
+     * 2. 那個 `touch` 失敗是因為 script 只 `mkdir $HOME/.local`，沒有
+     *    `mkdir -p` 中間層 —— 所以我們**預先把 `.local/share/applications`
+     *    建好**，讓它 touch 得成。
+     * 3. crashpad handler 被叫起來卻沒給 `--database`。用
+     *    `--disable-crash-reporter` 不讓它啟動（見 `createBrowser()`）。
+     *
+     * 所以每次截圖開一個這樣的工作目錄：
+     *
+     * ```
+     * <base>/<unique>/
+     * ├── profile/                          → --user-data-dir
+     * └── home/                             → HOME 與 XDG_*
+     *     └── .local/share/applications/    → 讓 wrapper script 寫得進去
+     * ```
+     *
+     * 每次都開新的而不是共用：Chrome 會對 profile 上鎖，共用的話兩張圖
+     * 同時截就會卡住。
+     *
+     * 建不起來時回 null（讓套件走它的預設），不讓截圖死在這 ——
      * 本來能跑的環境不該因為多了這段而壞掉。
      *
-     * @return string|null
+     * @return array{root: string, profile: string, home: string}|null
      */
-    private function makeUserDataDir()
+    private function makeWorkDir()
     {
         $base = (string) config('constants.DAILY_RATE.SCREENSHOT.USER_DATA_BASE');
 
@@ -238,63 +262,73 @@ class ScreenshotService
         }
 
         if (!is_dir($base) && !@mkdir($base, 0755, true) && !is_dir($base)) {
-            Log::warning('建不出 Chrome user data 基底目錄，改用套件預設', ['base' => $base]);
+            Log::warning('建不出 Chrome 工作目錄的基底，改用套件預設', ['base' => $base]);
 
             return null;
         }
 
-        $dir = rtrim($base, '/') . '/' . uniqid('p', true);
+        $root = rtrim($base, '/') . '/' . uniqid('w', true);
+        $profile = "{$root}/profile";
+        $home = "{$root}/home";
 
-        if (!@mkdir($dir, 0700)) {
-            Log::warning('建不出 Chrome user data 目錄，改用套件預設', ['dir' => $dir]);
+        // wrapper script 的 touch 需要這一層先存在（理由見上面第 2 點）
+        $needed = [$root, $profile, $home, "{$home}/.local", "{$home}/.local/share", "{$home}/.local/share/applications"];
 
-            return null;
+        foreach ($needed as $dir) {
+            if (!@mkdir($dir, 0700) && !is_dir($dir)) {
+                Log::warning('建不出 Chrome 工作目錄，改用套件預設', ['dir' => $dir]);
+                $this->removeWorkDir(['root' => $root]);
+
+                return null;
+            }
         }
 
-        return $dir;
+        return ['root' => $root, 'profile' => $profile, 'home' => $home];
     }
 
     /**
-     * 刪掉這次的 user data 目錄
+     * 刪掉這次的工作目錄
      *
-     * 不刪的話每截一次就留一份 profile，`storage/` 會一直長大。
+     * 不刪的話每截一次就留一份 profile 與 home，`storage/` 會一直長大。
      *
      * ⚠ 這是遞迴刪除，所以**先確認它真的在設定的基底底下**才動手 ——
      * 設定被改壞時不該變成刪掉別的東西。
      *
-     * @param string|null $dir
+     * @param array|null $work makeWorkDir() 的回傳
      * @return void
      */
-    private function removeUserDataDir($dir)
+    private function removeWorkDir($work)
     {
-        if (blank($dir)) {
+        $root = Arr::get((array) $work, 'root');
+
+        if (blank($root)) {
             return;
         }
 
         $base = rtrim((string) config('constants.DAILY_RATE.SCREENSHOT.USER_DATA_BASE'), '/');
 
         // 必須是「基底底下的子目錄」，不能是基底本身，也不能跑到外面去
-        if (blank($base) || strpos($dir, "{$base}/") !== 0) {
-            Log::warning('Chrome user data 目錄不在設定的基底底下，不刪', [
-                'dir'  => $dir,
+        if (blank($base) || strpos($root, "{$base}/") !== 0) {
+            Log::warning('Chrome 工作目錄不在設定的基底底下，不刪', [
+                'root' => $root,
                 'base' => $base,
             ]);
 
             return;
         }
 
-        File::deleteDirectory($dir);
+        File::deleteDirectory($root);
     }
 
     /**
      * 開一個瀏覽器
      *
-     * @param string      $binary
-     * @param array       $options
-     * @param string|null $userDataDir null 就讓套件自己挑（見 makeUserDataDir）
+     * @param string     $binary
+     * @param array      $options
+     * @param array|null $work null 就讓套件自己挑目錄（見 makeWorkDir）
      * @return \HeadlessChromium\Browser\ProcessAwareBrowser
      */
-    private function createBrowser($binary, $options, $userDataDir = null)
+    private function createBrowser($binary, $options, $work = null)
     {
         $browserOptions = [
             'headless'       => true,
@@ -312,16 +346,47 @@ class ScreenshotService
                 '--hide-scrollbars',
                 // headless 的 navigator.webdriver 是 true，一併關掉
                 '--disable-blink-features=AutomationControlled',
+                /*
+                 * crashpad handler 被叫起來卻沒給 `--database` 時，正式機會以
+                 * `chrome_crashpad_handler: --database is required` 起不來。
+                 * 我們不需要 crash 回報，直接不讓它啟動。
+                 *
+                 * 套件另有 `userCrashDumpsDir` 選項，但它的註解寫明
+                 * 「crash reporter will be enabled automatically」—— 那是
+                 * 反方向（給它一個可寫的 database），會多一個沒用的行程。
+                 */
+                '--disable-crash-reporter',
+                '--disable-breakpad',
+                // 首次啟動的精靈與預設瀏覽器檢查都會去碰 $HOME，一併關掉
+                '--no-first-run',
+                '--no-default-browser-check',
             ],
         ];
 
         /*
-         * 指定 user data 目錄 —— php-fpm 帳號下沒有這個會起不來。
-         * 套件一定會把它變成 `--user-data-dir=`（BrowserProcess 第 405 行），
-         * 所以不必自己塞進 customFlags。
+         * 指定工作目錄 —— php-fpm 帳號下少了這些會起不來，三個原因見
+         * makeWorkDir() 的註解。
+         *
+         * `userDataDir` 套件會轉成 `--user-data-dir=`（BrowserProcess 第 405
+         * 行），`envVariables` 會進 Symfony Process 的 $env（第 127 行）。
+         *
+         * ⚠ Symfony 的 env 是**我們設的優先、系統環境補上**
+         * （`Process.php` 第 310-314 行用 `+=`），所以這裡只覆寫這幾個，
+         * `PATH` 之類的照樣繼承 —— 不會把環境清空。
          */
-        if (filled($userDataDir)) {
-            $browserOptions['userDataDir'] = $userDataDir;
+        if (filled($work)) {
+            $home = Arr::get($work, 'home');
+
+            $browserOptions['userDataDir'] = Arr::get($work, 'profile');
+            $browserOptions['envVariables'] = [
+                // wrapper script 的 desktop integration 碰的是這個
+                'HOME'            => $home,
+                // 有些程式讀 XDG 而不是 HOME，一併指過來
+                'XDG_CONFIG_HOME' => "{$home}/.config",
+                'XDG_CACHE_HOME'  => "{$home}/.cache",
+                'XDG_DATA_HOME'   => "{$home}/.local/share",
+                'XDG_RUNTIME_DIR' => "{$home}/run",
+            ];
         }
 
         /*

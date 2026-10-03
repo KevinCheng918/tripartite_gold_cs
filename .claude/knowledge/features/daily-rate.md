@@ -361,23 +361,8 @@ X=0  Y=60  WIDTH=1035  HEIGHT=660
 - **不看 exit code**：headless Chrome 常常截圖成功卻回非 0（GPU、字型、
   dbus 的警告都算），看檔案有沒有生出來才準
 - **`--no-sandbox`**：容器裡沒有 sandbox 需要的權限，不加會直接起不來
-- **`--user-data-dir` 必須自己指定**（2026-10-03 維運回報）：
-  用 apache / php-fpm 帳號跑 Chrome 時，**不指定就會起不來**，錯誤是
-  `Failed to create headless user data directory`。
-
-  chrome-php 其實一定會傳這個參數（`BrowserProcess.php:405`），沒指定時
-  它用 `sys_get_temp_dir()` 自己建一個（同檔 497 行）—— 所以根因不是
-  「參數沒傳」，而是**那個暫存目錄在 php-fpm 帳號下寫不進去**
-  （apache 家目錄 `/usr/share/httpd` 不可寫、`TMPDIR` 沒設、或 `open_basedir`）。
-
-  改成指定 `constants.DAILY_RATE.SCREENSHOT.USER_DATA_BASE`
-  （預設 `storage/app/chrome-profile`）—— `storage/` 本來就得讓 PHP 寫，
-  權限對了這裡就一定對，而且 `storage/app/.gitignore` 已忽略一切。
-
-  兩個細節：**每次開唯一子目錄**（Chrome 會對 profile 上鎖，共用的話兩張圖
-  同時截會卡住）、**用完遞迴刪掉**（`removeUserDataDir()` 會先確認路徑真的在
-  設定的基底底下才動手，設定被改壞時不該變成刪別的東西）。
-  建不出來時回 `null` 退回套件預設 —— 本來能跑的環境不該因為多了這段而壞掉。
+- **php-fpm 帳號下要給一個可寫的 `$HOME`**，詳見下面獨立那節 —— 這是
+  正式機唯一真正擋住截圖的問題，`--user-data-dir` 一個人解不掉
 - **`--virtual-time-budget`**：圖表是 JS 畫的，要給它時間跑完。
   截到空白圖就是這個值不夠，調 `constants.DAILY_RATE.SCREENSHOT.WAIT_MS`
 - **截完就刪**：截圖只是為了送出去，不刪的話 public 會一直長大
@@ -387,6 +372,65 @@ X=0  Y=60  WIDTH=1035  HEIGHT=660
 
 `TelegramBotService::sendPhoto()` 本來就處理了「截圖太長 Telegram 不收」
 （`PHOTO_INVALID_DIMENSIONS`）自動改用檔案傳送，整頁截圖正好用得上。
+
+### ⚠ php-fpm 帳號跑 Chrome：要的是可寫的 `$HOME`，不是 user-data-dir
+
+正式機（apache / php-fpm）第一次跑的實際錯誤：
+
+```
+Chrome process stopped before startup completed. Additional info:
+mkdir: cannot create directory '/usr/share/httpd/.local': Permission denied
+touch: cannot touch '/usr/share/httpd/.local/share/applications/mimeapps.list': No such file or directory
+chrome_crashpad_handler: --database is required
+```
+
+**三件不同的事，`--user-data-dir` 一件都管不到**：
+
+| 症狀 | 真正的原因 | 解法 |
+|---|---|---|
+| `mkdir /usr/share/httpd/.local` 被拒 | `/usr/share/httpd` 是 apache 的家目錄、不可寫。`mkdir`／`touch` 這種錯誤格式是 **shell 腳本**噴的 —— Linux 的 `google-chrome-stable` 是個 wrapper script，啟動前會做 desktop integration，它碰的是 **`$HOME`** | `envVariables` 給一個可寫的 `HOME`（連 `XDG_*` 一起指過去） |
+| `touch .../applications/mimeapps.list` 說檔案不存在 | script 只 `mkdir $HOME/.local`，**沒有 `mkdir -p` 中間層** | 我們**預先把 `.local/share/applications` 建好** |
+| `chrome_crashpad_handler: --database is required` | crashpad handler 被叫起來卻沒給 database 路徑 | `--disable-crash-reporter` + `--disable-breakpad`，不讓它啟動 |
+
+> ⚠️ **教訓：第一次只改了 `--user-data-dir`，錯誤一字不差地又來一次。**
+>
+> 當時的推理是：「chrome-php 一定會傳 `--user-data-dir`
+> （`BrowserProcess.php:405`），沒指定時用 `sys_get_temp_dir()`
+> （同檔 497 行），所以根因是那個暫存目錄不可寫。」
+>
+> 前半段是對的（原始碼確實如此），**結論錯了** —— 錯誤訊息裡的路徑是
+> `/usr/share/httpd/.local`，從頭到尾沒提 user-data-dir，也沒出現
+> `Failed to create headless user data directory`。我是照著「維運回報的
+> 那句話」去想原因，而不是照著「錯誤訊息實際說的路徑」。
+>
+> **錯誤訊息裡的路徑就是答案**：它說不能寫 `$HOME/.local`，要處理的就是
+> `$HOME`。推測套件行為之前，先看它到底在抱怨哪個檔案。
+
+所以每次截圖開一個這樣的工作目錄（`makeWorkDir()`）：
+
+```
+<USER_DATA_BASE>/<unique>/
+├── profile/                          → --user-data-dir
+└── home/                             → HOME 與 XDG_*
+    └── .local/share/applications/    → 讓 wrapper script 寫得進去
+```
+
+基底是 `constants.DAILY_RATE.SCREENSHOT.USER_DATA_BASE`，預設
+`storage/app/chrome-profile` —— `storage/` 本來就得讓 PHP 寫，權限對了這裡
+就一定對，而且 `storage/app/.gitignore` 已忽略一切。
+
+三個細節：
+
+- **每次開新的**，不共用 —— Chrome 會對 profile 上鎖，共用的話兩張圖同時
+  截就會卡住
+- **用完整棵刪掉**（`removeWorkDir()`）—— 遞迴刪除前會先確認路徑真的在設定的
+  基底底下，設定被改壞時不該變成刪別的東西
+- **建不起來就回 `null`** 退回套件預設 —— 本來能跑的環境不該因為多了這段而壞掉
+
+`envVariables` 是套件支援的選項（`BrowserProcess.php:127` 傳給 Symfony
+Process 的 `$env`）。Symfony 的 env 是**我們設的優先、系統環境補上**
+（`Process.php` 第 310-314 行用 `+=`），所以只覆寫這幾個、`PATH` 照樣繼承
+—— 實測過 `PATH` 不會被清空。
 
 ### 兩個測試按鈕
 
