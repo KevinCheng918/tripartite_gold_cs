@@ -373,6 +373,49 @@ X=0  Y=60  WIDTH=1035  HEIGHT=660
 `TelegramBotService::sendPhoto()` 本來就處理了「截圖太長 Telegram 不收」
 （`PHOTO_INVALID_DIMENSIONS`）自動改用檔案傳送，整頁截圖正好用得上。
 
+### ⚠ K 線圖在 iframe 裡：SELECTOR 用不了，只能整頁截圖
+
+2026-10-03 看了 `/trades/usdttwd` 的實際 DOM 才確定的事：
+
+```
+外層頁面 max.maicoin.com/trades/usdttwd
+├── 報價列（價格、24h 量、最高最低、漲跌）   ← class 是 emotion hash
+└── <iframe src="/maxtv/...">                ← 圖表在這裡面
+    └── #max_tv.TradingViewScreen
+        └── <iframe src="/maxtv/charting_library/...">   ← 還有一層
+```
+
+三個結論：
+
+1. **舊設定的 `#tv_chart_container` 永遠選不到** —— 它是 iframe **內部**的
+   id，而 `$page->dom()->search()` 只搜當前 frame。每次都白等滿 30 秒才
+   退回整頁，這就是「截圖有點久」的來源。
+2. **要截的範圍橫跨 iframe 內外**（報價列在外、圖在內），本來就沒有單一
+   元素包得住兩者 —— 所以這頁 `SELECTOR` 一定是 `null`，只能整頁 + `CROP`。
+3. **別拿 DOM 上看到的 class 當 selector**：`css-g5y9jx` 是 emotion 產生的
+   hash，`tradingview_44faf` 的後綴是動態的，改版甚至重新整理就變。
+
+### 「等頁面好了」與「要截哪裡」是兩個設定
+
+拆開之後才解得掉上面那個情況：
+
+| 設定 | 做什麼 | 現值 |
+|---|---|---|
+| `WAIT_SELECTOR` | 等它出現＝骨架好了 | `iframe[src*="maxtv"]` |
+| `SETTLE_MS` | 骨架好了再等多久，讓圖畫完 | `5000` |
+| `SELECTOR` | 截哪個元素（null＝整頁） | `null` |
+| `CROP` | 整頁之後裁哪一塊（null＝不裁） | **待校正** |
+
+`WAIT_SELECTOR` 用 `src*="maxtv"` 而不是 id／class —— 路徑是 MAX 自己的，
+比 hash 穩定得多，而且它是**外層** DOM 的元素，選得到。
+
+⚠ **`SETTLE_MS` 是必要的，不是保險。** 跨 frame 等不到「圖畫好了」這個
+事件 —— iframe 元素出現只代表容器在，不代表裡面畫完了。**截到空白圖表框
+就把它調大。**
+
+> 這跟前面移除 `WAIT_MS` 不衝突：那個是死設定（註解寫得煞有介事，但程式
+> 從來沒讀過它）；`SETTLE_MS` 是真的接上線、也真的必要的那一個。
+
 ### 截圖很慢？查 SELECTOR，不是加等待時間
 
 **沒有「等幾秒」的設定。** K 線圖是 JS 畫的，程式是去**等 `SELECTOR` 那個

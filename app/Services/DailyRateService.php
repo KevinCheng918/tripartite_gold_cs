@@ -206,6 +206,10 @@ class DailyRateService
             'height' => Arr::get($config, 'HEIGHT'),
             // 只要 K 線圖那塊，不要右邊的成交明細與下單面板
             'selector'   => Arr::get($config, 'SELECTOR'),
+            // 等這個出現才算頁面準備好（截的範圍可能跟它無關）
+            'wait_selector' => Arr::get($config, 'WAIT_SELECTOR'),
+            // 骨架好了之後再等一下，讓 iframe 裡的圖畫完
+            'settle_ms'  => Arr::get($config, 'SETTLE_MS'),
             // selector 選不到時的備案
             'crop'       => Arr::get($config, 'CROP'),
             'user_agent' => Arr::get($config, 'USER_AGENT'),

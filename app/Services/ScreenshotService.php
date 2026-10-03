@@ -416,6 +416,39 @@ class ScreenshotService
     }
 
     /**
+     * 等頁面準備好再截
+     *
+     * 兩段：先等 `wait_selector` 那個元素出現（頁面骨架好了），再固定等
+     * `settle_ms` 讓它裡面的內容畫完。
+     *
+     * ⚠ **第二段是必要的，不是保險。** MAX 的 K 線圖在 iframe 裡，
+     * 跨 frame 等不到「圖畫好了」這個事件 —— iframe 元素出現只代表容器在，
+     * 不代表圖畫完了。沒有這段會截到空白的圖表框。
+     *
+     * （設定裡原本有個 `WAIT_MS`，但程式從來沒讀過它，2026-10-03 移除；
+     * 這裡的 `SETTLE_MS` 是真的接上線的那一個。截到空白圖表就調大它。）
+     *
+     * @param \HeadlessChromium\Page $page
+     * @param array                  $options
+     * @return void
+     */
+    private function waitForReady($page, $options)
+    {
+        $waitSelector = Arr::get($options, 'wait_selector');
+
+        if (filled($waitSelector)) {
+            // 等不到就算了 —— findNode() 自己會記 warning，截整頁仍有機會是對的
+            $this->findNode($page, $waitSelector);
+        }
+
+        $settleMs = (int) Arr::get($options, 'settle_ms');
+
+        if ($settleMs > 0) {
+            usleep($settleMs * 1000);
+        }
+    }
+
+    /**
      * 導頁、等畫面、截圖存檔
      *
      * @param \HeadlessChromium\Browser\ProcessAwareBrowser $browser
@@ -428,6 +461,15 @@ class ScreenshotService
     {
         $page = $browser->createPage();
         $page->navigate($url)->waitForNavigation();
+
+        /*
+         * 「等頁面準備好」與「要截哪裡」是兩件事，所以分成兩個設定。
+         *
+         * MAX 的 K 線圖在 iframe 裡，截的範圍又橫跨 iframe 內外（報價列在
+         * 外、圖在內）—— 截圖只能走整頁，但還是得等圖表掛載好才截得到東西。
+         * 這時 `wait_selector` 等外層那個 `<iframe>`，`selector` 留 null。
+         */
+        $this->waitForReady($page, $options);
 
         $selector = Arr::get($options, 'selector');
         $node = filled($selector) ? $this->findNode($page, $selector) : null;
