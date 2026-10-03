@@ -219,6 +219,26 @@ return [
             'ENABLED' => true,
             'URL'     => 'https://max.maicoin.com/trading/usdttwd',
 
+            /*
+             * Chrome 的 user data 目錄基底。
+             *
+             * ⚠ **一定要指定，而且要是跑 PHP 的那個帳號寫得進去的地方。**
+             *
+             * 不指定時 chrome-php 會用 `sys_get_temp_dir()` 自己建一個暫存
+             * 目錄。在 apache / php-fpm 帳號下跑時那裡**可能不可寫**
+             * （家目錄 `/usr/share/httpd` 不可寫、`TMPDIR` 沒設或被
+             * `open_basedir` 擋住），Chrome 會直接以
+             * `Failed to create headless user data directory` 起不來。
+             *
+             * 放在 `storage/` 底下是因為那裡本來就得讓 PHP 寫（log、cache），
+             * 權限對了這裡就一定對。`storage/app/.gitignore` 已經忽略一切，
+             * 不會進版控。
+             *
+             * 每次截圖在這底下開一個唯一子目錄、用完刪掉 ——
+             * 共用同一個 profile 的話並行截圖會被 Chrome 的 profile lock 卡住。
+             */
+            'USER_DATA_BASE' => storage_path('app/chrome-profile'),
+
             // 視窗尺寸。改這個就要重新校正下面的 CROP —— 版面是跟著寬度跑的
             'WIDTH'   => 1920,
             'HEIGHT'  => 1080,

@@ -59,6 +59,9 @@ class VmPaymentNoticeService
     /** @var string 發送目標：內部支援群組 */
     const TARGET_INTERNAL = 'internal';
 
+    /** @var int Telegram 圖說上限。超過整則會失敗，不是截斷 */
+    private const CAPTION_MAX = 1024;
+
     private $vmRepository;
     private $paymentConfigService;
     private $chatService;
@@ -239,17 +242,19 @@ class VmPaymentNoticeService
 
         // 站台有群組就發客戶，沒有就退到內部群組並說明為什麼沒發給客戶
         if (blank($station->telegram_group_id)) {
-            $text = strtr((string) config('constants.VM.NOTICE.INTERNAL_PREFIX'), [
+            $prefix = strtr((string) config('constants.VM.NOTICE.INTERNAL_PREFIX'), [
                 '{station}' => $station->name,
                 '{month}'   => $month,
-            ]) . Arr::get($notice, 'text');
+            ]);
 
             /*
-             * 繳款圖一起附上 —— 客服要拿這則去手動通知客戶，
-             * 而圖是「這個系統的」那一張，不是通用的。
+             * 拆兩則：說明一則、繳款文案＋該系統的繳款圖一則（需求方
+             * 2026-10-03 指定）。客服要把後面那則**原封不動轉傳**給客戶 ——
+             * 併成一則的話他得先手動編輯掉「這則沒有發給客戶」那段說明。
              */
             return $this->sendInternalOnly(
-                $billing, 'unpaid', null, $text, $dryRun, Arr::get($notice, 'image_url')
+                $billing, 'unpaid', null, Arr::get($notice, 'text'), $dryRun,
+                Arr::get($notice, 'image_url'), $prefix
             );
         }
 
@@ -340,9 +345,10 @@ class VmPaymentNoticeService
      * @param string      $text
      * @param bool        $dryRun
      * @param string|null $imageUrl 該系統的繳款圖片，null 就只發文字
+     * @param string|null $prefix   開頭說明，獨立發一則（見下方）
      * @return array
      */
-    private function sendInternalOnly($billing, $kind, $reason, $text, $dryRun, $imageUrl = null)
+    private function sendInternalOnly($billing, $kind, $reason, $text, $dryRun, $imageUrl = null, $prefix = null)
     {
         if (!$this->supportGroup->isConfigured()) {
             Log::warning('虛擬機繳款通知沒有可發送的群組', [
@@ -355,16 +361,23 @@ class VmPaymentNoticeService
         }
 
         if ($dryRun) {
-            return $this->noticeResult($billing, $kind, self::TARGET_INTERNAL, $reason, $text, $imageUrl);
+            // 預覽要看得到完整內容，所以把兩則接起來顯示
+            return $this->noticeResult($billing, $kind, self::TARGET_INTERNAL, $reason,
+                filled($prefix) ? "{$prefix}{$text}" : $text, $imageUrl);
         }
 
         try {
-            // 有圖就當圖說發出去，客服一則訊息就看到文案與繳款圖
-            if (filled($imageUrl)) {
-                $this->supportGroup->sendPhoto($imageUrl, $text);
-            } else {
-                $this->supportGroup->send($text);
+            /*
+             * 開頭說明**獨立一則** —— 客服要把後面那則原封不動轉傳給客戶，
+             * 併在一起的話他得先編輯掉說明（需求方 2026-10-03 指定）。
+             *
+             * 催審核那條不傳 $prefix：它不轉傳，整則就是要給客服看的。
+             */
+            if (filled($prefix)) {
+                $this->supportGroup->send($prefix);
             }
+
+            $this->sendInternalBody($text, $imageUrl);
         } catch (\Exception $e) {
             Log::error('虛擬機繳款通知發送失敗（內部群組）', [
                 'billing_id' => $billing->id,
@@ -376,6 +389,42 @@ class VmPaymentNoticeService
         }
 
         return $this->noticeResult($billing, $kind, self::TARGET_INTERNAL, $reason, $text, $imageUrl);
+    }
+
+    /**
+     * 內部群組那則本體（繳款文案＋圖）
+     *
+     * ⚠ Telegram 的圖說上限是 **1024 字，超過整則會失敗**（不是截斷）。
+     * 文案是客服自己在繳款設定裡維護的，寫長一點很正常 —— 超過就退回
+     * 「先發圖、再發文字」，寧可多一則也不要整則發不出去。
+     * 與補點訊息的 `StationCreditAlertService::sendTopupToInternal()`
+     * 及匯率報價的 `DailyRateService::sendAsk()` 同一個做法。
+     *
+     * @param string      $text
+     * @param string|null $imageUrl
+     * @return void
+     */
+    private function sendInternalBody($text, $imageUrl)
+    {
+        if (blank($imageUrl)) {
+            $this->supportGroup->send($text);
+
+            return;
+        }
+
+        if (mb_strlen($text) <= self::CAPTION_MAX) {
+            $this->supportGroup->sendPhoto($imageUrl, $text);
+
+            return;
+        }
+
+        Log::info('虛擬機繳款文案超過圖說上限，改成先發圖再發文字', [
+            'length' => mb_strlen($text),
+            'limit'  => self::CAPTION_MAX,
+        ]);
+
+        $this->supportGroup->sendPhoto($imageUrl);
+        $this->supportGroup->send($text);
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use HeadlessChromium\BrowserFactory;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
@@ -147,9 +148,10 @@ class ScreenshotService
         $target = Storage::disk('public')->path($relative);
 
         $browser = null;
+        $userDataDir = $this->makeUserDataDir();
 
         try {
-            $browser = $this->createBrowser($binary, $options);
+            $browser = $this->createBrowser($binary, $options, $userDataDir);
             $this->shoot($browser, $url, $target, $options);
         } catch (\Throwable $e) {
             /*
@@ -168,6 +170,9 @@ class ScreenshotService
                 // 不關的話 Chrome 行程會留著，跑久了會把機器塞滿
                 $browser->close();
             }
+
+            // 要等 Chrome 關掉才能刪，不然它還握著裡面的檔案
+            $this->removeUserDataDir($userDataDir);
         }
 
         if (!file_exists($target) || filesize($target) === 0) {
@@ -208,13 +213,88 @@ class ScreenshotService
     // ---------------------------------------------------------------
 
     /**
+     * 這次要用的 user data 目錄
+     *
+     * ⚠ **不能讓套件自己挑。** 不指定時 chrome-php 會在
+     * `sys_get_temp_dir()` 下建暫存目錄，而用 apache / php-fpm 帳號跑時
+     * 那裡可能不可寫（家目錄 `/usr/share/httpd` 不可寫、`TMPDIR` 沒設、
+     * 或被 `open_basedir` 擋住），Chrome 會直接以
+     * `Failed to create headless user data directory` 起不來。
+     *
+     * 每次開一個唯一子目錄而不是共用一個 —— Chrome 會對 profile 上鎖，
+     * 共用的話兩張圖同時截就會卡住。
+     *
+     * 建不起來時回 null（讓套件走它的預設），不讓截圖直接死在這 ——
+     * 本來能跑的環境不該因為多了這段而壞掉。
+     *
+     * @return string|null
+     */
+    private function makeUserDataDir()
+    {
+        $base = (string) config('constants.DAILY_RATE.SCREENSHOT.USER_DATA_BASE');
+
+        if (blank($base)) {
+            return null;
+        }
+
+        if (!is_dir($base) && !@mkdir($base, 0755, true) && !is_dir($base)) {
+            Log::warning('建不出 Chrome user data 基底目錄，改用套件預設', ['base' => $base]);
+
+            return null;
+        }
+
+        $dir = rtrim($base, '/') . '/' . uniqid('p', true);
+
+        if (!@mkdir($dir, 0700)) {
+            Log::warning('建不出 Chrome user data 目錄，改用套件預設', ['dir' => $dir]);
+
+            return null;
+        }
+
+        return $dir;
+    }
+
+    /**
+     * 刪掉這次的 user data 目錄
+     *
+     * 不刪的話每截一次就留一份 profile，`storage/` 會一直長大。
+     *
+     * ⚠ 這是遞迴刪除，所以**先確認它真的在設定的基底底下**才動手 ——
+     * 設定被改壞時不該變成刪掉別的東西。
+     *
+     * @param string|null $dir
+     * @return void
+     */
+    private function removeUserDataDir($dir)
+    {
+        if (blank($dir)) {
+            return;
+        }
+
+        $base = rtrim((string) config('constants.DAILY_RATE.SCREENSHOT.USER_DATA_BASE'), '/');
+
+        // 必須是「基底底下的子目錄」，不能是基底本身，也不能跑到外面去
+        if (blank($base) || strpos($dir, "{$base}/") !== 0) {
+            Log::warning('Chrome user data 目錄不在設定的基底底下，不刪', [
+                'dir'  => $dir,
+                'base' => $base,
+            ]);
+
+            return;
+        }
+
+        File::deleteDirectory($dir);
+    }
+
+    /**
      * 開一個瀏覽器
      *
-     * @param string $binary
-     * @param array  $options
+     * @param string      $binary
+     * @param array       $options
+     * @param string|null $userDataDir null 就讓套件自己挑（見 makeUserDataDir）
      * @return \HeadlessChromium\Browser\ProcessAwareBrowser
      */
-    private function createBrowser($binary, $options)
+    private function createBrowser($binary, $options, $userDataDir = null)
     {
         $browserOptions = [
             'headless'       => true,
@@ -234,6 +314,15 @@ class ScreenshotService
                 '--disable-blink-features=AutomationControlled',
             ],
         ];
+
+        /*
+         * 指定 user data 目錄 —— php-fpm 帳號下沒有這個會起不來。
+         * 套件一定會把它變成 `--user-data-dir=`（BrowserProcess 第 405 行），
+         * 所以不必自己塞進 customFlags。
+         */
+        if (filled($userDataDir)) {
+            $browserOptions['userDataDir'] = $userDataDir;
+        }
 
         /*
          * 偽裝成一般瀏覽器。

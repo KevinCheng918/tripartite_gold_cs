@@ -37,6 +37,9 @@ use Illuminate\Support\Facades\Log;
  */
 class StationCreditAlertService
 {
+    /** @var int Telegram 圖說上限。超過整則會失敗，不是截斷 */
+    private const CAPTION_MAX = 1024;
+
     /** @var string 跳過原因：主系統 API 沒回資料 */
     const SKIP_SYNC_FAILED = 'sync_failed';
 
@@ -593,40 +596,37 @@ class StationCreditAlertService
         $text = $this->renderAlert($settings['template'], $station->name, $credits, $threshold);
 
         /*
-         * 發到內部群組時併成一則 —— 客服要的是一眼看完整件事，
-         * 拆成兩則只是讓同一件事在群組裡響兩次。
+         * 退到內部群組的兩種情況要的東西完全不一樣（需求方 2026-10-03 指定）：
          *
-         * 前綴（沒設群組／有待審核）要擺在最前面，說明為什麼沒發給客戶。
-         *
-         * 但「沒設群組」與「有待審核」要的東西不一樣，見下面兩段。
+         *   待審核   → 說明與告警**併成一則**，不帶補點訊息也不帶圖。
+         *              那則不轉傳給客戶，客服看完就去後台審核。
+         *   沒設群組 → **拆成三則**：說明／告警／補點訊息＋圖。
+         *              客服要把後兩則原封不動轉傳給客戶，併在一起的話
+         *              他得先手動編輯掉開頭那段說明才能轉。
          */
-        if ($target !== self::TARGET_STATION) {
+        if ($target === self::TARGET_INTERNAL_PENDING) {
             $text = $this->internalPrefix($station, $target, $pendingTopups) . $text;
 
-            /*
-             * 沒設群組時，客服要拿這則去**手動通知客戶繳款** ——
-             * 所以補點訊息與該系統的繳款圖都要給他，一則訊息就能轉發出去。
-             *
-             * 待審核時不給：客戶已經申請補點了，客服要做的是去後台審核，
-             * 不是照著匯率匯款。那則只要說清楚「哪個站台、剩多少點、
-             * 幾筆沒審核」就夠了（需求方 2026-10-03 指定）。
-             */
-            $withTopup = $target === self::TARGET_INTERNAL;
-
-            if ($withTopup) {
-                $text .= $this->topupSuffix($topupText);
-            }
-
-            $internalImage = $withTopup ? Arr::get($topup, 'image_url') : null;
-
             if ($dryRun) {
-                return $this->result($station, $threshold, false, $target, null, $text, null, $internalImage);
+                return $this->result($station, $threshold, false, $target, null, $text);
             }
 
-            return $this->send($station, $threshold, $target, $text, null, $internalImage);
+            return $this->send($station, $threshold, $target, $text);
         }
 
         $imageUrl = Arr::get($topup, 'image_url');
+
+        if ($target !== self::TARGET_STATION) {
+            // 說明單獨一則，所以不併進 $text
+            $prefix = $this->internalPrefix($station, $target, $pendingTopups);
+
+            if ($dryRun) {
+                return $this->result($station, $threshold, false, $target, null,
+                    $prefix . $text, $topupText, $imageUrl);
+            }
+
+            return $this->send($station, $threshold, $target, $text, $topupText, $imageUrl, $prefix);
+        }
 
         if ($dryRun) {
             return $this->result($station, $threshold, false, $target, null, $text, $topupText, $imageUrl);
@@ -641,28 +641,36 @@ class StationCreditAlertService
      * @param Station     $station
      * @param float       $threshold
      * @param string      $target
-     * @param string      $text      告警那則（內部群組的已含前綴與補點訊息）
-     * @param string|null $topupText 補點訊息，當成第二則發；只有發給客戶時才有
-     * @param string|null $imageUrl  繳款圖。發客戶時掛在第二則（補點訊息）上，
-     *                               發內部群組時掛在併成的那一則上 ——
-     *                               兩者互斥，因為 target 只會是其中一種
+     * @param string      $text      告警那則
+     * @param string|null $topupText 補點訊息，當成獨立一則發
+     * @param string|null $imageUrl  繳款圖，掛在補點訊息那則上
+     * @param string|null $prefix    內部群組的開頭說明，獨立發一則（見下方）
      * @return array
      */
-    private function send(Station $station, $threshold, $target, $text, $topupText = null, $imageUrl = null)
+    private function send(Station $station, $threshold, $target, $text, $topupText = null, $imageUrl = null, $prefix = null)
     {
+        $toStation = $target === self::TARGET_STATION;
+
         try {
             /*
-             * 只有 TARGET_STATION 會送到客戶那邊，其餘（沒設群組的退路、
-             * 有補點單待審核）一律進內部群組 —— 說明的前綴在 handleStation
-             * 就依 target 組好了，這裡只負責送。
+             * 內部群組的開頭說明**獨立一則**。
              *
-             * 內部群組有圖的情況只有一種：沒設群組，客服要拿這則去手動
-             * 通知客戶繳款。待審核那則不給圖，$imageUrl 會是 null。
+             * 客服要把後面那兩則（告警、補點訊息＋圖）直接轉傳給客戶 ——
+             * 併在一起的話他得先手動編輯掉「這則沒有發給客戶」那段說明，
+             * 轉傳就變成一件要動手的事（需求方 2026-10-03 指定）。
+             *
+             * 待審核那則不走這裡（它不轉傳，說明與告警併成一則就好）。
              */
-            if ($target === self::TARGET_STATION) {
+            if (filled($prefix)) {
+                $this->supportGroup->send($prefix);
+            }
+
+            /*
+             * 只有 TARGET_STATION 會送到客戶那邊，其餘（沒設群組的退路、
+             * 有補點單待審核）一律進內部群組。
+             */
+            if ($toStation) {
                 $this->sendToStation($station, $text);
-            } elseif (filled($imageUrl)) {
-                $this->supportGroup->sendPhoto($imageUrl, $text);
             } else {
                 $this->supportGroup->send($text);
             }
@@ -671,7 +679,7 @@ class StationCreditAlertService
                 'station_id' => $station->id,
                 'station'    => $station->name,
                 'target'     => $target,
-                'has_image'  => filled($imageUrl),
+                'has_prefix' => filled($prefix),
                 'error'      => $e->getMessage(),
             ]);
 
@@ -679,10 +687,15 @@ class StationCreditAlertService
             return $this->result($station, $threshold, false, $target, self::SKIP_SEND_FAILED, $text, $topupText, $imageUrl);
         }
 
-        // 補點訊息是獨立的第二則，只發給客戶（內部群組已經併在上面那則裡）
-        $hasSecondMessage = $target === self::TARGET_STATION && filled($topupText);
+        /*
+         * 補點訊息是獨立的一則，**兩種目的地都發** —— 發客戶時是給他匯款
+         * 資訊，發內部群組時是給客服轉傳用的那一則。
+         *
+         * 待審核時 $topupText 會是 null（連查都沒查），所以不會發。
+         */
+        $hasSecondMessage = filled($topupText);
         $topupSent = $hasSecondMessage
-            ? $this->sendTopup($station, $topupText, $imageUrl)
+            ? $this->sendTopup($station, $topupText, $imageUrl, $toStation)
             : null;
 
         // 只是紀錄「最後一次告警的時間」—— 沒有冷卻期，不參與任何判斷
@@ -707,12 +720,14 @@ class StationCreditAlertService
     }
 
     /**
-     * 把補點訊息當第二則發給客戶
+     * 把補點訊息當獨立一則發出去
      *
-     * 分兩則而不是接在告警後面，是因為這兩段要做的事不一樣：
+     * 分開發而不是接在告警後面，是因為這兩段要做的事不一樣：
      * 告警是「你的點數快沒了」，補點訊息是「要補的話這樣匯款」。
      * 分開發，客戶要回頭找匯款資訊時不必在一長串告警裡翻，
      * 繳款圖也只掛在真正需要它的那一則上。
+     *
+     * 發內部群組時同樣獨立一則 —— 客服要原封不動轉傳這則給客戶。
      *
      * **失敗不會讓整則告警算失敗。** 告警已經出去了，這時回報失敗會讓
      * 下一輪重發一次一模一樣的告警 —— 對客戶是重複打擾。只記 log 讓客服
@@ -721,16 +736,21 @@ class StationCreditAlertService
      * @param Station     $station
      * @param string|null $topupText 空的就不發（匯率未定或這個系統沒填公版）
      * @param string|null $imageUrl
+     * @param bool        $toStation true=發客戶，false=發內部群組
      * @return bool 有沒有送出去（本來就沒有要送時回 true）
      */
-    private function sendTopup(Station $station, $topupText, $imageUrl)
+    private function sendTopup(Station $station, $topupText, $imageUrl, $toStation = true)
     {
         if (blank($topupText)) {
             return true;
         }
 
         try {
-            $this->sendToStation($station, $topupText, $imageUrl);
+            if ($toStation) {
+                $this->sendToStation($station, $topupText, $imageUrl);
+            } else {
+                $this->sendTopupToInternal($topupText, $imageUrl);
+            }
 
             return true;
         } catch (\Exception $e) {
@@ -742,6 +762,41 @@ class StationCreditAlertService
 
             return false;
         }
+    }
+
+    /**
+     * 補點訊息那則發到內部支援群組
+     *
+     * ⚠ Telegram 的圖說上限是 **1024 字，超過整則會失敗**（不是截斷）。
+     * 公版是客服自己在繳款設定裡維護的，寫長一點很正常 —— 超過就退回
+     * 「先發圖、再發文字」，寧可多一則也不要整則發不出去。
+     * 與匯率報價的 `DailyRateService::sendAsk()` 同一個做法。
+     *
+     * @param string      $topupText
+     * @param string|null $imageUrl
+     * @return void
+     */
+    private function sendTopupToInternal($topupText, $imageUrl)
+    {
+        if (blank($imageUrl)) {
+            $this->supportGroup->send($topupText);
+
+            return;
+        }
+
+        if (mb_strlen($topupText) <= self::CAPTION_MAX) {
+            $this->supportGroup->sendPhoto($imageUrl, $topupText);
+
+            return;
+        }
+
+        Log::info('補點訊息超過圖說上限，改成先發圖再發文字', [
+            'length' => mb_strlen($topupText),
+            'limit'  => self::CAPTION_MAX,
+        ]);
+
+        $this->supportGroup->sendPhoto($imageUrl);
+        $this->supportGroup->send($topupText);
     }
 
     /**

@@ -361,6 +361,23 @@ X=0  Y=60  WIDTH=1035  HEIGHT=660
 - **不看 exit code**：headless Chrome 常常截圖成功卻回非 0（GPU、字型、
   dbus 的警告都算），看檔案有沒有生出來才準
 - **`--no-sandbox`**：容器裡沒有 sandbox 需要的權限，不加會直接起不來
+- **`--user-data-dir` 必須自己指定**（2026-10-03 維運回報）：
+  用 apache / php-fpm 帳號跑 Chrome 時，**不指定就會起不來**，錯誤是
+  `Failed to create headless user data directory`。
+
+  chrome-php 其實一定會傳這個參數（`BrowserProcess.php:405`），沒指定時
+  它用 `sys_get_temp_dir()` 自己建一個（同檔 497 行）—— 所以根因不是
+  「參數沒傳」，而是**那個暫存目錄在 php-fpm 帳號下寫不進去**
+  （apache 家目錄 `/usr/share/httpd` 不可寫、`TMPDIR` 沒設、或 `open_basedir`）。
+
+  改成指定 `constants.DAILY_RATE.SCREENSHOT.USER_DATA_BASE`
+  （預設 `storage/app/chrome-profile`）—— `storage/` 本來就得讓 PHP 寫，
+  權限對了這裡就一定對，而且 `storage/app/.gitignore` 已忽略一切。
+
+  兩個細節：**每次開唯一子目錄**（Chrome 會對 profile 上鎖，共用的話兩張圖
+  同時截會卡住）、**用完遞迴刪掉**（`removeUserDataDir()` 會先確認路徑真的在
+  設定的基底底下才動手，設定被改壞時不該變成刪別的東西）。
+  建不出來時回 `null` 退回套件預設 —— 本來能跑的環境不該因為多了這段而壞掉。
 - **`--virtual-time-budget`**：圖表是 JS 畫的，要給它時間跑完。
   截到空白圖就是這個值不夠，調 `constants.DAILY_RATE.SCREENSHOT.WAIT_MS`
 - **截完就刪**：截圖只是為了送出去，不刪的話 public 會一直長大
