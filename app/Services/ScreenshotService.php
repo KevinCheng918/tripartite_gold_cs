@@ -128,7 +128,8 @@ class ScreenshotService
      * 有給 selector 就只截那個元素，沒給就截整個視窗。
      *
      * @param string $url
-     * @param array  $options width / height / selector / crop / user_agent / prefix
+     * @param array  $options width / height / selector / wait_selector / click_texts /
+     *                        settle_ms / crop / user_agent / locale / prefix
      * @return string|null public disk 的相對路徑；截不成回 null
      */
     public function capture($url, $options = [])
@@ -374,6 +375,21 @@ class ScreenshotService
         ];
 
         /*
+         * 介面語言。
+         *
+         * headless Chrome 沒有瀏覽器的語言偏好，不給就是英文版 ——
+         * `--lang` 管 Chrome 自己的 UI 與網頁的 `navigator.language`，
+         * `--accept-lang` 管送出去的 `Accept-Language` header，
+         * 兩個都要給，網站才會回中文。
+         */
+        $locale = Arr::get($options, 'locale');
+
+        if (filled($locale)) {
+            $browserOptions['customFlags'][] = "--lang={$locale}";
+            $browserOptions['customFlags'][] = "--accept-lang={$locale}";
+        }
+
+        /*
          * 指定工作目錄 —— php-fpm 帳號下少了這些會起不來，三個原因見
          * makeWorkDir() 的註解。
          *
@@ -441,10 +457,68 @@ class ScreenshotService
             $this->findNode($page, $waitSelector);
         }
 
+        /*
+         * 按鈕要在 settle **之前**按：切換時間區間會重抓資料重畫，
+         * 先按再等，那段等待才涵蓋得到新區間的繪製。
+         */
+        $this->clickByText($page, (array) Arr::get($options, 'click_texts'));
+
         $settleMs = (int) Arr::get($options, 'settle_ms');
 
         if ($settleMs > 0) {
             usleep($settleMs * 1000);
+        }
+    }
+
+    /**
+     * 依按鈕上的文字去按
+     *
+     * MAX 的 class 全是 emotion 產生的 hash（`css-g5y9jx`、`r-1loqt21`），
+     * 改版就變 —— 但按鈕上的文字（`4h`）穩定得多，所以用文字找。
+     *
+     * 真正可按的是外層帶 `tabindex` 的那個 div，文字在它裡面的子節點，
+     * 所以找到文字之後要往上找 `[tabindex]` 才按得到。
+     *
+     * **按不到只記 warning，不丟例外** —— 區間不對的圖總比沒有圖好。
+     *
+     * @param \HeadlessChromium\Page $page
+     * @param array                  $texts 依序要按的按鈕文字
+     * @return void
+     */
+    private function clickByText($page, $texts)
+    {
+        foreach ($texts as $text) {
+            if (blank($text)) {
+                continue;
+            }
+
+            // json_encode 負責跳脫，不要自己拼字串進 JS
+            $want = json_encode((string) $text, JSON_UNESCAPED_UNICODE);
+
+            $js = '(function (want) {'
+                . 'var all = document.querySelectorAll("div[dir=\'auto\']");'
+                . 'for (var i = 0; i < all.length; i++) {'
+                . '  if ((all[i].textContent || "").trim() !== want) { continue; }'
+                . '  var el = all[i].closest("[tabindex]") || all[i].parentElement;'
+                . '  if (el) { el.click(); return true; }'
+                . '}'
+                . 'return false;'
+                . "})({$want})";
+
+            try {
+                $clicked = $page->evaluate($js)->getReturnValue();
+            } catch (\Throwable $e) {
+                Log::warning('截圖前點擊按鈕出錯，略過', [
+                    'text'  => $text,
+                    'error' => $e->getMessage(),
+                ]);
+
+                continue;
+            }
+
+            if ($clicked !== true) {
+                Log::warning('截圖前找不到要點的按鈕，略過', ['text' => $text]);
+            }
         }
     }
 

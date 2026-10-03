@@ -208,8 +208,12 @@ class DailyRateService
             'selector'   => Arr::get($config, 'SELECTOR'),
             // 等這個出現才算頁面準備好（截的範圍可能跟它無關）
             'wait_selector' => Arr::get($config, 'WAIT_SELECTOR'),
-            // 骨架好了之後再等一下，讓 iframe 裡的圖畫完
+            // 截圖前要按的按鈕（例如把 K 線圖切到 4h）
+            'click_texts' => Arr::get($config, 'CLICK_TEXTS'),
+            // 按完之後再等一下，讓 iframe 裡的圖畫完
             'settle_ms'  => Arr::get($config, 'SETTLE_MS'),
+            // headless 沒有語言偏好，不指定會拿到英文版
+            'locale'     => Arr::get($config, 'LOCALE'),
             // selector 選不到時的備案
             'crop'       => Arr::get($config, 'CROP'),
             'user_agent' => Arr::get($config, 'USER_AGENT'),

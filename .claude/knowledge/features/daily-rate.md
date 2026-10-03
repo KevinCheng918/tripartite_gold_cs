@@ -416,6 +416,35 @@ X=0  Y=60  WIDTH=1035  HEIGHT=660
 > 這跟前面移除 `WAIT_MS` 不衝突：那個是死設定（註解寫得煞有介事，但程式
 > 從來沒讀過它）；`SETTLE_MS` 是真的接上線、也真的必要的那一個。
 
+### 時間區間（4h）與介面語言（中文）
+
+headless Chrome **沒有你瀏覽器的那些偏好**，所以預設拿到的是
+「1d ＋ 英文」，跟自己開 MAX 看到的不一樣。兩件事分別處理：
+
+| 要的 | 怎麼來的 | 設定 |
+|---|---|---|
+| 中文介面 | Chrome 的 `--lang`（UI 與 `navigator.language`）＋ `--accept-lang`（`Accept-Language` header）。**兩個都要**，網站才會回中文 | `LOCALE = 'zh-TW'` |
+| 4h 區間 | 截圖前用 JS **按一下「4h」按鈕** | `CLICK_TEXTS = ['4h']` |
+
+> 線索其實一直在 iframe 的 src 裡：`#symbol=USDT%2FTWD&interval=240&locale=zh_TW`
+> —— `interval=240`（240 分＝4h）與 `locale=zh_TW` 是**瀏覽器當下的狀態**，
+> 不是網址固定值。headless 沒有那些狀態，所以得自己弄出來。
+
+⚠ **按鈕用文字找，不是 class。** MAX 的 class 全是 emotion 產生的 hash
+（`css-g5y9jx`、`r-1loqt21`），改版就變；按鈕上的 `4h` 穩定得多。
+文字在內層節點、可按的是外層帶 `tabindex` 的 div，所以 `clickByText()`
+找到文字後要往上 `closest('[tabindex]')` 才按得到。
+
+比對用的是 `trim()` 後的**完整相等**，所以不會誤中報價列的「24h 漲跌」
+或區間列的 `1h`。
+
+⚠ **按鈕要在 `SETTLE_MS` 之前按** —— 切換區間會重抓資料重畫，先按再等，
+那段等待才涵蓋得到新區間的繪製。
+
+按不到只記 warning 不中斷（`截圖前找不到要點的按鈕`）——
+區間不對的圖總比沒有圖好。每次都是全新 profile，MAX 存在 localStorage
+的選擇不會留下來，所以**每次截圖都得按一次**。
+
 ### 截圖很慢？查 SELECTOR，不是加等待時間
 
 **沒有「等幾秒」的設定。** K 線圖是 JS 畫的，程式是去**等 `SELECTOR` 那個
