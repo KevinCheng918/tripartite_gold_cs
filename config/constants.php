@@ -212,12 +212,29 @@ return [
          * 需要 x86_64 Linux + google-chrome-stable。截不到就只發文字 ——
          * 報價不能因為截圖失敗就整則發不出去。
          *
-         * WAIT_MS 是給 JS 畫圖表的時間（--virtual-time-budget）。圖截到一半
-         * 空白的話就是這個值不夠，往上加。
+         * ⚠ **沒有「等幾秒」的設定。** K 線圖是 JS 畫的，程式是去**等
+         * SELECTOR 那個元素出現**（最多 30 秒，`ScreenshotService::WAIT_TIMEOUT`）
+         * —— 慢的時候不會截到空白，快的時候也不用白等。
+         *
+         * 所以**截圖很慢時要查的是 SELECTOR 對不對**，不是去加等待時間：
+         * 選擇器選不到的話會白等滿 30 秒才退回整頁截圖。
+         * log 裡會有「截圖選擇器等不到元素，改截整頁」。
+         *
+         * （這裡原本有一個 `WAIT_MS => 10000` 的設定，註解說它是
+         * `--virtual-time-budget`，但程式從來沒讀過它，flag 也沒加 ——
+         * 調它不會有任何效果，2026-10-03 移除。）
          */
         'SCREENSHOT' => [
             'ENABLED' => true,
-            'URL'     => 'https://max.maicoin.com/trading/usdttwd',
+            /*
+             * ⚠ 是 `trades`（複數）不是 `trading` —— 寫錯會截到 MAX 自己的
+             * 404 頁面（「您所搜尋的網頁不存在」），而不是空白或錯誤，
+             * 所以從 log 看不出來，只有看截圖才會發現。
+             *
+             * MAX 對一般 HTTP 請求一律回 403，curl 驗不出哪個路徑才對 ——
+             * 要確認就按匯率頁的「測試截圖」看實際截到什麼。
+             */
+            'URL'     => 'https://max.maicoin.com/trades/usdttwd',
 
             /*
              * Chrome 的 user data 目錄基底。
@@ -242,7 +259,6 @@ return [
             // 視窗尺寸。改這個就要重新校正下面的 CROP —— 版面是跟著寬度跑的
             'WIDTH'   => 1920,
             'HEIGHT'  => 1080,
-            'WAIT_MS' => 10000,
 
             /*
              * 只要 K 線圖那一塊：從 USDT/TWD 標題列到成交量圖底部，

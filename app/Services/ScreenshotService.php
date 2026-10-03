@@ -128,7 +128,7 @@ class ScreenshotService
      * 有給 selector 就只截那個元素，沒給就截整個視窗。
      *
      * @param string $url
-     * @param array  $options width / height / wait_ms / selector / prefix
+     * @param array  $options width / height / selector / crop / user_agent / prefix
      * @return string|null public disk 的相對路徑；截不成回 null
      */
     public function capture($url, $options = [])
@@ -147,6 +147,13 @@ class ScreenshotService
         Storage::disk('public')->makeDirectory(self::DIRECTORY);
         $target = Storage::disk('public')->path($relative);
 
+        /*
+         * 記耗時 —— 「截圖好像有點久」這種回報，沒有數字就只能猜。
+         * 最常見的慢法是選擇器選不到元素而白等滿 WAIT_TIMEOUT（30 秒），
+         * 那時這個數字會貼著 30000，一看就知道。
+         */
+        $startedAt = microtime(true);
+
         $browser = null;
         $work = $this->makeWorkDir();
 
@@ -161,6 +168,7 @@ class ScreenshotService
             Log::error('截圖失敗', [
                 'url'      => $url,
                 'selector' => Arr::get($options, 'selector'),
+                'ms'       => (int) round((microtime(true) - $startedAt) * 1000),
                 'error'    => $e->getMessage(),
             ]);
 
@@ -186,6 +194,8 @@ class ScreenshotService
             'path'     => $relative,
             'bytes'    => filesize($target),
             'selector' => Arr::get($options, 'selector'),
+            // 貼著 30000 就是選擇器等不到元素、白等滿 WAIT_TIMEOUT
+            'ms'       => (int) round((microtime(true) - $startedAt) * 1000),
         ]);
 
         return $relative;
