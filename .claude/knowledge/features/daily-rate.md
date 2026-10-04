@@ -522,21 +522,32 @@ MAX 自己的 404 頁（「您所搜尋的網頁不存在」）。**log 全綠�
 > ⚠️ **程式改完截圖還是不會成功。** 上面三點只讓它早退與好查，
 > 真正要修的是下面的權限／帳號。
 
-#### 維運要修的（正解在第 1 個）
+#### 維運要修的
+
+**實際採用：把那兩個目錄開 777**（需求方 2026-10-05 決定）。
 
 ```bash
-# 先查明兩邊各是誰
-ps -o user= -C php-fpm | sort -u          # 網頁跑哪個帳號
-ls -ld storage/app/public/screenshot       # 目錄是誰的、權限幾
-crontab -l                                 # 排程掛在誰的 crontab
+cd /home/lv_cs_uat/cs
+chmod 777 storage/app/public/screenshot storage/app/chrome-profile
 ```
 
-1. **讓排程用 php-fpm 同一個帳號跑**（Laravel 官方建議的做法）——
-   一勞永逸，`storage/` 底下所有東西都不會再有身份不一致的問題
-2. 或：兩個帳號放同一群組，`chgrp -R` ＋ `chmod -R g+ws storage/`
-   （`s` 讓新建的檔案繼承群組）
+⚠ **單層就夠，不要 `-R`。** 理由是這兩個目錄的使用方式：
 
-只 `chmod -R 777` 擋得住一時，但下次任一邊建新目錄又會回到 `0755`。
+| 目錄 | 底下的東西 | 誰建、誰刪 |
+|---|---|---|
+| `public/screenshot/` | 只有 png 檔，不再分層 | 建完送出就 `forget()` 刪掉 |
+| `chrome-profile/` | **每次截圖新建一組** `<unique>/{profile,home}` | 誰建誰擁有，`removeWorkDir()` 用完整棵刪 |
+
+`chrome-profile` 的子目錄雖然天天新建，但**從來不需要跨身份共用** ——
+建它的人自己用、自己刪。只有**基底那一層**要兩邊都進得去，而基底不常
+新建，所以 777 設一次就穩定。
+
+刪檔案看的是**父目錄**的寫權限、不是檔案本身，所以 cron 建的 png
+之後由 php-fpm 刪（或反過來）都沒問題。
+
+> 更正統的做法是**讓排程用 php-fpm 同一個帳號跑**（Laravel 官方建議），
+> 或兩帳號同群組 ＋ `chmod -R g+ws`。沒採用是因為這台只跑這個專案、
+> 又是 uat，777 的代價可以接受 —— 權衡過的決定，不是不知道。
 
 ### ⚠ php-fpm 帳號跑 Chrome：要的是可寫的 `$HOME`，不是 user-data-dir
 
