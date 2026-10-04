@@ -149,6 +149,22 @@ class ScreenshotService
         $target = Storage::disk('public')->path($relative);
 
         /*
+         * 先確認寫得進去再開 Chrome。
+         *
+         * 2026-10-04 正式機踩到的：排程（cron）跑的帳號與網頁（php-fpm）
+         * 不同，`storage/` 底下那幾個目錄是當初 php-fpm 建的、0755，
+         * 所以 cron 那個身份進不去。當時的行為是**整個跑完 10.8 秒**
+         * （Chrome 起來、頁面載入、圖也截好了），最後才在存檔那一刻
+         * `touch(): Permission denied` —— 白做一整輪。
+         *
+         * 檢查一次就能早退，順便把「是誰、哪個目錄」寫進 log，
+         * 不然從 `Permission denied` 看不出要去改什麼。
+         */
+        if (!$this->canWriteTo(dirname($target))) {
+            return null;
+        }
+
+        /*
          * 記耗時 —— 「截圖好像有點久」這種回報，沒有數字就只能猜。
          * 最常見的慢法是選擇器選不到元素而白等滿 WAIT_TIMEOUT（30 秒），
          * 那時這個數字會貼著 30000，一看就知道。
@@ -224,6 +240,47 @@ class ScreenshotService
     // ---------------------------------------------------------------
 
     /**
+     * 這個目錄寫得進去嗎
+     *
+     * 專門給「排程與網頁用不同帳號跑」這種情況用的 —— 兩邊 uid 不同時，
+     * 一邊建的目錄另一邊可能進不去。log 要寫清楚**現在是誰、目錄是誰的**，
+     * 不然只看到 `Permission denied` 根本不知道要改什麼。
+     *
+     * @param string $dir
+     * @return bool
+     */
+    private function canWriteTo($dir)
+    {
+        if (is_dir($dir) && is_writable($dir)) {
+            return true;
+        }
+
+        $owner = null;
+        $perms = null;
+
+        if (is_dir($dir)) {
+            $ownerId = @fileowner($dir);
+            $info = filled($ownerId) && function_exists('posix_getpwuid') ? @posix_getpwuid($ownerId) : null;
+            $owner = Arr::get((array) $info, 'name', $ownerId);
+            $perms = substr(sprintf('%o', @fileperms($dir)), -4);
+        }
+
+        $meId = function_exists('posix_geteuid') ? @posix_geteuid() : null;
+        $me = filled($meId) && function_exists('posix_getpwuid') ? @posix_getpwuid($meId) : null;
+
+        Log::error('截圖目錄不可寫，略過截圖', [
+            'dir'        => $dir,
+            'exists'     => is_dir($dir),
+            'dir_owner'  => $owner,
+            'dir_perms'  => $perms,
+            'running_as' => Arr::get((array) $me, 'name', $meId),
+            'hint'       => '排程與網頁若用不同帳號跑，storage 會互相寫不進去 —— 讓兩者同帳號（或同群組 + 群組可寫）',
+        ]);
+
+        return false;
+    }
+
+    /**
      * 這次截圖的工作目錄
      *
      * ⚠ **用 apache / php-fpm 帳號跑時，光給 `--user-data-dir` 不夠。**
@@ -272,8 +329,24 @@ class ScreenshotService
             return null;
         }
 
-        if (!is_dir($base) && !@mkdir($base, 0755, true) && !is_dir($base)) {
+        /*
+         * 0775 而不是 0755 —— 排程（cron）與網頁（php-fpm）可能用不同帳號
+         * 跑，基底目錄不論先被誰建起來，另一邊都還得進得去。同群組就能共用。
+         *
+         * 2026-10-04 正式機就是卡在這：目錄是 php-fpm 建的，cron 進不去。
+         */
+        if (!is_dir($base) && !@mkdir($base, 0775, true) && !is_dir($base)) {
             Log::warning('建不出 Chrome 工作目錄的基底，改用套件預設', ['base' => $base]);
+
+            return null;
+        }
+
+        if (!is_writable($base)) {
+            Log::warning('Chrome 工作目錄的基底不可寫，改用套件預設', [
+                'base'  => $base,
+                'owner' => function_exists('posix_getpwuid') ? Arr::get((array) @posix_getpwuid((int) @fileowner($base)), 'name') : null,
+                'perms' => substr(sprintf('%o', @fileperms($base)), -4),
+            ]);
 
             return null;
         }
@@ -286,6 +359,7 @@ class ScreenshotService
         $needed = [$root, $profile, $home, "{$home}/.local", "{$home}/.local/share", "{$home}/.local/share/applications"];
 
         foreach ($needed as $dir) {
+            // 子目錄 0700 就夠 —— 它只活在這一次截圖，不需要給別人
             if (!@mkdir($dir, 0700) && !is_dir($dir)) {
                 Log::warning('建不出 Chrome 工作目錄，改用套件預設', ['dir' => $dir]);
                 $this->removeWorkDir(['root' => $root]);
