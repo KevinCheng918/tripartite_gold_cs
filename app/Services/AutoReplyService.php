@@ -128,7 +128,7 @@ class AutoReplyService
 
         // 比對器掛了（逾時、額度用盡、格式壞掉）—— 一律走人工，不要讓客人空等
         if (blank($result)) {
-            $this->replyWait($group, $text, null, $messageId, [], $history);
+            $this->replyWait($group, $text, $messageId, [], $history);
 
             return;
         }
@@ -316,7 +316,7 @@ class AutoReplyService
             return;
         }
 
-        $this->replyWait($group, $text, $decision['opening'], $messageId, $result, $history);
+        $this->replyWait($group, $text, $messageId, $result, $history);
     }
 
     /**
@@ -538,7 +538,8 @@ class AutoReplyService
         } elseif ($action === $actions['REPLY']) {
             $content = (string) $opening;
         } else {
-            $content = filled($opening) ? $opening : (string) config('auto_reply.templates.wait');
+            // 轉人工不回覆客人（見 replyWait），所以預覽也是空的
+            $content = '';
         }
 
         return filled($content) ? "{$content} {$signature}" : '';
@@ -750,13 +751,12 @@ class AutoReplyService
      *
      * @param TelegramGroup $group
      * @param string        $question
-     * @param string|null   $opening   承接句；沒有或被擋下時退回固定話術
      * @param int|null      $messageId
      * @param array         $result    比對器的輸出，附在求助訊息裡給同仁參考
      * @param array         $history   近期對話，附在求助訊息裡讓同仁不用切視窗
      * @return void
      */
-    private function replyWait(TelegramGroup $group, $question, $opening, $messageId, array $result = [], array $history = [])
+    private function replyWait(TelegramGroup $group, $question, $messageId, array $result = [], array $history = [])
     {
         /*
          * 這裡以前有「5 分鐘內剛說過稍等就不再回」的冷卻，已移除。
@@ -768,11 +768,20 @@ class AutoReplyService
          * 依客人的話生成的承接句，每次都不一樣，這個理由已經不存在。
          * 客人問一次就回一次，本來就是客服該做的事。
          */
-        // 沒有承接句才退回固定話術 —— 模型逾時、額度用盡、或它判斷不需要回應
-        // 的時候會走到這裡，沒有這段客人會完全收不到訊息
-        $content = filled($opening) ? $opening : (string) config('auto_reply.templates.wait');
-
-        $this->send($group, $content, false);
+        /*
+         * ⚠ **轉人工時不回覆客人**（需求方 2026-10-06）。
+         *
+         * 原本會先送一句「馬上請同仁為您說明」，等同仁作答後再送答案 ——
+         * 客人收到兩則，而且第一則純粹是客套話。需求方看了實際對話後的決定：
+         * 只要同仁的那一則就好。
+         *
+         * ⚠ **代價是客人問完到同仁回覆之間完全靜默。** 接住這段的是既有的
+         * 未回覆告警（`telegram:alert`，每分鐘跑）—— 同仁太久沒處理時
+         * 群組會被提醒，所以不會真的沒人管。
+         *
+         * 要改回去的話，在這裡送 `auto_reply.templates.wait` 即可
+         * （那個設定已一併移除，要連它一起加回來）。
+         */
         $this->telegramRepository->updateAutoReplyState($group, null);
 
         $this->supportService->openTicket(
