@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Contracts\AutoReplyMatcher;
 use App\Models\AutoReplyTicket;
 use App\Models\TelegramGroup;
 use App\Repositories\AutoReplyTicketRepository;
@@ -9,6 +10,7 @@ use App\Repositories\QuickReplyRepository;
 use App\Repositories\TelegramRepository;
 use App\Repositories\UserRepository;
 use App\Services\AutoReply\AnswerSplitter;
+use App\Services\AutoReply\OpeningSanitizer;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -48,6 +50,8 @@ class AutoReplySupportService
     private $appSettingService;
     private $supportGroup;
     private $splitter;
+    private $matcher;
+    private $sanitizer;
 
     public function __construct(
         AutoReplyTicketRepository $ticketRepository,
@@ -59,7 +63,9 @@ class AutoReplySupportService
         QuickReplyService $quickReplyService,
         AppSettingService $appSettingService,
         SupportGroupService $supportGroup,
-        AnswerSplitter $splitter
+        AnswerSplitter $splitter,
+        AutoReplyMatcher $matcher,
+        OpeningSanitizer $sanitizer
     ) {
         $this->ticketRepository = $ticketRepository;
         $this->telegramRepository = $telegramRepository;
@@ -71,6 +77,9 @@ class AutoReplySupportService
         $this->appSettingService = $appSettingService;
         $this->supportGroup = $supportGroup;
         $this->splitter = $splitter;
+        // 讀同仁的答案、寫一句承接（失敗就退回固定話術）
+        $this->matcher = $matcher;
+        $this->sanitizer = $sanitizer;
     }
 
     /**
@@ -715,6 +724,100 @@ class AutoReplySupportService
     }
 
     /**
+     * 組出要送給客人的整則訊息
+     *
+     * 三條路，優先序由好到壞：
+     *
+     * 1. 模型讀過答案寫了一句 → 用它（最自然，接得上答案的開頭）
+     * 2. 模型判斷**不需要**承接 → 直接送答案（答案本身已經是完整的一段話）
+     * 3. 模型失敗／逾時／被護欄擋 → 退回依等待時間挑的固定話術
+     *
+     * @param AutoReplyTicket $ticket
+     * @return string
+     */
+    private function buildCustomerText(AutoReplyTicket $ticket)
+    {
+        $ai = $this->aiOpening($ticket);
+
+        if (Arr::get($ai, 'ok') === true) {
+            $opening = Arr::get($ai, 'opening');
+
+            // 模型說不需要承接 —— 直接送答案，不要硬套模板
+            return blank($opening) ? (string) $ticket->answer : "{$opening}\n\n{$ticket->answer}";
+        }
+
+        $template = $this->supportTemplate($ticket);
+
+        return blank($template) ? '' : strtr($template, ['{答案}' => $ticket->answer]);
+    }
+
+    /**
+     * 讓模型讀過同仁的答案再寫承接句
+     *
+     * 固定話術治不了的狀況：同仁打「老闆你好，這個部分…」，前面再加一句
+     * 「老闆您好」就問候了兩次。答案開頭千變萬化，接得自然就得真的讀過。
+     *
+     * ⚠ **三種結果要分清楚**：
+     *
+     * | 回傳 | 意思 | 呼叫端怎麼做 |
+     * |---|---|---|
+     * | `['ok' => true, 'opening' => '…']` | 模型寫了一句 | 用它 |
+     * | `['ok' => true, 'opening' => null]` | 模型判斷**不需要**承接句 | 直接送答案 |
+     * | `['ok' => false]` | 呼叫失敗／逾時／被護欄擋 | **退回固定話術** |
+     *
+     * 中間那個最容易寫錯成「失敗」—— 那樣答案開頭已有問候時又會被套上模板，
+     * 等於這個功能沒做。
+     *
+     * @param AutoReplyTicket $ticket
+     * @return array{ok: bool, opening: string|null}
+     */
+    private function aiOpening(AutoReplyTicket $ticket)
+    {
+        $failed = ['ok' => false, 'opening' => null];
+
+        if (config('auto_reply.templates.ai_opening') !== true) {
+            return $failed;
+        }
+
+        $result = $this->matcher->composeSupportOpening($ticket->answer, $this->waitMinutes($ticket));
+
+        // null = 呼叫失敗（已經在 matcher 裡記過 log）
+        if (blank($result)) {
+            return $failed;
+        }
+
+        $opening = Arr::get($result, 'opening');
+
+        // 模型明確說不需要承接句
+        if (blank($opening)) {
+            return ['ok' => true, 'opening' => null];
+        }
+
+        /*
+         * 護欄跟客人訊息那條承接句用同一組（長度 + 黑名單）——
+         * prompt 是請求，不是保證。被擋下就當作失敗，退回固定話術。
+         */
+        $clean = $this->sanitizer->sanitize($opening);
+
+        if (blank($clean)) {
+            return $failed;
+        }
+
+        return ['ok' => true, 'opening' => $clean];
+    }
+
+    /**
+     * 客人等了幾分鐘（求助單開立到現在）
+     *
+     * @param AutoReplyTicket $ticket
+     * @return int
+     */
+    private function waitMinutes(AutoReplyTicket $ticket)
+    {
+        return blank($ticket->created_at) ? 0 : (int) $ticket->created_at->diffInMinutes(now());
+    }
+
+    /**
      * 挑一句承接，依客人**實際等了多久**
      *
      * ⚠ 原本固定一句「久等了，已為您確認完畢 😊」。兩個毛病：每次都一樣，
@@ -780,18 +883,24 @@ class AutoReplySupportService
      */
     private function replyToCustomer(AutoReplyTicket $ticket)
     {
-        // 同仁的答案要原文轉給客人（求助訊息上就是這樣寫的），
-        // 所以這層開頭結尾得自己來，模型不參與
-        $template = $this->supportTemplate($ticket);
+        if (blank($ticket->answer)) {
+            return false;
+        }
 
-        if (blank($template) || blank($ticket->answer)) {
+        /*
+         * ⚠ **同仁的答案一律原文送出**（求助訊息上就是這樣寫的）——
+         * 不管承接句是模型寫的還是固定話術，被改寫的都只有外層那一句。
+         */
+        $text = $this->buildCustomerText($ticket);
+
+        if (blank($text)) {
             return false;
         }
 
         try {
             $this->chatService->sendReply(
                 $ticket->telegram_group_id,
-                strtr($template, ['{答案}' => $ticket->answer]),
+                $text,
                 null,
                 config('constants.AUTO_REPLY.SENDER_NAME'),
                 [

@@ -8,6 +8,7 @@ use App\Repositories\QuickReplyRepository;
 use App\Repositories\StationRepository;
 use App\Repositories\TelegramRepository;
 use App\Services\AutoReply\AnswerSplitter;
+use App\Services\AutoReply\OpeningSanitizer;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -474,31 +475,8 @@ class AutoReplyService
      */
     private function sanitizeOpening($opening)
     {
-        if (blank($opening)) {
-            return null;
-        }
-
-        $opening = trim($opening);
-        $maxLength = (int) config('constants.AUTO_REPLY.OPENING.MAX_LENGTH');
-
-        if (mb_strlen($opening) > $maxLength) {
-            Log::warning('承接句過長，退回固定話術', ['opening' => $opening]);
-
-            return null;
-        }
-
-        foreach ((array) config('constants.AUTO_REPLY.OPENING.BLACKLIST') as $word) {
-            if (mb_strpos($opening, $word) !== false) {
-                Log::warning('承接句含不該由系統說的話，退回固定話術', [
-                    'word'    => $word,
-                    'opening' => $opening,
-                ]);
-
-                return null;
-            }
-        }
-
-        return $opening;
+        // 實作搬到 OpeningSanitizer —— 轉同仁答案那條路徑也要用同一組護欄
+        return app(OpeningSanitizer::class)->sanitize($opening);
     }
 
     /**

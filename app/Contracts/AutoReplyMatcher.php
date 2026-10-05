@@ -35,4 +35,22 @@ interface AutoReplyMatcher
      *                    opening    string|null 承接句；純寒暄不需回應時為 null
      */
     public function resolve($text, array $context = []);
+
+    /**
+     * 讀同仁寫好的答案，寫一句接在前面的承接
+     *
+     * 轉求助單答案給客人時用。固定話術治不了這件事：**答案的開頭千變萬化**，
+     * 同仁打「老闆你好，這個部分…」時，前面再加一句問候就變成問候兩次。
+     * 要判斷這個，就得真的讀過答案。
+     *
+     * ⚠ 這裡同樣**不准改寫答案本體** —— 實作只回那一句承接，
+     * 答案原文由呼叫端自己接上去。
+     *
+     * @param string $answer      同仁寫的答案原文
+     * @param int    $waitMinutes 客人已經等了幾分鐘（決定要不要提「等」）
+     * @return array|null `['opening' => string|null]`。
+     *                    **回 null 代表這次呼叫失敗**，呼叫端應退回固定話術；
+     *                    回 `['opening' => null]` 則是判斷「不需要承接句」。
+     */
+    public function composeSupportOpening($answer, $waitMinutes);
 }
