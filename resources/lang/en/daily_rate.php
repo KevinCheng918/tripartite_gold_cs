@@ -61,7 +61,6 @@ return [
         'ask_sent_with_chart' => 'Quote posted to the internal support group with the chart',
         'ask_no_support_group' => 'Internal support group is not configured',
         'ask_send_failed'      => 'Failed to post the quote — see the log',
-        'ask_already_decided'  => "Today's rate is already decided",
 
         'screenshot_sent'             => 'Screenshot sent to the internal support group (using :binary)',
         'screenshot_no_chrome'        => 'No usable Chrome on this machine',

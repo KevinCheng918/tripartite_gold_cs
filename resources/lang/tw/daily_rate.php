@@ -61,7 +61,6 @@ return [
         'ask_sent_with_chart' => '報價已發到內部支援群組，含走勢圖',
         'ask_no_support_group' => '尚未設定內部支援群組，沒有地方可以報',
         'ask_send_failed'      => '報價發送失敗，詳見 log',
-        'ask_already_decided'  => '今天的匯率已經決定了',
 
         'screenshot_sent'             => '截圖已發到內部支援群組（使用 :binary）',
         'screenshot_no_chrome'        => '這台機器沒有可用的 Chrome，無法截圖',

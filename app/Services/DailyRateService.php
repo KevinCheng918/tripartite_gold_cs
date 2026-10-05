@@ -120,7 +120,8 @@ class DailyRateService
     /**
      * 送出今天的報價詢問
      *
-     * @param bool $force 今天已經問過也重送一次
+     * @param bool $force 已無作用（不管報過沒、決定了沒都照報），
+     *                    留著是為了相容 `rate:ask --force` 與後台的「立即報價」
      * @return array 處理結果，給 Command 印出來
      */
     public function ask($force = false)
@@ -129,21 +130,32 @@ class DailyRateService
         $existing = $this->rateRepository->findByDate($today);
 
         /*
-         * ⚠ 跳過的條件是「**已經決定了**」，不是「已經問過」。
+         * ⚠ **不管今天報過沒、決定了沒，九點都照報**（需求方 2026-10-06）。
          *
-         * 需求方 2026-10-06：早上自己先按過「立即報價」、但還沒有人回覆
-         * 決定匯率時，**九點那次排程仍然要報**。原本的條件是
-         * `filled($existing->ask_message_id)`（問過就不再問），於是手動按過
-         * 的那天九點就靜悄悄地跳過了 —— 而那天其實還沒有匯率可用。
+         * 原本的條件是「問過就不再問」（`filled($existing->ask_message_id)`），
+         * 於是早上手動按過的那天九點就靜悄悄跳過了 —— 而那天可能還沒有匯率。
+         * 中間一度改成「已決定才跳過」，但需求方要的是**連已決定也照報**，
+         * 只是訊息要講清楚「誰、什麼時候、決定了多少」。
          *
-         * 已經決定的話就真的不必再問：答案都有了，再報一次只是洗版。
+         * 理由是群組裡完全沒動靜時，沒人分得出是「已經決定了」還是
+         * 「排程又壞了」—— 前陣子截圖那串問題就是這樣查了好幾輪。
+         *
+         * 所以這裡沒有跳過的分支，差別只在訊息前面那段說明（`askPrefix()`）。
+         * `$force` 因此沒有實際作用了，留著是為了相容既有的呼叫
+         * （`rate:ask --force`、後台的「立即報價」）。
          */
-        if (filled($existing) && filled($existing->rate) && !$force) {
-            return ['sent' => false, 'reason' => 'already_decided', 'rate' => $existing->rate];
-        }
 
-        // 今天問過、但還沒人決定 —— 這次是補報，訊息要讓同仁知道回哪一則
-        $reAsk = filled($existing) && filled($existing->ask_message_id);
+        /*
+         * 今天先前的狀態，決定報價前面要不要加一段說明。
+         *
+         * 在 `firstOrCreateByDate()` 之前取 —— 那之後就分不出「今天第一次報」
+         * 與「今天已經報過」了。
+         */
+        $previousState = [
+            'decided' => filled($existing) && filled($existing->rate),
+            're_ask'  => filled($existing) && filled($existing->ask_message_id),
+            'record'  => $existing,
+        ];
 
         if (!$this->supportGroup->isConfigured()) {
             Log::warning('未設定內部支援群組，今日匯率沒有報出去', ['date' => $today]);
@@ -164,20 +176,7 @@ class DailyRateService
             'asked_at'       => now(),
         ]);
 
-        $text = $this->buildAskText($record, $previous);
-
-        /*
-         * 補報時要講一句 —— 群組裡會有兩則長得一樣的報價，同仁必須知道
-         * 回哪一則才算數。
-         *
-         * ⚠ `ask_message_id` 只存得下一個，下面會被這次的新訊息蓋掉，
-         * 所以**引用舊那則的回覆會對不上**（不會出錯，只是沒反應）。
-         * 與其事後查不出為什麼沒生效，不如在訊息上先說清楚。
-         */
-        if ($reAsk) {
-            $text = (string) config('constants.DAILY_RATE.RE_ASK_PREFIX') . $text;
-        }
-
+        $text = $this->askPrefix($previousState) . $this->buildAskText($record, $previous);
         $shot = $this->captureChart();
         $result = $this->sendAsk($text, $shot);
 
@@ -841,5 +840,63 @@ class DailyRateService
     private function format($rate)
     {
         return rtrim(rtrim(number_format((float) $rate, 4, '.', ''), '0'), '.');
+    }
+
+    /**
+     * 報價訊息前面要不要加一段說明
+     *
+     * 三種狀態，說明的目的都不一樣：
+     *
+     * | 今天的狀態 | 什麼時候 | 說明要做的事 |
+     * |---|---|---|
+     * | 第一次報 | 九點排程 | 不用說明 |
+     * | 報過、沒決定 | 九點排程（早上手動報過）或再按一次 | 指路：回最新這則 |
+     * | **報過、已決定** | **只有手動按才會到**（排程已經 return 了） | 講清楚早上定了多少、這次可以改 |
+     *
+     * 最後那種是需求方 2026-10-06 指定的：已經決定好還手動按報價，就是想
+     * 重新評估 —— 所以要把「早上定多少」跟「現在市場多少」擺在一起看。
+     * 市場那半邊由報價公版本體負責（`4H 均價`、`建議報價`），走勢圖也照附。
+     *
+     * @param array $state decided / re_ask / record
+     * @return string 不需要說明時回空字串
+     */
+    private function askPrefix(array $state)
+    {
+        $record = Arr::get($state, 'record');
+
+        if (Arr::get($state, 'decided') === true && filled($record)) {
+            return strtr((string) config('constants.DAILY_RATE.RE_DECIDE_PREFIX'), [
+                '{date}'    => now()->format('n/j'),
+                '{decided}' => $this->format($record->rate),
+                '{who}'     => $this->decidedByName($record),
+                '{time}'    => filled($record->replied_at) ? $record->replied_at->format('H:i') : '—',
+            ]);
+        }
+
+        if (Arr::get($state, 're_ask') === true) {
+            return (string) config('constants.DAILY_RATE.RE_ASK_PREFIX');
+        }
+
+        return '';
+    }
+
+    /**
+     * 決定匯率的人叫什麼名字
+     *
+     * 帳號被刪或當初對不到後台帳號時回「—」—— 這則只是告知，
+     * 查不到名字不該讓它發不出去。
+     *
+     * @param DailyRate $record
+     * @return string
+     */
+    private function decidedByName(DailyRate $record)
+    {
+        if (blank($record->replied_by)) {
+            return '—';
+        }
+
+        $user = $this->userRepository->getNamesByIds([(int) $record->replied_by])->first();
+
+        return filled($user) ? (string) $user->nickname : '—';
     }
 }

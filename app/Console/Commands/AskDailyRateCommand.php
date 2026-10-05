@@ -21,8 +21,8 @@ class AskDailyRateCommand extends Command
 
     /** @var array 沒送出時的原因說明 */
     private const REASONS = [
-        // 問過但還沒人決定時仍然會報 —— 只有「已經決定」才跳過
-        'already_decided'  => '今天的匯率已經決定了（要重送請加 --force）',
+        // 沒有「今天已經報過就不報」這回事了 —— 不管報過沒、決定了沒都照報，
+        // 差別只在訊息前面那段說明。所以這裡不再有 already_* 的原因。
         'no_support_group' => '未設定內部支援群組，沒有地方可以報',
         'send_failed'      => 'Telegram 送出失敗，詳見 log',
     ];
