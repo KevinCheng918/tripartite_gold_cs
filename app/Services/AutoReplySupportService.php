@@ -715,6 +715,62 @@ class AutoReplySupportService
     }
 
     /**
+     * 挑一句承接，依客人**實際等了多久**
+     *
+     * ⚠ 原本固定一句「久等了，已為您確認完畢 😊」。兩個毛病：每次都一樣，
+     * 客人問幾次就看出是罐頭；而且**同仁一分鐘內就回答時說「久等了」是錯的**
+     * —— 不合語境的客套話比沒有還糟。
+     *
+     * 等待時間從求助單開立起算（含 AI 判斷的那幾十秒 —— 那段客人也在等）。
+     *
+     * 取不到時間時當成 `slow`：寧可多道一次歉，也不要在客人等很久之後
+     * 回一句輕快的「幫您問到了」。
+     *
+     * @param AutoReplyTicket $ticket
+     * @return string 空字串代表沒有可用的話術
+     */
+    private function supportTemplate(AutoReplyTicket $ticket)
+    {
+        $groups = (array) config('auto_reply.templates.support');
+        $pool = (array) Arr::get($groups, $this->waitGroup($ticket));
+
+        // 設定被改壞（整組空的）時退回任何一句可用的，不要讓答案發不出去
+        if (blank($pool)) {
+            $pool = (array) Arr::first($groups, function ($candidates) {
+                return filled($candidates);
+            });
+        }
+
+        return blank($pool) ? '' : (string) Arr::random($pool);
+    }
+
+    /**
+     * 這張單屬於哪一組等待時間
+     *
+     * @param AutoReplyTicket $ticket
+     * @return string quick / normal / slow
+     */
+    private function waitGroup(AutoReplyTicket $ticket)
+    {
+        if (blank($ticket->created_at)) {
+            return 'slow';
+        }
+
+        $minutes = $ticket->created_at->diffInMinutes(now());
+        $thresholds = (array) config('auto_reply.templates.support_minutes');
+
+        if ($minutes <= (int) Arr::get($thresholds, 'quick', 3)) {
+            return 'quick';
+        }
+
+        if ($minutes <= (int) Arr::get($thresholds, 'normal', 15)) {
+            return 'normal';
+        }
+
+        return 'slow';
+    }
+
+    /**
      * 把答案轉給客人
      *
      * 送的是自己人打的原文，系統不改寫 —— 只在外層包上禮貌話術。
@@ -726,7 +782,7 @@ class AutoReplySupportService
     {
         // 同仁的答案要原文轉給客人（求助訊息上就是這樣寫的），
         // 所以這層開頭結尾得自己來，模型不參與
-        $template = (string) config('auto_reply.templates.support');
+        $template = $this->supportTemplate($ticket);
 
         if (blank($template) || blank($ticket->answer)) {
             return false;
