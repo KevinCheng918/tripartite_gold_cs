@@ -742,6 +742,18 @@ class AutoReplyService
      */
     private function replyOpeningOnly(TelegramGroup $group, $opening)
     {
+        /*
+         * ⚠ 這條路**不會開求助單** —— 寒暄本來就不需要同仁處理。
+         *
+         * 所以記一筆：判成寒暄卻其實是在問事情的話（「老闆，有蝦嗎」被當成
+         * 打招呼），客人問的事情沒有任何人會看到。事後要查「為什麼這句沒有
+         * 進支援群組」，沒有這行就只能用猜的。
+         */
+        Log::info('自動回覆判定為寒暄，只回一句、不開求助單', [
+            'group_id' => $group->id,
+            'opening'  => $opening,
+        ]);
+
         $this->send($group, $opening, true);
         $this->telegramRepository->updateAutoReplyState($group, null);
     }
