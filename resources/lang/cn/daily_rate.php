@@ -61,7 +61,7 @@ return [
         'ask_sent_with_chart' => '报价已发到内部支援群组，含走势图',
         'ask_no_support_group' => '尚未设定内部支援群组，没有地方可以报',
         'ask_send_failed'      => '报价发送失败，详见 log',
-        'ask_already_asked'    => '今天已经报过了',
+        'ask_already_decided'  => '今天的汇率已经决定了',
 
         'screenshot_sent'             => '截图已发到内部支援群组（使用 :binary）',
         'screenshot_no_chrome'        => '这台机器没有可用的 Chrome，无法截图',

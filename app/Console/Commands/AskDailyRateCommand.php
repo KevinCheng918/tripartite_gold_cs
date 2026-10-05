@@ -21,7 +21,8 @@ class AskDailyRateCommand extends Command
 
     /** @var array 沒送出時的原因說明 */
     private const REASONS = [
-        'already_asked'    => '今天已經問過了（要重送請加 --force）',
+        // 問過但還沒人決定時仍然會報 —— 只有「已經決定」才跳過
+        'already_decided'  => '今天的匯率已經決定了（要重送請加 --force）',
         'no_support_group' => '未設定內部支援群組，沒有地方可以報',
         'send_failed'      => 'Telegram 送出失敗，詳見 log',
     ];

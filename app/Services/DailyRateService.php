@@ -128,9 +128,22 @@ class DailyRateService
         $today = now()->toDateString();
         $existing = $this->rateRepository->findByDate($today);
 
-        if (filled($existing) && filled($existing->ask_message_id) && !$force) {
-            return ['sent' => false, 'reason' => 'already_asked', 'rate' => $existing->rate];
+        /*
+         * ⚠ 跳過的條件是「**已經決定了**」，不是「已經問過」。
+         *
+         * 需求方 2026-10-06：早上自己先按過「立即報價」、但還沒有人回覆
+         * 決定匯率時，**九點那次排程仍然要報**。原本的條件是
+         * `filled($existing->ask_message_id)`（問過就不再問），於是手動按過
+         * 的那天九點就靜悄悄地跳過了 —— 而那天其實還沒有匯率可用。
+         *
+         * 已經決定的話就真的不必再問：答案都有了，再報一次只是洗版。
+         */
+        if (filled($existing) && filled($existing->rate) && !$force) {
+            return ['sent' => false, 'reason' => 'already_decided', 'rate' => $existing->rate];
         }
+
+        // 今天問過、但還沒人決定 —— 這次是補報，訊息要讓同仁知道回哪一則
+        $reAsk = filled($existing) && filled($existing->ask_message_id);
 
         if (!$this->supportGroup->isConfigured()) {
             Log::warning('未設定內部支援群組，今日匯率沒有報出去', ['date' => $today]);
@@ -152,6 +165,19 @@ class DailyRateService
         ]);
 
         $text = $this->buildAskText($record, $previous);
+
+        /*
+         * 補報時要講一句 —— 群組裡會有兩則長得一樣的報價，同仁必須知道
+         * 回哪一則才算數。
+         *
+         * ⚠ `ask_message_id` 只存得下一個，下面會被這次的新訊息蓋掉，
+         * 所以**引用舊那則的回覆會對不上**（不會出錯，只是沒反應）。
+         * 與其事後查不出為什麼沒生效，不如在訊息上先說清楚。
+         */
+        if ($reAsk) {
+            $text = (string) config('constants.DAILY_RATE.RE_ASK_PREFIX') . $text;
+        }
+
         $shot = $this->captureChart();
         $result = $this->sendAsk($text, $shot);
 
