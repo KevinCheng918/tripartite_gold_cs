@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Contracts\AutoReplyMatcher;
+use App\Jobs\ReplyTicketJob;
 use App\Models\AutoReplyTicket;
 use App\Models\TelegramGroup;
 use App\Repositories\AutoReplyTicketRepository;
@@ -475,10 +476,10 @@ class AutoReplySupportService
      */
     private function handleAskInfo(AutoReplyTicket $ticket, $messageId)
     {
-        $sent = $this->replyToCustomer($ticket);
+        $this->queueCustomerReply($ticket);
         $item = $this->saveToQuickReply($ticket, $this->askInfoCategoryId());
 
-        $lines = [$sent ? '✅ 已把問題送給客人。' : '⚠️ 送給客人失敗，請到後台手動處理。'];
+        $lines = ['✅ 已安排把問題送給客人。'];
 
         if (blank($item)) {
             $lines[] = '';
@@ -595,9 +596,9 @@ class AutoReplySupportService
         }
 
         if ($action === $actions['REPLY']) {
-            $sent = $this->replyToCustomer($ticket);
+            $this->queueCustomerReply($ticket);
             $this->ticketRepository->update($ticket, ['status' => $statuses['REPLIED']]);
-            $this->editSupportMessage($messageId, $sent ? '✅ 已回覆客人。' : '⚠️ 回覆客人失敗，請到後台手動處理。');
+            $this->editSupportMessage($messageId, '✅ 已安排回覆客人。');
 
             return;
         }
@@ -612,11 +613,20 @@ class AutoReplySupportService
 
         // 要加入題庫的兩個動作：先問類別
         if ($action === $actions['REPLY_AND_SAVE']) {
-            $sent = $this->replyToCustomer($ticket);
+            /*
+             * ⚠ 回覆丟背景、類別選單馬上出來。
+             *
+             * 原本是先同步把答案轉給客人（中間要跑模型寫承接句，好幾秒）
+             * 才顯示選單 —— 需求方 2026-10-06 回報「這個按鈕跑很慢」。
+             */
+            $this->queueCustomerReply($ticket);
             $this->ticketRepository->update($ticket, ['status' => $statuses['REPLIED']]);
 
-            $prefix = $sent ? '✅ 已回覆客人。' : '⚠️ 回覆客人失敗。';
-            $this->editSupportMessage($messageId, "{$prefix}\n\n請選擇要把這題歸到哪個類別：", $this->buildCategoryKeyboard($ticket->id));
+            $this->editSupportMessage(
+                $messageId,
+                "✅ 已安排回覆客人。\n\n請選擇要把這題歸到哪個類別：",
+                $this->buildCategoryKeyboard($ticket->id)
+            );
 
             return;
         }
@@ -874,9 +884,41 @@ class AutoReplySupportService
     }
 
     /**
-     * 把答案轉給客人
+     * 安排把答案轉給客人（丟背景）
      *
-     * 送的是自己人打的原文，系統不改寫 —— 只在外層包上禮貌話術。
+     * ⚠ **按鈕那邊不等結果**：轉答案前要讓模型讀過答案再寫承接句，那要跑
+     * 幾秒；同步做的話同仁按完得乾等才看得到下一步（2026-10-06 回報）。
+     *
+     * 代價是「有沒有送成功」當下不知道，所以訊息只能寫「已安排回覆」。
+     * 真的失敗時 `ReplyTicketJob` 會回報到內部群組 —— 不講的話沒有人會發現
+     * 客人其實沒收到。
+     *
+     * @param AutoReplyTicket $ticket
+     * @return void
+     */
+    private function queueCustomerReply(AutoReplyTicket $ticket)
+    {
+        ReplyTicketJob::dispatch($ticket->id);
+    }
+
+    /**
+     * 把答案轉給客人（`ReplyTicketJob` 的入口）
+     *
+     * ⚠ 這件事跑在背景，不在 webhook 裡 —— 轉答案前要讓模型讀過答案再寫
+     * 承接句，那要幾秒。同步做的話同仁按完按鈕得乾等才看得到下一步。
+     *
+     * @param AutoReplyTicket $ticket
+     * @return bool
+     */
+    public function sendTicketAnswer(AutoReplyTicket $ticket)
+    {
+        return $this->replyToCustomer($ticket);
+    }
+
+    /**
+     * 把答案轉給客人（實作）
+     *
+     * 外部請走 `sendTicketAnswer()` —— 它是 `ReplyTicketJob` 的入口。
      *
      * @param AutoReplyTicket $ticket
      * @return bool
