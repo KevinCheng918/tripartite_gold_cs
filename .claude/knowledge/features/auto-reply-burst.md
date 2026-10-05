@@ -88,19 +88,59 @@ HTTP request、php-fpm 會並行處理：A 還在跑 CLI 時，B 的 request 已
 （sync 直接忽略）。而且這條路**依賴 php-fpm 還有空閒 worker** ——
 正是上面第 2 點不保證的事。
 
-#### 開 queue 要做什麼
+#### 開 queue：程式這邊已經備好（2026-10-05）
 
-`database` driver 就夠（不必上 redis）：
+**不需要 systemd、不需要 supervisor、不需要動 crontab。**
+`schedule:run` 本來就每分鐘在跑，worker 掛在那裡就好
+（`Kernel::scheduleQueueWorker()`）：
 
-```bash
-php artisan queue:table && php artisan migrate   # 一張 jobs 表
-# .env
-QUEUE_CONNECTION=database
+```php
+$schedule->command('queue:work --max-time=55 --tries=1 --timeout=180')
+    ->everyMinute()->withoutOverlapping(2)->runInBackground();
 ```
 
-再加一個**常駐 worker**（systemd 或 supervisor），跑
-`php artisan queue:work --tries=1`。⚠ worker 要用**跟 php-fpm 同一個帳號**
-跑，否則又是 [[daily-rate]] 那個 storage 權限問題。
+每分鐘起一個、跑 55 秒自己退場，下一分鐘接手 —— 等於常駐，交接時有幾秒
+空窗（進來的工作等下一輪）。
+
+四個參數都不能亂改：
+
+| 參數 | 為什麼 |
+|---|---|
+| `--max-time=55` | ⚠ **不要用 `--stop-when-empty`** —— 那個做完就退出，下一批要等下一分鐘，客人最多等 60 秒才收到回覆 |
+| `--tries=1` | 與 `AutoReplyJob::$tries` 一致（不重試是刻意的） |
+| `--timeout=180` | 要比 Job 的 `$timeout = 120` 大，讓 Job 自己逾時並被記錄 |
+| `runInBackground()` | ⚠ **少了它 `schedule:run` 會卡著等 55 秒**，其他排程全被阻塞 |
+
+⚠ **`sync` 時不排程**（`config('queue.default') === 'sync'` 就 return）——
+所以切換只要改 `.env` 一個地方，現狀完全不受影響。
+
+**切換步驟**（正式機）：
+
+```bash
+php artisan migrate          # 建 jobs 表（migration 已經在版控裡）
+# .env: QUEUE_CONNECTION=database
+php artisan optimize         # 清 config 快取，worker 才會被排進去
+```
+
+#### 帳號與權限：這台機器本來就設好了
+
+2026-10-05 查證：
+
+```
+drwxrwsr-x  apache  webdata   storage/app/claude-home
+drwxrwsr-x  rduser  webdata   storage/logs
+id rduser → groups=1001(rduser),1500(webdata)
+```
+
+**php-fpm 是 `apache`、cron 是 `rduser`、兩邊共用 `webdata` 群組**，
+目錄是 775 + setgid（新建的東西自動繼承群組），cron 那行也有 `umask 002`。
+所以 worker 用 rduser 跑**寫得進** `claude-home` 與 `logs`，不必再開權限。
+
+> ⚠ 那為什麼 [[daily-rate]] 的截圖目錄會卡住？**是 umask 削的**：
+> `mkdir($path, 0775)` 的 mode 會被 umask 遮罩，php-fpm 的 umask 是 022，
+> 實際只建出 `0755` → 群組不可寫 → rduser 進不去。
+> 已在 `ScreenshotService::makeWorkDir()` 與 `ClaudeCodeMatcher::claudeHome()`
+> 補上 **`chmod`（不受 umask 影響）**，往後新建的目錄一律 0775。
 
 ### 2. 延遲幾秒？
 

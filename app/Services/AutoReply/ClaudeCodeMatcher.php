@@ -703,6 +703,16 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
         if (!is_dir($path)) {
             // 併發時可能有人先建好了，第二個 mkdir 會失敗 —— 那不是問題
             @mkdir($path, 0775, true);
+
+            /*
+             * ⚠ **`mkdir` 的 mode 會被 umask 遮掉，`chmod` 不會。**
+             *
+             * 網頁是 apache、排程是 cron 的帳號，兩邊共用 webdata 群組。
+             * php-fpm 的 umask 多半是 022，`mkdir(0775)` 實際只會建出 0755
+             * —— 群組不可寫，另一邊就進不來（2026-10-04 截圖目錄踩過這個）。
+             * 明確 chmod 一次，不論誰先建、umask 多少都是 0775。
+             */
+            @chmod($path, 0775);
         }
 
         return $path;

@@ -55,6 +55,47 @@ class Kernel extends ConsoleKernel
         // 每日上午 10 點同步各站台系統餘點，低於門檻發告警
         // withoutOverlapping：逐站打主系統 API，站台多的時候可能跑超過一輪
         $schedule->command('station:sync-credit')->dailyAt('10:00')->withoutOverlapping();
+
+        $this->scheduleQueueWorker($schedule);
+    }
+
+    /**
+     * 佇列 worker（用排程器代替常駐 service）
+     *
+     * 這台機器沒有 systemd service 也沒有 supervisor，而 `schedule:run`
+     * 本來就每分鐘在跑 —— 所以 worker 掛在這裡，不必另外請人裝東西。
+     *
+     * 每分鐘起一個、跑 55 秒自己退場，下一分鐘的接手，等於常駐；
+     * 交接那幾秒的空窗，進來的工作會等到下一輪才處理。
+     *
+     * ⚠ **不要改用 `--stop-when-empty`**：那個做完就退出，下一批要等到
+     * 下一分鐘才開始 —— 客人最多等 60 秒才收到自動回覆，太慢。
+     * `--max-time` 是「待命 55 秒」，有工作進來立刻處理。
+     *
+     * ⚠ `--tries=1` 要跟 `AutoReplyJob::$tries` 一致（失敗不重試是刻意的，
+     * 理由見該類別註解）；`--timeout=180` 要比 Job 的 `$timeout = 120` 大，
+     * 讓 Job 有機會自己逾時並被記錄下來。
+     *
+     * `withoutOverlapping(2)` 帶 2 分鐘過期 —— worker 被 kill 時鎖不會卡住。
+     *
+     * @param Schedule $schedule
+     * @return void
+     */
+    private function scheduleQueueWorker(Schedule $schedule)
+    {
+        /*
+         * sync 不是真的佇列（工作當場同步跑完），對它下 `queue:work`
+         * 沒有意義。所以切換只需要改 `.env` 一個地方：
+         * QUEUE_CONNECTION=database 之後，worker 自動開始排程。
+         */
+        if (config('queue.default') === 'sync') {
+            return;
+        }
+
+        $schedule->command('queue:work --max-time=55 --tries=1 --timeout=180')
+            ->everyMinute()
+            ->withoutOverlapping(2)
+            ->runInBackground();
     }
 
     /**

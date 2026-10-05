@@ -341,6 +341,18 @@ class ScreenshotService
             return null;
         }
 
+        /*
+         * ⚠ **`mkdir` 的 mode 會被 umask 遮掉，`chmod` 不會。**
+         *
+         * 2026-10-04 的 Permission denied 根因就是這個：php-fpm 的 umask
+         * 是 022，`mkdir(0775)` 實際建出來是 0755，群組不可寫，所以排程
+         * （另一個帳號、同屬 webdata 群組）進不來。明確 chmod 一次，
+         * 不論誰先建、umask 多少都是 0775。
+         *
+         * 只對基底做 —— 子目錄是誰建誰用、用完就刪，不需要給別人。
+         */
+        @chmod($base, 0775);
+
         if (!is_writable($base)) {
             Log::warning('Chrome 工作目錄的基底不可寫，改用套件預設', [
                 'base'  => $base,

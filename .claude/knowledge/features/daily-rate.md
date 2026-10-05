@@ -549,6 +549,35 @@ chmod 777 storage/app/public/screenshot storage/app/chrome-profile
 > 或兩帳號同群組 ＋ `chmod -R g+ws`。沒採用是因為這台只跑這個專案、
 > 又是 uat，777 的代價可以接受 —— 權衡過的決定，不是不知道。
 
+#### 後記（2026-10-05）：真正的根因是 umask，不是帳號
+
+查佇列的事情時順手查清楚了，這台機器的權限設計**本來就是對的**：
+
+```
+drwxrwsr-x  apache  webdata   storage/app/claude-home
+drwxrwsr-x  rduser  webdata   storage/logs
+id rduser → groups=1001(rduser),1500(webdata)
+```
+
+php-fpm 是 `apache`、cron 是 `rduser`、**兩邊共用 `webdata` 群組**，
+目錄 775 + setgid，crontab 那行還寫了 `umask 002`。照理說兩邊互通。
+
+**卡住的原因是 `mkdir` 的 mode 會被 umask 遮罩**：
+
+| 誰建的 | umask | `mkdir(0775)` 實際變成 |
+|---|---|---|
+| cron（rduser） | `002` | `0775` ✓ 群組可寫 |
+| **php-fpm（apache）** | `022` | **`0755`** ✗ 群組不可寫 |
+
+所以 php-fpm 建出來的目錄，rduser 就是進不去 —— 跟「帳號不同」無關，
+**同群組也救不了，因為群組位元根本沒被寫進去**。
+
+修法是建完之後明確 `chmod` 一次（**`chmod` 不受 umask 影響**），
+已加在 `makeWorkDir()` 與 `ClaudeCodeMatcher::claudeHome()`。
+往後新建的目錄一律 0775，與這台機器原本的 webdata + setgid 設計一致。
+
+已經 `chmod 777` 的那兩個目錄不受影響（更寬鬆），不用改回來。
+
 ### ⚠ php-fpm 帳號跑 Chrome：要的是可寫的 `$HOME`，不是 user-data-dir
 
 正式機（apache / php-fpm）第一次跑的實際錯誤：
