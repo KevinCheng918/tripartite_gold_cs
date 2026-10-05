@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\VmBilling;
 use App\Presenters\NumberPresenter;
+use App\Presenters\TelegramUsernamePresenter;
+use App\Repositories\UserRepository;
 use App\Repositories\VmRepository;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
@@ -66,18 +68,42 @@ class VmPaymentNoticeService
     private $paymentConfigService;
     private $chatService;
     private $supportGroup;
+    private $userRepository;
 
     public function __construct(
         VmRepository $vmRepository,
         PaymentConfigService $paymentConfigService,
         TelegramChatService $chatService,
-        SupportGroupService $supportGroup
+        SupportGroupService $supportGroup,
+        UserRepository $userRepository
     ) {
         $this->vmRepository = $vmRepository;
         // 繳款通知的文案與圖都在繳款設定裡
         $this->paymentConfigService = $paymentConfigService;
         $this->chatService = $chatService;
         $this->supportGroup = $supportGroup;
+        // 催審核那則要 tag 主管以上
+        $this->userRepository = $userRepository;
+    }
+
+    /**
+     * 要 tag 的主管（含換行）
+     *
+     * 重用 `getManagersForMention()`（level <= 主管、狀態正常、有填 Telegram
+     * 帳號）—— 跟匯率提醒、求助單升級、補點催審核 tag 的是同一批人。
+     *
+     * ⚠ 沒人可 tag 時回**空字串而不是空白行** —— 文案裡的 `{mentions}` 緊貼
+     * 著下一行，換行跟著 mention 一起出現，不然會多一行空的。
+     *
+     * @return string
+     */
+    private function managerMentions()
+    {
+        $line = TelegramUsernamePresenter::mentionLine(
+            $this->userRepository->getManagersForMention()->pluck('telegram_username')
+        );
+
+        return filled($line) ? "{$line}\n" : '';
     }
 
     /**
@@ -316,6 +342,8 @@ class VmPaymentNoticeService
              * （paid_at 不能用：那是審核通過才設的收款時間）。
              */
             '{uploaded_at}' => filled($billing->updated_at) ? $billing->updated_at->format('n/j H:i') : '—',
+            // 這則是要人去後台審核的，不點名容易變成「大家都看到、沒人動手」
+            '{mentions}'    => $this->managerMentions(),
         ]);
 
         return $this->sendInternalOnly($billing, 'pending', null, $text, $dryRun);

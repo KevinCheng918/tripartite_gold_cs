@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Models\Station;
+use App\Presenters\TelegramUsernamePresenter;
 use App\Repositories\CreditTopupRepository;
 use App\Repositories\StationRepository;
+use App\Repositories\UserRepository;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
@@ -103,6 +105,7 @@ class StationCreditAlertService
     private $chatService;
     private $supportGroup;
     private $dailyRateService;
+    private $userRepository;
 
     public function __construct(
         StationRepository $stationRepository,
@@ -113,7 +116,8 @@ class StationCreditAlertService
         PaymentConfigService $paymentConfigService,
         TelegramChatService $chatService,
         SupportGroupService $supportGroup,
-        DailyRateService $dailyRateService
+        DailyRateService $dailyRateService,
+        UserRepository $userRepository
     ) {
         $this->stationRepository = $stationRepository;
         $this->topupRepository = $topupRepository;
@@ -126,6 +130,8 @@ class StationCreditAlertService
         $this->supportGroup = $supportGroup;
         // 補點訊息要帶今日匯率，匯率還沒定就不附
         $this->dailyRateService = $dailyRateService;
+        // 催審核那則要 tag 主管以上
+        $this->userRepository = $userRepository;
     }
 
     /**
@@ -1064,14 +1070,41 @@ class StationCreditAlertService
      */
     private function internalPrefix(Station $station, $target, $pendingTopups)
     {
-        $key = $target === self::TARGET_INTERNAL_PENDING
-            ? 'INTERNAL_PENDING_PREFIX'
-            : 'INTERNAL_PREFIX';
+        $pending = $target === self::TARGET_INTERNAL_PENDING;
+        $key = $pending ? 'INTERNAL_PENDING_PREFIX' : 'INTERNAL_PREFIX';
 
         return strtr((string) config("constants.STATION.CREDIT_ALERT.{$key}"), [
             '{station}' => $station->name,
             '{count}'   => $pendingTopups,
+            /*
+             * 只有催審核那則 tag 主管 —— 「沒設群組」那則是請客服自己
+             * 轉傳給客戶，不是要主管動手，點名他們只會變成雜訊。
+             *
+             * `INTERNAL_PREFIX` 的文案裡沒有 {mentions}，所以這裡給空字串
+             * 也只是沒東西可換，不會留下殘跡。
+             */
+            '{mentions}' => $pending ? $this->managerMentions() : '',
         ]);
+    }
+
+    /**
+     * 要 tag 的主管（含換行）
+     *
+     * 重用 `getManagersForMention()`（level <= 主管、狀態正常、有填 Telegram
+     * 帳號）—— 跟匯率提醒、求助單升級 tag 的是同一批人，名單只有一份。
+     *
+     * ⚠ 沒人可 tag 時回**空字串而不是空白行** —— 文案裡的 `{mentions}` 緊貼
+     * 著下一行，換行是跟著 mention 一起出現的，不然會多一行空的。
+     *
+     * @return string
+     */
+    private function managerMentions()
+    {
+        $line = TelegramUsernamePresenter::mentionLine(
+            $this->userRepository->getManagersForMention()->pluck('telegram_username')
+        );
+
+        return filled($line) ? "{$line}\n" : '';
     }
 
     // ---------------------------------------------------------------

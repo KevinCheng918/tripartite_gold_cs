@@ -178,7 +178,12 @@ return [
              * 客戶已經申請補點了，再發「請補充點數」等於在催一件他已經做完的事 ——
              * 真正卡住的是我們這邊還沒審核，所以改成提醒自己人。
              */
-            'INTERNAL_PENDING_PREFIX' => "⏳ <b>{station}</b> 的系統餘點已低於門檻，"
+            /*
+             * {mentions} 會 tag 主管以上 —— 這則是要人去後台審核的，
+             * 不點名就容易變成「大家都看到、沒人動手」。
+             * 放最前面：Telegram 的通知只顯示開頭那幾個字。
+             */
+            'INTERNAL_PENDING_PREFIX' => "{mentions}⏳ <b>{station}</b> 的系統餘點已低於門檻，"
                 . "但還有 <b>{count}</b> 筆補點單沒有審核\n"
                 . "這則<b>沒有</b>發給客戶 —— 他已經申請補點了，再催一次只會造成困擾\n"
                 . "麻煩盡快到後台審核，點數要審核通過才會進去\n\n"
@@ -430,7 +435,14 @@ return [
              * 待審核的催審核。這一則**永遠只發內部群組**，語氣與對客的
              * 繳款通知完全不同：客戶已經付了，要催的是我們自己。
              */
-            'PENDING_TEXT' => "⏳ <b>{station}</b> 的 {month} 虛擬機繳款證明還沒有人審核\n"
+            /*
+             * {mentions} 會 tag 主管以上（`UserRepository::getManagersForMention()`，
+             * level <= LEADER、狀態正常、有填 Telegram 帳號）。
+             *
+             * 放最前面是因為 Telegram 的通知只顯示訊息開頭 —— 被 tag 的人
+             * 在通知列就看得到自己被叫了。沒人可 tag 時整行連換行一起消失。
+             */
+            'PENDING_TEXT' => "{mentions}⏳ <b>{station}</b> 的 {month} 虛擬機繳款證明還沒有人審核\n"
                 . "金額：{amount} USDT ｜ 上傳時間：{uploaded_at}\n"
                 . '客戶已經付款並上傳證明了，麻煩盡快到後台審核',
         ],
