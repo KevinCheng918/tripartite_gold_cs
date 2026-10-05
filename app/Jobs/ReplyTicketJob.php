@@ -15,12 +15,9 @@ use Illuminate\Support\Facades\Log;
 /**
  * 把求助單的答案轉給客人
  *
- * **為什麼要丟背景**：轉答案前會先讓模型讀過同仁寫的答案再寫承接句
- * （`composeSupportOpening()`），那要跑幾秒。原本是在 webhook 裡同步做完
- * 才顯示下一步，於是同仁按「回覆並加入題庫」之後要**乾等好幾秒**類別選單
- * 才出現 —— 2026-10-06 需求方回報「這個按鈕跑很慢」。
- *
- * 丟背景之後：按鈕立刻有反應、類別選單馬上出現，答案由 worker 送出。
+ * **為什麼要丟背景**：webhook 不該等 Telegram 送訊的往返。同仁按
+ * 「回覆並加入題庫」之後要能**立刻**看到類別選單，不是等答案送完才出現
+ * （2026-10-06 需求方回報「這個按鈕跑很慢」）。
  *
  * ⚠ **不重試**（`$tries = 1`）：重試等於再發一次給客人。寧可漏掉一則由
  * 同仁手動補，也不要客人收到兩則一樣的答案。
@@ -32,8 +29,8 @@ class ReplyTicketJob implements ShouldQueue
     /** @var int 不重試，理由見類別註解 */
     public $tries = 1;
 
-    /** @var int 秒。要比承接句那次呼叫的逾時（support_opening_timeout）寬一些 */
-    public $timeout = 90;
+    /** @var int 秒。只是發一則 Telegram 訊息，不需要太久 */
+    public $timeout = 60;
 
     /** @var int 求助單 id */
     protected $ticketId;

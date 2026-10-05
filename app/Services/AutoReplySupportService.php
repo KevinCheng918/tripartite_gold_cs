@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Contracts\AutoReplyMatcher;
 use App\Jobs\ReplyTicketJob;
 use App\Models\AutoReplyTicket;
 use App\Models\TelegramGroup;
@@ -11,7 +10,6 @@ use App\Repositories\QuickReplyRepository;
 use App\Repositories\TelegramRepository;
 use App\Repositories\UserRepository;
 use App\Services\AutoReply\AnswerSplitter;
-use App\Services\AutoReply\OpeningSanitizer;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -51,8 +49,6 @@ class AutoReplySupportService
     private $appSettingService;
     private $supportGroup;
     private $splitter;
-    private $matcher;
-    private $sanitizer;
 
     public function __construct(
         AutoReplyTicketRepository $ticketRepository,
@@ -64,9 +60,7 @@ class AutoReplySupportService
         QuickReplyService $quickReplyService,
         AppSettingService $appSettingService,
         SupportGroupService $supportGroup,
-        AnswerSplitter $splitter,
-        AutoReplyMatcher $matcher,
-        OpeningSanitizer $sanitizer
+        AnswerSplitter $splitter
     ) {
         $this->ticketRepository = $ticketRepository;
         $this->telegramRepository = $telegramRepository;
@@ -78,9 +72,6 @@ class AutoReplySupportService
         $this->appSettingService = $appSettingService;
         $this->supportGroup = $supportGroup;
         $this->splitter = $splitter;
-        // 讀同仁的答案、寫一句承接（失敗就退回固定話術）
-        $this->matcher = $matcher;
-        $this->sanitizer = $sanitizer;
     }
 
     /**
@@ -734,156 +725,6 @@ class AutoReplySupportService
     }
 
     /**
-     * 組出要送給客人的整則訊息
-     *
-     * 三條路，優先序由好到壞：
-     *
-     * 1. 模型讀過答案寫了一句 → 用它（最自然，接得上答案的開頭）
-     * 2. 模型判斷**不需要**承接 → 直接送答案（答案本身已經是完整的一段話）
-     * 3. 模型失敗／逾時／被護欄擋 → 退回依等待時間挑的固定話術
-     *
-     * @param AutoReplyTicket $ticket
-     * @return string
-     */
-    private function buildCustomerText(AutoReplyTicket $ticket)
-    {
-        $ai = $this->aiOpening($ticket);
-
-        if (Arr::get($ai, 'ok') === true) {
-            $opening = Arr::get($ai, 'opening');
-
-            // 模型說不需要承接 —— 直接送答案，不要硬套模板
-            return blank($opening) ? (string) $ticket->answer : "{$opening}\n\n{$ticket->answer}";
-        }
-
-        $template = $this->supportTemplate($ticket);
-
-        return blank($template) ? '' : strtr($template, ['{答案}' => $ticket->answer]);
-    }
-
-    /**
-     * 讓模型讀過同仁的答案再寫承接句
-     *
-     * 固定話術治不了的狀況：同仁打「老闆你好，這個部分…」，前面再加一句
-     * 「老闆您好」就問候了兩次。答案開頭千變萬化，接得自然就得真的讀過。
-     *
-     * ⚠ **三種結果要分清楚**：
-     *
-     * | 回傳 | 意思 | 呼叫端怎麼做 |
-     * |---|---|---|
-     * | `['ok' => true, 'opening' => '…']` | 模型寫了一句 | 用它 |
-     * | `['ok' => true, 'opening' => null]` | 模型判斷**不需要**承接句 | 直接送答案 |
-     * | `['ok' => false]` | 呼叫失敗／逾時／被護欄擋 | **退回固定話術** |
-     *
-     * 中間那個最容易寫錯成「失敗」—— 那樣答案開頭已有問候時又會被套上模板，
-     * 等於這個功能沒做。
-     *
-     * @param AutoReplyTicket $ticket
-     * @return array{ok: bool, opening: string|null}
-     */
-    private function aiOpening(AutoReplyTicket $ticket)
-    {
-        $failed = ['ok' => false, 'opening' => null];
-
-        if (config('auto_reply.templates.ai_opening') !== true) {
-            return $failed;
-        }
-
-        $result = $this->matcher->composeSupportOpening($ticket->answer, $this->waitMinutes($ticket));
-
-        // null = 呼叫失敗（已經在 matcher 裡記過 log）
-        if (blank($result)) {
-            return $failed;
-        }
-
-        $opening = Arr::get($result, 'opening');
-
-        // 模型明確說不需要承接句
-        if (blank($opening)) {
-            return ['ok' => true, 'opening' => null];
-        }
-
-        /*
-         * 護欄跟客人訊息那條承接句用同一組（長度 + 黑名單）——
-         * prompt 是請求，不是保證。被擋下就當作失敗，退回固定話術。
-         */
-        $clean = $this->sanitizer->sanitize($opening);
-
-        if (blank($clean)) {
-            return $failed;
-        }
-
-        return ['ok' => true, 'opening' => $clean];
-    }
-
-    /**
-     * 客人等了幾分鐘（求助單開立到現在）
-     *
-     * @param AutoReplyTicket $ticket
-     * @return int
-     */
-    private function waitMinutes(AutoReplyTicket $ticket)
-    {
-        return blank($ticket->created_at) ? 0 : (int) $ticket->created_at->diffInMinutes(now());
-    }
-
-    /**
-     * 挑一句承接，依客人**實際等了多久**
-     *
-     * ⚠ 原本固定一句「久等了，已為您確認完畢 😊」。兩個毛病：每次都一樣，
-     * 客人問幾次就看出是罐頭；而且**同仁一分鐘內就回答時說「久等了」是錯的**
-     * —— 不合語境的客套話比沒有還糟。
-     *
-     * 等待時間從求助單開立起算（含 AI 判斷的那幾十秒 —— 那段客人也在等）。
-     *
-     * 取不到時間時當成 `slow`：寧可多道一次歉，也不要在客人等很久之後
-     * 回一句輕快的「幫您問到了」。
-     *
-     * @param AutoReplyTicket $ticket
-     * @return string 空字串代表沒有可用的話術
-     */
-    private function supportTemplate(AutoReplyTicket $ticket)
-    {
-        $groups = (array) config('auto_reply.templates.support');
-        $pool = (array) Arr::get($groups, $this->waitGroup($ticket));
-
-        // 設定被改壞（整組空的）時退回任何一句可用的，不要讓答案發不出去
-        if (blank($pool)) {
-            $pool = (array) Arr::first($groups, function ($candidates) {
-                return filled($candidates);
-            });
-        }
-
-        return blank($pool) ? '' : (string) Arr::random($pool);
-    }
-
-    /**
-     * 這張單屬於哪一組等待時間
-     *
-     * @param AutoReplyTicket $ticket
-     * @return string quick / normal / slow
-     */
-    private function waitGroup(AutoReplyTicket $ticket)
-    {
-        if (blank($ticket->created_at)) {
-            return 'slow';
-        }
-
-        $minutes = $ticket->created_at->diffInMinutes(now());
-        $thresholds = (array) config('auto_reply.templates.support_minutes');
-
-        if ($minutes <= (int) Arr::get($thresholds, 'quick', 3)) {
-            return 'quick';
-        }
-
-        if ($minutes <= (int) Arr::get($thresholds, 'normal', 15)) {
-            return 'normal';
-        }
-
-        return 'slow';
-    }
-
-    /**
      * 安排把答案轉給客人（丟背景）
      *
      * ⚠ **按鈕那邊不等結果**：轉答案前要讓模型讀過答案再寫承接句，那要跑
@@ -930,19 +771,25 @@ class AutoReplySupportService
         }
 
         /*
-         * ⚠ **同仁的答案一律原文送出**（求助訊息上就是這樣寫的）——
-         * 不管承接句是模型寫的還是固定話術，被改寫的都只有外層那一句。
+         * ⚠ **同仁寫什麼就送什麼，一個字都不加。**
+         *
+         * 這裡原本會在前面補一句承接（先是 12 句固定話術輪替，後來改成讓模型
+         * 讀過答案再寫）。兩種都拿掉了 —— 需求方 2026-10-06：
+         *
+         * > 只要同仁有回覆，就是使用同仁回覆就好，即使是叫他等待，也是一樣，
+         * > 因為同仁回覆就是正確的
+         *
+         * 實際踩到的毛病：同仁回「稍等，請人員為您說明」，前面卻被加上
+         * 「為您問清楚了 😊」—— 上一句說問到了、下一句還在請客人等。
+         * 承接句治不了這個，因為它永遠在猜那段答案是什麼性質。
+         *
+         * 客人問完當下已經收到一則「馬上請同仁為您說明」了（轉人工那則），
+         * 所以這裡再客套一次本來就是多的。
          */
-        $text = $this->buildCustomerText($ticket);
-
-        if (blank($text)) {
-            return false;
-        }
-
         try {
             $this->chatService->sendReply(
                 $ticket->telegram_group_id,
-                $text,
+                (string) $ticket->answer,
                 null,
                 config('constants.AUTO_REPLY.SENDER_NAME'),
                 [
