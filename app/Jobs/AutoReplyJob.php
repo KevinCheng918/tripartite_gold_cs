@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Repositories\TelegramRepository;
 use App\Services\AutoReplyProgressService;
 use App\Services\AutoReplyService;
 use Illuminate\Bus\Queueable;
@@ -59,6 +60,20 @@ class AutoReplyJob implements ShouldQueue
      */
     public function handle(AutoReplyService $autoReplyService, AutoReplyProgressService $progressService)
     {
+        /*
+         * 客人連著傳好幾句講同一件事時，只有最後一則該回覆 ——
+         * 每則都回會把同一個問題答好幾次。
+         *
+         * 這是第一道（開始前）：客人在排隊等待期間又說話了，這則就不必跑了。
+         * **連 AI 都不呼叫**，省一次 CLI。
+         *
+         * 答案的完整性不受影響：最後那則回覆時，脈絡本來就會帶上前面幾則
+         * （`auto_reply.context`，前 6 則／15 分鐘），所以不需要把文字合併。
+         */
+        if ($this->supersededBy('開始前')) {
+            return;
+        }
+
         $progressService->start($this->groupId);
 
         try {
@@ -68,6 +83,34 @@ class AutoReplyJob implements ShouldQueue
             // Claude 一失敗畫面就會卡在「AI 回覆中」直到 TTL 過期
             $progressService->finish($this->groupId);
         }
+    }
+
+    /**
+     * 客人在這則之後又說話了嗎
+     *
+     * ⚠ **兩個呼叫點分工不同**：
+     *
+     * - 開始前：省掉整次 AI 呼叫
+     * - 真正要發送之前（`AutoReplyService`）：CLI 要跑數秒到數十秒，
+     *   那段時間客人很可能又補了一句 —— 沒有第二道就還是會回兩次
+     *
+     * @param string $stage 只用在 log，方便分辨是哪一道擋下的
+     * @return bool
+     */
+    private function supersededBy($stage)
+    {
+        $superseded = app(TelegramRepository::class)
+            ->hasNewerInbound($this->groupId, $this->messageId);
+
+        if ($superseded) {
+            Log::info('客人已有更新的訊息，略過這則的自動回覆', [
+                'group_id'   => $this->groupId,
+                'message_id' => $this->messageId,
+                'stage'      => $stage,
+            ]);
+        }
+
+        return $superseded;
     }
 
     /**

@@ -95,7 +95,16 @@ class Kernel extends ConsoleKernel
         $schedule->command('queue:work --max-time=55 --tries=1 --timeout=180')
             ->everyMinute()
             ->withoutOverlapping(2)
-            ->runInBackground();
+            ->runInBackground()
+            /*
+             * `runInBackground()` 預設把輸出丟進 /dev/null —— 那樣 worker
+             * 自己起不來（PHP fatal、找不到 autoload…）會完全無聲無息。
+             *
+             * 工作本身的失敗有 Log 與 failed_jobs 接著，這個檔收的是
+             * 「worker 這個行程」的狀況。沒有工作時 `queue:work` 不輸出東西，
+             * 所以平常不會長大。
+             */
+            ->appendOutputTo(storage_path('logs/queue-worker.log'));
     }
 
     /**

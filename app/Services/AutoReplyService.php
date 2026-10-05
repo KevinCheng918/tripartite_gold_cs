@@ -102,6 +102,29 @@ class AutoReplyService
             'history'  => $history,
         ]);
 
+        /*
+         * AI 跑完了，但客人在這期間又說話了。
+         *
+         * 這是第二道「我還是最後一則嗎」—— 第一道在 `AutoReplyJob` 開始前。
+         * CLI 要跑數秒到數十秒，客人很容易在那段時間補上第二句，
+         * **少了這一道，連著傳的三句話仍然會被回三次**。
+         *
+         * 擺在兩個分支之前：命中答案與轉人工都要跳過。不然連發時會開出
+         * 好幾張內容幾乎一樣的求助單，同仁得一張張關掉。
+         *
+         * 不必擔心漏回：最後那則會負責回覆，而且它的脈絡本來就帶得到
+         * 前面幾句（`auto_reply.context`）。
+         */
+        if ($this->telegramRepository->hasNewerInbound($group->id, $messageId)) {
+            Log::info('客人已有更新的訊息，這則的答案不送出', [
+                'group_id'   => $group->id,
+                'message_id' => $messageId,
+                'stage'      => 'AI 跑完後',
+            ]);
+
+            return;
+        }
+
         // 比對器掛了（逾時、額度用盡、格式壞掉）—— 一律走人工，不要讓客人空等
         if (blank($result)) {
             $this->replyWait($group, $text, null, $messageId, [], $history);

@@ -348,7 +348,26 @@ class TelegramChatService
         if ($group->isAutoReplyOn() && filled($rawText)
             && !$this->staffIgnoreService->isStaff($from, $group->id)
             && !$this->memberService->isIgnored($group->id, $from)) {
-            AutoReplyJob::dispatch($group->id, $rawText, $msg->id);
+            /*
+             * 壓一段延遲再處理，讓客人把話講完。
+             *
+             * 客人常常連著傳好幾句講同一件事（「老闆」「這邊先直接儲值」
+             * 「不讓你為難」）—— 馬上處理的話每一則都會被當成獨立的問題。
+             * 等這幾秒，前面幾則的 Job 會在 `hasNewerInbound()` 那關自己退掉，
+             * 只有最後一則真正回覆。
+             *
+             * ⚠ 這是「所有人都慢幾秒」換「連發的人只被回一次」。
+             * 設定在 `auto_reply.burst_delay`，填 0 就是維持原本的即時處理。
+             *
+             * ⚠ `QUEUE_CONNECTION=sync` 時 **delay 會被忽略**（當場同步跑完），
+             * 這段才有意義的前提是真的有佇列。
+             */
+            $delay = (int) config('auto_reply.burst_delay');
+            $job = AutoReplyJob::dispatch($group->id, $rawText, $msg->id);
+
+            if ($delay > 0) {
+                $job->delay(now()->addSeconds($delay));
+            }
         }
     }
 

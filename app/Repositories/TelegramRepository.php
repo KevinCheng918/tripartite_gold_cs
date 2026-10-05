@@ -408,6 +408,35 @@ class TelegramRepository
     }
 
     /**
+     * 這則之後，客人還有沒有再說話
+     *
+     * 給自動回覆判斷「我是不是最後一則」用 —— 客人連著傳好幾句講同一件事時，
+     * 只有最後一則該回覆，前面幾則白回會變成同一個問題被答好幾次。
+     *
+     * **只看 inbound**：客服或 AI 自己發的訊息不算「客人又說話了」，
+     * 不然 AI 一回覆就會把自己判定成過期。
+     *
+     * ⚠ 比 `id` 不比 `created_at` —— 同一秒內進來的多則訊息時間會一樣，
+     * 用時間比會漏掉。id 是遞增的，照寫入順序。
+     *
+     * @param int      $groupId
+     * @param int|null $messageId 空的話一律回 false（沒有基準點可比）
+     * @return bool
+     */
+    public function hasNewerInbound($groupId, $messageId)
+    {
+        if (blank($messageId)) {
+            return false;
+        }
+
+        return TelegramMessage::query()
+            ->where('telegram_group_id', $groupId)
+            ->where('direction', config('constants.TELEGRAM.DIRECTION.INBOUND'))
+            ->where('id', '>', $messageId)
+            ->exists();
+    }
+
+    /**
      * 取得群組內未回覆 inbound 訊息數量
      *
      * @param int $groupId
