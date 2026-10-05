@@ -56,10 +56,14 @@ class AutoReplyJob implements ShouldQueue
     /**
      * @param AutoReplyService         $autoReplyService
      * @param AutoReplyProgressService $progressService
+     * @param TelegramRepository       $telegramRepository
      * @return void
      */
-    public function handle(AutoReplyService $autoReplyService, AutoReplyProgressService $progressService)
-    {
+    public function handle(
+        AutoReplyService $autoReplyService,
+        AutoReplyProgressService $progressService,
+        TelegramRepository $telegramRepository
+    ) {
         /*
          * 客人連著傳好幾句講同一件事時，只有最後一則該回覆 ——
          * 每則都回會把同一個問題答好幾次。
@@ -70,7 +74,7 @@ class AutoReplyJob implements ShouldQueue
          * 答案的完整性不受影響：最後那則回覆時，脈絡本來就會帶上前面幾則
          * （`auto_reply.context`，前 6 則／15 分鐘），所以不需要把文字合併。
          */
-        if ($this->supersededBy('開始前')) {
+        if ($this->supersededBy($telegramRepository, '開始前')) {
             return;
         }
 
@@ -94,13 +98,13 @@ class AutoReplyJob implements ShouldQueue
      * - 真正要發送之前（`AutoReplyService`）：CLI 要跑數秒到數十秒，
      *   那段時間客人很可能又補了一句 —— 沒有第二道就還是會回兩次
      *
-     * @param string $stage 只用在 log，方便分辨是哪一道擋下的
+     * @param TelegramRepository $repository
+     * @param string             $stage 只用在 log，方便分辨是哪一道擋下的
      * @return bool
      */
-    private function supersededBy($stage)
+    private function supersededBy(TelegramRepository $repository, $stage)
     {
-        $superseded = app(TelegramRepository::class)
-            ->hasNewerInbound($this->groupId, $this->messageId);
+        $superseded = $repository->hasNewerInbound($this->groupId, $this->messageId);
 
         if ($superseded) {
             Log::info('客人已有更新的訊息，略過這則的自動回覆', [
