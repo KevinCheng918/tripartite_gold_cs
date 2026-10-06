@@ -89,7 +89,8 @@ return [
 
         // Support group
         'chat_id_invalid'     => 'Invalid chat_id format (group IDs are negative)',
-        'chat_id_is_customer' => 'This group is already a customer conversation and cannot be used as the internal support group (all of its customer messages would be intercepted, never delivered and never auto-replied). Please use a separate group, or remove that conversation in Telegram CS first.',
+        'chat_id_is_customer' => 'This chat_id already appears in the Telegram CS conversation list and cannot also be the internal support group (its messages would all be intercepted, never delivered and never auto-replied). Delete that conversation in Telegram CS first, then save again.'
+            . ' | Common cause: after the support group was upgraded to a supergroup (which happens when Topics are enabled), its old chat_id stopped working and the system no longer recognised it — so it created a conversation for it as if it were a new customer. Deleting that one entry is enough.',
         'system_not_found'    => 'System not found',
         'support_test_sent'   => 'Test message sent, please check the group',
         'support_test_failed' => 'Failed to send. Check the chat_id, that the bot is in the group, and that Group Privacy is disabled',

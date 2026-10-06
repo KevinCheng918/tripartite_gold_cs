@@ -169,6 +169,20 @@ sendMessage(chat_id=-100…, message_thread_id=42, text=…)
 | 查 log | `⚠ Telegram 群組已升級為 supergroup，chat_id 變了` 這一行有新舊 id |
 | 群組連結 | `t.me/c/XXXXXXXXXX/…` → chat_id = `-100` + `XXXXXXXXXX` |
 
+### ⚠ 換新 id 時會被 unique 規則擋住
+
+`UpdateGroupRequest` 有 `unique:telegram_group,chat_id`（支援群組不能拿客戶對話
+的群組來用）。但舊 id 失效的那段時間，系統認不得支援群組，**把它當成新客戶
+建了一筆對話** —— 於是新 id 被自己建的那筆擋住，存不進去。
+
+解法：到「Telegram 客服」把那筆對話刪掉，再回設定頁存。
+錯誤訊息已經寫明這個情境。
+
+> ⚠ 2026-10-06 當下使用者只看到 `The given data was invalid.` ——
+> `notification-setting.js` 的 `errorMessage()` 把 `body.message` 排在
+> `body.errors` 前面。Laravel 驗證失敗時兩個都會給，`message` 只是通用外殼。
+> **`errors` 一定要先看。**（`setting-admin.js` 原本就是對的，是我抄過去時寫反。）
+
 ### 為什麼不自動改設定
 
 Telegram 給的 `migrate_to_chat_id` 是權威值，自動寫回技術上可行。

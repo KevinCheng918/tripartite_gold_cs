@@ -89,7 +89,8 @@ return [
 
         // 支援群組
         'chat_id_invalid'     => 'chat_id 格式不正確（群組的 id 是負數）',
-        'chat_id_is_customer' => '這個群組已經是客服對話的群組，不能同時當內部支援群組（那個群組的客戶訊息會全部被攔掉、不會送達也不會自動回覆）。請改用另一個群組，或先在 Telegram 客服移除該對話。',
+        'chat_id_is_customer' => '這個 chat_id 已經出現在 Telegram 客服的對話列表裡，不能同時當內部支援群組（那個對話的訊息會全部被攔掉、不會送達也不會自動回覆）。請先到「Telegram 客服」把該筆對話刪除，再回來儲存。'
+            . '｜常見情況：支援群組開啟「話題」功能被升級成 supergroup 之後，舊 chat_id 失效的那段時間，系統認不得它，就把它當成新客戶建了一筆對話。那一筆刪掉即可。',
         'system_not_found'    => '找不到該系統',
         'support_test_sent'   => '測試訊息已送出，請到群組確認',
         'support_test_failed' => '測試訊息送出失敗，請確認 chat_id、Bot 是否已加入群組、以及 Group Privacy 是否關閉',

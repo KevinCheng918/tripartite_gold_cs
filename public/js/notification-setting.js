@@ -63,18 +63,19 @@
     /**
      * 把後端的錯誤訊息挖出來
      *
-     * 驗證失敗時 Laravel 回的是 errors 物件，只有一般錯誤才有 message。
+     * ⚠ **errors 要先看，message 後看**。驗證失敗時 Laravel 兩個都會給：
+     * `errors` 是真正的原因（「這個群組已經是客服對話的群組…」），
+     * `message` 只有一句通用的 `The given data was invalid.`。
+     * 順序寫反的話，使用者永遠只看得到那句廢話，完全不知道要改什麼。
      */
     function errorMessage(body, fallback) {
-        if (body && body.message) { return body.message; }
-
         if (body && body.errors) {
-            var keys = Object.keys(body.errors);
+            var first = Object.keys(body.errors)[0];
 
-            if (keys.length) { return body.errors[keys[0]][0]; }
+            if (first && body.errors[first].length) { return body.errors[first][0]; }
         }
 
-        return fallback;
+        return (body && body.message) || fallback;
     }
 
     /**
