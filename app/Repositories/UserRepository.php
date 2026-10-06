@@ -290,12 +290,17 @@ class UserRepository
     public function findForDm($id)
     {
         return User::query()
-            ->select(['id', 'nickname', 'telegram_user_id', 'telegram_dm_ready', 'status'])
+            ->select(['id', 'nickname', 'telegram_user_id', 'telegram_dm_ready', 'status', 'level'])
             ->find($id);
     }
 
     /**
-     * 整批取私訊資料（班表通知用）
+     * 整批取私訊資料（通知收件人用）
+     *
+     * ⚠ **`telegram_dm_ready` 與 `level` 都一定要在 select 裡。**
+     * 少了前者所有人都被判定成沒綁定；少了後者 `$user->level` 會是 null，
+     * `(int) null === 0` 剛好等於 ADMIN —— `StaffDmService` 的「排除管理者」
+     * 就會把**每一個人**都排除掉，而且完全不報錯。
      *
      * @param array $ids
      * @return \Illuminate\Database\Eloquent\Collection
@@ -309,17 +314,19 @@ class UserRepository
         }
 
         return User::query()
-            ->select(['id', 'nickname', 'telegram_user_id', 'telegram_dm_ready', 'status'])
+            ->select(['id', 'nickname', 'telegram_user_id', 'telegram_dm_ready', 'status', 'level'])
             ->whereIn('id', $ids)
             ->get();
     }
 
     /**
-     * 可以當私訊收件人的帳號清單（設定頁下拉用）
+     * 可以當私訊收件人的帳號清單（通知設定頁用）
      *
-     * 跟 `getActiveForDropdown()` 的差別：**不排除管理者**（班表通知的收件人
-     * 很可能就是管理者自己），而且帶著綁定狀態 —— 設定頁要能直接顯示
-     * 「這個人還沒私訊過機器人」，不然選了之後只會默默發不出去。
+     * ⚠ **排除管理者**（需求方 2026-10-06 指定）—— 管理者是系統維護用的帳號，
+     * 不是收班表與統計的對象。這點跟 `getActiveForDropdown()` 一致。
+     *
+     * 帶著綁定狀態：設定頁要能直接顯示「這個人還沒私訊過機器人」，
+     * 不然勾了之後只會默默發不出去。
      *
      * @return \Illuminate\Database\Eloquent\Collection
      */
@@ -328,6 +335,7 @@ class UserRepository
         return User::query()
             ->select(['id', 'nickname', 'telegram_user_id', 'telegram_dm_ready'])
             ->where('status', config('constants.USER.STATUS.NORMAL'))
+            ->where('level', '!=', config('constants.USER.LEVEL.ADMIN'))
             ->orderBy('level')
             ->orderBy('nickname')
             ->get();

@@ -60,12 +60,27 @@ class StaffDmService
             return ['sent' => 0, 'reason' => self::SKIP_NO_RECIPIENT, 'failed' => [], 'names' => []];
         }
 
+        /*
+         * ⚠ **管理者不在收件人之列**（需求方 2026-10-06）。
+         *
+         * 設定頁的候選清單已經排除管理者（`getDmCandidates()`），但**早先存進去的
+         * 設定值可能還留著管理者的 id** —— 那種情況下 UI 看不到他、無從取消勾選，
+         * 他卻還是會一直收到。所以送出這一端也要擋。
+         */
         $sent = 0;
         $failed = [];
         $names = [];
         $notBound = 0;
+        $admin = (int) config('constants.USER.LEVEL.ADMIN');
+        $eligible = 0;
 
         foreach ($this->userRepository->getForDmByIds($userIds) as $user) {
+            if ((int) $user->level === $admin) {
+                continue;
+            }
+
+            $eligible++;
+
             if (!$this->canDm($user)) {
                 $failed[] = $user->nickname;
                 $notBound++;
@@ -86,8 +101,11 @@ class StaffDmService
         /*
          * 設定裡有 id、資料庫卻查不到（帳號被刪或被停用）——
          * 要讓它變成「沒收到的人」，不然那個人會從結果裡無聲消失。
+         *
+         * ⚠ 基準是 `$eligible`（查得到且不是管理者的人數）而不是設定裡的 id 數：
+         * 用後者的話，被刻意排除的管理者會被算成「沒收到」而出現在失敗名單裡。
          */
-        $missing = count($userIds) - count($failed) - $sent;
+        $missing = $eligible - count($failed) - $sent;
 
         for ($i = 0; $i < $missing; $i++) {
             $failed[] = '#?';
@@ -97,10 +115,19 @@ class StaffDmService
             return ['sent' => $sent, 'reason' => null, 'failed' => $failed, 'names' => $names];
         }
 
-        // 一則都沒送出：分得出「全都沒綁定」和「送出時被拒」對處理方式有差
+        /*
+         * 一則都沒送出。分得出三種：
+         *   勾的全是管理者（已被排除）→ 等於沒有收件人
+         *   收件人全都沒綁定            → 要請他們私訊機器人
+         *   送出時被拒                  → 多半是被封鎖，要查 log
+         */
+        if ($eligible < 1) {
+            return ['sent' => 0, 'reason' => self::SKIP_NO_RECIPIENT, 'failed' => $failed, 'names' => []];
+        }
+
         return [
             'sent'   => 0,
-            'reason' => $notBound === count($userIds) ? self::SKIP_NOT_BOUND : self::SKIP_SEND_FAILED,
+            'reason' => $notBound === $eligible ? self::SKIP_NOT_BOUND : self::SKIP_SEND_FAILED,
             'failed' => $failed,
             'names'  => [],
         ];

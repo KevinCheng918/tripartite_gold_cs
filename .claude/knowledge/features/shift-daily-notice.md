@@ -139,6 +139,20 @@ sidebar 的**通訊管理**分組，把原本散在上面的「Telegram 客服�
 | `resources/lang/{tw,cn,en}/shift_notice.php`（新增） | 語系 |
 | `resources/lang/{tw,cn,en}/permission.php` | 權限說明 |
 
+## ⚠ 收件人排除管理者
+
+`getDmCandidates()` 排除 `level = ADMIN`（需求方 2026-10-06）——
+管理者是系統維護用的帳號，不是收班表與統計的對象。
+
+**兩端都要擋**：設定頁的候選清單排除他，`StaffDmService::sendToUserIds()`
+送出時也排除。只擋前者的話，**早先存進去的管理者 id 還留在設定裡** ——
+UI 看不到他、無從取消勾選，他卻會一直收到。
+
+⚠ 連帶一定要在 `getForDmByIds()` / `findForDm()` 的 select 裡加 `level`：
+少了它 `$user->level` 是 null，而 `(int) null === 0` 剛好等於 ADMIN ——
+「排除管理者」會把**每一個人**都排除掉，而且完全不報錯。
+（這專案為「select 漏欄位」修過好幾次，這是第 N 次）
+
 ## 怎麼看誰還沒綁定
 
 **帳號管理的表格有「TG 綁定」一欄**（2026-10-06 加），三態：
