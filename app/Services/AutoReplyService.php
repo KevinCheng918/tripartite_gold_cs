@@ -9,6 +9,7 @@ use App\Repositories\StationRepository;
 use App\Repositories\TelegramRepository;
 use App\Services\AutoReply\AnswerSplitter;
 use App\Services\AutoReply\OpeningSanitizer;
+use App\Services\AutoReply\WaitWriter;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -51,6 +52,7 @@ class AutoReplyService
     private $stationRepository;
     private $paymentConfigService;
     private $splitter;
+    private $waitWriter;
 
     public function __construct(
         AutoReplyMatcher $matcher,
@@ -62,7 +64,8 @@ class AutoReplyService
         DailyRateService $dailyRateService,
         StationRepository $stationRepository,
         PaymentConfigService $paymentConfigService,
-        AnswerSplitter $splitter
+        AnswerSplitter $splitter,
+        WaitWriter $waitWriter
     ) {
         $this->matcher = $matcher;
         $this->telegramRepository = $telegramRepository;
@@ -76,6 +79,8 @@ class AutoReplyService
         $this->stationRepository = $stationRepository;
         $this->paymentConfigService = $paymentConfigService;
         $this->splitter = $splitter;
+        // 轉人工那句稍等由模型現寫，失敗才退公版
+        $this->waitWriter = $waitWriter;
     }
 
     /**
@@ -573,7 +578,7 @@ class AutoReplyService
         if (blank($result)) {
             return [
                 'action'  => $actions['WAIT'],
-                'content' => $this->previewContent($actions['WAIT'], null, null),
+                'content' => $this->previewContent($actions['WAIT'], null, null, $text),
                 'hint'    => null,
                 'result'  => null,
             ];
@@ -583,7 +588,7 @@ class AutoReplyService
 
         return [
             'action'  => $decision['action'],
-            'content' => $this->previewContent($decision['action'], $decision['item'], $decision['opening']),
+            'content' => $this->previewContent($decision['action'], $decision['item'], $decision['opening'], $text),
             // 轉人工時支援群組會多收到這段，測試時一併看得到
             'hint'    => $decision['action'] === $actions['WAIT'] ? $this->buildHint($result) : null,
             'result'  => $result,
@@ -598,9 +603,10 @@ class AutoReplyService
      * @param string                          $action
      * @param \App\Models\QuickReplyItem|null $item
      * @param string|null                     $opening
+     * @param string                          $text 客人問的話（轉人工那句要順著它寫）
      * @return string
      */
-    private function previewContent($action, $item, $opening)
+    private function previewContent($action, $item, $opening, $text = '')
     {
         $actions = config('constants.AUTO_REPLY.DECISION');
         $signature = config('constants.AUTO_REPLY.SIGNATURE');
@@ -622,7 +628,7 @@ class AutoReplyService
              * ⚠ 預覽一定要跟實際送出的一致 —— 這支是拿來調 prompt 與話術的，
              * 預覽說「不回客人」而線上其實會回，那調出來的東西就是錯的。
              */
-            $content = $this->buildWaitText($opening);
+            $content = $this->buildWaitText($text, $opening);
         }
 
         return filled($content) ? "{$content} {$signature}" : '';
@@ -925,32 +931,26 @@ class AutoReplyService
          * 那是開空頭支票：沒有任何同仁會看到那個問題，客人卻在等。
          * 上面那個 `return` 就是為了這件事。
          */
-        $this->send($group, $this->buildWaitText($opening), true);
+        $this->send($group, $this->buildWaitText($question, $opening), true);
     }
 
     /**
      * 組轉人工時回客人的那一句
      *
-     * ⚠ 承接句**直接用模型這次已經生成好的那一句**，不另外再呼叫一次 ——
-     * 客人正在等，多一次 CLI 呼叫就是多等幾秒，而素材（客人的話）是同一份。
+     * ⚠ **由模型順著客人問的內容現寫**（需求方 2026-10-07），不用公版 ——
+     * 固定一句話客人看幾次就知道是機器回的。模型不可用時才退公版。
      *
-     * 承接句負責「不要每次都一模一樣」，公版負責「已經轉給專員」這個事實 ——
-     * 後者是承接句講不得的：`OPENING.BLACKLIST` 擋掉「請同仁」「會有人」這類
-     * 替人承諾的詞，因為模型沒辦法保證真的有人會做。這裡是開單成功之後，
-     * 所以由系統來講這句話才算數。
+     * ⚠ 這句話的護欄跟承接句**不是同一套**（走 `WAIT` 規則）：這時求助單已經
+     * 開出來了，「已轉給專員」是事實、不該被擋；但認帳與保證仍然要擋，
+     * 另外多擋「幾分鐘內回覆」這種系統保證不了的承諾。細節見 `WaitWriter`。
      *
-     * @param string|null $opening 已經過 `OpeningSanitizer` 的承接句
+     * @param string      $question 客人問的內容（合併過的那一段）
+     * @param string|null $opening  模型這次已經生成的承接句，退公版時接在前面
      * @return string
      */
-    private function buildWaitText($opening)
+    private function buildWaitText($question, $opening)
     {
-        $wait = (string) config('auto_reply.templates.wait');
-
-        if (blank($opening)) {
-            return $wait;
-        }
-
-        return "{$opening}\n{$wait}";
+        return $this->waitWriter->write($question, $opening);
     }
 
     /**

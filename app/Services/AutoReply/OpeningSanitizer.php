@@ -23,37 +23,44 @@ use Illuminate\Support\Facades\Log;
 class OpeningSanitizer
 {
     /**
-     * 檢查一句承接能不能用
+     * 檢查一句模型寫的話能不能送給客人
      *
-     * @param string|null $opening
-     * @return string|null 可用的承接句（已去頭尾空白）；不可用時為 null
+     * ⚠ **規則可以換一套**（`$configKey`）。承接句與「轉人工時的稍等」的禁語
+     * 不完全一樣：前者禁止「幫您轉給專員」這類替人承諾的話（模型保證不了真的
+     * 有人會做），後者那句卻是**事實**（求助單已經開出來了）。
+     * 共用的是「認帳」與「保證」那幾組 —— 那兩組在任何情況下都不能說。
+     *
+     * @param string|null $text
+     * @param string      $configKey `constants.AUTO_REPLY` 底下哪一組規則
+     * @return string|null 可用的句子（已去頭尾空白）；不可用時為 null
      */
-    public function sanitize($opening)
+    public function sanitize($text, $configKey = 'OPENING')
     {
-        if (blank($opening)) {
+        if (blank($text)) {
             return null;
         }
 
-        $opening = trim($opening);
-        $maxLength = (int) config('constants.AUTO_REPLY.OPENING.MAX_LENGTH');
+        $text = trim($text);
+        $maxLength = (int) config("constants.AUTO_REPLY.{$configKey}.MAX_LENGTH");
 
-        if (mb_strlen($opening) > $maxLength) {
-            Log::warning('承接句過長，退回固定話術', ['opening' => $opening]);
+        if ($maxLength > 0 && mb_strlen($text) > $maxLength) {
+            Log::warning('模型寫的句子過長，退回固定話術', ['rule' => $configKey, 'text' => $text]);
 
             return null;
         }
 
-        foreach ((array) config('constants.AUTO_REPLY.OPENING.BLACKLIST') as $word) {
-            if (mb_strpos($opening, $word) !== false) {
-                Log::warning('承接句含不該由系統說的話，退回固定話術', [
-                    'word'    => $word,
-                    'opening' => $opening,
+        foreach ((array) config("constants.AUTO_REPLY.{$configKey}.BLACKLIST") as $word) {
+            if (mb_strpos($text, $word) !== false) {
+                Log::warning('模型寫的句子含不該由系統說的話，退回固定話術', [
+                    'rule' => $configKey,
+                    'word' => $word,
+                    'text' => $text,
                 ]);
 
                 return null;
             }
         }
 
-        return $opening;
+        return $text;
     }
 }
