@@ -136,8 +136,8 @@ class StaffDmService
     /**
      * 發給已經查出來的帳號物件
      *
-     * ⚠ 這個 `$user` 必須是 `UserRepository::findForDm()` / `getForDmByIds()`
-     * 查出來的 —— 別處的查詢 select 裡沒有 `telegram_dm_ready`，
+     * ⚠ 這個 `$user` 必須是 `UserRepository::getForDmByIds()` /
+     * `getDmCandidates()` 查出來的 —— 別處的查詢 select 裡沒有 `telegram_dm_ready`，
      * 讀到的永遠是 null，於是**每個人都被判定成沒綁定**而且不會報錯。
      *
      * @param object $user

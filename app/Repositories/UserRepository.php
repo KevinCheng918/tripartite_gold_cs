@@ -278,23 +278,6 @@ class UserRepository
     }
 
     /**
-     * 取一個人的私訊資料
-     *
-     * ⚠ `telegram_dm_ready` 一定要在 select 裡 —— 少了它
-     * `ShiftNoticeService::canDm()` 讀到的永遠是 null，於是**所有人都被判定
-     * 成沒綁定**，班表一則都發不出去而且不會報錯。
-     *
-     * @param int $id
-     * @return \App\Models\User|null
-     */
-    public function findForDm($id)
-    {
-        return User::query()
-            ->select(['id', 'nickname', 'telegram_user_id', 'telegram_dm_ready', 'status', 'level'])
-            ->find($id);
-    }
-
-    /**
      * 整批取私訊資料（通知收件人用）
      *
      * ⚠ **`telegram_dm_ready` 與 `level` 都一定要在 select 裡。**
