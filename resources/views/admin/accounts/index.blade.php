@@ -126,6 +126,7 @@
                             <th>{{ trans('account.field_account') }}</th>
                             <th>{{ trans('account.field_nickname') }}</th>
                             <th>{{ trans('account.label_telegram_nickname') }}</th>
+                            <th>{{ trans('account.label_telegram_bind') }}</th>
                             <th>{{ trans('account.field_status') }}</th>
                             <th>{{ trans('account.field_level') }}</th>
                             <th>{{ trans('account.field_action') }}</th>
@@ -147,6 +148,24 @@
                                         <span class="badge bg-secondary">-{{ $account->telegram_nickname }}</span>
                                     @else
                                         <span class="text-muted">{{ trans('account.not_set') }}</span>
+                                    @endif
+                                </td>
+                                {{-- TG 綁定狀態。三態而不是兩態：「沒填 Telegram 帳號」與
+                                     「填了但還沒私訊機器人」要做的事完全不同 —— 前者要後台補資料，
+                                     後者要請他本人去私訊一次 --}}
+                                <td>
+                                    @if(blank($account->telegram_username))
+                                        <span class="badge bg-secondary" title="{{ trans('account.telegram_bind_no_account_hint') }}">
+                                            {{ trans('account.telegram_bind_no_account') }}
+                                        </span>
+                                    @elseif($account->telegram_dm_ready)
+                                        <span class="badge bg-success" title="{{ trans('account.telegram_bind_ready_hint') }}">
+                                            <i class="fas fa-check me-1"></i>{{ trans('account.telegram_bind_ready') }}
+                                        </span>
+                                    @else
+                                        <span class="badge bg-warning text-dark" title="{{ trans('account.telegram_bind_pending_hint') }}">
+                                            {{ trans('account.telegram_bind_pending') }}
+                                        </span>
                                     @endif
                                 </td>
                                 <td>
@@ -229,6 +248,15 @@
                                 <span class="badge bg-danger">{{ trans('account.status_deactivate') }}</span>
                             @endif
                             {!! \App\Presenters\UserPresenter::levelBadge($account->level) !!}
+                            @if(blank($account->telegram_username))
+                                <span class="badge bg-secondary">{{ trans('account.telegram_bind_no_account') }}</span>
+                            @elseif($account->telegram_dm_ready)
+                                <span class="badge bg-success">
+                                    <i class="fas fa-check me-1"></i>{{ trans('account.telegram_bind_ready') }}
+                                </span>
+                            @else
+                                <span class="badge bg-warning text-dark">{{ trans('account.telegram_bind_pending') }}</span>
+                            @endif
                         </div>
                     </div>
                     <div class="d-grid gap-1" style="grid-template-columns: 1fr 1fr">

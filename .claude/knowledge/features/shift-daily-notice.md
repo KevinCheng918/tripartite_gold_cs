@@ -139,6 +139,36 @@ sidebar 的**通訊管理**分組，把原本散在上面的「Telegram 客服�
 | `resources/lang/{tw,cn,en}/shift_notice.php`（新增） | 語系 |
 | `resources/lang/{tw,cn,en}/permission.php` | 權限說明 |
 
+## 怎麼看誰還沒綁定
+
+**帳號管理的表格有「TG 綁定」一欄**（2026-10-06 加），三態：
+
+| 顯示 | 意思 | 要做什麼 |
+|---|---|---|
+| 🟢 已綁定 | 私訊過機器人，`telegram_dm_ready` = true | 不用做事 |
+| 🟡 未綁定 | 填了 `telegram_username` 但還沒私訊過 | 請**他本人**私訊機器人一次 |
+| ⚪ 未填帳號 | `telegram_username` 是空的 | **後台先補**，不然他私訊也綁不上 |
+
+⚠ **三態而不是兩態**是刻意的：後兩者要做的事完全不同（一個是後台補資料、
+一個是請本人動作），併成「未綁定」會讓人不知道該找誰。
+
+通知設定頁的收件人清單也會標「（未綁定）」，但那只涵蓋候選人；
+要看全員狀態看帳號管理。
+
+## ⚠ `telegram_username` 還是得手動填
+
+`bindPrivateChat()` 是用 **`from.username` 去對後台帳號**
+（`findByTelegramUsername()`）—— 沒填就對不到，bot 只能回
+「請先到後台設定您的 Telegram 帳號」。
+
+而且 **Telegram 的 username 是選填的**：沒設 username 的同事，
+這條路永遠綁不上。
+
+> 要真正免掉手動輸入，得改成**驗證碼綁定**：後台「我的帳號」顯示一組一次性
+> 代碼，同事私訊那個代碼 → 系統用代碼找到帳號、記下 `telegram_user_id`。
+> 那樣完全不需要事先知道對方的 username，也不要求他有 username。
+> **尚未實作。**
+
 ## 上線要做的事
 
 1. `php artisan migrate`（新欄位 `telegram_dm_ready`）

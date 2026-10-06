@@ -15,8 +15,14 @@ use Illuminate\Support\Facades\DB;
  */
 class UserRepository
 {
-    /** @var array 列表查詢欄位 */
-    private const LIST_COLUMNS = ['id', 'account', 'nickname', 'telegram_nickname', 'telegram_username', 'status', 'level', 'project_ids', 'hired_at', 'equipments', 'created_at'];
+    /*
+     * 列表查詢欄位。
+     *
+     * ⚠ `telegram_dm_ready` 是帳號管理列表要顯示「有沒有私訊過機器人」用的。
+     * 少了它那一欄永遠顯示「未綁定」而且不會報錯 —— 這個專案為「select 漏欄位」
+     * 的同一類問題修過好幾次（見 bugfix/2026-09-30-on-duty-reply-time）。
+     */
+    private const LIST_COLUMNS = ['id', 'account', 'nickname', 'telegram_nickname', 'telegram_username', 'telegram_user_id', 'telegram_dm_ready', 'status', 'level', 'project_ids', 'hired_at', 'equipments', 'created_at'];
 
     /**
      * 依條件分頁查詢使用者
