@@ -52,9 +52,9 @@ return [
     'support_remind_interval_hint' => 'Reminds again every this many minutes after the first one, until the ticket is handled. From reminder :escalate onward, managers and owners are tagged as well (engineers are always skipped).',
     'support_remind_max'    => 'Maximum reminders',
     'support_remind_max_hint' => 'Stops reminding at this count and sends one final notice to managers and owners. Prevents a barrage overnight when nobody is on shift.',
-    'support_report_user'   => 'Daily summary goes to',
-    'support_report_user_hint' => 'Sends yesterday\'s overdue-reminder summary (by ticket and by person) to this person at :time daily. Staff marked "not linked" cannot receive it — ask them to message the bot once.',
-    'support_report_none'   => '— Do not send —',
+    'support_report_user'   => 'Full summary goes to (multiple)',
+    'support_report_all'    => 'Select all',
+    'support_report_user_hint' => 'Sends yesterday\'s overdue-reminder summary for *everyone* (by ticket and by person) to the people ticked here at :time daily — managers and above is the usual choice. Anyone who was reminded also receives their own personal summary automatically, with no setup. Staff marked "not linked" cannot receive it — ask them to message the bot once.',
     'support_report_unbound' => 'not linked',
     'support_test'          => 'Send test message',
 

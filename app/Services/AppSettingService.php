@@ -33,7 +33,10 @@ class AppSettingService
     const KEY_FALLBACK_DAILY_LIMIT = 'auto_reply.fallback_daily_limit';
 
     /*
-     * 今日班表要私訊給誰（user.id）。
+     * 今日班表的完整版要私訊給誰。
+     *
+     * ⚠ **可以指定多個人**，存的是逗號串接的 id（`3,7,12`），用 `getIntList()` 讀。
+     * 常數名沿用單數的 `manager_user_id` —— 換掉儲存鍵會讓既有設定值歸零。
      *
      * 放 app_setting 而不是 config：換人是常態，不該為了換個收件人重新部署。
      */
@@ -60,10 +63,10 @@ class AppSettingService
     const KEY_REMIND_MAX_COUNT        = 'auto_reply.remind_max_count';
 
     /*
-     * 每日提醒統計要私訊給誰（user.id）。
+     * 每日提醒統計要私訊給誰。同樣**可以指定多個人**（逗號串接）。
      *
      * 跟 KEY_SHIFT_NOTICE_MANAGER 分開（需求方 2026-10-06 指定）——
-     * 班表給排班的人看、超時統計給管績效的人看，不一定是同一位。
+     * 班表給排班的人看、超時統計給管績效的人看，不一定是同一批。
      */
     const KEY_REMIND_REPORT_MANAGER = 'auto_reply.remind_report_user_id';
 
@@ -148,6 +151,64 @@ class AppSettingService
         $value = $this->get($key);
 
         return filled($value) ? (int) $value : $default;
+    }
+
+    /**
+     * 讀取「一串 id」設定
+     *
+     * 通知收件人這種「可以指定多個人」的設定用這支。存的是逗號串接的字串
+     * （`3,7,12`），不是 JSON —— 內容就只是一串整數，JSON 只會多一層轉義。
+     *
+     * 回傳一定是 array：空字串、null、只有逗號都回空陣列，呼叫端不必再判斷。
+     *
+     * @param string $key
+     * @return array<int, int>
+     */
+    public function getIntList($key)
+    {
+        $value = (string) $this->get($key);
+
+        if (blank($value)) {
+            return [];
+        }
+
+        $ids = [];
+
+        foreach (explode(',', $value) as $part) {
+            $id = (int) trim($part);
+
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * 把一串 id 寫成設定值
+     *
+     * 全部清空時存 null 而不是空字串 —— 資料庫裡留個 `''`
+     * 跟「從來沒設定過」看起來一樣，但多一列查不出用途的紀錄。
+     *
+     * @param array $ids
+     * @return string|null
+     */
+    public function idListValue($ids)
+    {
+        $clean = [];
+
+        foreach ((array) $ids as $id) {
+            $id = (int) $id;
+
+            if ($id > 0) {
+                $clean[] = $id;
+            }
+        }
+
+        $clean = array_values(array_unique($clean));
+
+        return filled($clean) ? implode(',', $clean) : null;
     }
 
     /**

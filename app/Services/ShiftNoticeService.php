@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Log;
  *
  * | 收件人 | 內容 |
  * |---|---|
- * | 設定頁指定的主管 | 今天**每個班次**各是誰，沒人排的班特別標出來 |
+ * | 設定頁指定的人（可多位） | 今天**每個班次**各是誰，沒人排的班特別標出來 |
  * | 今天有班的每個人 | 只有自己那一筆，不列同班的其他人 |
  *
  * ⚠ **Telegram 不讓 bot 主動私訊沒對話過的人**（403）。綁定與送出都交給
@@ -26,10 +26,10 @@ use Illuminate\Support\Facades\Log;
  */
 class ShiftNoticeService
 {
-    /** @var string 跳過原因：沒有設定主管收件人 */
+    /** @var string 跳過原因：沒有設定任何收件人 */
     const SKIP_NO_MANAGER = 'no_manager';
 
-    /** @var string 跳過原因：收件人沒私訊過 bot */
+    /** @var string 跳過原因：收件人全都沒私訊過 bot */
     const SKIP_NOT_BOUND = 'not_bound';
 
     /** @var string 跳過原因：Telegram 拒收（多半是被封鎖或其實沒綁定） */
@@ -76,7 +76,7 @@ class ShiftNoticeService
         $shifts = $this->shiftRepository->allActive();
 
         $managerText = $this->buildManagerText($date, $assignments, $shifts);
-        $manager = $this->sendToManager($managerText, $dryRun);
+        $manager = $this->sendToManagers($managerText, $dryRun);
         $personal = $this->sendToEveryone($assignments, $shifts, $dryRun);
 
         $failed = array_merge(
@@ -91,8 +91,9 @@ class ShiftNoticeService
         return [
             'date'          => $date,
             'manager_text'  => $managerText,
-            'manager_sent'  => Arr::get($manager, 'sent', false),
+            'manager_sent'  => Arr::get($manager, 'sent', 0),
             'manager_skip'  => Arr::get($manager, 'reason'),
+            'manager_names' => Arr::get($manager, 'names', []),
             'personal_sent' => Arr::get($personal, 'sent', 0),
             'personal_text' => Arr::get($personal, 'sample'),
             'failed'        => $failed,
@@ -120,7 +121,7 @@ class ShiftNoticeService
         }
 
         return [
-            'manager_user_id' => $this->appSettingService->getInt(AppSettingService::KEY_SHIFT_NOTICE_MANAGER),
+            'manager_user_ids' => $this->appSettingService->getIntList(AppSettingService::KEY_SHIFT_NOTICE_MANAGER),
             'candidates'      => $candidates,
             'send_at'         => (string) config('constants.SHIFT_NOTICE.SEND_AT'),
         ];
@@ -135,13 +136,10 @@ class ShiftNoticeService
      */
     public function updateSetting(array $params, $operatorId)
     {
-        $managerId = (int) Arr::get($params, 'manager_user_id', 0);
-
         $this->appSettingService->put(
             AppSettingService::KEY_SHIFT_NOTICE_MANAGER,
-            // 清空用 null 而不是 '0'：getInt 讀回來都是 0，但資料庫裡留個 '0'
-            // 看起來像「指定了 id 0 的人」
-            $managerId > 0 ? (string) $managerId : null,
+            // 全部取消勾選時存 null —— 轉換與清空的規則都在 idListValue() 裡
+            $this->appSettingService->idListValue(Arr::get($params, 'manager_user_ids', [])),
             $operatorId
         );
     }
@@ -164,11 +162,13 @@ class ShiftNoticeService
         $text = (string) config('constants.SHIFT_NOTICE.TEST_PREFIX')
             . $this->buildManagerText($date, $assignments, $shifts);
 
-        $result = $this->sendToManager($text, false);
+        $result = $this->sendToManagers($text, false);
 
         return [
-            'sent'   => Arr::get($result, 'sent', false),
+            'sent'   => Arr::get($result, 'sent', 0),
             'reason' => Arr::get($result, 'reason'),
+            'names'  => Arr::get($result, 'names', []),
+            'failed' => Arr::get($result, 'failed', []),
         ];
     }
 
@@ -228,39 +228,32 @@ class ShiftNoticeService
     }
 
     /**
-     * 發給主管
+     * 發完整班表給設定的收件人（可以是多位）
+     *
+     * ⚠ 收件人**不是**「今天有班的人」，是設定頁勾選的那幾位 ——
+     * 他們拿到的是全部班次，有班的人另外拿自己那一份。
      *
      * @param string $text
      * @param bool   $dryRun
-     * @return array sent / reason / failed
+     * @return array sent（送出幾則）/ reason / failed / names
      */
-    private function sendToManager($text, $dryRun)
+    private function sendToManagers($text, $dryRun)
     {
-        $managerId = $this->appSettingService->getInt(AppSettingService::KEY_SHIFT_NOTICE_MANAGER);
+        $managerIds = $this->appSettingService->getIntList(AppSettingService::KEY_SHIFT_NOTICE_MANAGER);
 
-        if ($managerId < 1) {
-            return ['sent' => false, 'reason' => self::SKIP_NO_MANAGER, 'failed' => []];
+        if (blank($managerIds)) {
+            return ['sent' => 0, 'reason' => self::SKIP_NO_MANAGER, 'failed' => [], 'names' => []];
         }
 
-        $manager = $this->userRepository->findForDm($managerId);
-
-        if (blank($manager) || !$this->staffDm->canDm($manager)) {
-            return [
-                'sent'   => false,
-                'reason' => self::SKIP_NOT_BOUND,
-                'failed' => [filled($manager) ? $manager->nickname : "#{$managerId}"],
-            ];
-        }
-
+        /*
+         * 空跑只回「幾個人會收到」，不去判斷綁定狀態 ——
+         * `--dry-run` 要看的是內容與排版，不是誰收得到（那是測試發送的事）。
+         */
         if ($dryRun) {
-            return ['sent' => true, 'reason' => null, 'failed' => []];
+            return ['sent' => count($managerIds), 'reason' => null, 'failed' => [], 'names' => []];
         }
 
-        if ($this->staffDm->send($manager, $text)) {
-            return ['sent' => true, 'reason' => null, 'failed' => []];
-        }
-
-        return ['sent' => false, 'reason' => self::SKIP_SEND_FAILED, 'failed' => [$manager->nickname]];
+        return $this->staffDm->sendToUserIds($managerIds, $text);
     }
 
     /**

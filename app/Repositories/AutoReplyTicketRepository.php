@@ -159,6 +159,27 @@ class AutoReplyTicketRepository
     }
 
     /**
+     * 所有還在等人回答的單（早班待接手清單用）
+     *
+     * 跟 `getTicketsDueForRemind()` 的差別：那支問「現在該催了嗎」（看時間），
+     * 這支問「有哪些還沒人處理」（不看時間，連超過提醒上限的也要列）——
+     * 撞到上限的單系統已經放手了，反而最需要人接手。
+     *
+     * 最舊的排前面：等最久的客人要先看到。
+     *
+     * @return Collection
+     */
+    public function getPendingTickets()
+    {
+        return AutoReplyTicket::query()
+            ->select(self::COLUMNS)
+            ->with('group')
+            ->where('status', config('constants.AUTO_REPLY.TICKET_STATUS.PENDING'))
+            ->orderBy('created_at')
+            ->get();
+    }
+
+    /**
      * 更新求助單
      *
      * @param AutoReplyTicket $ticket

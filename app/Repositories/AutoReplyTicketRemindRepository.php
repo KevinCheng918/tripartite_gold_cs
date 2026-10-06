@@ -98,6 +98,31 @@ class AutoReplyTicketRemindRepository
     }
 
     /**
+     * 某一天「每個人各自被催了哪幾題」（個人版統計用）
+     *
+     * 一列 = 一個人在一張單上被催的次數，所以同一個人會有多列，
+     * 呼叫端依 `user_id` 分組就是他那一份。
+     *
+     * ⚠ 排除 `user_id` 為 null 的列：那是「沒 tag 到人」的紀錄，
+     * 不屬於任何人，只在完整版出現。
+     *
+     * @param string $date Y-m-d
+     * @return Collection
+     */
+    public function getUserTicketsForDate($date)
+    {
+        return AutoReplyTicketRemind::query()
+            ->selectRaw('user_id, auto_reply_ticket_id, COUNT(DISTINCT seq) as times, MAX(stage) as max_stage')
+            ->with('ticket.group')
+            ->whereBetween('created_at', $this->dayRange($date))
+            ->whereNotNull('user_id')
+            ->groupBy('user_id', 'auto_reply_ticket_id')
+            ->orderBy('user_id')
+            ->orderByDesc(DB::raw('COUNT(DISTINCT seq)'))
+            ->get();
+    }
+
+    /**
      * 一天的起訖時間
      *
      * ⚠ 用區間而不是 `whereDate()`：後者等於 `DATE(created_at) = ?`，

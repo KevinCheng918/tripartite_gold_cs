@@ -8,10 +8,10 @@ return [
     'section_label' => '通讯管理',
 
     'manager_title' => '完整班表收件人',
-    'manager_desc'  => '每天 :time 私信今日完整班表（每个班次是谁、哪个班没人）。没有设置收件人时不会发送。',
-    'manager_field'  => '收件人',
-    'manager_none'   => '— 不发送 —',
-    'manager_hint'   => '标示「未绑定」的同事收不到消息，请他先私信机器人一次。',
+    'manager_desc'  => '每天 :time 私信今日完整班表（每个班次是谁、哪个班没人）。可以勾多位，没勾任何人时不会发送。',
+    'manager_field'  => '收件人（可多选）',
+    'manager_all'    => '全选',
+    'manager_hint'   => '标示「未绑定」的同事收不到消息，请他先私信机器人一次。全部取消勾选就不发送。',
     'manager_unbound' => '未绑定',
 
     'personal_title' => '个人班表',
@@ -27,16 +27,17 @@ return [
     'action_saving'  => '保存中…',
     'action_test'    => '测试发送',
     'action_testing' => '发送中…',
-    'test_hint'      => '会立刻把今天的完整班表私信给上面设置的收件人。',
+    'test_hint'      => '会立刻把今天的完整班表私信给上面勾选的收件人。',
 
     'msg' => [
         'saved'             => '已保存',
         'save_failed'       => '保存失败，请稍后再试',
         'manager_invalid'   => '收件人格式不正确',
         'manager_not_found' => '找不到这个账号',
-        'test_sent'         => '测试消息已发出，请确认 Telegram 有收到',
-        'test_no_manager'   => '请先选择收件人并保存',
-        'test_not_bound'    => '这位同事还没私信过机器人，所以收不到消息',
+        'test_sent'         => '测试消息已发出 :sent 则，请确认 Telegram 有收到',
+        'test_partial'      => '已发出 :sent 则，但这几位没收到：:failed（请他们先私信机器人一次）',
+        'test_no_manager'   => '请先勾选收件人并保存',
+        'test_not_bound'    => '勾选的同事都还没私信过机器人，所以收不到消息',
         'test_failed'       => '发送失败，请确认同事没有屏蔽机器人',
     ],
 ];

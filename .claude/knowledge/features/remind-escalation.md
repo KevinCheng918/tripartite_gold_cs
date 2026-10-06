@@ -15,6 +15,13 @@
 4. **每次提醒都記次數**
 5. **每天把統計報給主管**
 
+後續追加（同日）：
+
+6. 統計收件人**可以勾多位**（含全選）
+7. 統計分兩種：**勾選的人收全部人的**、**被提醒到的人各收自己那份**
+8. 「還沒人處理的」**早上 7:00 發到內部群組並 tag 當天早班** ——
+   因為**大夜班目前沒有人排班**，深夜的提醒 tag 不到任何人
+
 ## 一、要移除的東西（視窗上的超時橫幅）
 
 現在這條路整個是獨立的，跟求助單無關 —— 它看的是「客人訊息沒人回」：
@@ -108,23 +115,51 @@ auto-reply:remind（每分鐘）
 
 所以客服在對話視窗直接回客人，提醒也會自己停，不必再去內部群組處理一次。
 
-## 三、每天報給主管
+## 三、每天 08:30 的統計（兩種收件人）
 
 ```
-remind:report（每天固定時間）
-  └─ 統計「昨天」所有提醒
-      ├─ 總計：幾張單被提醒、共幾次、幾張升級到叫主管
-      ├─ 逐張：客人群組、問題前 N 字、被提醒幾次、現在狀態
-      └─ 私訊給設定的收件人
+remind:report（每天 08:30）
+  ├─ 完整版 → 設定頁勾選的人（可多位，建議主管以上）
+  │    ├─ 總計：幾題被提醒、累計幾次、幾題升級到叫主管
+  │    ├─ 依題目：問題前 40 字、客人群組、幾次、現在狀態
+  │    └─ 依人員：誰被催幾次（含「沒 tag 到任何人」幾次）
+  └─ 個人版 → 昨天被提醒到的每個人，各自一則
+       └─ 只有自己被催的那幾題
 ```
 
-私訊走的是 [[shift-daily-notice]] 剛建好的那條路（`telegram_dm_ready`）。
-⚠ 兩邊都要「發 DM 給某個同事、沒綁定就跳過、失敗記 log」，
-建議把 `ShiftNoticeService::dm()` 抽成共用的 `StaffDmService`，
-不要在第二個 service 裡複製一份。
+私訊走 `StaffDmService`（從 `ShiftNoticeService::dm()` 抽出來共用）。
 
-沒有任何提醒的日子**也要發**（寫「昨天沒有超時的求助單」）—— 理由同班表通知：
-安靜不動時分不出「沒事發生」還是「排程壞了」。
+⚠ **完整版沒事也發、個人版沒事不發**：
+- 完整版安靜不動時分不出「昨天沒事」還是「排程壞了」
+- 個人版發一則「您昨天沒事」只是噪音，而且會讓真的有事那天被當例行訊息忽略
+
+⚠ **個人版只報統計，不交辦事情**（需求方指定）。「仍未處理的麻煩今天優先看」
+那種交辦話改由下面的待接手清單負責 —— 個人版的收件人是「昨天被催到的人」，
+他**今天不一定上班**，交辦給他只會沒人做。
+
+## 四、早上 07:00 的待接手清單
+
+```
+ticket:handover（每天 07:00）
+  ├─ 所有 status = PENDING 的求助單（不看時間，連超過提醒上限的也列）
+  ├─ tag 當天早班
+  └─ 發到內部支援群組
+```
+
+⚠ **存在的理由是大夜班目前沒有人排班**：深夜的提醒 tag 不到任何人，
+那些問題整晚沒有人接手。這則在早班上班前把它們正式交接出去。
+
+⚠ **發群組不是私訊**（需求方指定）：交接要留在大家看得到的地方，
+而且 tag 得到人就不必擔心對方有沒有私訊過 bot。
+
+⚠ **「早班」＝啟用中的班別裡 `start_time` 最早的那一個**，不是比對班別名稱 ——
+名稱改掉（「早班」→「A 班」）就會悄悄 tag 不到人而且不報錯。
+代價是：大夜班若被改成從 00:00 開始，它會變成「最早」，改班別時間時要一起看。
+
+⚠ **tag 不到人時那句說明比清單本身重要**：沒人被 tag 代表這份清單沒有人負責，
+靜靜發出去只會沒人認領，所以換成「今天早班沒有可以 tag 的人員，麻煩主管協助指派」。
+
+清單裡每題都寫「已等多久」—— 判斷先處理哪一題靠的是這個，不是順序。
 
 ## 已確認的決策（2026-10-06）
 
@@ -188,7 +223,12 @@ auto-reply:remind（每分鐘）
 | 第一次提醒（分鐘） | 開單後多久送第一次 |
 | 之後每隔（分鐘） | 第一次之後的固定間隔 |
 | 最多提醒幾次 | 到這個次數就停並發收尾那則 |
-| 每日統計私訊給 | 收件人下拉，沒綁定的標「（未綁定）」 |
+| 完整統計私訊給 | **可勾多位 + 全選**，沒綁定的標「（未綁定）」但不隱藏 |
+
+⚠ 收件人存的是**逗號串接的 id**（`3,7,12`），用 `AppSettingService::getIntList()` 讀、
+`idListValue()` 寫。不用 JSON —— 內容就只是一串整數，JSON 只會多一層轉義。
+儲存鍵沿用單數的 `shift_notice.manager_user_id` / `auto_reply.remind_report_user_id`：
+換掉字串會讓既有設定值歸零。
 
 ⚠ `KEY_REMIND_INTERVAL_MINUTES` 存的字串**刻意沿用舊的 `remind_second_minutes`**：
 語意變了（「第二次要再等多久」→「之後每隔」），但換掉字串會讓既有設定值歸零、
@@ -235,16 +275,19 @@ remind:report（每天 08:30）
 | `app/Services/StaffDmService.php`（新增） | 從 `ShiftNoticeService::dm()` 抽出來共用 |
 | `app/Services/RemindReportService.php`（新增） | 每日統計 |
 | `app/Console/Commands/RemindReportCommand.php`（新增） | `remind:report` |
-| `app/Console/Kernel.php` | 加 `remind:report`、移掉 `telegram:alert` |
+| `app/Services/TicketHandoverService.php`（新增） | 早上 7:00 的待接手清單 |
+| `app/Console/Commands/TicketHandoverCommand.php`（新增） | `ticket:handover` |
+| `app/Console/Kernel.php` | 加 `ticket:handover`（07:00）、`remind:report`（08:30）、移掉 `telegram:alert` |
+| `app/Services/AppSettingService.php` | `getIntList()` / `idListValue()`：收件人改成可多位（逗號串接） |
 
 
 ## 上線要做的事
 
 1. `php artisan migrate`（`auto_reply_ticket_remind` 新表；`telegram_dm_ready` 若還沒跑也要）
 2. `php artisan optimize`（動過 `config/`）
-3. 到「全域設定 → 內部支援群組」設定：之後每隔幾分鐘、最多幾次、統計私訊給誰
+3. 到「全域設定 → 內部支援群組」設定：之後每隔幾分鐘、最多幾次、完整統計私訊給誰（可勾多位／全選）
 4. **請統計收件人先私訊機器人一次**，否則下拉顯示「（未綁定）」、統計發不出去
-5. `php artisan remind:report --dry-run` 看一眼排版
+5. `php artisan remind:report --dry-run` 與 `php artisan ticket:handover --dry-run` 各看一眼排版
 
 ⚠ **沒跑 migration 的話全域設定頁會 500**（`getDmCandidates()` 讀
 `telegram_dm_ready`）—— 這是既有頁面，不能只部署程式不跑 migration。

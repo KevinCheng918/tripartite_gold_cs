@@ -41,8 +41,9 @@ class UpdateSupportRequest extends FormRequest
              */
             'remind_max_count'        => 'required|integer|min:1|max:200',
 
-            // 統計收件人。nullable = 暫時不發統計
-            'remind_report_user_id'   => 'nullable|integer|exists:user,id',
+            // 統計收件人，可以勾多位。全部取消勾選 = 暫時不發統計
+            'remind_report_user_ids'   => 'nullable|array',
+            'remind_report_user_ids.*' => 'integer|exists:user,id',
         ];
     }
 
@@ -61,7 +62,9 @@ class UpdateSupportRequest extends FormRequest
             'remind_max_count.required'         => trans('setting.msg.remind_max_required'),
             'remind_max_count.min'              => trans('setting.msg.remind_max_invalid'),
             'remind_max_count.max'              => trans('setting.msg.remind_max_invalid'),
-            'remind_report_user_id.exists'      => trans('setting.msg.report_user_not_found'),
+            'remind_report_user_ids.array'        => trans('setting.msg.report_user_not_found'),
+            'remind_report_user_ids.*.integer'    => trans('setting.msg.report_user_not_found'),
+            'remind_report_user_ids.*.exists'     => trans('setting.msg.report_user_not_found'),
         ];
     }
 }

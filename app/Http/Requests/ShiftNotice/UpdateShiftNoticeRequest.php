@@ -18,20 +18,23 @@ class UpdateShiftNoticeRequest extends FormRequest
     {
         return [
             /*
-             * nullable：允許清空（暫時不要發給任何人）。
+             * 可以勾多位（含全選）。nullable + array：全部取消勾選代表
+             * 「暫時不要發給任何人」。
              *
-             * exists 查的是 `user` 表（不是 `users`）—— 這個專案的使用者表
+             * ⚠ exists 查的是 `user` 表（不是 `users`）—— 這個專案的使用者表
              * 沒有複數 s，寫錯會變成「資料表不存在」的 500。
              */
-            'manager_user_id' => 'nullable|integer|exists:user,id',
+            'manager_user_ids'   => 'nullable|array',
+            'manager_user_ids.*' => 'integer|exists:user,id',
         ];
     }
 
     public function messages()
     {
         return [
-            'manager_user_id.integer' => trans('shift_notice.msg.manager_invalid'),
-            'manager_user_id.exists'  => trans('shift_notice.msg.manager_not_found'),
+            'manager_user_ids.array'      => trans('shift_notice.msg.manager_invalid'),
+            'manager_user_ids.*.integer'  => trans('shift_notice.msg.manager_invalid'),
+            'manager_user_ids.*.exists'   => trans('shift_notice.msg.manager_not_found'),
         ];
     }
 }

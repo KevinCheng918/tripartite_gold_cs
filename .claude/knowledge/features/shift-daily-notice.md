@@ -4,7 +4,7 @@
 
 | 收件人 | 內容 |
 |---|---|
-| 設定頁指定的一個人（主管） | 今天**每個班次**各是誰、哪個班沒人、每班的上班與核心回訊時間 |
+| 設定頁勾選的人（**可多位**，含全選） | 今天**每個班次**各是誰、哪個班沒人、每班的上班與核心回訊時間 |
 | 今天有班的每個人 | **只有自己那一筆**（不列同班的其他人，需求方指定） |
 
 **平假日都發**（需求方指定）。假日沒排班時主管那則寫「今天沒有任何排班」——
@@ -60,7 +60,7 @@ private 訊息進來（TelegramChatService）
 ShiftNoticeService::run($date, $dryRun)
   ├─ 今天的 ShiftAssignment（getByDateRange(today, today)）
   ├─ 所有啟用中的班別（ShiftRepository::allActive()）
-  ├─ buildManagerText() → sendToManager()
+  ├─ buildManagerText() → sendToManagers()（逐位勾選的收件人）
   └─ sendToEveryone()：逐一私訊今天有班的人
 ```
 
@@ -94,13 +94,24 @@ sidebar 新增**通訊管理**分組，把原本散在上面的「Telegram 客�
 └─ 班表通知        （新頁）
 ```
 
-頁面上只有一個欄位（完整班表的收件人）+ 一顆測試發送。收件人下拉會把
-**沒綁定的人標成「（未綁定）」**但不隱藏 —— 選了也收不到，要在選之前就看得出來；
-整個拿掉會變成「名單裡沒這個人」，更難判斷。
+頁面上只有一個欄位（完整班表的收件人）+ 一顆測試發送。收件人是**可勾多位的清單
+加一個「全選」**，沒綁定的人標成灰的「（未綁定）」但不隱藏 —— 勾了也收不到，
+要在勾之前就看得出來；整個拿掉會變成「名單裡沒這個人」，更難判斷。
+
+⚠ 收件人存的是**逗號串接的 id**（`3,7,12`），用 `AppSettingService::getIntList()` 讀、
+`idListValue()` 寫。儲存鍵沿用單數的 `shift_notice.manager_user_id` ——
+換掉字串會讓既有設定值歸零。
+
+⚠ **「全選」的勾選狀態要跟著個別項目走**：少了那段同步，手動把人逐一勾完之後
+「全選」還是沒勾，看起來像壞掉。
 
 ⚠ **測試按鈕是真的發出去**（不是 dry-run）：要回答的是「訊息到得了他手機嗎」，
 只組字串的話，沒綁定、被封鎖這些真正會出事的狀況全都測不到。
-只發主管那一則，不會打擾今天有班的同仁，開頭掛 `TEST_PREFIX` 以免被當成真的班表。
+只發完整班表那一則給勾選的人，不會打擾今天有班的同仁，開頭掛 `TEST_PREFIX`
+以免被當成真的班表。
+
+⚠ **有人收到、有人沒收到也要回報**：勾了五個人只有三個收到時，
+只回「已送出」會讓另外兩個無聲消失（`test_partial` 那句語系就是為此）。
 
 ## 檔案
 
@@ -109,12 +120,13 @@ sidebar 新增**通訊管理**分組，把原本散在上面的「Telegram 客�
 | `database/migrations/2026_10_06_000001_add_telegram_dm_ready_to_user_table.php` | 新欄位 `telegram_dm_ready` |
 | `app/Services/TelegramChatService.php` | `bindPrivateChat()`：private 訊息改成綁定而不是丟掉 |
 | `app/Services/ShiftNoticeService.php`（新增） | 組訊息、逐人發送、彙總失敗、`forPage()` / `updateSetting()` / `test()` |
+| `app/Services/StaffDmService.php`（新增） | 私訊同仁的共用入口（綁定檢查、逐人送、失敗處理），班表與提醒統計共用 |
+| `app/Services/AppSettingService.php` | `KEY_SHIFT_NOTICE_MANAGER`、`getIntList()` / `idListValue()` |
 | `app/Console/Commands/NotifyDailyShiftCommand.php`（新增） | `shift:notify-daily` |
 | `app/Console/Kernel.php` | `dailyAt('08:00')` |
 | `app/Http/Controllers/Admin/ShiftNoticeController.php`（新增） | 設定頁 + ajax |
-| `app/Http/Requests/ShiftNotice/UpdateShiftNoticeRequest.php`（新增） | `manager_user_id` 驗證（`exists:user,id`，表名沒有 s） |
+| `app/Http/Requests/ShiftNotice/UpdateShiftNoticeRequest.php`（新增） | `manager_user_ids` 陣列驗證（`exists:user,id`，表名沒有 s） |
 | `app/Repositories/UserRepository.php` | `markDmReady()` / `findForDm()` / `getForDmByIds()` / `getDmCandidates()` |
-| `app/Services/AppSettingService.php` | `KEY_SHIFT_NOTICE_MANAGER` |
 | `config/constants.php` | `TELEGRAM.DM_BIND`、`SHIFT_NOTICE.*` |
 | `config/permissionMap.php` | `shift_notice.view` / `shift_notice.manage` |
 | `routes/web.php` | `admin/shift-notice/*` |
@@ -128,8 +140,8 @@ sidebar 新增**通訊管理**分組，把原本散在上面的「Telegram 客�
 
 1. `php artisan migrate`（新欄位 `telegram_dm_ready`）
 2. `php artisan optimize`（動過 `config/`）
-3. 到「通訊管理 → 班表通知」指定收件人
-4. **請收件人先私訊機器人一次**，否則下拉會顯示「（未綁定）」、測試發送會失敗
+3. 到「通訊管理 → 班表通知」勾選收件人（可多位／全選）
+4. **請收件人先私訊機器人一次**，否則清單會顯示「（未綁定）」、測試發送會失敗
 5. 按「測試發送」確認真的收到
 
 ⚠ 第 4 步漏掉是最常見的狀況 —— 設定頁的右欄常駐說明就是為了這件事。
@@ -146,3 +158,4 @@ sidebar 新增**通訊管理**分組，把原本散在上面的「Telegram 客�
 - [[ignore-staff]] — `telegram_user_id` 的另一個回填來源（群組訊息）
 - [[daily-rate]] — 每日排程 + 測試按鈕的既有範例
 - [[telegram-chat]] — webhook 收訊的入口
+- [[remind-escalation]] — 另一個用 `StaffDmService` 的功能（每日提醒統計）

@@ -157,8 +157,17 @@ npm install -g @anthropic-ai/claude-code</code></pre>
                             <small class="form-text text-muted">{{ trans('setting.support_remind_max_hint') }}</small>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label" for="support-report-user">{{ trans('setting.support_report_user') }}</label>
-                            <select class="form-select" id="support-report-user"></select>
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <label class="form-label mb-0">{{ trans('setting.support_report_user') }}</label>
+                                <div class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" id="support-report-all">
+                                    <label class="form-check-label" for="support-report-all">{{ trans('setting.support_report_all') }}</label>
+                                </div>
+                            </div>
+                            {{-- 人多的時候不要把整頁撐長，超過就在框內捲動 --}}
+                            <div id="support-report-list" class="p-2"
+                                 style="max-height:200px;overflow-y:auto;border:1px solid var(--bs-border-color, rgba(0,0,0,0.175));border-radius:6px">
+                            </div>
                             <small class="form-text text-muted">
                                 {{ trans('setting.support_report_user_hint', ['time' => config('constants.AUTO_REPLY.REMIND.REPORT_AT')]) }}
                             </small>

@@ -67,59 +67,112 @@
     }
 
     /**
-     * 畫收件人下拉
+     * 畫收件人清單（可多選 + 全選）
      *
-     * 沒綁定的人後面掛「未綁定」—— 選了也收不到，要在選之前就看得出來。
+     * 沒綁定的人後面掛「未綁定」—— 選了也收不到，要在勾之前就看得出來。
      * 不直接把他們拿掉：那樣會變成「名單裡沒有這個人」，更難判斷。
      */
     function render() {
-        var select = document.getElementById('notice-manager');
-        var current = parseInt(settings.manager_user_id, 10) || 0;
+        var list = document.getElementById('notice-manager-list');
+        var selected = settings.manager_user_ids || [];
 
-        select.innerHTML = '';
-
-        var none = document.createElement('option');
-        none.value = '';
-        none.textContent = i18n.manager_none;
-        select.appendChild(none);
+        list.innerHTML = '';
 
         (settings.candidates || []).forEach(function (user) {
-            var option = document.createElement('option');
-            option.value = user.id;
-            option.textContent = user.dm_ready
+            var wrap = document.createElement('div');
+            wrap.className = 'form-check';
+
+            var input = document.createElement('input');
+            input.className = 'form-check-input js-manager';
+            input.type = 'checkbox';
+            input.id = 'notice-manager-' + user.id;
+            input.value = user.id;
+            input.checked = selected.indexOf(user.id) !== -1;
+
+            var label = document.createElement('label');
+            label.className = 'form-check-label';
+            label.setAttribute('for', input.id);
+            label.textContent = user.dm_ready
                 ? user.nickname
                 : user.nickname + '（' + i18n.manager_unbound + '）';
-            option.selected = user.id === current;
-            select.appendChild(option);
+
+            // 沒綁定的標成灰的，一眼看出這幾個收不到
+            if (!user.dm_ready) { label.classList.add('text-muted'); }
+
+            wrap.appendChild(input);
+            wrap.appendChild(label);
+            list.appendChild(wrap);
         });
 
+        syncAllCheckbox();
+
         if (!canManage) {
-            select.disabled = true;
-            root.querySelectorAll('.js-manage-only').forEach(function (el) { el.disabled = true; });
+            root.querySelectorAll('input, .js-manage-only').forEach(function (el) { el.disabled = true; });
         }
+    }
+
+    /**
+     * 目前勾選的 id
+     *
+     * @return {Array<number>}
+     */
+    function checkedIds() {
+        var ids = [];
+
+        root.querySelectorAll('.js-manager:checked').forEach(function (el) {
+            ids.push(parseInt(el.value, 10));
+        });
+
+        return ids;
+    }
+
+    /**
+     * 「全選」的勾選狀態要跟著個別項目走
+     *
+     * 少了這段，手動把人逐一勾完之後「全選」還是沒勾，看起來像壞掉。
+     */
+    function syncAllCheckbox() {
+        var all = document.getElementById('notice-manager-all');
+        var boxes = root.querySelectorAll('.js-manager');
+
+        if (!all) { return; }
+
+        all.checked = boxes.length > 0 && checkedIds().length === boxes.length;
     }
 
     function bind() {
         if (!canManage) { return; }
+
+        // 全選：一次勾完或一次清空
+        document.getElementById('notice-manager-all').addEventListener('change', function () {
+            var checked = this.checked;
+
+            root.querySelectorAll('.js-manager').forEach(function (el) { el.checked = checked; });
+        });
+
+        // 個別勾選要回頭同步「全選」
+        document.getElementById('notice-manager-list').addEventListener('change', function (event) {
+            if (event.target.classList.contains('js-manager')) { syncAllCheckbox(); }
+        });
 
         document.getElementById('form-shift-notice').addEventListener('submit', function (event) {
             event.preventDefault();
 
             var button = this.querySelector('button[type="submit"]');
             var original = button.textContent;
-            var value = document.getElementById('notice-manager').value;
+            var ids = checkedIds();
 
             button.disabled = true;
             button.textContent = i18n.action_saving;
 
             apiFetch('/admin/shift-notice/ajax-update', {
                 method: 'PUT',
-                // 空字串代表「不發送」，後端的 nullable 規則接得住
-                body: JSON.stringify({ manager_user_id: value === '' ? null : parseInt(value, 10) })
+                // 空陣列代表「不發送」，後端的 nullable|array 規則接得住
+                body: JSON.stringify({ manager_user_ids: ids })
             })
                 .then(function (body) {
                     showMessage(body.message || i18n.msg.saved);
-                    settings.manager_user_id = value === '' ? 0 : parseInt(value, 10);
+                    settings.manager_user_ids = ids;
                 })
                 .catch(function (body) {
                     showMessage(errorMessage(body, i18n.msg.save_failed));

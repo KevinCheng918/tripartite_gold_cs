@@ -19,6 +19,17 @@ class Kernel extends ConsoleKernel
         $schedule->command('attendance:mark-absent')->dailyAt('01:00');
 
         /*
+         * 每天早上 7:00 把還沒人處理的求助單發到內部群組，tag 當天早班接手。
+         *
+         * ⚠ **排在 08:00 班表通知之前是刻意的**：早班上班前就該看到自己要接什麼。
+         *
+         * ⚠ 存在的理由是**大夜班目前沒有人排班** —— 深夜的超時提醒 tag 不到
+         * 任何人，那些問題整晚沒有人接手。大夜班補上人之後這則仍然有用
+         * （交接本來就該有），但緊迫性會降低。
+         */
+        $schedule->command('ticket:handover')->dailyAt('07:00')->withoutOverlapping();
+
+        /*
          * 每天早上 8:00 私訊今日班表 —— 主管收完整班表、有班的人收自己那份。
          *
          * ⚠ **平假日都發**（需求方指定）：假日沒排班時主管那則會寫「今天沒有

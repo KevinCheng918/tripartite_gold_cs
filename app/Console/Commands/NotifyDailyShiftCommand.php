@@ -22,8 +22,8 @@ class NotifyDailyShiftCommand extends Command
 
     /** @var array 沒送出時的原因說明 */
     private const REASONS = [
-        ShiftNoticeService::SKIP_NO_MANAGER  => '沒有設定收件主管（到通訊管理的設定頁指定）',
-        ShiftNoticeService::SKIP_NOT_BOUND   => '收件主管還沒私訊過機器人',
+        ShiftNoticeService::SKIP_NO_MANAGER  => '沒有勾選收件人（到通訊管理的設定頁指定）',
+        ShiftNoticeService::SKIP_NOT_BOUND   => '勾選的收件人都還沒私訊過機器人',
         ShiftNoticeService::SKIP_SEND_FAILED => 'Telegram 送出失敗，詳見 log',
     ];
 
@@ -46,11 +46,15 @@ class NotifyDailyShiftCommand extends Command
 
         $this->info('日期：' . Arr::get($result, 'date') . ($dryRun ? '（空跑，沒有實際發送）' : ''));
 
-        if (Arr::get($result, 'manager_sent')) {
-            $this->info('主管那份：已送出');
+        $managerSent = (int) Arr::get($result, 'manager_sent', 0);
+
+        if ($managerSent > 0) {
+            $names = (array) Arr::get($result, 'manager_names', []);
+            $this->info("完整班表：已送出 {$managerSent} 則"
+                . (filled($names) ? '（' . implode('、', $names) . '）' : ''));
         } else {
             $reason = (string) Arr::get($result, 'manager_skip');
-            $this->warn('主管那份：沒送出 —— ' . Arr::get(self::REASONS, $reason, $reason));
+            $this->warn('完整班表：沒送出 —— ' . Arr::get(self::REASONS, $reason, $reason));
         }
 
         $this->info('個人那份：' . Arr::get($result, 'personal_sent', 0) . ' 則');
@@ -62,7 +66,7 @@ class NotifyDailyShiftCommand extends Command
         // 空跑時把內容印出來，不然看不到排版對不對
         if ($dryRun) {
             $this->line('');
-            $this->line('--- 主管那份 ---');
+            $this->line('--- 完整班表（收件人收到的）---');
             $this->line(strip_tags((string) $result['manager_text']));
 
             if (filled($result['personal_text'])) {

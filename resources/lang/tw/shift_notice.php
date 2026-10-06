@@ -8,10 +8,10 @@ return [
     'section_label' => '通訊管理',
 
     'manager_title' => '完整班表收件人',
-    'manager_desc'  => '每天 :time 私訊今日完整班表（每個班次是誰、哪個班沒人）。沒有設定收件人時不會發送。',
-    'manager_field'  => '收件人',
-    'manager_none'   => '— 不發送 —',
-    'manager_hint'   => '標示「未綁定」的同仁收不到訊息，請他先私訊機器人一次。',
+    'manager_desc'  => '每天 :time 私訊今日完整班表（每個班次是誰、哪個班沒人）。可以勾多位，沒勾任何人時不會發送。',
+    'manager_field'  => '收件人（可多選）',
+    'manager_all'    => '全選',
+    'manager_hint'   => '標示「未綁定」的同仁收不到訊息，請他先私訊機器人一次。全部取消勾選就不發送。',
     'manager_unbound' => '未綁定',
 
     'personal_title' => '個人班表',
@@ -27,16 +27,17 @@ return [
     'action_saving'  => '儲存中…',
     'action_test'    => '測試發送',
     'action_testing' => '發送中…',
-    'test_hint'      => '會立刻把今天的完整班表私訊給上面設定的收件人。',
+    'test_hint'      => '會立刻把今天的完整班表私訊給上面勾選的收件人。',
 
     'msg' => [
         'saved'             => '已儲存',
         'save_failed'       => '儲存失敗，請稍後再試',
         'manager_invalid'   => '收件人格式不正確',
         'manager_not_found' => '找不到這個帳號',
-        'test_sent'         => '測試訊息已送出，請確認 Telegram 有收到',
-        'test_no_manager'   => '請先選擇收件人並儲存',
-        'test_not_bound'    => '這位同仁還沒私訊過機器人，所以收不到訊息',
+        'test_sent'         => '測試訊息已送出 :sent 則，請確認 Telegram 有收到',
+        'test_partial'      => '已送出 :sent 則，但這幾位沒收到：:failed（請他們先私訊機器人一次）',
+        'test_no_manager'   => '請先勾選收件人並儲存',
+        'test_not_bound'    => '勾選的同仁都還沒私訊過機器人，所以收不到訊息',
         'test_failed'       => '發送失敗，請確認同仁沒有封鎖機器人',
     ],
 ];

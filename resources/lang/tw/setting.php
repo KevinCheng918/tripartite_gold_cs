@@ -52,9 +52,9 @@ return [
     'support_remind_interval_hint' => '第一次之後每隔這個時間再提醒一次，一直催到問題被處理。第 :escalate 次起會同時 tag 主管與老闆（都跳過工程）。',
     'support_remind_max'    => '最多提醒幾次',
     'support_remind_max_hint' => '到這個次數仍沒處理就停止提醒，並發最後一則通知主管與老闆。避免深夜沒人值班時被連續轟炸。',
-    'support_report_user'   => '每日統計私訊給',
-    'support_report_user_hint' => '每天 :time 把前一天的超時提醒統計（依題目、依人員）私訊給這個人。標示「未綁定」的同仁收不到，請他先私訊機器人一次。',
-    'support_report_none'   => '— 不發送 —',
+    'support_report_user'   => '完整統計私訊給（可多選）',
+    'support_report_all'    => '全選',
+    'support_report_user_hint' => '每天 :time 把前一天的「全部人」超時提醒統計（依題目、依人員）私訊給勾選的人，建議勾主管以上。被提醒到的同仁另外會各自收到「自己那份」，不需要設定。標示「未綁定」的人收不到，請他先私訊機器人一次。',
     'support_report_unbound' => '未綁定',
     'support_test'          => '發送測試訊息',
 

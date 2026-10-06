@@ -7,11 +7,11 @@ return [
 
     'section_label' => 'Messaging',
 
-    'manager_title' => 'Full roster recipient',
-    'manager_desc'  => 'The full roster (who is on each shift, which shift has nobody) is sent by direct message at :time daily. Nothing is sent while no recipient is set.',
-    'manager_field'  => 'Recipient',
-    'manager_none'   => '— Do not send —',
-    'manager_hint'   => 'Staff marked "not linked" cannot receive messages. Ask them to message the bot once.',
+    'manager_title' => 'Full roster recipients',
+    'manager_desc'  => 'The full roster (who is on each shift, which shift has nobody) is sent by direct message at :time daily. Pick as many recipients as you like; nothing is sent while none are ticked.',
+    'manager_field'  => 'Recipients (multiple)',
+    'manager_all'    => 'Select all',
+    'manager_hint'   => 'Staff marked "not linked" cannot receive messages — ask them to message the bot once. Untick everyone to stop sending.',
     'manager_unbound' => 'not linked',
 
     'personal_title' => 'Personal roster',
@@ -27,16 +27,17 @@ return [
     'action_saving'  => 'Saving…',
     'action_test'    => 'Send test',
     'action_testing' => 'Sending…',
-    'test_hint'      => 'Sends today\'s full roster to the recipient above right now.',
+    'test_hint'      => 'Sends today\'s full roster to everyone ticked above right now.',
 
     'msg' => [
         'saved'             => 'Saved',
         'save_failed'       => 'Save failed, please try again later',
         'manager_invalid'   => 'Invalid recipient',
         'manager_not_found' => 'Account not found',
-        'test_sent'         => 'Test message sent, please check Telegram',
-        'test_no_manager'   => 'Please select a recipient and save first',
-        'test_not_bound'    => 'This person has not messaged the bot yet, so they cannot receive messages',
+        'test_sent'         => ':sent test message(s) sent, please check Telegram',
+        'test_partial'      => ':sent sent, but these people did not receive it: :failed (ask them to message the bot once)',
+        'test_no_manager'   => 'Please tick at least one recipient and save first',
+        'test_not_bound'    => 'None of the ticked recipients has messaged the bot yet, so they cannot receive messages',
         'test_failed'       => 'Send failed, please check the bot is not blocked',
     ],
 ];

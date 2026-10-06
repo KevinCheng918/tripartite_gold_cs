@@ -25,8 +25,17 @@
                         </p>
                         <form id="form-shift-notice">
                             <div class="mb-3">
-                                <label class="form-label" for="notice-manager">{{ trans('shift_notice.manager_field') }}</label>
-                                <select class="form-select" id="notice-manager"></select>
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <label class="form-label mb-0">{{ trans('shift_notice.manager_field') }}</label>
+                                    <div class="form-check mb-0">
+                                        <input class="form-check-input" type="checkbox" id="notice-manager-all">
+                                        <label class="form-check-label" for="notice-manager-all">{{ trans('shift_notice.manager_all') }}</label>
+                                    </div>
+                                </div>
+                                {{-- 人多的時候不要把整頁撐長，超過就在框內捲動 --}}
+                                <div id="notice-manager-list" class="p-2"
+                                     style="max-height:260px;overflow-y:auto;border:1px solid var(--bs-border-color, rgba(0,0,0,0.175));border-radius:6px">
+                                </div>
                                 <small class="form-text text-muted">{{ trans('shift_notice.manager_hint') }}</small>
                             </div>
                             <button type="submit" class="btn btn-primary js-manage-only">{{ trans('shift_notice.action_save') }}</button>

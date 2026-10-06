@@ -145,22 +145,61 @@
         document.getElementById('support-system').innerHTML = systemHtml;
 
         /*
-         * 每日統計的收件人。
+         * 每日統計的收件人（可多選 + 全選）。
          *
-         * 沒私訊過機器人的人後面掛「未綁定」但**不隱藏** —— 選了也收不到，
-         * 要在選之前就看得出來；整個拿掉會變成「名單裡沒這個人」，更難判斷。
+         * 沒私訊過機器人的人標成灰的但**不隱藏** —— 勾了也收不到，
+         * 要在勾之前就看得出來；整個拿掉會變成「名單裡沒這個人」，更難判斷。
          */
         var candidates = settings.options.dm_candidates || [];
-        var reportHtml = '<option value="">' + escapeHtml(i18n.support_report_none) + '</option>';
+        var selected = settings.support.remind_report_user_ids || [];
+        var reportHtml = '';
 
         candidates.forEach(function (user) {
             var label = user.dm_ready
                 ? user.nickname
                 : user.nickname + '（' + i18n.support_report_unbound + '）';
-            reportHtml += '<option value="' + user.id + '">' + escapeHtml(label) + '</option>';
+            var checked = selected.indexOf(user.id) !== -1 ? ' checked' : '';
+            var muted = user.dm_ready ? '' : ' text-muted';
+
+            reportHtml += '<div class="form-check">' +
+                '<input class="form-check-input js-report-user" type="checkbox" ' +
+                'id="support-report-' + user.id + '" value="' + user.id + '"' + checked + '>' +
+                '<label class="form-check-label' + muted + '" for="support-report-' + user.id + '">' +
+                escapeHtml(label) + '</label>' +
+                '</div>';
         });
 
-        document.getElementById('support-report-user').innerHTML = reportHtml;
+        document.getElementById('support-report-list').innerHTML = reportHtml;
+        syncReportAll();
+    }
+
+    /**
+     * 目前勾選的統計收件人 id
+     *
+     * @return {Array<number>}
+     */
+    function checkedReportIds() {
+        var ids = [];
+
+        root.querySelectorAll('.js-report-user:checked').forEach(function (el) {
+            ids.push(parseInt(el.value, 10));
+        });
+
+        return ids;
+    }
+
+    /**
+     * 「全選」的勾選狀態要跟著個別項目走
+     *
+     * 少了這段，手動把人逐一勾完之後「全選」還是沒勾，看起來像壞掉。
+     */
+    function syncReportAll() {
+        var all = document.getElementById('support-report-all');
+        var boxes = root.querySelectorAll('.js-report-user');
+
+        if (!all) { return; }
+
+        all.checked = boxes.length > 0 && checkedReportIds().length === boxes.length;
     }
 
     function renderClaude() {
@@ -193,7 +232,6 @@
         document.getElementById('support-remind-first').value = support.remind_first_minutes;
         document.getElementById('support-remind-interval').value = support.remind_interval_minutes;
         document.getElementById('support-remind-max').value = support.remind_max_count;
-        document.getElementById('support-report-user').value = support.remind_report_user_id || '';
     }
 
     function renderUsage() {
@@ -322,11 +360,21 @@
                 remind_first_minutes: parseInt(value('support-remind-first'), 10) || 10,
                 remind_interval_minutes: parseInt(value('support-remind-interval'), 10) || 10,
                 remind_max_count: parseInt(value('support-remind-max'), 10) || 30,
-                // 空字串代表「不發統計」，後端的 nullable 規則接得住
-                remind_report_user_id: value('support-report-user') === ''
-                    ? null
-                    : parseInt(value('support-report-user'), 10)
+                // 空陣列代表「不發統計」，後端的 nullable|array 規則接得住
+                remind_report_user_ids: checkedReportIds()
             }, e.target.querySelector('button[type="submit"]'));
+        });
+
+        // 統計收件人的全選：一次勾完或一次清空
+        document.getElementById('support-report-all').addEventListener('change', function () {
+            var checked = this.checked;
+
+            root.querySelectorAll('.js-report-user').forEach(function (el) { el.checked = checked; });
+        });
+
+        // 個別勾選要回頭同步「全選」
+        document.getElementById('support-report-list').addEventListener('change', function (event) {
+            if (event.target.classList.contains('js-report-user')) { syncReportAll(); }
         });
 
         document.getElementById('btn-test-support').addEventListener('click', function () {

@@ -142,16 +142,15 @@ class SettingService
      */
     public function updateSupport($params, $userId = null)
     {
-        $reportUserId = (int) Arr::get($params, 'remind_report_user_id', 0);
-
         $this->appSettingService->putMany([
             AppSettingService::KEY_SUPPORT_CHAT_ID        => trim((string) Arr::get($params, 'chat_id')),
             AppSettingService::KEY_SUPPORT_SYSTEM_ID      => (string) Arr::get($params, 'system_id'),
             AppSettingService::KEY_REMIND_FIRST_MINUTES   => (string) Arr::get($params, 'remind_first_minutes'),
             AppSettingService::KEY_REMIND_INTERVAL_MINUTES => (string) Arr::get($params, 'remind_interval_minutes'),
             AppSettingService::KEY_REMIND_MAX_COUNT       => (string) Arr::get($params, 'remind_max_count'),
-            // 清空用 null 而不是 '0'：資料庫裡留個 '0' 看起來像「指定了 id 0 的人」
-            AppSettingService::KEY_REMIND_REPORT_MANAGER  => $reportUserId > 0 ? (string) $reportUserId : null,
+            // 全部取消勾選時存 null —— 轉換與清空的規則都在 idListValue() 裡
+            AppSettingService::KEY_REMIND_REPORT_MANAGER  => $this->appSettingService
+                ->idListValue(Arr::get($params, 'remind_report_user_ids', [])),
         ], $userId);
     }
 
@@ -241,7 +240,7 @@ class SettingService
                 AppSettingService::KEY_REMIND_MAX_COUNT,
                 (int) config('constants.AUTO_REPLY.REMIND.MAX_COUNT')
             ),
-            'remind_report_user_id'   => $this->appSettingService->getInt(AppSettingService::KEY_REMIND_REPORT_MANAGER),
+            'remind_report_user_ids'  => $this->appSettingService->getIntList(AppSettingService::KEY_REMIND_REPORT_MANAGER),
             'escalate_at'             => (int) config('constants.AUTO_REPLY.REMIND.ESCALATE_AT'),
             'report_at'               => (string) config('constants.AUTO_REPLY.REMIND.REPORT_AT'),
         ];

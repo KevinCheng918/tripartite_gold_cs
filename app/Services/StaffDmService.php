@@ -40,35 +40,70 @@ class StaffDmService
     }
 
     /**
-     * 發給某個帳號 id
+     * 發給一串帳號 id
      *
-     * @param int    $userId
+     * ⚠ **一個人失敗不能讓整批停掉**：逐人送、逐人判斷，沒收到的收進
+     * `failed` 讓呼叫端回報。
+     *
+     * ⚠ `reason` 只在**完全沒送出任何一則**時才有值 —— 有人收到就不算失敗，
+     * 不然三個人裡一個沒綁定會讓整件事看起來沒發生。
+     *
+     * @param array  $userIds
      * @param string $text
-     * @return array sent / reason / name
+     * @return array sent（送出幾則）/ reason / failed（沒收到的暱稱）/ names（收到的暱稱）
      */
-    public function sendToUserId($userId, $text)
+    public function sendToUserIds($userIds, $text)
     {
-        $userId = (int) $userId;
+        $userIds = array_values(array_filter((array) $userIds));
 
-        if ($userId < 1) {
-            return ['sent' => false, 'reason' => self::SKIP_NO_RECIPIENT, 'name' => null];
+        if (blank($userIds)) {
+            return ['sent' => 0, 'reason' => self::SKIP_NO_RECIPIENT, 'failed' => [], 'names' => []];
         }
 
-        $user = $this->userRepository->findForDm($userId);
+        $sent = 0;
+        $failed = [];
+        $names = [];
+        $notBound = 0;
 
-        if (blank($user) || !$this->canDm($user)) {
-            return [
-                'sent'   => false,
-                'reason' => self::SKIP_NOT_BOUND,
-                'name'   => filled($user) ? $user->nickname : "#{$userId}",
-            ];
+        foreach ($this->userRepository->getForDmByIds($userIds) as $user) {
+            if (!$this->canDm($user)) {
+                $failed[] = $user->nickname;
+                $notBound++;
+
+                continue;
+            }
+
+            if ($this->send($user, $text)) {
+                $sent++;
+                $names[] = $user->nickname;
+
+                continue;
+            }
+
+            $failed[] = $user->nickname;
         }
 
-        if ($this->send($user, $text)) {
-            return ['sent' => true, 'reason' => null, 'name' => $user->nickname];
+        /*
+         * 設定裡有 id、資料庫卻查不到（帳號被刪或被停用）——
+         * 要讓它變成「沒收到的人」，不然那個人會從結果裡無聲消失。
+         */
+        $missing = count($userIds) - count($failed) - $sent;
+
+        for ($i = 0; $i < $missing; $i++) {
+            $failed[] = '#?';
         }
 
-        return ['sent' => false, 'reason' => self::SKIP_SEND_FAILED, 'name' => $user->nickname];
+        if ($sent > 0) {
+            return ['sent' => $sent, 'reason' => null, 'failed' => $failed, 'names' => $names];
+        }
+
+        // 一則都沒送出：分得出「全都沒綁定」和「送出時被拒」對處理方式有差
+        return [
+            'sent'   => 0,
+            'reason' => $notBound === count($userIds) ? self::SKIP_NOT_BOUND : self::SKIP_SEND_FAILED,
+            'failed' => $failed,
+            'names'  => [],
+        ];
     }
 
     /**

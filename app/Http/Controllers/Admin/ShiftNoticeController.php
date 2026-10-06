@@ -67,12 +67,30 @@ class ShiftNoticeController extends Controller
     public function ajaxTest()
     {
         $result = $this->noticeService->test();
+        $sent = (int) Arr::get($result, 'sent', 0);
 
-        if (Arr::get($result, 'sent')) {
-            return response()->json(['message' => trans('shift_notice.msg.test_sent')]);
+        if ($sent > 0) {
+            /*
+             * 有人收到就算成功，但**沒收到的人也要講** —— 勾了五個人只有三個
+             * 收到時，只回「已送出」會讓另外兩個無聲消失。
+             */
+            $failed = (array) Arr::get($result, 'failed', []);
+
+            if (filled($failed)) {
+                return response()->json([
+                    'message' => trans('shift_notice.msg.test_partial', [
+                        'sent'   => $sent,
+                        'failed' => implode('、', $failed),
+                    ]),
+                ]);
+            }
+
+            return response()->json([
+                'message' => trans('shift_notice.msg.test_sent', ['sent' => $sent]),
+            ]);
         }
 
-        // 失敗原因要講清楚：「沒設定收件人」和「他沒私訊過機器人」的處理方式完全不同
+        // 失敗原因要講清楚：「沒勾收件人」和「他沒私訊過機器人」的處理方式完全不同
         $reason = (string) Arr::get($result, 'reason');
         $messages = [
             ShiftNoticeService::SKIP_NO_MANAGER  => trans('shift_notice.msg.test_no_manager'),

@@ -9,17 +9,19 @@ use Illuminate\Support\Arr;
 /**
  * 每日超時提醒統計
  *
- * 前一天所有的超時提醒，整理成一則私訊給設定頁指定的收件人。
- * 兩個維度都要（需求方 2026-10-06）：
+ * 前一天的超時提醒，兩種收件人、內容不一樣（需求方 2026-10-06）：
  *
- * - **按單**：哪一題卡住、被催幾次、現在的狀態
- * - **按人**：誰被催得最多
+ * | 收件人 | 內容 |
+ * |---|---|
+ * | 設定頁勾選的人（主管以上，可多位） | **全部人的**：按單 ＋ 按人兩段 |
+ * | 昨天被提醒到的每個人 | **只有自己那份**：我被催了哪幾題（純統計，不交辦） |
  *
- * ⚠ 這兩個維度**不能互相換算**：當班人員會隨時段換人，同一張單催五次可能
+ * ⚠ 按單與按人**不能互相換算**：當班人員會隨時段換人，同一張單催五次可能
  * tag 到三組不同的人，所以每次 tag 到誰在 `auto_reply_ticket_remind` 逐筆落地。
  *
- * ⚠ **沒有任何提醒的日子也要發**。安靜不動時分不出「昨天沒事」還是
- * 「排程壞了」—— 理由同 `ShiftNoticeService`。
+ * ⚠ **沒有任何提醒的日子，完整版也要發**（寫「昨天沒有超時」）。安靜不動時
+ * 分不出「昨天沒事」還是「排程壞了」—— 理由同 `ShiftNoticeService`。
+ * 個人版相反：沒被提醒到的人不發，他不需要收到一則「您昨天沒事」。
  */
 class RemindReportService
 {
@@ -41,34 +43,177 @@ class RemindReportService
     }
 
     /**
-     * 跑一輪
+     * 跑一輪：完整版給勾選的人，個人版給每個被提醒到的人
      *
      * @param string|null $date   統計哪一天（預設昨天）
      * @param bool        $dryRun 只組內容不發送
-     * @return array date / text / sent / reason / name
+     * @return array 結果，給 Command 顯示
      */
     public function run($date = null, $dryRun = false)
     {
         // 預設昨天：早上發的是「昨天一整天」的結果，今天的還在發生
         $date = filled($date) ? $date : now()->subDay()->toDateString();
-        $text = $this->buildText($date);
 
-        if ($dryRun) {
-            return ['date' => $date, 'text' => $text, 'sent' => false, 'reason' => null, 'name' => null];
-        }
-
-        $result = $this->staffDm->sendToUserId(
-            $this->appSettingService->getInt(AppSettingService::KEY_REMIND_REPORT_MANAGER),
-            $text
-        );
+        $fullText = $this->buildText($date);
+        $full = $this->sendFull($fullText, $dryRun);
+        $personal = $this->sendPersonal($date, $dryRun);
 
         return [
-            'date'   => $date,
-            'text'   => $text,
-            'sent'   => Arr::get($result, 'sent', false),
-            'reason' => Arr::get($result, 'reason'),
-            'name'   => Arr::get($result, 'name'),
+            'date'          => $date,
+            'text'          => $fullText,
+            'sent'          => Arr::get($full, 'sent', 0),
+            'reason'        => Arr::get($full, 'reason'),
+            'names'         => Arr::get($full, 'names', []),
+            'personal_sent' => Arr::get($personal, 'sent', 0),
+            'personal_text' => Arr::get($personal, 'sample'),
+            'failed'        => array_merge(
+                Arr::get($full, 'failed', []),
+                Arr::get($personal, 'failed', [])
+            ),
         ];
+    }
+
+    /**
+     * 完整版 —— 發給設定頁勾選的人
+     *
+     * @param string $text
+     * @param bool   $dryRun
+     * @return array sent / reason / failed / names
+     */
+    private function sendFull($text, $dryRun)
+    {
+        $userIds = $this->appSettingService->getIntList(AppSettingService::KEY_REMIND_REPORT_MANAGER);
+
+        if (blank($userIds)) {
+            return ['sent' => 0, 'reason' => StaffDmService::SKIP_NO_RECIPIENT, 'failed' => [], 'names' => []];
+        }
+
+        /*
+         * 空跑只回「幾個人會收到」，不判斷綁定狀態 —— `--dry-run` 要看的是
+         * 內容與排版，誰收得到是另一件事。
+         */
+        if ($dryRun) {
+            return ['sent' => count($userIds), 'reason' => null, 'failed' => [], 'names' => []];
+        }
+
+        return $this->staffDm->sendToUserIds($userIds, $text);
+    }
+
+    /**
+     * 個人版 —— 發給每個昨天被提醒到的人
+     *
+     * ⚠ **沒被提醒到的人不發**：一則「您昨天沒事」只是噪音，
+     * 而且會讓真的有事的那天被當成例行訊息忽略。
+     *
+     * ⚠ **一個人失敗不能讓整批停掉**：`sendToUserIds()` 是逐人送的，
+     * 但這裡每個人的內容都不一樣，所以是逐人呼叫、逐人收結果。
+     *
+     * @param string $date
+     * @param bool   $dryRun
+     * @return array sent / sample / failed
+     */
+    private function sendPersonal($date, $dryRun)
+    {
+        $byUser = $this->groupByUser($this->remindRepository->getUserTicketsForDate($date));
+
+        if (blank($byUser)) {
+            return ['sent' => 0, 'sample' => null, 'failed' => []];
+        }
+
+        $names = $this->nicknamesOfIds(array_keys($byUser));
+        $sent = 0;
+        $failed = [];
+        $sample = null;
+
+        foreach ($byUser as $userId => $rows) {
+            $name = (string) Arr::get($names, (int) $userId, '');
+            $text = $this->buildPersonalText($date, $name, $rows);
+            $sample = filled($sample) ? $sample : $text;
+
+            if ($dryRun) {
+                $sent++;
+
+                continue;
+            }
+
+            $result = $this->staffDm->sendToUserIds([$userId], $text);
+
+            if (Arr::get($result, 'sent', 0) > 0) {
+                $sent++;
+
+                continue;
+            }
+
+            $failed[] = filled($name) ? $name : "#{$userId}";
+        }
+
+        return ['sent' => $sent, 'sample' => $sample, 'failed' => $failed];
+    }
+
+    /**
+     * 把逐筆的（人、單）彙總成「user_id => 那個人的那幾筆」
+     *
+     * @param iterable $rows
+     * @return array<int, array>
+     */
+    private function groupByUser($rows)
+    {
+        $byUser = [];
+
+        foreach ($rows as $row) {
+            $byUser[(int) $row->user_id][] = $row;
+        }
+
+        return $byUser;
+    }
+
+    /**
+     * 組個人版
+     *
+     * @param string $date
+     * @param string $name
+     * @param array  $rows 這個人的那幾筆
+     * @return string
+     */
+    private function buildPersonalText($date, $name, array $rows)
+    {
+        $report = (array) config('constants.AUTO_REPLY.REMIND.REPORT');
+        $statusLabels = (array) Arr::get($report, 'STATUS_LABEL');
+
+        $text = strtr((string) Arr::get($report, 'PERSONAL_HEADER'), [
+            '{name}' => $name,
+            '{date}' => $this->formatDate($date),
+        ]);
+
+        $times = 0;
+        $lines = '';
+
+        foreach ($rows as $row) {
+            $times += (int) $row->times;
+            $ticket = $row->ticket;
+
+            if (blank($ticket)) {
+                continue;
+            }
+
+            $lines .= strtr((string) Arr::get($report, 'PERSONAL_LINE'), [
+                '{question}' => $this->shorten($ticket->question, (int) Arr::get($report, 'QUESTION_CHARS')),
+                '{group}'    => filled($ticket->group) ? (string) $ticket->group->title : '-',
+                '{times}'    => (int) $row->times,
+                '{status}'   => (string) Arr::get($statusLabels, (int) $ticket->status, ''),
+            ]);
+        }
+
+        // 單全被刪掉時只剩標題，那樣的訊息沒有意義
+        if (blank($lines)) {
+            return $text . (string) Arr::get($report, 'PERSONAL_NONE');
+        }
+
+        $text .= strtr((string) Arr::get($report, 'PERSONAL_SUMMARY'), [
+            '{tickets}' => count($rows),
+            '{times}'   => $times,
+        ]);
+        return $text . $lines;
     }
 
     /**
@@ -227,7 +372,7 @@ class RemindReportService
     }
 
     /**
-     * user_id => 暱稱
+     * user_id => 暱稱（從統計列挖出 id）
      *
      * @param iterable $rows
      * @return array
@@ -242,6 +387,19 @@ class RemindReportService
             }
         }
 
+        return $this->nicknamesOfIds($ids);
+    }
+
+    /**
+     * user_id => 暱稱
+     *
+     * ⚠ 一次撈完，不要在迴圈裡逐人查 —— 那就是 N+1。
+     *
+     * @param array $ids
+     * @return array
+     */
+    private function nicknamesOfIds(array $ids)
+    {
         $names = [];
 
         foreach ($this->userRepository->getNamesByIds(array_unique($ids)) as $user) {
