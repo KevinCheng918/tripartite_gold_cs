@@ -394,7 +394,7 @@ class AutoReplyService
             return;
         }
 
-        $this->replyWait($group, $text, $messageId, $result, $history);
+        $this->replyWait($group, $text, $messageId, $result, $history, $decision['opening']);
     }
 
     /**
@@ -616,8 +616,13 @@ class AutoReplyService
         } elseif ($action === $actions['REPLY']) {
             $content = (string) $opening;
         } else {
-            // 轉人工不回覆客人（見 replyWait），所以預覽也是空的
-            $content = '';
+            /*
+             * 轉人工。
+             *
+             * ⚠ 預覽一定要跟實際送出的一致 —— 這支是拿來調 prompt 與話術的，
+             * 預覽說「不回客人」而線上其實會回，那調出來的東西就是錯的。
+             */
+            $content = $this->buildWaitText($opening);
         }
 
         return filled($content) ? "{$content} {$signature}" : '';
@@ -844,9 +849,10 @@ class AutoReplyService
      * @param int|null      $messageId
      * @param array         $result    比對器的輸出，附在求助訊息裡給同仁參考
      * @param array         $history   近期對話，附在求助訊息裡讓同仁不用切視窗
+     * @param string|null   $opening   模型這次生成的承接句，接在「稍等」前面
      * @return void
      */
-    private function replyWait(TelegramGroup $group, $question, $messageId, array $result = [], array $history = [])
+    private function replyWait(TelegramGroup $group, $question, $messageId, array $result = [], array $history = [], $opening = null)
     {
         /*
          * 這裡以前有「5 分鐘內剛說過稍等就不再回」的冷卻，已移除。
@@ -859,26 +865,11 @@ class AutoReplyService
          * 客人問一次就回一次，本來就是客服該做的事。
          */
         /*
-         * ⚠ **轉人工時不回覆客人**（需求方 2026-10-06）。
-         *
-         * 原本會先送一句「馬上請同仁為您說明」，等同仁作答後再送答案 ——
-         * 客人收到兩則，而且第一則純粹是客套話。需求方看了實際對話後的決定：
-         * 只要同仁的那一則就好。
-         *
-         * ⚠ **代價是客人問完到同仁回覆之間完全靜默。** 接住這段的是求助單的
-         * 超時提醒（`auto-reply:remind`，每分鐘跑）—— 沒人回答就在內部群組
-         * 一路催到有人處理，所以不會真的沒人管。
-         *
-         * 要改回去的話，在這裡送 `auto_reply.templates.wait` 即可
-         * （那個設定已一併移除，要連它一起加回來）。
-         */
-        /*
          * ⚠ **這條路一定要記 log。**
          *
-         * 轉人工是最常走的一條（答不出來就來這裡），而且**客人那邊是完全
-         * 靜默的** —— 2026-10-06 查「題庫明明有答案卻沒回」時才發現：
-         * 從 `replyWait()` 到 `openTicket()` 全程沒有任何紀錄，所以
-         * 「AI 到底判了什麼」「有沒有開單」事後都只能用猜的。
+         * 轉人工是最常走的一條（答不出來就來這裡）。2026-10-06 查「題庫明明
+         * 有答案卻沒回」時才發現：從 `replyWait()` 到 `openTicket()` 全程沒有
+         * 任何紀錄，所以「AI 到底判了什麼」「有沒有開單」事後都只能用猜的。
          *
          * 記 intent / item_id / confidence 三個值：題庫裡明明有答案卻轉人工
          * 時，看這三個就知道是沒挑到題（item_id 為 null）還是挑到了但沒把握
@@ -909,8 +900,8 @@ class AutoReplyService
         );
 
         /*
-         * 開單結果也要記 —— 客人那邊靜默，支援群組是唯一的出口，
-         * 這一步沒成功就等於整則訊息消失了。
+         * 開單結果也要記 —— 支援群組是這個問題唯一的出口，
+         * 這一步沒成功就等於整則訊息消失了（而且客人也不會收到那句稍等）。
          *
          * `openTicket()` 回 null 有兩種：沒設定支援群組（它自己會記
          * warning），或擋掉了一模一樣的重複問題（那是刻意的）。
@@ -920,7 +911,46 @@ class AutoReplyService
                 'group_id'   => $group->id,
                 'message_id' => $messageId,
             ]);
+
+            return;
         }
+
+        /*
+         * ⚠ **回客人一句稍等**（需求方 2026-10-07）。
+         *
+         * 2026-10-06 曾經拿掉這一句（當時決定只送同仁的答案），結果客人問完到
+         * 同仁回覆之間完全靜默 —— 需求方看了實際對話後要求加回來。
+         *
+         * ⚠ **一定要在開單成功之後才送。** 單沒開出來就說「已經為您轉給專員」，
+         * 那是開空頭支票：沒有任何同仁會看到那個問題，客人卻在等。
+         * 上面那個 `return` 就是為了這件事。
+         */
+        $this->send($group, $this->buildWaitText($opening), true);
+    }
+
+    /**
+     * 組轉人工時回客人的那一句
+     *
+     * ⚠ 承接句**直接用模型這次已經生成好的那一句**，不另外再呼叫一次 ——
+     * 客人正在等，多一次 CLI 呼叫就是多等幾秒，而素材（客人的話）是同一份。
+     *
+     * 承接句負責「不要每次都一模一樣」，公版負責「已經轉給專員」這個事實 ——
+     * 後者是承接句講不得的：`OPENING.BLACKLIST` 擋掉「請同仁」「會有人」這類
+     * 替人承諾的詞，因為模型沒辦法保證真的有人會做。這裡是開單成功之後，
+     * 所以由系統來講這句話才算數。
+     *
+     * @param string|null $opening 已經過 `OpeningSanitizer` 的承接句
+     * @return string
+     */
+    private function buildWaitText($opening)
+    {
+        $wait = (string) config('auto_reply.templates.wait');
+
+        if (blank($opening)) {
+            return $wait;
+        }
+
+        return "{$opening}\n{$wait}";
     }
 
     /**
