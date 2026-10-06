@@ -94,11 +94,34 @@ class AutoReplyService
             return;
         }
 
-        // 脈絡要在比對之前取：客人常常分兩則講一件事（先貼錯誤訊息、再問
-        // 「這是什麼錯誤呢」），只送後面那一句進去必然比不到
-        $history = $this->buildHistory($group->id, $messageId);
+        /*
+         * ⚠ **把客人這一輪連著說的話合併起來再比對。**
+         *
+         * 客人常把一件事拆成兩則：先貼 `{"code":10002,"msg":"代理未授權"}`，
+         * 再問「這個是甚麼原因」。連發合併會讓前面那幾則讓位給最後一則，
+         * 但**能命中題庫的資訊在前面那則裡** —— 只拿「這個是甚麼原因」去比對，
+         * 模型看到的主詞是「這個」，必然沒把握，於是轉人工。
+         *
+         * 2026-10-06 實際踩到：第一則單獨拿去比對是命中的，合併機制上線後
+         * 反而變成轉人工 —— 需求方一眼看出這個矛盾。
+         *
+         * 當初評估時以為「有脈絡就夠了」。不夠 —— 脈絡是「參考資料」，
+         * 而要比對的那句話仍然是模糊的。合併之後模型看到的才是完整的問題。
+         */
+        $run = $this->telegramRepository->getConsecutiveInbound(
+            $group->id,
+            $messageId,
+            $this->contextSetting('limit'),
+            $this->contextSetting('minutes')
+        );
 
-        $result = $this->matcher->resolve($text, [
+        $question = $this->mergeRun($run, $text);
+
+        // 脈絡取「這一輪之前」的 —— 這一輪的已經合併進 $question 了，
+        // 再放進脈絡只是同樣的內容送兩次
+        $history = $this->buildHistory($group->id, $messageId, $run->pluck('id')->all());
+
+        $result = $this->matcher->resolve($question, [
             'group_id' => $group->id,
             'history'  => $history,
         ]);
@@ -129,12 +152,46 @@ class AutoReplyService
 
         // 比對器掛了（逾時、額度用盡、格式壞掉）—— 一律走人工，不要讓客人空等
         if (blank($result)) {
-            $this->replyWait($group, $text, $messageId, [], $history);
+            $this->replyWait($group, $question, $messageId, [], $history);
 
             return;
         }
 
-        $this->dispatchResult($group, $result, $text, $messageId, $history);
+        // 往下一律用合併後的 $question：轉人工時求助單上也要是完整的問題，
+        // 同仁只看到「這個是甚麼原因」一樣查不下去
+        $this->dispatchResult($group, $result, $question, $messageId, $history);
+    }
+
+    /**
+     * 把客人這一輪說的話接成一段
+     *
+     * 媒體訊息沒有文字，換成 `[圖片]` 這類標籤 —— 整則跳過的話，
+     * 「這張圖是什麼意思」會變成沒頭沒尾。
+     *
+     * @param Collection $run  這一輪的訊息，舊的在前
+     * @param string     $text 現在這一則的原文（`$run` 撈不到時的退路）
+     * @return string
+     */
+    private function mergeRun($run, $text)
+    {
+        if (blank($run) || $run->count() < 2) {
+            return (string) $text;
+        }
+
+        $labels = config('constants.TELEGRAM.MEDIA_LABELS');
+        $lines = [];
+
+        foreach ($run as $message) {
+            $content = trim((string) $message->content);
+
+            if (blank($content)) {
+                $content = Arr::get($labels, $message->media_type, Arr::get($labels, 'default'));
+            }
+
+            $lines[] = $content;
+        }
+
+        return implode("\n", $lines);
     }
 
     /**
@@ -143,11 +200,12 @@ class AutoReplyService
      * 格式化只做這一次 —— 送進模型的脈絡與求助單的前情用的是同一份，
      * 同仁在支援群組看到的就等於模型看到的。
      *
-     * @param int      $groupId
-     * @param int|null $messageId 客人現在這一則，它自己不算脈絡
+     * @param int        $groupId
+     * @param int|null   $messageId 客人現在這一則，它自己不算脈絡
+     * @param array<int> $excludeIds 已經合併進問題的那幾則（空的話只排除 $messageId）
      * @return array<int, string> 依時間正序，舊的在前
      */
-    private function buildHistory($groupId, $messageId)
+    private function buildHistory($groupId, $messageId, array $excludeIds = [])
     {
         $limit = $this->contextSetting('limit');
 
@@ -156,9 +214,15 @@ class AutoReplyService
             return [];
         }
 
+        /*
+         * 這一輪的訊息已經合併進要比對的那段話了（見 handle()），
+         * 再放進脈絡等於同樣的內容送兩次 —— 佔 token 又讓模型看到重複的東西。
+         */
+        $skip = filled($excludeIds) ? $excludeIds : [$messageId];
+
         $messages = $this->telegramRepository->getRecentMessages(
             $groupId,
-            $messageId,
+            $skip,
             $limit,
             $this->contextSetting('minutes')
         );

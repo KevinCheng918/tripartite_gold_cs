@@ -384,7 +384,7 @@ class TelegramRepository
      * 那是幾個月前的事。
      *
      * @param int      $groupId
-     * @param int|null $excludeId 客人現在這一則的 id，它自己不算脈絡
+     * @param int|array|null $excludeId 不算脈絡的 id（可給陣列：客人這一輪的那幾則）
      * @param int      $limit
      * @param int      $minutes   只看這段時間內的；更早的多半是別的問題
      * @return Collection 依時間正序（舊 → 新）
@@ -396,10 +396,20 @@ class TelegramRepository
             ->where('telegram_group_id', $groupId)
             ->where('created_at', '>=', now()->subMinutes($minutes));
 
-        // ⚠️ 一定要判斷有沒有值：`id <> NULL` 在 SQL 裡恆為 NULL，
-        // 整個 WHERE 會變成 false，一則都撈不到而且不會報錯
-        if (filled($excludeId)) {
-            $query->where('id', '<>', $excludeId);
+        /*
+         * ⚠️ 一定要判斷有沒有值：`id <> NULL` 在 SQL 裡恆為 NULL，
+         * 整個 WHERE 會變成 false，一則都撈不到而且不會報錯。
+         *
+         * 收陣列是因為「客人這一輪說的那幾則」會整批被排除（它們已經合併進
+         * 要比對的那段話了，見 `AutoReplyService::handle()`）。
+         * `array_filter` 濾掉 null，否則 `whereNotIn` 會帶進一個 NULL 元素。
+         */
+        $excludeIds = array_filter((array) $excludeId, function ($id) {
+            return filled($id);
+        });
+
+        if (filled($excludeIds)) {
+            $query->whereNotIn('id', $excludeIds);
         }
 
         $messages = $query->orderByDesc('id')->limit($limit)->get();
@@ -423,6 +433,55 @@ class TelegramRepository
      * @param int|null $messageId 空的話一律回 false（沒有基準點可比）
      * @return bool
      */
+    /**
+     * 客人這一輪連著說的話（含這一則）
+     *
+     * 「一輪」＝ 從上一次我方發言之後，到這一則為止的所有客人訊息。
+     * 遇到 outbound 就停 —— 那表示客服或 AI 已經回過，再往前是上一輪的事了。
+     *
+     * ⚠ **為什麼需要這個**：客人常把一件事拆成兩則（先貼錯誤訊息，再問
+     * 「這是什麼原因」）。只拿最後那一則去比對題庫，模型看到的主詞是
+     * 「這個」，必然沒把握 —— 而**能命中的資訊在前一則裡**。
+     * 合併成一段送進去，模型才看得到完整的問題。
+     *
+     * 倒著取再翻正：正序取前 N 筆會拿到對話最開頭那幾則。
+     *
+     * @param int      $groupId
+     * @param int|null $messageId 這一輪的最後一則；空值回空集合
+     * @param int      $limit     最多往前幾則（防呆，客人一次貼十幾則時不要全吃）
+     * @param int      $minutes   只看這段時間內的
+     * @return Collection 依時間正序（舊 → 新），最後一筆就是 $messageId 那則
+     */
+    public function getConsecutiveInbound($groupId, $messageId, $limit, $minutes)
+    {
+        if (blank($messageId)) {
+            return new Collection();
+        }
+
+        $messages = TelegramMessage::query()
+            ->select(['id', 'direction', 'content', 'media_type'])
+            ->where('telegram_group_id', $groupId)
+            ->where('id', '<=', $messageId)
+            ->where('created_at', '>=', now()->subMinutes($minutes))
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get();
+
+        $inbound = config('constants.TELEGRAM.DIRECTION.INBOUND');
+        $run = [];
+
+        // 由新往舊走，遇到我方發言就停 —— 那是上一輪的分界
+        foreach ($messages as $message) {
+            if ((int) $message->direction !== (int) $inbound) {
+                break;
+            }
+
+            $run[] = $message;
+        }
+
+        return (new Collection($run))->reverse()->values();
+    }
+
     public function hasNewerInbound($groupId, $messageId)
     {
         if (blank($messageId)) {
