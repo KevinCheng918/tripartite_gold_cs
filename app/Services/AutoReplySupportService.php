@@ -11,6 +11,7 @@ use App\Repositories\QuickReplyRepository;
 use App\Repositories\TelegramRepository;
 use App\Repositories\UserRepository;
 use App\Services\AutoReply\AnswerSplitter;
+use App\Services\Notify\NoticeText;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -63,6 +64,7 @@ class AutoReplySupportService
     private $appSettingService;
     private $supportGroup;
     private $splitter;
+    private $noticeText;
 
     public function __construct(
         AutoReplyTicketRepository $ticketRepository,
@@ -75,7 +77,8 @@ class AutoReplySupportService
         QuickReplyService $quickReplyService,
         AppSettingService $appSettingService,
         SupportGroupService $supportGroup,
-        AnswerSplitter $splitter
+        AnswerSplitter $splitter,
+        NoticeText $noticeText
     ) {
         $this->ticketRepository = $ticketRepository;
         // 每次提醒 tag 到誰要逐筆落地，才答得出「某個人被催了幾次」
@@ -89,6 +92,8 @@ class AutoReplySupportService
         $this->appSettingService = $appSettingService;
         $this->supportGroup = $supportGroup;
         $this->splitter = $splitter;
+        // 等待時間與題目截短的排版，跟三支通知 service 共用同一份
+        $this->noticeText = $noticeText;
     }
 
     /**
@@ -1094,7 +1099,7 @@ class AutoReplySupportService
 
         $users = $this->pickTargets($targets, $stage);
         $text = $isFinal
-            ? $this->buildFinalText($users, $seq - 1)
+            ? $this->buildFinalText($users, $ticket, $seq - 1)
             : $this->buildRemindText($users, $ticket, $seq);
 
         $ok = $this->sendRemind($ticket, $text);
@@ -1146,18 +1151,71 @@ class AutoReplySupportService
         try {
             $result = $this->sendToSupport($text, null, $ticket->ask_message_id);
 
-            if (filled(Arr::get((array) $result, 'result'))) {
-                return true;
+            if (blank(Arr::get((array) $result, 'result'))) {
+                Log::warning('求助單提醒未送達', ['ticket_id' => $ticket->id, 'response' => $result]);
+
+                return false;
             }
 
-            Log::warning('求助單提醒未送達', ['ticket_id' => $ticket->id, 'response' => $result]);
+            $this->reissueIfQuoteBroken($ticket, $result);
 
-            return false;
+            return true;
         } catch (\Exception $e) {
             Log::error('求助單提醒送出失敗', ['ticket_id' => $ticket->id, 'error' => $e->getMessage()]);
 
             return false;
         }
+    }
+
+    /**
+     * 引用掛不上時，重發一張求助訊息並把 `ask_message_id` 換成新的
+     *
+     * ⚠ **沒有這條迴路就接不回來。** 客服作答靠「引用回覆求助訊息」，原訊息不在
+     * 了（被刪、或群組換過 id）就永遠回不了 —— 那張單會一路催到上限然後消失，
+     * 而客人的問題從頭到尾沒人處理。
+     *
+     * ⚠ 怎麼知道引用沒掛上：送出時帶了 `allow_sending_without_reply`，所以引用
+     * 失敗時 Telegram **不會報錯**，而是靜默退化成一般訊息 —— 回應裡就少了
+     * `result.reply_to_message`。那個欄位在不在，是唯一分得出來的訊號。
+     *
+     * 2026-10-06 踩到：群組開話題被升級成 supergroup，舊的 message_id 在新群組
+     * 裡不存在，群組裡只剩一排孤兒提醒。
+     *
+     * @param \App\Models\AutoReplyTicket $ticket
+     * @param array|null                  $result 剛才那則提醒的 API 回應
+     * @return void
+     */
+    private function reissueIfQuoteBroken($ticket, $result)
+    {
+        // 本來就沒有引用對象（理論上不會發生），不是這裡要處理的狀況
+        if (blank($ticket->ask_message_id)) {
+            return;
+        }
+
+        if (filled(Arr::get((array) $result, 'result.reply_to_message'))) {
+            return;
+        }
+
+        $remind = (array) config('constants.AUTO_REPLY.REMIND');
+        $reissued = $this->sendToSupport(strtr((string) Arr::get($remind, 'REISSUE'), [
+            '{group}'    => $this->ticketGroupTitle($ticket),
+            '{question}' => (string) $ticket->question,
+        ]));
+        $newAskId = Arr::get((array) $reissued, 'result.message_id');
+
+        if (blank($newAskId)) {
+            Log::error('求助單重發失敗，這張單仍然無法被回覆對應', ['ticket_id' => $ticket->id]);
+
+            return;
+        }
+
+        $this->ticketRepository->update($ticket, ['ask_message_id' => $newAskId]);
+
+        Log::warning('求助單的原始訊息已失效，已重發並更新對應', [
+            'ticket_id'      => $ticket->id,
+            'old_message_id' => $ticket->ask_message_id,
+            'new_message_id' => $newAskId,
+        ]);
     }
 
     /**
@@ -1208,26 +1266,46 @@ class AutoReplySupportService
      */
     private function buildRemindText($users, $ticket, $seq)
     {
-        return strtr((string) config('constants.AUTO_REPLY.REMIND.TEXT'), [
+        $remind = (array) config('constants.AUTO_REPLY.REMIND');
+
+        return strtr((string) Arr::get($remind, 'TEXT'), [
             '{mentions}' => $this->buildMentions($users),
             // 從開單起算，不是從上次提醒起算 —— 客人等的是前者
-            '{minutes}'  => (int) now()->diffInMinutes($ticket->created_at),
+            '{waited}'   => $this->noticeText->waited($ticket->created_at, $remind),
             '{count}'    => $seq,
+            '{group}'    => $this->ticketGroupTitle($ticket),
+            '{question}' => $this->noticeText->shorten($ticket->question, (int) Arr::get($remind, 'QUESTION_CHARS')),
         ]);
+    }
+
+    /**
+     * 這張單的客人群組名稱
+     *
+     * @param \App\Models\AutoReplyTicket $ticket
+     * @return string
+     */
+    private function ticketGroupTitle($ticket)
+    {
+        return filled($ticket->group) ? (string) $ticket->group->title : '-';
     }
 
     /**
      * 撞到上限、不再提醒的收尾文案
      *
      * @param \Illuminate\Support\Collection $users
+     * @param \App\Models\AutoReplyTicket    $ticket
      * @param int                            $count 總共催了幾次
      * @return string
      */
-    private function buildFinalText($users, $count)
+    private function buildFinalText($users, $ticket, $count)
     {
-        return strtr((string) config('constants.AUTO_REPLY.REMIND.FINAL_TEXT'), [
+        $remind = (array) config('constants.AUTO_REPLY.REMIND');
+
+        return strtr((string) Arr::get($remind, 'FINAL_TEXT'), [
             '{mentions}' => $this->buildMentions($users),
             '{count}'    => $count,
+            '{group}'    => $this->ticketGroupTitle($ticket),
+            '{question}' => $this->noticeText->shorten($ticket->question, (int) Arr::get($remind, 'QUESTION_CHARS')),
         ]);
     }
 
