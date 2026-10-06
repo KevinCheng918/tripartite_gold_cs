@@ -10,7 +10,8 @@ use Illuminate\Support\Arr;
 /**
  * 每日超時提醒統計
  *
- * 兩種收件人：設定頁勾選的人收**全部人的**，昨天被提醒到的人各收**自己那份**。
+ * 兩種收件人：設定頁勾選的人收**全部人的**，所有在職同仁各收**自己那份**
+ * （被提醒到的是統計，沒被提醒到的是一句肯定）。
  *
  * 排程在 08:30（`Kernel`）。`--date` 是補發用，也方便上線前拿真實資料看排版。
  */
@@ -81,7 +82,9 @@ class RemindReportCommand extends Command
             }
 
             $this->line('');
-            $this->info('個人版會發給 ' . Arr::get($result, 'personal_sent', 0) . ' 位被提醒到的同仁');
+            $this->info('個人版會發給 ' . Arr::get($result, 'personal_sent', 0) . ' 位在職同仁'
+                . '（被提醒到的收統計，沒被提醒到的收一句肯定）');
+            $this->line('⚠ 空跑的那句肯定是公版 —— 實際發送時由模型逐人生成');
         }
 
         return 0;

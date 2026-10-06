@@ -300,6 +300,84 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
     }
 
     /**
+     * 請模型寫一小段自由文字
+     *
+     * 跟 `resolve()` 完全不同的任務：那支是「從題庫挑一題」（固定 schema、
+     * 要回 item_id），這支是「寫一句話」。所以結果自己解析，不走 `parseResult()`。
+     *
+     * ⚠ **只走訂閱，不切備援 API**。這類文案是錦上添花 —— 訂閱額度用完時
+     * 還去花 API 的錢寫鼓勵的話並不合理，呼叫端本來就有公版可退。
+     *
+     * ⚠ **失敗一律回 null**，由呼叫端決定怎麼辦。排程不能因為模型掛掉就不發訊息。
+     *
+     * @param string $systemPrompt 要它扮演什麼、寫出來要符合什麼條件
+     * @param string $userPrompt   這一次的輸入
+     * @return string|null
+     */
+    public function generateText($systemPrompt, $userPrompt)
+    {
+        $token = $this->appSettingService->get(AppSettingService::KEY_CLAUDE_TOKEN);
+
+        // 短路：連 token 都沒設定就不用起 process 了
+        if (blank($token)) {
+            return null;
+        }
+
+        $options = [
+            'model'       => $this->appSettingService->get(AppSettingService::KEY_CLAUDE_MODEL, 'opus'),
+            'source'      => config('constants.AUTO_REPLY.SOURCE.SUBSCRIPTION'),
+            'env'         => $this->buildEnv([
+                'CLAUDE_CODE_OAUTH_TOKEN' => $token,
+                // 明確移除，避免兩把憑證同時存在時分不清這次花的是誰的額度
+                'ANTHROPIC_API_KEY'       => false,
+            ]),
+            'user_prompt' => $userPrompt,
+            'schema'      => json_encode([
+                'type'       => 'object',
+                'properties' => ['text' => ['type' => 'string']],
+                'required'   => ['text'],
+            ]),
+        ];
+
+        $startedAt = microtime(true);
+        $process = $this->buildProcess('', $systemPrompt, [], $options);
+
+        try {
+            $process->run();
+        } catch (\Exception $e) {
+            Log::warning('Claude 生成文字失敗', ['error' => $e->getMessage()]);
+            $this->recordUsage($options, [], $startedAt, true, false, []);
+
+            return null;
+        }
+
+        $envelope = json_decode($process->getOutput(), true);
+        $usage = is_array($envelope) ? (array) Arr::get($envelope, 'usage', []) : [];
+
+        // CLI 失敗時不一定是非 0 結束，理由見 execute()
+        if (!$process->isSuccessful() || (is_array($envelope) && filled(Arr::get($envelope, 'is_error')))) {
+            Log::warning('Claude 生成文字回傳失敗', [
+                'reason' => mb_substr(trim($this->envelopeMessage($envelope)), 0, 200),
+            ]);
+            $this->recordUsage($options, [], $startedAt, true, $this->looksRateLimited($process->getErrorOutput()), $usage);
+
+            return null;
+        }
+
+        $result = Arr::get((array) $envelope, 'result');
+
+        if (is_string($result)) {
+            $result = json_decode($result, true);
+        }
+
+        $text = trim((string) Arr::get((array) $result, 'text'));
+
+        $this->recordUsage($options, [], $startedAt, blank($text), false, $usage);
+
+        return filled($text) ? $text : null;
+    }
+
+    /**
      * 組出 CLI 指令
      *
      * 用陣列傳參數（不經 shell），所以題庫與客人的話裡有引號、換行都不會出事。

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Repositories\AutoReplyTicketRemindRepository;
 use App\Repositories\UserRepository;
+use App\Services\Notify\EncouragementWriter;
 use App\Services\Notify\NoticeText;
 use Illuminate\Support\Arr;
 
@@ -15,14 +16,15 @@ use Illuminate\Support\Arr;
  * | 收件人 | 內容 |
  * |---|---|
  * | 設定頁勾選的人（主管以上，可多位） | **全部人的**：按單 ＋ 按人兩段 |
- * | 昨天被提醒到的每個人 | **只有自己那份**：我被催了哪幾題（純統計，不交辦） |
+ * | **所有在職同仁** | 自己那份：被催到就是統計，沒被催到就是一句肯定 |
  *
  * ⚠ 按單與按人**不能互相換算**：當班人員會隨時段換人，同一張單催五次可能
  * tag 到三組不同的人，所以每次 tag 到誰在 `auto_reply_ticket_remind` 逐筆落地。
  *
- * ⚠ **沒有任何提醒的日子，完整版也要發**（寫「昨天沒有超時」）。安靜不動時
- * 分不出「昨天沒事」還是「排程壞了」—— 理由同 `ShiftNoticeService`。
- * 個人版相反：沒被提醒到的人不發，他不需要收到一則「您昨天沒事」。
+ * ⚠ **沒事的日子兩種都要發**（需求方 2026-10-06 調整）。安靜不動時分不出
+ * 「昨天沒事」還是「排程壞了」。沒事那天的那句肯定**由模型當天生成、不用公版**
+ * —— 公版寫久了大家會自動略過，那就失去意義了。
+ * 模型不可用時才退公版：沒有鼓勵的話，比整則不發好得多。
  */
 class RemindReportService
 {
@@ -31,13 +33,15 @@ class RemindReportService
     private $staffDm;
     private $appSettingService;
     private $noticeText;
+    private $encouragement;
 
     public function __construct(
         AutoReplyTicketRemindRepository $remindRepository,
         UserRepository $userRepository,
         StaffDmService $staffDm,
         AppSettingService $appSettingService,
-        NoticeText $noticeText
+        NoticeText $noticeText,
+        EncouragementWriter $encouragement
     ) {
         $this->remindRepository = $remindRepository;
         $this->userRepository = $userRepository;
@@ -45,6 +49,8 @@ class RemindReportService
         $this->appSettingService = $appSettingService;
         // 日期與截短的排版三支共用，不各寫一份
         $this->noticeText = $noticeText;
+        // 沒事的日子那句肯定由模型寫，失敗時退公版
+        $this->encouragement = $encouragement;
     }
 
     /**
@@ -147,35 +153,31 @@ class RemindReportService
     {
         $byUser = $this->groupByUser($this->remindRepository->getUserTicketsForDate($date));
 
-        if (blank($byUser)) {
-            return ['sent' => 0, 'sample' => null, 'failed' => []];
-        }
-
-        $userIds = array_keys($byUser);
-        $names = $this->nicknamesOfIds($userIds);
-
         /*
-         * ⚠ **收件人整批撈一次**。
+         * ⚠ **發給所有在職同仁，不只昨天被提醒到的人**（需求方 2026-10-06）。
          *
-         * 每個人的內容都不一樣，所以訊息必須逐人送；但「這個人能不能被私訊」
-         * 的查詢不必逐人做 —— 原本每輪都對 `getForDmByIds([$id])` 呼叫一次，
-         * 二十個人就是二十趟。
+         * 沒被提醒到的人收到的是一句肯定，不是空白統計 —— 所以收件人範圍是
+         * 「同仁」而不是「昨天出事的人」。`getDmCandidates()` 已經排除管理者
+         * 與停用帳號，跟設定頁的收件人清單同一份名單。
          */
-        $users = [];
-
-        if (!$dryRun) {
-            foreach ($this->userRepository->getForDmByIds($userIds) as $user) {
-                $users[(int) $user->id] = $user;
-            }
-        }
-
         $sent = 0;
         $failed = [];
         $sample = null;
 
-        foreach ($byUser as $userId => $rows) {
-            $name = (string) Arr::get($names, (int) $userId, '');
-            $text = $this->buildPersonalText($date, $name, $rows);
+        foreach ($this->userRepository->getDmCandidates() as $user) {
+            $userId = (int) $user->id;
+            $rows = (array) Arr::get($byUser, $userId, []);
+
+            /*
+             * 有被提醒到 → 發統計；沒有 → 發一句肯定。
+             *
+             * ⚠ 肯定那句是逐人叫模型生成的（每次幾秒），所以**空跑時不要生**：
+             * `--dry-run` 只是要看排版，不該為了預覽燒掉額度也不該跑好幾分鐘。
+             */
+            $text = filled($rows)
+                ? $this->buildPersonalText($date, (string) $user->nickname, $rows)
+                : $this->buildClearText((string) $user->nickname, $dryRun);
+
             $sample = filled($sample) ? $sample : $text;
 
             if ($dryRun) {
@@ -184,16 +186,36 @@ class RemindReportService
                 continue;
             }
 
-            if ($this->staffDm->send(Arr::get($users, (int) $userId), $text)) {
+            if ($this->staffDm->send($user, $text)) {
                 $sent++;
 
                 continue;
             }
 
-            $failed[] = filled($name) ? $name : "#{$userId}";
+            $failed[] = (string) $user->nickname;
         }
 
         return ['sent' => $sent, 'sample' => $sample, 'failed' => $failed];
+    }
+
+    /**
+     * 組「昨天沒事」那份
+     *
+     * @param string $name
+     * @param bool   $dryRun 空跑時不叫模型，直接用公版
+     * @return string
+     */
+    private function buildClearText($name, $dryRun)
+    {
+        $report = (array) config('constants.AUTO_REPLY.REMIND.REPORT');
+        $praise = $dryRun
+            ? (string) Arr::get($report, 'ENCOURAGE.PERSON_FALLBACK')
+            : $this->encouragement->forPerson($name);
+
+        return strtr((string) Arr::get($report, 'PERSONAL_CLEAR'), [
+            '{name}'   => $name,
+            '{praise}' => $praise,
+        ]);
     }
 
     /**
@@ -250,9 +272,12 @@ class RemindReportService
             ]);
         }
 
-        // 單全被刪掉時只剩標題，那樣的訊息沒有意義
+        /*
+         * 單全被刪掉時只剩標題，那樣的訊息沒有意義 —— 改成發「昨天沒事」那份。
+         * 對收件人來說結果一樣（他確實沒有要處理的東西）。
+         */
         if (blank($lines)) {
-            return $text . (string) Arr::get($report, 'PERSONAL_NONE');
+            return $this->buildClearText($name, false);
         }
 
         $text .= strtr((string) Arr::get($report, 'PERSONAL_SUMMARY'), [
@@ -276,7 +301,9 @@ class RemindReportService
         $text = strtr((string) Arr::get($report, 'HEADER'), ['{date}' => $this->noticeText->date($date)]);
 
         if (blank($tickets)) {
-            return $text . (string) Arr::get($report, 'EMPTY');
+            return $text . strtr((string) Arr::get($report, 'EMPTY'), [
+                '{praise}' => $this->encouragement->forTeam(),
+            ]);
         }
 
         $text .= $this->buildSummary($report, $tickets);
