@@ -153,6 +153,23 @@ sendMessage(chat_id=-100…, message_thread_id=42, text=…)
 5. **按「測試發送」** —— 這步不能省：話題 id 填錯 Telegram 會整則拒收，
    那一類通知會從此默默消失，只有測試發送看得出來
 
+## ⚠ 共用的排版工具
+
+`app/Services/Notify/NoticeText.php` —— `date()` / `shorten()` / `waited()`。
+
+三支通知 service（班表、待接手、統計）原本各抄一份一模一樣的 `formatDate()`。
+抽出來不只是為了不重複：**同一批訊息（7:00、7:30、8:30 連著發）的日期寫法
+不一致，看起來就像不同系統發的。**
+
+## ⚠ 兩個每分鐘跑的 N+1（2026-10-06 修）
+
+| 哪裡 | 原本 | 現在 |
+|---|---|---|
+| `remindTimeoutTickets()` | **每張超時單**都重查一次當班人員與主管名單 | `remindTargets()` 整輪查一次，回 `on_duty` / `escalated` 兩組，`pickTargets()` 挑其中一組 |
+| `RemindReportService::sendPersonal()` | **每位收件人**都 `getForDmByIds([$id])` 一次 | 整批撈一次再逐人送（內容逐人不同，但「能不能被私訊」的查詢不必逐人做） |
+
+前者特別要小心：那支**每分鐘都在跑**，而且「同時卡住十張單」是常態。
+
 ## 相關
 
 - [[auto-reply]] — 求助單的完整流程

@@ -1033,14 +1033,16 @@ class AutoReplySupportService
         }
 
         /*
-         * 當班人員整輪只查一次 —— 逐張單查的話，同時卡住十張單就是十次
-         * 排班查詢，而這支每分鐘都在跑。一分鐘內當班的人不會換。
+         * ⚠ **要 tag 的人整輪只查一次**。
+         *
+         * 這支每分鐘跑，而且同時卡住十張單是常態 —— 逐張單去查排班與主管名單
+         * 就是十倍查詢。一分鐘內當班的人與主管名單都不會變。
          */
-        $onDutyIds = $this->chatService->getOnDutyUserIds();
+        $targets = $this->remindTargets($this->chatService->getOnDutyUserIds());
         $sent = 0;
 
         foreach ($tickets as $ticket) {
-            if ($this->remindOne($ticket, $onDutyIds, $max)) {
+            if ($this->remindOne($ticket, $targets, $max)) {
                 $sent++;
             }
         }
@@ -1055,11 +1057,11 @@ class AutoReplySupportService
      * 這張單每分鐘都會被重試一次，整晚下來是幾百次查詢與送信。
      *
      * @param \App\Models\AutoReplyTicket $ticket
-     * @param array                       $onDutyIds 當班人員的 user.id
-     * @param int                         $max       次數上限
+     * @param array                       $targets 見 `remindTargets()`：各階段要 tag 的人
+     * @param int                         $max     次數上限
      * @return bool 有送出訊息才算 true
      */
-    private function remindOne($ticket, array $onDutyIds, $max)
+    private function remindOne($ticket, array $targets, $max)
     {
         $stageConfig = config('constants.AUTO_REPLY.REMIND.STAGE');
         $seq = (int) $ticket->remind_count + 1;
@@ -1072,7 +1074,7 @@ class AutoReplySupportService
                 ? (int) Arr::get($stageConfig, 'MANAGER')
                 : (int) Arr::get($stageConfig, 'ON_DUTY'));
 
-        $users = $this->remindTargets($stage, $onDutyIds);
+        $users = $this->pickTargets($targets, $stage);
         $text = $isFinal
             ? $this->buildFinalText($users, $seq - 1)
             : $this->buildRemindText($users, $ticket, $seq);
@@ -1141,29 +1143,41 @@ class AutoReplySupportService
     }
 
     /**
-     * 這一階段要 tag 的人
+     * 整輪要用到的兩組人，一次查完
      *
      * ⚠ 第 3 次之後是「當班人員 **＋** 主管與老闆」，不是「換成主管」——
      * 2026-10-06 以前的版本是後者，當班的人會以為事情已經不關他了。
      *
+     * @param array $onDutyIds 當班人員的 user.id
+     * @return array{on_duty: \Illuminate\Support\Collection, escalated: \Illuminate\Support\Collection}
+     */
+    private function remindTargets(array $onDutyIds)
+    {
+        $onDuty = collect($this->userRepository->getMentionableByIds($onDutyIds));
+
+        return [
+            'on_duty' => $onDuty,
+            // id 去重：主管自己也在值班時，不要被 tag 兩次
+            'escalated' => $onDuty
+                ->concat($this->userRepository->getManagersForMention())
+                ->unique('id')
+                ->values(),
+        ];
+    }
+
+    /**
+     * 這一階段要用哪一組
+     *
+     * @param array $targets
      * @param int   $stage
-     * @param array $onDutyIds
      * @return \Illuminate\Support\Collection
      */
-    private function remindTargets($stage, array $onDutyIds)
+    private function pickTargets(array $targets, $stage)
     {
-        $onDuty = $this->userRepository->getMentionableByIds($onDutyIds);
-        $stageConfig = config('constants.AUTO_REPLY.REMIND.STAGE');
+        $onDutyStage = (int) config('constants.AUTO_REPLY.REMIND.STAGE.ON_DUTY');
+        $key = (int) $stage === $onDutyStage ? 'on_duty' : 'escalated';
 
-        if ((int) $stage === (int) Arr::get($stageConfig, 'ON_DUTY')) {
-            return collect($onDuty);
-        }
-
-        // id 去重：主管自己也在值班時，不要被 tag 兩次
-        return collect($onDuty)
-            ->concat($this->userRepository->getManagersForMention())
-            ->unique('id')
-            ->values();
+        return collect(Arr::get($targets, $key, []));
     }
 
     /**

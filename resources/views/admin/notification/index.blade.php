@@ -164,8 +164,7 @@
                                                 <label class="form-check-label" for="shift-user-all">{{ trans('notification.select_all') }}</label>
                                             </div>
                                         </div>
-                                        <div id="shift-user-list" class="p-2"
-                                             style="max-height:260px;overflow-y:auto;border:1px solid var(--bs-border-color, rgba(0,0,0,0.175));border-radius:6px">
+                                        <div id="shift-user-list" class="notice-check-list p-2">
                                         </div>
                                         <small class="form-text text-muted">{{ trans('notification.shift_user_hint') }}</small>
                                     </div>
@@ -229,8 +228,7 @@
                                             </div>
                                         </div>
                                         {{-- 人多的時候不要把整頁撐長，超過就在框內捲動 --}}
-                                        <div id="support-report-list" class="p-2"
-                                             style="max-height:260px;overflow-y:auto;border:1px solid var(--bs-border-color, rgba(0,0,0,0.175));border-radius:6px">
+                                        <div id="support-report-list" class="notice-check-list p-2">
                                         </div>
                                         <small class="form-text text-muted">{{ trans('notification.report_user_hint') }}</small>
                                     </div>

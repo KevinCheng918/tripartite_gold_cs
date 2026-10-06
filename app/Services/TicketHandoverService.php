@@ -6,6 +6,7 @@ use App\Repositories\AutoReplyTicketRepository;
 use App\Repositories\ShiftAssignmentRepository;
 use App\Repositories\ShiftRepository;
 use App\Repositories\UserRepository;
+use App\Services\Notify\NoticeText;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
@@ -42,19 +43,23 @@ class TicketHandoverService
     private $shiftRepository;
     private $userRepository;
     private $supportGroup;
+    private $noticeText;
 
     public function __construct(
         AutoReplyTicketRepository $ticketRepository,
         ShiftAssignmentRepository $assignmentRepository,
         ShiftRepository $shiftRepository,
         UserRepository $userRepository,
-        SupportGroupService $supportGroup
+        SupportGroupService $supportGroup,
+        NoticeText $noticeText
     ) {
         $this->ticketRepository = $ticketRepository;
         $this->assignmentRepository = $assignmentRepository;
         $this->shiftRepository = $shiftRepository;
         $this->userRepository = $userRepository;
         $this->supportGroup = $supportGroup;
+        // 日期與截短的排版三支共用，不各寫一份
+        $this->noticeText = $noticeText;
     }
 
     /**
@@ -169,7 +174,7 @@ class TicketHandoverService
         $handover = (array) config('constants.SHIFT_HANDOVER');
 
         $text = strtr((string) Arr::get($handover, 'HEADER'), [
-            '{date}'     => $this->formatDate($date),
+            '{date}'     => $this->noticeText->date($date),
             '{mentions}' => $this->buildMentions($handover, $users),
         ]);
 
@@ -188,9 +193,9 @@ class TicketHandoverService
             }
 
             $text .= strtr((string) Arr::get($handover, 'LINE'), [
-                '{question}' => $this->shorten($ticket->question, (int) Arr::get($handover, 'QUESTION_CHARS')),
+                '{question}' => $this->noticeText->shorten($ticket->question, (int) Arr::get($handover, 'QUESTION_CHARS')),
                 '{group}'    => filled($ticket->group) ? (string) $ticket->group->title : '-',
-                '{waited}'   => $this->waited($handover, $ticket->created_at),
+                '{waited}'   => $this->noticeText->waited($ticket->created_at, $handover),
             ]);
             $shown++;
         }
@@ -230,40 +235,6 @@ class TicketHandoverService
     }
 
     /**
-     * 等了多久（天／小時／分鐘，只取最大的兩個單位）
-     *
-     * @param array  $handover
-     * @param mixed  $createdAt
-     * @return string
-     */
-    private function waited(array $handover, $createdAt)
-    {
-        if (blank($createdAt)) {
-            return '-';
-        }
-
-        $minutes = (int) now()->diffInMinutes($createdAt);
-        $days = intdiv($minutes, 1440);
-        $hours = intdiv($minutes % 1440, 60);
-
-        if ($days > 0) {
-            return strtr((string) Arr::get($handover, 'WAITED_DAYS'), [
-                '{days}'  => $days,
-                '{hours}' => $hours,
-            ]);
-        }
-
-        if ($hours > 0) {
-            return strtr((string) Arr::get($handover, 'WAITED_HOURS'), [
-                '{hours}'   => $hours,
-                '{minutes}' => $minutes % 60,
-            ]);
-        }
-
-        return strtr((string) Arr::get($handover, 'WAITED_MINS'), ['{minutes}' => $minutes]);
-    }
-
-    /**
      * 送出
      *
      * ⚠ 失敗不丟例外：這支掛在排程上，丟例外只會讓整輪排程中斷。
@@ -290,35 +261,4 @@ class TicketHandoverService
         }
     }
 
-    /**
-     * 截短並補省略號
-     *
-     * @param string $text
-     * @param int    $chars
-     * @return string
-     */
-    private function shorten($text, $chars)
-    {
-        $text = trim(preg_replace('/\s+/u', ' ', (string) $text));
-
-        if ($chars < 1 || mb_strlen($text) <= $chars) {
-            return $text;
-        }
-
-        return mb_substr($text, 0, $chars) . '…';
-    }
-
-    /**
-     * `2026-10-06` → `10/6（週二）`
-     *
-     * @param string $date
-     * @return string
-     */
-    private function formatDate($date)
-    {
-        $weekdays = ['日', '一', '二', '三', '四', '五', '六'];
-        $carbon = \Illuminate\Support\Carbon::parse($date);
-
-        return $carbon->format('n/j') . '（週' . Arr::get($weekdays, (int) $carbon->dayOfWeek, '') . '）';
-    }
 }

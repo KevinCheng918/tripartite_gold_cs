@@ -989,3 +989,25 @@ a:hover { color: #85640a; }
 
 /* 深色模式切換按鈕圖示 */
 .theme-icon-dark, .theme-icon-light { pointer-events: none; }
+
+/* ===== 通知設定：收件人勾選清單與話題列 =====
+ *
+ * ⚠ 邊框色一定要用 CSS 變數 + 同色 fallback，不能寫死 rgba(0,0,0,.175)：
+ * 深色模式下寫死的黑邊會整條消失在深底上，看起來像沒有框。
+ * （這專案為「只補了淺色或只補了深色那一半」的問題修過好幾次，
+ *   見 bugfix/2026-10-01-badge-bg-light-dark-mode）
+ */
+.notice-check-list {
+    max-height: 260px;
+    overflow-y: auto;
+    border: 1px solid var(--bs-border-color, rgba(0, 0, 0, 0.175));
+    border-radius: 6px;
+}
+
+.notice-topic-row {
+    border: 1px solid var(--bs-border-color, rgba(0, 0, 0, 0.175));
+    border-radius: 6px;
+}
+
+[data-theme="dark"] .notice-check-list,
+[data-theme="dark"] .notice-topic-row { border-color: #2d3039; }

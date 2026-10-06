@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Repositories\AutoReplyTicketRemindRepository;
 use App\Repositories\UserRepository;
+use App\Services\Notify\NoticeText;
 use Illuminate\Support\Arr;
 
 /**
@@ -29,17 +30,21 @@ class RemindReportService
     private $userRepository;
     private $staffDm;
     private $appSettingService;
+    private $noticeText;
 
     public function __construct(
         AutoReplyTicketRemindRepository $remindRepository,
         UserRepository $userRepository,
         StaffDmService $staffDm,
-        AppSettingService $appSettingService
+        AppSettingService $appSettingService,
+        NoticeText $noticeText
     ) {
         $this->remindRepository = $remindRepository;
         $this->userRepository = $userRepository;
         $this->staffDm = $staffDm;
         $this->appSettingService = $appSettingService;
+        // 日期與截短的排版三支共用，不各寫一份
+        $this->noticeText = $noticeText;
     }
 
     /**
@@ -105,8 +110,8 @@ class RemindReportService
      * ⚠ **沒被提醒到的人不發**：一則「您昨天沒事」只是噪音，
      * 而且會讓真的有事的那天被當成例行訊息忽略。
      *
-     * ⚠ **一個人失敗不能讓整批停掉**：`sendToUserIds()` 是逐人送的，
-     * 但這裡每個人的內容都不一樣，所以是逐人呼叫、逐人收結果。
+     * ⚠ **一個人失敗不能讓整批停掉**：逐人送、逐人收結果，
+     * 失敗的收進 `failed` 讓呼叫端回報。
      *
      * @param string $date
      * @param bool   $dryRun
@@ -120,7 +125,24 @@ class RemindReportService
             return ['sent' => 0, 'sample' => null, 'failed' => []];
         }
 
-        $names = $this->nicknamesOfIds(array_keys($byUser));
+        $userIds = array_keys($byUser);
+        $names = $this->nicknamesOfIds($userIds);
+
+        /*
+         * ⚠ **收件人整批撈一次**。
+         *
+         * 每個人的內容都不一樣，所以訊息必須逐人送；但「這個人能不能被私訊」
+         * 的查詢不必逐人做 —— 原本每輪都對 `getForDmByIds([$id])` 呼叫一次，
+         * 二十個人就是二十趟。
+         */
+        $users = [];
+
+        if (!$dryRun) {
+            foreach ($this->userRepository->getForDmByIds($userIds) as $user) {
+                $users[(int) $user->id] = $user;
+            }
+        }
+
         $sent = 0;
         $failed = [];
         $sample = null;
@@ -136,9 +158,7 @@ class RemindReportService
                 continue;
             }
 
-            $result = $this->staffDm->sendToUserIds([$userId], $text);
-
-            if (Arr::get($result, 'sent', 0) > 0) {
+            if ($this->staffDm->send(Arr::get($users, (int) $userId), $text)) {
                 $sent++;
 
                 continue;
@@ -182,7 +202,7 @@ class RemindReportService
 
         $text = strtr((string) Arr::get($report, 'PERSONAL_HEADER'), [
             '{name}' => $name,
-            '{date}' => $this->formatDate($date),
+            '{date}' => $this->noticeText->date($date),
         ]);
 
         $times = 0;
@@ -197,7 +217,7 @@ class RemindReportService
             }
 
             $lines .= strtr((string) Arr::get($report, 'PERSONAL_LINE'), [
-                '{question}' => $this->shorten($ticket->question, (int) Arr::get($report, 'QUESTION_CHARS')),
+                '{question}' => $this->noticeText->shorten($ticket->question, (int) Arr::get($report, 'QUESTION_CHARS')),
                 '{group}'    => filled($ticket->group) ? (string) $ticket->group->title : '-',
                 '{times}'    => (int) $row->times,
                 '{status}'   => (string) Arr::get($statusLabels, (int) $ticket->status, ''),
@@ -227,7 +247,7 @@ class RemindReportService
         $report = (array) config('constants.AUTO_REPLY.REMIND.REPORT');
         $tickets = $this->remindRepository->getTicketsForDate($date);
 
-        $text = strtr((string) Arr::get($report, 'HEADER'), ['{date}' => $this->formatDate($date)]);
+        $text = strtr((string) Arr::get($report, 'HEADER'), ['{date}' => $this->noticeText->date($date)]);
 
         if (blank($tickets)) {
             return $text . (string) Arr::get($report, 'EMPTY');
@@ -299,7 +319,7 @@ class RemindReportService
             }
 
             $text .= strtr((string) Arr::get($report, 'BY_TICKET_LINE'), [
-                '{question}' => $this->shorten($ticket->question, (int) Arr::get($report, 'QUESTION_CHARS')),
+                '{question}' => $this->noticeText->shorten($ticket->question, (int) Arr::get($report, 'QUESTION_CHARS')),
                 '{group}'    => filled($ticket->group) ? (string) $ticket->group->title : '-',
                 '{times}'    => (int) $row->times,
                 '{status}'   => (string) Arr::get($statusLabels, (int) $ticket->status, ''),
@@ -409,35 +429,4 @@ class RemindReportService
         return $names;
     }
 
-    /**
-     * 截短並補省略號
-     *
-     * @param string $text
-     * @param int    $chars
-     * @return string
-     */
-    private function shorten($text, $chars)
-    {
-        $text = trim(preg_replace('/\s+/u', ' ', (string) $text));
-
-        if ($chars < 1 || mb_strlen($text) <= $chars) {
-            return $text;
-        }
-
-        return mb_substr($text, 0, $chars) . '…';
-    }
-
-    /**
-     * `2026-10-05` → `10/5（週日）`
-     *
-     * @param string $date
-     * @return string
-     */
-    private function formatDate($date)
-    {
-        $weekdays = ['日', '一', '二', '三', '四', '五', '六'];
-        $carbon = \Illuminate\Support\Carbon::parse($date);
-
-        return $carbon->format('n/j') . '（週' . Arr::get($weekdays, (int) $carbon->dayOfWeek, '') . '）';
-    }
 }

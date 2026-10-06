@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Repositories\ShiftAssignmentRepository;
 use App\Repositories\ShiftRepository;
 use App\Repositories\UserRepository;
+use App\Services\Notify\NoticeText;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
@@ -49,6 +50,7 @@ class ShiftNoticeService
     private $staffDm;
     private $supportGroup;
     private $appSettingService;
+    private $noticeText;
 
     public function __construct(
         ShiftAssignmentRepository $assignmentRepository,
@@ -56,7 +58,8 @@ class ShiftNoticeService
         UserRepository $userRepository,
         StaffDmService $staffDm,
         SupportGroupService $supportGroup,
-        AppSettingService $appSettingService
+        AppSettingService $appSettingService,
+        NoticeText $noticeText
     ) {
         $this->assignmentRepository = $assignmentRepository;
         $this->shiftRepository = $shiftRepository;
@@ -67,6 +70,8 @@ class ShiftNoticeService
         $this->supportGroup = $supportGroup;
         // 主管收件人存在 app_setting，換人不用動程式
         $this->appSettingService = $appSettingService;
+        // 日期與截短的排版三支共用，不各寫一份
+        $this->noticeText = $noticeText;
     }
 
     /**
@@ -195,7 +200,7 @@ class ShiftNoticeService
     private function buildManagerText($date, $assignments, $shifts)
     {
         $text = strtr((string) config('constants.SHIFT_NOTICE.MANAGER_HEADER'), [
-            '{date}' => $this->formatDate($date),
+            '{date}' => $this->noticeText->date($date),
         ]);
 
         if (blank($shifts)) {
@@ -414,20 +419,6 @@ class ShiftNoticeService
     private function shortTime($time)
     {
         return mb_substr((string) $time, 0, 5);
-    }
-
-    /**
-     * `2026-10-07` → `10/07（週二）`
-     *
-     * @param string $date
-     * @return string
-     */
-    private function formatDate($date)
-    {
-        $weekdays = ['日', '一', '二', '三', '四', '五', '六'];
-        $carbon = \Illuminate\Support\Carbon::parse($date);
-
-        return $carbon->format('n/j') . '（週' . Arr::get($weekdays, (int) $carbon->dayOfWeek, '') . '）';
     }
 
     /**

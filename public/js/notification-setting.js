@@ -318,8 +318,7 @@
                 '</div>';
         });
 
-        return '<div class="js-topic-row p-3 mb-3" ' +
-            'style="border:1px solid var(--bs-border-color, rgba(0,0,0,0.175));border-radius:6px">' +
+        return '<div class="js-topic-row notice-topic-row p-3 mb-3">' +
             '<div class="row align-items-end mb-2">' +
                 '<div class="col-sm-5 mb-2">' +
                     '<label class="form-label">' + escapeHtml(i18n.topic_name) + '</label>' +

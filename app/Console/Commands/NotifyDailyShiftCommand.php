@@ -22,7 +22,7 @@ class NotifyDailyShiftCommand extends Command
 
     /** @var array 沒送出時的原因說明 */
     private const REASONS = [
-        ShiftNoticeService::SKIP_NO_MANAGER  => '沒有勾選收件人（到通訊管理的設定頁指定）',
+        ShiftNoticeService::SKIP_NO_MANAGER  => '沒有勾選收件人（到通訊管理 → 通知設定 → 班表通知指定）',
         ShiftNoticeService::SKIP_NOT_BOUND   => '勾選的收件人都還沒私訊過機器人',
         ShiftNoticeService::SKIP_SEND_FAILED => 'Telegram 送出失敗，詳見 log',
     ];

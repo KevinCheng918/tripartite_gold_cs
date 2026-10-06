@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Repositories\AppSettingRepository;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 /**
  * 系統層級設定服務
@@ -219,7 +220,7 @@ class AppSettingService
         $decoded = json_decode($value, true);
 
         if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
-            \Log::warning('設定值不是合法的 JSON，已退回預設值', ['key' => $key]);
+            Log::warning('設定值不是合法的 JSON，已退回預設值', ['key' => $key]);
 
             return $default;
         }
