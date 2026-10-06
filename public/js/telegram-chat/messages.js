@@ -214,6 +214,21 @@
         var container = document.getElementById('tg-messages');
         if (!container) { return; }
 
+        /*
+         * 同一則訊息只能上畫面一次。
+         *
+         * 2026-10-06 回報「送出後顯示兩條，重新整理剩一條」：送出成功後會
+         * T.loadMessages() 重繪整份，而後端的廣播又會走到這裡 append 一次 ——
+         * 兩條路都把同一則畫出來。誰先到不一定，所以有時兩條、有時正常。
+         *
+         * 不改那兩條路徑、改成在這裡擋：去重對「重連後補推」「同一則推兩次」
+         * 這類情況一樣有效，而拿掉任何一條路徑都會少一層保險
+         * （廣播掛掉時 loadMessages 是唯一會顯示的途徑，反之亦然）。
+         */
+        if (msg && msg.id && container.querySelector('[data-msg-id="' + msg.id + '"]')) {
+            return;
+        }
+
         var empty = container.querySelector('.text-center.text-muted');
         if (empty) { empty.remove(); }
 

@@ -45,10 +45,23 @@
     .chat-box-wrapper .chat-box { max-width: 50vw; }
 }
 
-/* 聊天泡泡禁止選取（避免長按觸發選字） */
-.chat-box-wrapper {
-    -webkit-user-select: none;
-    user-select: none;
+/*
+ * 聊天泡泡禁止選取（避免長按觸發選字，那會跟滑動回覆的手勢打架）。
+ *
+ * ⚠ **只在觸控裝置關掉** —— 電腦版要能選字複製（2026-10-06 需求方回報
+ * 「現在沒辦法選取」）。原本是無條件關閉，桌機也跟著不能選。
+ *
+ * 用 `pointer: coarse` 而不是螢幕寬度：真正的關鍵是「有沒有長按手勢」，
+ * 不是視窗多大 —— 把瀏覽器縮窄的桌機使用者仍然該能選字。
+ *
+ * 滑動回覆只綁 touchstart/touchmove/touchend（`swipe-reply.js`），
+ * 桌機用滑鼠不會觸發，所以放開選取不影響它。
+ */
+@media (pointer: coarse) {
+    .chat-box-wrapper {
+        -webkit-user-select: none;
+        user-select: none;
+    }
 }
 
 /* 收到方靠左 */
