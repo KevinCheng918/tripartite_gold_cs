@@ -117,7 +117,8 @@ class AutoReplyService
          * 前面幾句（`auto_reply.context`）。
          */
         if ($this->telegramRepository->hasNewerInbound($group->id, $messageId)) {
-            Log::info('客人已有更新的訊息，這則的答案不送出', [
+            // 文案同 AutoReplyJob：講「後面還有新訊息」，不要說「有更新的訊息」
+            Log::info('這則不是最後一則，答案不送出（客人後面還有新訊息）', [
                 'group_id'   => $group->id,
                 'message_id' => $messageId,
                 'stage'      => 'AI 跑完後',
@@ -292,6 +293,19 @@ class AutoReplyService
         }
 
         if ($decision['action'] === $actions['ANSWER']) {
+            /*
+             * 命中也要記 —— 五種結局裡這是唯一「客人真的拿到答案」的，
+             * 沒有紀錄的話連「今天命中幾則」都答不出來。
+             *
+             * 回報「它回錯題了」時，這一行直接指出它挑了哪一題。
+             */
+            Log::info('自動回覆命中題庫', [
+                'group_id' => $group->id,
+                'item_id'  => $decision['item']->id,
+                'label'    => mb_substr((string) $decision['item']->label, 0, 60),
+                'text'     => mb_substr((string) $text, 0, 100),
+            ]);
+
             $this->replyWithItem($group, $decision['item'], $decision['opening']);
 
             return;
@@ -794,9 +808,34 @@ class AutoReplyService
          * 要改回去的話，在這裡送 `auto_reply.templates.wait` 即可
          * （那個設定已一併移除，要連它一起加回來）。
          */
+        /*
+         * ⚠ **這條路一定要記 log。**
+         *
+         * 轉人工是最常走的一條（答不出來就來這裡），而且**客人那邊是完全
+         * 靜默的** —— 2026-10-06 查「題庫明明有答案卻沒回」時才發現：
+         * 從 `replyWait()` 到 `openTicket()` 全程沒有任何紀錄，所以
+         * 「AI 到底判了什麼」「有沒有開單」事後都只能用猜的。
+         *
+         * 記 intent / item_id / confidence 三個值：題庫裡明明有答案卻轉人工
+         * 時，看這三個就知道是沒挑到題（item_id 為 null）還是挑到了但沒把握
+         * （confidence = low）—— 兩者要調的東西完全不同。
+         */
+        Log::info('自動回覆轉人工', [
+            'group_id'   => $group->id,
+            'message_id' => $messageId,
+            'text'       => mb_substr((string) $question, 0, 100),
+            'intent'     => Arr::get($result, 'intent'),
+            'item_id'    => Arr::get($result, 'item_id'),
+            'confidence' => Arr::get($result, 'confidence'),
+            'candidates' => (array) Arr::get($result, 'candidates', []),
+            // 脈絡帶到幾則 —— 「這個是什麼原因」這種指代前文的問法，
+            // 脈絡是 0 則就必然比不中
+            'history'    => count($history),
+        ]);
+
         $this->telegramRepository->updateAutoReplyState($group, null);
 
-        $this->supportService->openTicket(
+        $ticket = $this->supportService->openTicket(
             $group,
             $question,
             $messageId,
@@ -804,6 +843,20 @@ class AutoReplyService
             $history,
             (array) Arr::get($result, 'candidates', [])
         );
+
+        /*
+         * 開單結果也要記 —— 客人那邊靜默，支援群組是唯一的出口，
+         * 這一步沒成功就等於整則訊息消失了。
+         *
+         * `openTicket()` 回 null 有兩種：沒設定支援群組（它自己會記
+         * warning），或擋掉了一模一樣的重複問題（那是刻意的）。
+         */
+        if (blank($ticket)) {
+            Log::warning('自動回覆轉人工，但沒有開出求助單', [
+                'group_id'   => $group->id,
+                'message_id' => $messageId,
+            ]);
+        }
     }
 
     /**

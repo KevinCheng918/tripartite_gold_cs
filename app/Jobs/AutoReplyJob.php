@@ -107,7 +107,9 @@ class AutoReplyJob implements ShouldQueue
         $superseded = $repository->hasNewerInbound($this->groupId, $this->messageId);
 
         if ($superseded) {
-            Log::info('客人已有更新的訊息，略過這則的自動回覆', [
+            // ⚠ 文案講「後面還有新訊息」而不是「有更新的訊息」——
+            // 後者讀起來像「客人編輯了訊息」，看 log 的人會往錯的方向查
+            Log::info('這則不是最後一則，略過（客人後面還有新訊息）', [
                 'group_id'   => $this->groupId,
                 'message_id' => $this->messageId,
                 'stage'      => $stage,
