@@ -286,6 +286,10 @@
                     settings.support.remind_report_user_ids = ids;
                 });
         });
+
+        document.getElementById('btn-test-report').addEventListener('click', function () {
+            runTest('/admin/notification/ajax-test-report', this, i18n.msg.report_test_failed);
+        });
     }
 
     // ===== 分頁一下半：話題分流 =====

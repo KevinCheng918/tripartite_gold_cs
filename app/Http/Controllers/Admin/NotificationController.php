@@ -10,6 +10,7 @@ use App\Http\Requests\Notification\UpdateShiftNoticeRequest;
 use App\Http\Requests\Notification\UpdateTopicRequest;
 use App\Services\NotificationSettingService;
 use App\Services\ShiftNoticeService;
+use App\Services\StaffDmService;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -117,6 +118,48 @@ class NotificationController extends Controller
 
             return response()->json(['message' => trans('notification.msg.save_failed')], 500);
         }
+    }
+
+    /**
+     * Ajax 每日統計測試發送
+     *
+     * 真的發出去（不是空跑）—— 理由見 `RemindReportService::test()`。
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxTestReport()
+    {
+        $result = $this->settingService->testReport();
+        $sent = (int) Arr::get($result, 'sent', 0);
+
+        if ($sent > 0) {
+            // 有人收到就算成功，但沒收到的人也要講 —— 理由同 ajaxTestShift()
+            $failed = (array) Arr::get($result, 'failed', []);
+
+            if (filled($failed)) {
+                return response()->json([
+                    'message' => trans('notification.msg.report_test_partial', [
+                        'sent'   => $sent,
+                        'failed' => implode('、', $failed),
+                    ]),
+                ]);
+            }
+
+            return response()->json([
+                'message' => trans('notification.msg.report_test_sent', ['sent' => $sent]),
+            ]);
+        }
+
+        $reason = (string) Arr::get($result, 'reason');
+        $messages = [
+            StaffDmService::SKIP_NO_RECIPIENT => trans('notification.msg.report_test_no_user'),
+            StaffDmService::SKIP_NOT_BOUND    => trans('notification.msg.report_test_not_bound'),
+            StaffDmService::SKIP_SEND_FAILED  => trans('notification.msg.report_test_failed'),
+        ];
+
+        return response()->json([
+            'message' => Arr::get($messages, $reason, trans('notification.msg.report_test_failed')),
+        ], 422);
     }
 
     /**

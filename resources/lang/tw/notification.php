@@ -39,6 +39,8 @@ return [
     'report_desc'      => '每天 :time 把前一天的超時提醒統計私訊出去。勾選的人收「全部人的」（依題目、依人員），被提醒到的同仁另外會各自收到「自己那份」，不需要設定。',
     'report_user'      => '完整統計私訊給（可多選）',
     'report_user_hint' => '建議勾主管以上。標示「未綁定」的人收不到，請他先私訊機器人一次。',
+    'report_test'      => '測試發送',
+    'report_test_hint' => '會立刻把昨天的完整統計私訊給上面勾選的人。只發完整版，不會打擾昨天被提醒到的同仁。',
     'report_personal_title' => '個人統計',
     'report_personal_desc'  => '昨天被提醒到的同仁，每天 :time 會各自收到「自己那份」（我被催了哪幾題）。這部分自動發送，不需要設定；沒被提醒到的人不會收到。',
 
@@ -124,6 +126,11 @@ return [
         'remind_max_required'  => '請填寫最多提醒幾次',
         'remind_max_invalid'   => '提醒次數須介於 1 到 200 次',
         'report_user_not_found' => '找不到這個帳號',
+        'report_test_sent'      => '測試統計已送出 :sent 則，請確認 Telegram 有收到',
+        'report_test_partial'   => '已送出 :sent 則，但這幾位沒收到：:failed（請他們先私訊機器人一次）',
+        'report_test_no_user'   => '請先勾選收件人並儲存',
+        'report_test_not_bound' => '勾選的同仁都還沒私訊過機器人，所以收不到訊息',
+        'report_test_failed'    => '發送失敗，請確認同仁沒有封鎖機器人',
 
         // 話題
         'topic_too_many'       => '話題數量超過上限',

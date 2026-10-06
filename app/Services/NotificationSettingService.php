@@ -35,6 +35,7 @@ class NotificationSettingService
     private $supportGroup;
     private $supportService;
     private $shiftNotice;
+    private $remindReport;
 
     public function __construct(
         AppSettingService $appSettingService,
@@ -43,7 +44,8 @@ class NotificationSettingService
         StaffDmService $staffDm,
         SupportGroupService $supportGroup,
         AutoReplySupportService $supportService,
-        ShiftNoticeService $shiftNotice
+        ShiftNoticeService $shiftNotice,
+        RemindReportService $remindReport
     ) {
         $this->appSettingService = $appSettingService;
         $this->stationRepository = $stationRepository;
@@ -52,6 +54,7 @@ class NotificationSettingService
         $this->supportGroup = $supportGroup;
         $this->supportService = $supportService;
         $this->shiftNotice = $shiftNotice;
+        $this->remindReport = $remindReport;
     }
 
     /**
@@ -128,6 +131,16 @@ class NotificationSettingService
             AppSettingService::KEY_REMIND_INTERVAL_MINUTES => (string) Arr::get($params, 'remind_interval_minutes'),
             AppSettingService::KEY_REMIND_MAX_COUNT        => (string) Arr::get($params, 'remind_max_count'),
         ], $userId);
+    }
+
+    /**
+     * 每日統計的測試發送
+     *
+     * @return array
+     */
+    public function testReport()
+    {
+        return $this->remindReport->test();
     }
 
     /**

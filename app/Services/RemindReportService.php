@@ -79,6 +79,32 @@ class RemindReportService
     }
 
     /**
+     * 測試發送：真的把昨天的完整統計私訊給勾選的收件人
+     *
+     * ⚠ 刻意**不是** dry-run —— 測試按鈕要回答的是「訊息到得了他手機嗎」，
+     * 只組字串不發送的話，沒綁定、被封鎖這些真正會出事的狀況全都測不到。
+     * 比照 `ShiftNoticeService::test()`。
+     *
+     * ⚠ **只發完整版**，不發個人版 —— 測試不該去打擾昨天被提醒到的同仁。
+     *
+     * @return array sent / reason / names / failed
+     */
+    public function test()
+    {
+        $date = now()->subDay()->toDateString();
+        $text = (string) config('constants.AUTO_REPLY.REMIND.REPORT.TEST_PREFIX') . $this->buildText($date);
+
+        $result = $this->sendFull($text, false);
+
+        return [
+            'sent'   => Arr::get($result, 'sent', 0),
+            'reason' => Arr::get($result, 'reason'),
+            'names'  => Arr::get($result, 'names', []),
+            'failed' => Arr::get($result, 'failed', []),
+        ];
+    }
+
+    /**
      * 完整版 —— 發給設定頁勾選的人
      *
      * @param string $text

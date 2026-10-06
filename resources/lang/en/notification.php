@@ -39,6 +39,8 @@ return [
     'report_desc'      => 'Yesterday\'s overdue-reminder summary is sent by direct message at :time daily. The people ticked here receive the summary for *everyone* (by ticket and by person); anyone who was reminded also receives their own personal summary automatically, with no setup.',
     'report_user'      => 'Full summary goes to (multiple)',
     'report_user_hint' => 'Managers and above is the usual choice. Staff marked "not linked" cannot receive it — ask them to message the bot once.',
+    'report_test'      => 'Send test',
+    'report_test_hint' => 'Sends yesterday\'s full summary to everyone ticked above right now. Only the full version — nobody who was reminded yesterday is disturbed.',
     'report_personal_title' => 'Personal summary',
     'report_personal_desc'  => 'Anyone who was reminded yesterday receives their own summary at :time (which tickets they were chased on). This is automatic and needs no setup; people who were not reminded receive nothing.',
 
@@ -124,6 +126,11 @@ return [
         'remind_max_required'  => 'Please enter the maximum number of reminders',
         'remind_max_invalid'   => 'Maximum reminders must be between 1 and 200',
         'report_user_not_found' => 'Account not found',
+        'report_test_sent'      => ':sent test summary message(s) sent, please check Telegram',
+        'report_test_partial'   => ':sent sent, but these people did not receive it: :failed (ask them to message the bot once)',
+        'report_test_no_user'   => 'Please tick at least one recipient and save first',
+        'report_test_not_bound' => 'None of the ticked recipients has messaged the bot yet, so they cannot receive messages',
+        'report_test_failed'    => 'Send failed, please check the bot is not blocked',
 
         // Topics
         'topic_too_many'       => 'Too many topics',

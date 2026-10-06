@@ -233,6 +233,8 @@
                                         <small class="form-text text-muted">{{ trans('notification.report_user_hint') }}</small>
                                     </div>
                                     <button type="submit" class="btn btn-primary js-manage-only">{{ trans('notification.action_save') }}</button>
+                                    <button type="button" class="btn btn-outline-secondary js-manage-only" id="btn-test-report">{{ trans('notification.report_test') }}</button>
+                                    <div class="form-text mt-2">{{ trans('notification.report_test_hint') }}</div>
                                 </form>
                             </div>
                         </div>
