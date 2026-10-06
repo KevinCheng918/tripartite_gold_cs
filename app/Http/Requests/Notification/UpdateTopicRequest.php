@@ -120,7 +120,8 @@ class UpdateTopicRequest extends FormRequest
 
             if ((int) Arr::get($counts, $key, 0) > 1) {
                 $validator->errors()->add('topics', trans('notification.msg.type_single_only', [
-                    'type' => (string) Arr::get($type, 'label', $key),
+                    // 顯示名稱在語系檔，config 只留 needs_reply
+                    'type' => trans("notification.notice_type.{$key}"),
                 ]));
             }
         }

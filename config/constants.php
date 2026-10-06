@@ -254,44 +254,24 @@ return [
      */
     'SUPPORT_TOPIC' => [
         /*
-         * 通知類型。key 存進設定、value 是設定頁顯示的名稱與限制。
+         * 通知類型。key 存進設定，`needs_reply` 決定它能不能勾在多個話題。
          *
-         * `NEEDS_REPLY` = 這類訊息**要等客服引用回覆**，系統得記住「發出去那則的
+         * ⚠ **顯示名稱與說明在語系檔**（`notification.notice_type.*`），不在這裡。
+         * 那是設定頁的介面文字，會跟著操作者的語系跑 —— 跟對客話術不一樣
+         * （後者刻意留在 config，因為客戶收到的內容不該因客服的語系而變）。
+         *
+         * `needs_reply` = 這類訊息**要等客服引用回覆**，系統得記住「發出去那則的
          * message_id」才對得回來（求助單的 `ask_message_id`、匯率的決定回覆）。
          * 發到兩個話題會有兩個 id、只能記一個，另一個話題的訊息就變成
          * 「回覆了也沒反應」—— 所以這類**只能勾一個話題**，設定頁會驗證。
          */
         'TYPES' => [
-            'auto_reply_ticket' => [
-                'label'       => 'AI 轉問題與客服回答',
-                'hint'        => '題庫找不到答案時轉出來的求助單、超時提醒、處理結果',
-                'needs_reply' => true,
-            ],
-            'daily_rate' => [
-                'label'       => '每日匯率',
-                'hint'        => '每天 9:00 報價、沒決定時每 30 分的提醒、決定後的結果',
-                'needs_reply' => true,
-            ],
-            'ticket_handover' => [
-                'label'       => '待接手清單',
-                'hint'        => '每天 7:00 把還沒人處理的問題交接給當天早班',
-                'needs_reply' => false,
-            ],
-            'shift_notice' => [
-                'label'       => '班表通知異常',
-                'hint'        => '今日班表有同仁沒收到時的彙總',
-                'needs_reply' => false,
-            ],
-            'vm_payment' => [
-                'label'       => '虛擬機繳款',
-                'hint'        => '每天 9:30 的繳款通知、沒設群組時退回內部、催內部審核',
-                'needs_reply' => false,
-            ],
-            'station_credit' => [
-                'label'       => '站台餘點告警',
-                'hint'        => '每天 10:00 的餘點告警與補點訊息、沒設群組時退回內部',
-                'needs_reply' => false,
-            ],
+            'auto_reply_ticket' => ['needs_reply' => true],
+            'daily_rate'        => ['needs_reply' => true],
+            'ticket_handover'   => ['needs_reply' => false],
+            'shift_notice'      => ['needs_reply' => false],
+            'vm_payment'        => ['needs_reply' => false],
+            'station_credit'    => ['needs_reply' => false],
         ],
 
         // 話題名稱只是給人看的備註，Bot API 沒有「依名稱查話題」的方法

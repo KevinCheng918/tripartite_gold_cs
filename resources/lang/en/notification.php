@@ -83,6 +83,28 @@ return [
     'action_saving'  => 'Saving…',
     'action_testing' => 'Sending…',
 
+    /*
+     * Notification types that a topic can subscribe to.
+     *
+     * ⚠ Name them by **what lands in the group**, not by which feature they
+     * belong to. The shift roster itself is a direct message and never reaches
+     * the group — only the "who did not receive it" summary does.
+     */
+    'notice_type' => [
+        'auto_reply_ticket'      => 'Questions forwarded by AI',
+        'auto_reply_ticket_hint' => 'Tickets raised when the knowledge base has no answer, overdue reminders and outcomes. Staff answer by quoting here',
+        'daily_rate'             => 'Daily rate quote',
+        'daily_rate_hint'        => 'The 9:00 quote, the 30-minute reminders while undecided, and the outcome. Decided by quoting the message',
+        'ticket_handover'        => 'Morning handover list',
+        'ticket_handover_hint'   => 'Unhandled questions handed to the morning shift at 7:30 daily',
+        'shift_notice'           => 'Staff who missed the roster',
+        'shift_notice_hint'      => 'A summary of whoever could not be reached by direct message. The roster itself is a DM and never reaches the group',
+        'vm_payment'             => 'VM payment notices',
+        'vm_payment_hint'        => 'The 9:30 payment notice: falls back here when a station has no group, and chases internal approval',
+        'station_credit'         => 'Station credit alerts',
+        'station_credit_hint'    => 'The 10:00 credit alert and top-up message, falling back here when a station has no group',
+    ],
+
     'msg' => [
         'saved'       => 'Saved',
         'save_failed' => 'Save failed, please try again later',

@@ -78,18 +78,25 @@ sendMessage(chat_id=-100…, message_thread_id=42, text=…)
 
 ## 通知類型
 
-`constants.SUPPORT_TOPIC.TYPES` 定義六類，每類由對應 service 的 `NOTICE_TYPE` 宣告：
+`constants.SUPPORT_TOPIC.TYPES` 只定義 key 與 `needs_reply`，
+**顯示名稱與說明在語系檔** `notification.notice_type.*`
+（那是設定頁的介面文字，要跟著操作者的語系跑；對客話術才留在 config）。
 
-| key | 內容 | 哪支 service | 只能一個話題 |
+| key | 群組裡會收到什麼 | 哪支 service | 只能一個話題 |
 |---|---|---|---|
-| `auto_reply_ticket` | AI 轉問題、超時提醒、處理結果 | `AutoReplySupportService` | ✅ |
-| `daily_rate` | 9:00 報價、每 30 分提醒、決定結果 | `DailyRateService` | ✅ |
-| `ticket_handover` | 7:30 待接手清單 | `TicketHandoverService` | |
-| `shift_notice` | 班表沒收到的人彙總 | `ShiftNoticeService` | |
-| `vm_payment` | 9:30 虛擬機繳款通知 | `VmPaymentNoticeService` | |
-| `station_credit` | 10:00 餘點告警與補點訊息 | `StationCreditAlertService` | |
+| `auto_reply_ticket` | AI 轉來的問題（求助單、超時提醒、處理結果） | `AutoReplySupportService` | ✅ |
+| `daily_rate` | 每日匯率報價（9:00 報價、提醒、結果） | `DailyRateService` | ✅ |
+| `ticket_handover` | 早班待接手清單（7:30） | `TicketHandoverService` | |
+| `shift_notice` | **班表沒收到的人** | `ShiftNoticeService` | |
+| `vm_payment` | 虛擬機繳款（9:30） | `VmPaymentNoticeService` | |
+| `station_credit` | 站台餘點告警（10:00） | `StationCreditAlertService` | |
 
-⚠ **匯率歸「排程通知」類**（需求方確認）—— 它是排程發的，雖然也要客服引用回覆。
+⚠ **名稱要寫「群組裡會收到什麼」，不是「這是哪個功能」。**
+`shift_notice` 原本叫「班表通知異常」—— 但班表通知本身是**私訊、不會進群組**，
+進群組的只有「誰沒收到」那則彙總。用功能名當標籤會讓人以為是另一個功能。
+
+⚠ **匯率歸排程通知而不是「要回覆的」那一類**（需求方確認）：它是排程發的，
+雖然也要客服引用回覆。
 
 ## 實作
 

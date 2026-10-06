@@ -394,9 +394,10 @@ class NotificationSettingService
 
         foreach ((array) config('constants.SUPPORT_TOPIC.TYPES') as $key => $type) {
             $types[] = [
-                'key'         => $key,
-                'label'       => (string) Arr::get($type, 'label', $key),
-                'hint'        => (string) Arr::get($type, 'hint', ''),
+                'key' => $key,
+                // 顯示文字在語系檔，config 只留「能不能勾多個話題」這種行為設定
+                'label'       => trans("notification.notice_type.{$key}"),
+                'hint'        => trans("notification.notice_type.{$key}_hint"),
                 'needs_reply' => (bool) Arr::get($type, 'needs_reply', false),
             ];
         }
