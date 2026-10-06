@@ -1,9 +1,9 @@
 <?php
 
 return [
-    'nav_label'   => '全局设置',
-    'page_title'  => '全局设置',
-    'subtitle'    => 'Claude 凭证、备援 API 与用量流量',
+    'nav_label'   => 'AI 引擎',
+    'page_title'  => 'AI 引擎',
+    'subtitle'    => '自动回复用的 Claude 凭证、备援 API 与用量流量',
 
     // Claude 主要设置
     'claude_title'        => 'Claude（自动回复）',

@@ -227,7 +227,7 @@
                             @if(Auth::user()->hasPermission('setting.view'))
                             <li>
                                 <a href="{{ route('admin.setting.index') }}" class="{{ request()->routeIs('admin.setting.*') ? 'mm-active' : '' }}">
-                                    <i class="metismenu-icon fas fa-cog"></i>
+                                    <i class="metismenu-icon fas fa-brain"></i>
                                     {{ trans('setting.nav_label') }}
                                 </a>
                             </li>

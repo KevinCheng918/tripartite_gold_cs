@@ -20,7 +20,7 @@ return [
         'login_log' => 'Login Log',
         'daily_rate' => 'Daily Rate',
         'notification' => 'Notifications',
-        'setting' => 'Global Settings',
+        'setting' => 'AI Engine',
     ],
     'dashboard' => [
         'usdt_rate' => 'View USDT rate',
@@ -73,8 +73,8 @@ return [
         'edit' => 'Edit quick reply library',
     ],
     'setting' => [
-        'view'   => 'View global settings',
-        'manage' => 'Modify global settings (incl. Claude credentials)',
+        'view'   => 'View AI engine settings and usage',
+        'manage' => 'Modify AI engine settings (Claude credentials, fallback API)',
     ],
     'notification' => [
         'view'   => 'View notification settings',

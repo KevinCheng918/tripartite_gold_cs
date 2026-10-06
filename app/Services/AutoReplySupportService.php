@@ -1255,7 +1255,7 @@ class AutoReplySupportService
     {
         $this->sendToSupport(implode("\n", [
             '⚠️ Claude 訂閱額度已達上限，自動回覆改用備援 API Key。',
-            '這段期間的回覆會產生 API 費用，可到後台「全域設定」查看用量。',
+            '這段期間的回覆會產生 API 費用，可到後台「AI 引擎」查看用量。',
         ]));
     }
 

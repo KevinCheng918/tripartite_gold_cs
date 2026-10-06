@@ -6,7 +6,7 @@
 
 @section('content')
 
-    {{-- 三個分頁的資料隨頁面一起送出，切分頁不必再等 ajax --}}
+    {{-- 四個分頁的資料隨頁面一起送出，切分頁不必再等 ajax --}}
     {{-- ⚠️ data 屬性用單引號包，JSON 內的單引號會提早結束屬性、讓前端解析失敗，
          所以一律用 JSON_HEX_APOS 轉義 --}}
     <div id="notification-app"
@@ -16,13 +16,13 @@
 
         <ul class="nav nav-tabs mb-3" role="tablist">
             <li class="nav-item">
-                <a class="nav-link active" data-bs-toggle="tab" href="#tab-support" role="tab">
-                    <i class="fas fa-users me-1"></i>{{ trans('notification.tab_support') }}
+                <a class="nav-link active" data-bs-toggle="tab" href="#tab-group" role="tab">
+                    <i class="fas fa-comment-dots me-1"></i>{{ trans('notification.tab_group') }}
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" data-bs-toggle="tab" href="#tab-topic" role="tab">
-                    <i class="fas fa-comment-dots me-1"></i>{{ trans('notification.tab_topic') }}
+                <a class="nav-link" data-bs-toggle="tab" href="#tab-remind" role="tab">
+                    <i class="fas fa-bell me-1"></i>{{ trans('notification.tab_remind') }}
                 </a>
             </li>
             <li class="nav-item">
@@ -30,17 +30,22 @@
                     <i class="fas fa-calendar-alt me-1"></i>{{ trans('notification.tab_shift') }}
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#tab-report" role="tab">
+                    <i class="fas fa-chart-bar me-1"></i>{{ trans('notification.tab_report') }}
+                </a>
+            </li>
         </ul>
 
         <div class="tab-content">
 
-            {{-- ============ 分頁一：內部支援群組 ============ --}}
-            <div class="tab-pane fade show active" id="tab-support" role="tabpanel">
+            {{-- ============ 分頁一：支援群組與話題分流 ============ --}}
+            <div class="tab-pane fade show active" id="tab-group" role="tabpanel">
                 <div class="main-card mb-3 card">
                     <div class="card-body">
                         <h5 class="card-title">{{ trans('notification.support_title') }}</h5>
                         <p class="text-muted" style="font-size:0.875rem">{{ trans('notification.support_desc') }}</p>
-                        <form id="form-support">
+                        <form id="form-group">
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label" for="support-chat-id">{{ trans('notification.support_chat_id') }}</label>
@@ -52,60 +57,12 @@
                                     <select class="form-select" id="support-system"></select>
                                 </div>
                             </div>
-
-                            <hr>
-                            <h6 class="mb-3">{{ trans('notification.remind_title') }}</h6>
-                            <div class="row">
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label" for="support-remind-first">{{ trans('notification.remind_first') }}</label>
-                                    <input type="number" class="form-control" id="support-remind-first" min="1" max="1440" step="1">
-                                    <small class="form-text text-muted">{{ trans('notification.remind_first_hint') }}</small>
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label" for="support-remind-interval">{{ trans('notification.remind_interval') }}</label>
-                                    <input type="number" class="form-control" id="support-remind-interval" min="1" max="1440" step="1">
-                                    <small class="form-text text-muted">
-                                        {{ trans('notification.remind_interval_hint', ['escalate' => config('constants.AUTO_REPLY.REMIND.ESCALATE_AT')]) }}
-                                    </small>
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label" for="support-remind-max">{{ trans('notification.remind_max') }}</label>
-                                    <input type="number" class="form-control" id="support-remind-max" min="1" max="200" step="1">
-                                    <small class="form-text text-muted">{{ trans('notification.remind_max_hint') }}</small>
-                                </div>
-                            </div>
-
-                            <hr>
-                            <h6 class="mb-2">{{ trans('notification.report_title') }}</h6>
-                            <p class="text-muted" style="font-size:0.875rem">
-                                {{ trans('notification.report_desc', ['time' => config('constants.AUTO_REPLY.REMIND.REPORT_AT')]) }}
-                            </p>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <div class="d-flex align-items-center justify-content-between mb-2">
-                                        <label class="form-label mb-0">{{ trans('notification.report_user') }}</label>
-                                        <div class="form-check mb-0">
-                                            <input class="form-check-input" type="checkbox" id="support-report-all">
-                                            <label class="form-check-label" for="support-report-all">{{ trans('notification.select_all') }}</label>
-                                        </div>
-                                    </div>
-                                    {{-- 人多的時候不要把整頁撐長，超過就在框內捲動 --}}
-                                    <div id="support-report-list" class="p-2"
-                                         style="max-height:200px;overflow-y:auto;border:1px solid var(--bs-border-color, rgba(0,0,0,0.175));border-radius:6px">
-                                    </div>
-                                    <small class="form-text text-muted">{{ trans('notification.report_user_hint') }}</small>
-                                </div>
-                            </div>
-
                             <button type="submit" class="btn btn-primary js-manage-only">{{ trans('notification.action_save') }}</button>
                             <button type="button" class="btn btn-outline-secondary js-manage-only" id="btn-test-support">{{ trans('notification.support_test') }}</button>
                         </form>
                     </div>
                 </div>
-            </div>
 
-            {{-- ============ 分頁二：話題分流 ============ --}}
-            <div class="tab-pane fade" id="tab-topic" role="tabpanel">
                 <div class="row">
                     <div class="col-lg-8">
                         <div class="main-card mb-3 card">
@@ -150,6 +107,40 @@
                                 </p>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- ============ 分頁二：求助單提醒 ============ --}}
+            <div class="tab-pane fade" id="tab-remind" role="tabpanel">
+                <div class="main-card mb-3 card">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ trans('notification.remind_title') }}</h5>
+                        <p class="text-muted" style="font-size:0.875rem">
+                            {{ trans('notification.remind_desc', ['escalate' => config('constants.AUTO_REPLY.REMIND.ESCALATE_AT')]) }}
+                        </p>
+                        <form id="form-remind">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label" for="support-remind-first">{{ trans('notification.remind_first') }}</label>
+                                    <input type="number" class="form-control" id="support-remind-first" min="1" max="1440" step="1">
+                                    <small class="form-text text-muted">{{ trans('notification.remind_first_hint') }}</small>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label" for="support-remind-interval">{{ trans('notification.remind_interval') }}</label>
+                                    <input type="number" class="form-control" id="support-remind-interval" min="1" max="1440" step="1">
+                                    <small class="form-text text-muted">
+                                        {{ trans('notification.remind_interval_hint', ['escalate' => config('constants.AUTO_REPLY.REMIND.ESCALATE_AT')]) }}
+                                    </small>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label" for="support-remind-max">{{ trans('notification.remind_max') }}</label>
+                                    <input type="number" class="form-control" id="support-remind-max" min="1" max="200" step="1">
+                                    <small class="form-text text-muted">{{ trans('notification.remind_max_hint') }}</small>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary js-manage-only">{{ trans('notification.action_save') }}</button>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -210,6 +201,52 @@
                                 </ol>
                                 <p class="mb-0 text-danger" style="font-size:0.875rem">
                                     <i class="fas fa-exclamation-triangle me-1"></i>{{ trans('notification.bind_note') }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            {{-- ============ 分頁四：超時提醒統計 ============ --}}
+            <div class="tab-pane fade" id="tab-report" role="tabpanel">
+                <div class="row">
+                    <div class="col-lg-7">
+                        <div class="main-card mb-3 card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ trans('notification.report_title') }}</h5>
+                                <p class="text-muted" style="font-size:0.875rem">
+                                    {{ trans('notification.report_desc', ['time' => config('constants.AUTO_REPLY.REMIND.REPORT_AT')]) }}
+                                </p>
+                                <form id="form-report">
+                                    <div class="mb-3">
+                                        <div class="d-flex align-items-center justify-content-between mb-2">
+                                            <label class="form-label mb-0">{{ trans('notification.report_user') }}</label>
+                                            <div class="form-check mb-0">
+                                                <input class="form-check-input" type="checkbox" id="support-report-all">
+                                                <label class="form-check-label" for="support-report-all">{{ trans('notification.select_all') }}</label>
+                                            </div>
+                                        </div>
+                                        {{-- 人多的時候不要把整頁撐長，超過就在框內捲動 --}}
+                                        <div id="support-report-list" class="p-2"
+                                             style="max-height:260px;overflow-y:auto;border:1px solid var(--bs-border-color, rgba(0,0,0,0.175));border-radius:6px">
+                                        </div>
+                                        <small class="form-text text-muted">{{ trans('notification.report_user_hint') }}</small>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary js-manage-only">{{ trans('notification.action_save') }}</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- 個人版（純說明，沒有東西要設定） --}}
+                    <div class="col-lg-5">
+                        <div class="main-card mb-3 card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ trans('notification.report_personal_title') }}</h5>
+                                <p class="text-muted mb-0" style="font-size:0.875rem">
+                                    {{ trans('notification.report_personal_desc', ['time' => config('constants.AUTO_REPLY.REMIND.REPORT_AT')]) }}
                                 </p>
                             </div>
                         </div>

@@ -3,21 +3,28 @@
 namespace App\Services;
 
 use App\Repositories\StationRepository;
+use App\Repositories\UserRepository;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
 /**
  * 通知設定（通訊管理 → 通知設定）
  *
- * 2026-10-06 把三組原本散在兩頁的設定收成一頁三個分頁：
+ * 2026-10-06 把原本散在兩頁的通知設定收成一頁四個分頁：
  *
- * | 分頁 | 原本在哪 | 內容 |
- * |---|---|---|
- * | 內部支援群組 | 全域設定頁 | chat_id、用哪個 Bot、求助單提醒間隔／上限、統計收件人 |
- * | 話題分流 | 新增 | 話題清單，逐話題勾要收哪些通知 |
- * | 班表通知 | 班表通知頁（已移除） | 完整班表的收件人 |
+ * | 分頁 | 內容 |
+ * |---|---|
+ * | 支援群組與話題 | chat_id、用哪個 Bot、話題清單（逐話題勾要收哪些通知） |
+ * | 求助單提醒 | 首次／之後每隔／上限次數 |
+ * | 班表通知 | 完整班表的收件人 |
+ * | 超時提醒統計 | 完整統計的收件人 |
  *
- * 全域設定頁只留 Claude 憑證、備援 API、用量 —— 那些跟「通知發到哪」無關。
+ * 「AI 引擎」頁（原本的全域設定）只留 Claude 憑證、備援 API、用量 ——
+ * 那些跟「通知發到哪」無關。
+ *
+ * ⚠ **每個分頁各自存自己的那幾個設定**（`updateGroup` / `updateRemind` /
+ * `updateTopics` / `updateShift` / `updateReport`）。合成一支的話，存一個分頁
+ * 會把其他分頁的值一起寫掉 —— 那些欄位在這次送出裡是空的。
  */
 class NotificationSettingService
 {
@@ -32,7 +39,7 @@ class NotificationSettingService
     public function __construct(
         AppSettingService $appSettingService,
         StationRepository $stationRepository,
-        \App\Repositories\UserRepository $userRepository,
+        UserRepository $userRepository,
         StaffDmService $staffDm,
         SupportGroupService $supportGroup,
         AutoReplySupportService $supportService,
@@ -50,7 +57,7 @@ class NotificationSettingService
     /**
      * 整頁要的資料
      *
-     * 一次送出三個分頁的資料 —— 切換分頁不該再發 ajax，使用者會看到空白一拍。
+     * 一次送出四個分頁的資料 —— 切換分頁不該再發 ajax，使用者會看到空白一拍。
      *
      * @return array
      */
@@ -69,7 +76,7 @@ class NotificationSettingService
     }
 
     // ---------------------------------------------------------------
-    //  內部支援群組
+    //  支援群組 / 提醒 / 統計（讀取是一份，寫入按分頁分開）
     // ---------------------------------------------------------------
 
     /**
@@ -93,24 +100,51 @@ class NotificationSettingService
     }
 
     /**
-     * 存內部支援群組
+     * 存群組本身（chat_id 與用哪個 Bot）
      *
      * @param array    $params
      * @param int|null $userId
      * @return void
      */
-    public function updateSupport($params, $userId = null)
+    public function updateGroup($params, $userId = null)
     {
         $this->appSettingService->putMany([
-            AppSettingService::KEY_SUPPORT_CHAT_ID         => trim((string) Arr::get($params, 'chat_id')),
-            AppSettingService::KEY_SUPPORT_SYSTEM_ID       => (string) Arr::get($params, 'system_id'),
+            AppSettingService::KEY_SUPPORT_CHAT_ID   => trim((string) Arr::get($params, 'chat_id')),
+            AppSettingService::KEY_SUPPORT_SYSTEM_ID => (string) Arr::get($params, 'system_id'),
+        ], $userId);
+    }
+
+    /**
+     * 存求助單超時提醒
+     *
+     * @param array    $params
+     * @param int|null $userId
+     * @return void
+     */
+    public function updateRemind($params, $userId = null)
+    {
+        $this->appSettingService->putMany([
             AppSettingService::KEY_REMIND_FIRST_MINUTES    => (string) Arr::get($params, 'remind_first_minutes'),
             AppSettingService::KEY_REMIND_INTERVAL_MINUTES => (string) Arr::get($params, 'remind_interval_minutes'),
             AppSettingService::KEY_REMIND_MAX_COUNT        => (string) Arr::get($params, 'remind_max_count'),
-            // 全部取消勾選時存 null —— 轉換與清空的規則都在 idListValue() 裡
-            AppSettingService::KEY_REMIND_REPORT_MANAGER   => $this->appSettingService
-                ->idListValue(Arr::get($params, 'remind_report_user_ids', [])),
         ], $userId);
+    }
+
+    /**
+     * 存每日統計的收件人
+     *
+     * @param array    $params
+     * @param int|null $userId
+     * @return void
+     */
+    public function updateReport($params, $userId = null)
+    {
+        $this->appSettingService->put(
+            AppSettingService::KEY_REMIND_REPORT_MANAGER,
+            // 全部取消勾選時存 null —— 轉換與清空的規則都在 idListValue() 裡
+            $this->appSettingService->idListValue(Arr::get($params, 'remind_report_user_ids', [])),
+            $userId
+        );
     }
 
     /**

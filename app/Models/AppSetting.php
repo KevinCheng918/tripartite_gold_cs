@@ -7,9 +7,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Log;
 
 /**
- * 全域設定 Model
+ * 系統層級設定 Model
  *
- * key-value 形式的系統層級設定，由後台「全域設定」頁維護。
+ * key-value 形式的系統層級設定，由後台「AI 引擎」與「通知設定」兩頁維護。
  * 敏感值（Claude token、API key）以 Crypt::encrypt 加密存放，
  * 沿用 User 密碼的既有慣例 —— 是可還原的加密而非雜湊，因為用的時候需要明文。
  *
@@ -61,7 +61,7 @@ class AppSetting extends Model
             return \Crypt::decrypt($this->value);
         } catch (\Exception $e) {
             // 只記 key，不記內容 —— 這裡放的是 token 與 API key
-            Log::error('全域設定解密失敗', ['key' => $this->key, 'error' => $e->getMessage()]);
+            Log::error('系統設定解密失敗', ['key' => $this->key, 'error' => $e->getMessage()]);
 
             return null;
         }

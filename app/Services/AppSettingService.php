@@ -6,10 +6,13 @@ use App\Repositories\AppSettingRepository;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * 全域設定服務
+ * 系統層級設定服務
  *
- * 後台「全域設定」頁的讀寫入口。敏感值（Claude token、API key）以 Crypt::encrypt
- * 加密存放，明文只在這一層還原，對外一律只給遮罩。
+ * 讀寫入口。後台有兩頁在維護它：「AI 引擎」（Claude 憑證、備援 API）
+ * 與「通訊管理 → 通知設定」（支援群組、話題分流、通知收件人）。
+ *
+ * 敏感值（Claude token、API key）以 Crypt::encrypt 加密存放，明文只在這一層還原，
+ * 對外一律只給遮罩。
  *
  * 設定極少變動但每則訊息都會讀，所以整份快取起來，寫入時主動清掉。
  */

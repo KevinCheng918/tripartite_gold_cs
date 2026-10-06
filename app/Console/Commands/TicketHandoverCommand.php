@@ -22,7 +22,7 @@ class TicketHandoverCommand extends Command
 
     /** @var array 沒送出時的原因說明 */
     private const REASONS = [
-        TicketHandoverService::SKIP_NO_GROUP    => '沒有設定內部支援群組（到全域設定指定）',
+        TicketHandoverService::SKIP_NO_GROUP    => '沒有設定內部支援群組（到通訊管理 → 通知設定指定）',
         TicketHandoverService::SKIP_SEND_FAILED => 'Telegram 送出失敗，詳見 log',
     ];
 

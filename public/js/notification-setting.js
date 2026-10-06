@@ -1,8 +1,10 @@
 /**
  * 通知設定（通訊管理 → 通知設定）
  *
- * 三個分頁：內部支援群組、話題分流、班表通知。
- * 2026-10-06 從「全域設定」與「班表通知」兩頁合併過來。
+ * 四個分頁：支援群組與話題、求助單提醒、班表通知、超時提醒統計。
+ *
+ * ⚠ 每個分頁各自一支 ajax —— 合成一支的話，存一個分頁會把其他分頁的值
+ * 一起寫掉（那些欄位在這次送出裡是空的）。
  */
 (function () {
     'use strict';
@@ -205,15 +207,12 @@
         });
     }
 
-    // ===== 分頁一：內部支援群組 =====
+    // ===== 分頁一：支援群組（話題分流在下面單獨一段）=====
 
-    function renderSupport() {
+    function renderGroup() {
         var support = settings.support;
 
         document.getElementById('support-chat-id').value = support.chat_id || '';
-        document.getElementById('support-remind-first').value = support.remind_first_minutes;
-        document.getElementById('support-remind-interval').value = support.remind_interval_minutes;
-        document.getElementById('support-remind-max').value = support.remind_max_count;
 
         // Bot 來源：沒選就用 .env 的預設 bot
         var systemHtml = '<option value="">' + escapeHtml(i18n.support_system_default) + '</option>';
@@ -227,25 +226,15 @@
         var select = document.getElementById('support-system');
         select.innerHTML = systemHtml;
         select.value = support.system_id || '';
-
-        renderUserList('support-report-list', 'js-report-user', support.remind_report_user_ids);
-        syncAll('support-report-all', 'js-report-user');
     }
 
-    function bindSupport() {
-        bindSelectAll('support-report-all', 'support-report-list', 'js-report-user');
-
-        document.getElementById('form-support').addEventListener('submit', function (event) {
+    function bindGroup() {
+        document.getElementById('form-group').addEventListener('submit', function (event) {
             event.preventDefault();
 
-            submit('/admin/notification/ajax-update-support', {
+            submit('/admin/notification/ajax-update-group', {
                 chat_id: document.getElementById('support-chat-id').value.trim(),
-                system_id: document.getElementById('support-system').value || null,
-                remind_first_minutes: parseInt(document.getElementById('support-remind-first').value, 10) || 10,
-                remind_interval_minutes: parseInt(document.getElementById('support-remind-interval').value, 10) || 10,
-                remind_max_count: parseInt(document.getElementById('support-remind-max').value, 10) || 30,
-                // 空陣列代表「不發統計」，後端的 nullable|array 規則接得住
-                remind_report_user_ids: checkedIds('js-report-user')
+                system_id: document.getElementById('support-system').value || null
             }, event.target.querySelector('button[type="submit"]'));
         });
 
@@ -254,7 +243,51 @@
         });
     }
 
-    // ===== 分頁二：話題分流 =====
+    // ===== 分頁二：求助單提醒 =====
+
+    function renderRemind() {
+        var support = settings.support;
+
+        document.getElementById('support-remind-first').value = support.remind_first_minutes;
+        document.getElementById('support-remind-interval').value = support.remind_interval_minutes;
+        document.getElementById('support-remind-max').value = support.remind_max_count;
+    }
+
+    function bindRemind() {
+        document.getElementById('form-remind').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            submit('/admin/notification/ajax-update-remind', {
+                remind_first_minutes: parseInt(document.getElementById('support-remind-first').value, 10) || 10,
+                remind_interval_minutes: parseInt(document.getElementById('support-remind-interval').value, 10) || 10,
+                remind_max_count: parseInt(document.getElementById('support-remind-max').value, 10) || 30
+            }, event.target.querySelector('button[type="submit"]'));
+        });
+    }
+
+    // ===== 分頁四：超時提醒統計 =====
+
+    function renderReport() {
+        renderUserList('support-report-list', 'js-report-user', settings.support.remind_report_user_ids);
+        syncAll('support-report-all', 'js-report-user');
+    }
+
+    function bindReport() {
+        bindSelectAll('support-report-all', 'support-report-list', 'js-report-user');
+
+        document.getElementById('form-report').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            var ids = checkedIds('js-report-user');
+
+            submit('/admin/notification/ajax-update-report', { remind_report_user_ids: ids },
+                event.target.querySelector('button[type="submit"]'), function () {
+                    settings.support.remind_report_user_ids = ids;
+                });
+        });
+    }
+
+    // ===== 分頁一下半：話題分流 =====
 
     /**
      * 畫一列話題
@@ -437,14 +470,18 @@
 
     // ===== 啟動 =====
 
-    renderSupport();
+    renderGroup();
+    renderRemind();
     renderTopics();
     renderShift();
+    renderReport();
     applyPermission();
 
     if (canManage) {
-        bindSupport();
+        bindGroup();
+        bindRemind();
         bindTopics();
         bindShift();
+        bindReport();
     }
 }());

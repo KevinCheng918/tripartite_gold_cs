@@ -44,7 +44,7 @@ return [
 
     'auto_reply'             => '自动回复',
     'auto_reply_placeholder' => '自动回复中，取消勾选才能人工输入',
-    'auto_reply_unavailable' => '尚未设置 Claude，请先到「全局设置」完成设置',
+    'auto_reply_unavailable' => '尚未设置 Claude，请先到「AI 引擎」完成设置',
     'badge_auto'             => '自动',
     'auto_reply_running'     => 'AI 正在查询题库并回覆客人…',
 

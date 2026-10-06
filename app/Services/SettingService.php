@@ -6,7 +6,7 @@ use App\Services\AutoReply\ClaudeCodeMatcher;
 use Illuminate\Support\Facades\Log;
 
 /**
- * 全域設定頁的商業邏輯
+ * AI 引擎設定頁的商業邏輯
  *
  * 單純的讀寫在 AppSettingService，這一層負責需要跨服務協調的事：
  * 換 token 要先驗證、頁面資料要合併用量統計。

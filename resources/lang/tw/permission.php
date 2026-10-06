@@ -20,7 +20,7 @@ return [
         'login_log' => '登入紀錄',
         'daily_rate' => '每日匯率',
         'notification' => '通知設定',
-        'setting' => '全域設定',
+        'setting' => 'AI 引擎',
     ],
     'dashboard' => [
         'usdt_rate' => '查看 USDT 匯率',
@@ -80,8 +80,8 @@ return [
         'ignore_manage'   => '設定不自動回覆的成員',
     ],
     'setting' => [
-        'view'   => '檢視全域設定',
-        'manage' => '修改全域設定（含 Claude 憑證）',
+        'view'   => '檢視 AI 引擎設定與用量',
+        'manage' => '修改 AI 引擎設定（Claude 憑證、備援 API）',
     ],
     'notification' => [
         'view'   => '檢視通知設定',

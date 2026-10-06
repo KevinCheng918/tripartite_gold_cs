@@ -1,9 +1,9 @@
 <?php
 
 return [
-    'nav_label'   => '全域設定',
-    'page_title'  => '全域設定',
-    'subtitle'    => 'Claude 憑證、備援 API 與用量流量',
+    'nav_label'   => 'AI 引擎',
+    'page_title'  => 'AI 引擎',
+    'subtitle'    => '自動回覆用的 Claude 憑證、備援 API 與用量流量',
 
     // Claude 主要設定
     'claude_title'        => 'Claude（自動回覆）',

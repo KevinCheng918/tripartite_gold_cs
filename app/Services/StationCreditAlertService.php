@@ -163,7 +163,7 @@ class StationCreditAlertService
             return [];
         }
 
-        // 全域設定整組讀一次，不要在迴圈裡每站重讀
+        // 全站共用的那組設定讀一次，不要在迴圈裡每站重讀
         $settings = $this->globalSettings();
         $results = [];
 
@@ -499,7 +499,7 @@ class StationCreditAlertService
      * 處理單一站台：同步 → 判斷 → 發送
      *
      * @param Station $station
-     * @param array   $settings 全域設定
+     * @param array   $settings 全站共用的設定
      * @param bool    $dryRun
      * @return array 處理結果
      */

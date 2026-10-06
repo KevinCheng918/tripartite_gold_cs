@@ -72,7 +72,7 @@ class TelegramChatController extends Controller
         }
 
         return view('admin.telegram-chat.index', [
-            // 沒設定 Claude 憑證時，前端要把自動回覆勾選框停用並提示去全域設定
+            // 沒設定 Claude 憑證時，前端要把自動回覆勾選框停用並提示去「AI 引擎」設定
             'autoReplyAvailable' => $this->autoReplyService->isAvailable(),
         ]);
     }

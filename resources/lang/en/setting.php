@@ -1,9 +1,9 @@
 <?php
 
 return [
-    'nav_label'   => 'Global Settings',
-    'page_title'  => 'Global Settings',
-    'subtitle'    => 'Claude credentials, fallback API and usage',
+    'nav_label'   => 'AI Engine',
+    'page_title'  => 'AI Engine',
+    'subtitle'    => 'Claude credentials, fallback API and usage for auto-reply',
 
     // Claude
     'claude_title'        => 'Claude (Auto Reply)',

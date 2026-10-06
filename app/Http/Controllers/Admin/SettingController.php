@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 /**
- * 全域設定控制器
+ * AI 引擎設定控制器（選單上叫「AI 引擎」，路由仍是 setting）
  *
  * Claude 憑證、備援 API、用量流量。
  *

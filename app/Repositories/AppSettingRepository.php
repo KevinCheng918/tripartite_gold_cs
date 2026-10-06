@@ -6,7 +6,7 @@ use App\Models\AppSetting;
 use Illuminate\Database\Eloquent\Collection;
 
 /**
- * 全域設定 Repository
+ * 系統層級設定 Repository
  */
 class AppSettingRepository
 {

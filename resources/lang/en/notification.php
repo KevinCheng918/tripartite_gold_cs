@@ -3,13 +3,14 @@
 return [
     'nav_label'  => 'Notifications',
     'page_title' => 'Notification Settings',
-    'subtitle'   => 'Internal support group, topic routing, shift notices',
+    'subtitle'   => 'Support group & topics, ticket reminders, shift notices, summaries',
 
     'section_label' => 'Messaging',
 
-    'tab_support' => 'Support Group',
-    'tab_topic'   => 'Topic Routing',
-    'tab_shift'   => 'Shift Notice',
+    'tab_group'  => 'Group & Topics',
+    'tab_remind' => 'Ticket Reminders',
+    'tab_shift'  => 'Shift Notice',
+    'tab_report' => 'Reminder Summary',
 
     'select_all' => 'Select all',
     'unbound'    => 'not linked',
@@ -25,6 +26,7 @@ return [
 
     // ===== Ticket reminders =====
     'remind_title'         => 'Overdue ticket reminders',
+    'remind_desc'          => 'Questions the AI could not answer are forwarded to the support group, and reminders continue until somebody handles them. Reminders 1 and 2 tag the staff on shift; from reminder :escalate onward managers and owners are tagged as well (engineers are always skipped).',
     'remind_first'         => 'First reminder (minutes)',
     'remind_first_hint'    => 'Tags the staff currently on shift if nobody has answered within this time of the ticket opening.',
     'remind_interval'      => 'Then every (minutes)',
@@ -37,6 +39,8 @@ return [
     'report_desc'      => 'Yesterday\'s overdue-reminder summary is sent by direct message at :time daily. The people ticked here receive the summary for *everyone* (by ticket and by person); anyone who was reminded also receives their own personal summary automatically, with no setup.',
     'report_user'      => 'Full summary goes to (multiple)',
     'report_user_hint' => 'Managers and above is the usual choice. Staff marked "not linked" cannot receive it — ask them to message the bot once.',
+    'report_personal_title' => 'Personal summary',
+    'report_personal_desc'  => 'Anyone who was reminded yesterday receives their own summary at :time (which tickets they were chased on). This is automatic and needs no setup; people who were not reminded receive nothing.',
 
     // ===== Topic routing =====
     'topic_title'         => 'Topic Routing',

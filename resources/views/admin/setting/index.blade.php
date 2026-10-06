@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('title', trans('setting.page_title'))
-@section('icon', 'cog')
+@section('icon', 'brain')
 @section('subtitle', trans('setting.subtitle'))
 
 @section('content')

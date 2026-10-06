@@ -75,7 +75,7 @@ class CheckDailyRateCommand extends Command
             $this->required(
                 '內部支援群組',
                 Arr::get($state, 'group'),
-                '到全域設定頁填 chat_id，沒有這個報價送不出去'
+                '到通訊管理 → 通知設定填 chat_id，沒有這個報價送不出去'
             ),
             $this->required(
                 '題庫的匯率題',

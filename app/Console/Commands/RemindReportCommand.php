@@ -24,7 +24,7 @@ class RemindReportCommand extends Command
 
     /** @var array 沒送出時的原因說明 */
     private const REASONS = [
-        StaffDmService::SKIP_NO_RECIPIENT => '沒有勾選收件人（到全域設定的內部支援群組區塊指定）',
+        StaffDmService::SKIP_NO_RECIPIENT => '沒有勾選收件人（到通訊管理 → 通知設定 → 超時提醒統計指定）',
         StaffDmService::SKIP_NOT_BOUND    => '勾選的收件人都還沒私訊過機器人',
         StaffDmService::SKIP_SEND_FAILED  => 'Telegram 送出失敗，詳見 log',
     ];

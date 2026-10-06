@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Notification\UpdateGroupRequest;
+use App\Http\Requests\Notification\UpdateRemindRequest;
+use App\Http\Requests\Notification\UpdateReportRequest;
 use App\Http\Requests\Notification\UpdateShiftNoticeRequest;
-use App\Http\Requests\Notification\UpdateSupportRequest;
 use App\Http\Requests\Notification\UpdateTopicRequest;
 use App\Services\NotificationSettingService;
 use App\Services\ShiftNoticeService;
@@ -15,8 +17,11 @@ use Illuminate\Support\Facades\Log;
 /**
  * 通知設定（通訊管理 → 通知設定）
  *
- * 三個分頁：內部支援群組、話題分流、班表通知。
- * 2026-10-06 從「全域設定」與「班表通知」兩頁合併過來。
+ * 四個分頁：支援群組與話題、求助單提醒、班表通知、超時提醒統計。
+ * 2026-10-06 從「全域設定」（現已改名「AI 引擎」）與「班表通知」兩頁合併過來。
+ *
+ * ⚠ 每個分頁各自一支 ajax —— 合成一支的話，存一個分頁會把其他分頁的值
+ * 一起寫掉（那些欄位在這次送出裡是空的）。
  */
 class NotificationController extends Controller
 {
@@ -30,7 +35,7 @@ class NotificationController extends Controller
     /**
      * 設定頁
      *
-     * 三個分頁的資料隨頁面一起送出 —— 切分頁不該再等一次 ajax。
+     * 四個分頁的資料隨頁面一起送出 —— 切分頁不該再等一次 ajax。
      *
      * @return \Illuminate\View\View
      */
@@ -52,21 +57,63 @@ class NotificationController extends Controller
     }
 
     /**
-     * Ajax 更新內部支援群組
+     * Ajax 更新群組本身（chat_id 與用哪個 Bot）
      *
-     * @param UpdateSupportRequest $request
+     * @param UpdateGroupRequest $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function ajaxUpdateSupport(UpdateSupportRequest $request)
+    public function ajaxUpdateGroup(UpdateGroupRequest $request)
     {
         $params = $request->validated();
 
         try {
-            $this->settingService->updateSupport($params, Auth::id());
+            $this->settingService->updateGroup($params, Auth::id());
 
             return response()->json(['message' => trans('notification.msg.saved')]);
         } catch (\Exception $e) {
             Log::error('支援群組設定更新失敗', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
+
+            return response()->json(['message' => trans('notification.msg.save_failed')], 500);
+        }
+    }
+
+    /**
+     * Ajax 更新求助單超時提醒
+     *
+     * @param UpdateRemindRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxUpdateRemind(UpdateRemindRequest $request)
+    {
+        $params = $request->validated();
+
+        try {
+            $this->settingService->updateRemind($params, Auth::id());
+
+            return response()->json(['message' => trans('notification.msg.saved')]);
+        } catch (\Exception $e) {
+            Log::error('求助單提醒設定更新失敗', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
+
+            return response()->json(['message' => trans('notification.msg.save_failed')], 500);
+        }
+    }
+
+    /**
+     * Ajax 更新每日統計的收件人
+     *
+     * @param UpdateReportRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxUpdateReport(UpdateReportRequest $request)
+    {
+        $params = $request->validated();
+
+        try {
+            $this->settingService->updateReport($params, Auth::id());
+
+            return response()->json(['message' => trans('notification.msg.saved')]);
+        } catch (\Exception $e) {
+            Log::error('提醒統計設定更新失敗', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
 
             return response()->json(['message' => trans('notification.msg.save_failed')], 500);
         }

@@ -13,7 +13,8 @@ use Illuminate\Console\Command;
  *
  * 不會變成定時轟炸的煞車是**次數上限** —— 到上限就發一則收尾然後停。
  *
- * 由排程每分鐘執行，首次間隔／之後每隔／上限次數都在後台全域設定頁調整。
+ * 由排程每分鐘執行，首次間隔／之後每隔／上限次數都在「通訊管理 → 通知設定 →
+ * 求助單提醒」調整。
  */
 class AutoReplyRemindCommand extends Command
 {

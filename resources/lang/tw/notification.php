@@ -3,13 +3,14 @@
 return [
     'nav_label'  => '通知設定',
     'page_title' => '通知設定',
-    'subtitle'   => '內部支援群組、話題分流、班表通知',
+    'subtitle'   => '支援群組與話題、求助單提醒、班表通知、提醒統計',
 
     'section_label' => '通訊管理',
 
-    'tab_support' => '內部支援群組',
-    'tab_topic'   => '話題分流',
-    'tab_shift'   => '班表通知',
+    'tab_group'  => '支援群組與話題',
+    'tab_remind' => '求助單提醒',
+    'tab_shift'  => '班表通知',
+    'tab_report' => '超時提醒統計',
 
     'select_all' => '全選',
     'unbound'    => '未綁定',
@@ -25,6 +26,7 @@ return [
 
     // ===== 求助單提醒 =====
     'remind_title'         => '求助單超時提醒',
+    'remind_desc'          => 'AI 答不出來轉到支援群組的問題，沒人回答就會一直提醒到有人處理。第 1、2 次 tag 當班人員，第 :escalate 次起同時 tag 主管與老闆（都跳過工程）。',
     'remind_first'         => '第一次提醒（分鐘）',
     'remind_first_hint'    => '開單後超過這個時間沒人回答，tag 當下排班的人員。',
     'remind_interval'      => '之後每隔（分鐘）',
@@ -37,6 +39,8 @@ return [
     'report_desc'      => '每天 :time 把前一天的超時提醒統計私訊出去。勾選的人收「全部人的」（依題目、依人員），被提醒到的同仁另外會各自收到「自己那份」，不需要設定。',
     'report_user'      => '完整統計私訊給（可多選）',
     'report_user_hint' => '建議勾主管以上。標示「未綁定」的人收不到，請他先私訊機器人一次。',
+    'report_personal_title' => '個人統計',
+    'report_personal_desc'  => '昨天被提醒到的同仁，每天 :time 會各自收到「自己那份」（我被催了哪幾題）。這部分自動發送，不需要設定；沒被提醒到的人不會收到。',
 
     // ===== 話題分流 =====
     'topic_title'         => '話題分流',

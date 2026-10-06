@@ -20,7 +20,7 @@ return [
         'login_log' => '登录记录',
         'daily_rate' => '每日汇率',
         'notification' => '通知设置',
-        'setting' => '全局设置',
+        'setting' => 'AI 引擎',
     ],
     'dashboard' => [
         'usdt_rate' => '查看 USDT 汇率',
@@ -73,8 +73,8 @@ return [
         'edit' => '编辑快速回复题库',
     ],
     'setting' => [
-        'view'   => '查看全局设置',
-        'manage' => '修改全局设置（含 Claude 凭证）',
+        'view'   => '查看 AI 引擎设置与用量',
+        'manage' => '修改 AI 引擎设置（Claude 凭证、备援 API）',
     ],
     'notification' => [
         'view'   => '查看通知设置',

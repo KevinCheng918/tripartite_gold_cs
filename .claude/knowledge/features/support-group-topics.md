@@ -124,22 +124,30 @@ sendMessage(chat_id=-100…, message_thread_id=42, text=…)
 ```
 通訊管理
 ├─ Telegram 客服
-└─ 通知設定        ← 新（三個分頁）
-     ├─ 內部支援群組   （從全域設定頁搬來：chat_id、Bot、提醒間隔／上限、統計收件人）
-     ├─ 話題分流       （新）
-     └─ 班表通知       （原本獨立一頁，併進來）
+└─ 通知設定        ← 新（四個分頁）
+     ├─ 支援群組與話題   chat_id、用哪個 Bot、話題分流
+     ├─ 求助單提醒       第一次提醒／之後每隔／最多幾次
+     ├─ 班表通知         完整班表收件人
+     └─ 超時提醒統計     完整統計收件人
 ```
 
+⚠ **每個分頁各自一支 ajax**（`ajax-update-group` / `-remind` / `-topics` /
+`-shift` / `-report`）。合成一支的話，存一個分頁會把其他分頁的值一起寫掉 ——
+那些欄位在這次送出裡是空的。Request 也跟著拆成五個。
+
 - 權限 keyword 從 `shift_notice.*` 改成 `notification.*`
-- 全域設定頁只剩 Claude 憑證、備援 API、用量 —— `SettingService` 的建構子
-  也因此從 7 個依賴瘦到 3 個
+- **「全域設定」改名「AI 引擎」**（選單、頁面標題、權限群組名、icon 齒輪→大腦），
+  只剩 Claude 憑證、備援 API、用量 —— `SettingService` 的建構子也因此從 7 個
+  依賴瘦到 3 個。路由前綴仍是 `setting`
 - 刪除：`ShiftNoticeController`、`shift-notice` 的 view/js、`shift_notice.php` 三份語系
+- 所有「請到全域設定…」的指路文字（指令輸出、`/topicid` 的回覆、語系）都改指向新位置
 
 ## ⚠ 上線要做的事
 
 1. `php artisan optimize`（動過 `config/` 與 `routes/`）
 2. 權限表勾新的 **`notification.view` / `notification.manage`** ——
-   `shift_notice.*` 已不存在，原本勾那兩個的人會看不到選單
+   `shift_notice.*` 已不存在，原本勾那兩個的人會看不到選單。
+   （`setting.*` 只是改了顯示名稱為「AI 引擎」，keyword 沒變，不用重勾）
 3. 在每個話題裡輸入 `/topicid` 取得 id
 4. 到「通訊管理 → 通知設定 → 話題分流」新增話題、勾選要收的通知
 5. **按「測試發送」** —— 這步不能省：話題 id 填錯 Telegram 會整則拒收，
