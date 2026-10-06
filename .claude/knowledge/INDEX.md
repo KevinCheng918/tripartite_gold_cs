@@ -19,6 +19,7 @@
 |------|------|------|
 | [features/rbac.md](features/rbac.md) | 分帳號、權限管理（含最小登入/登出） | 已完成 |
 | [features/scheduling.md](features/scheduling.md) | 排班（報班/換班/三班制） | 已完成 |
+| [features/shift-daily-notice.md](features/shift-daily-notice.md) | 班表通知（每天 8:00 私訊今日班表：主管收完整班表含時間與缺人班次、有班的人收自己那份；bot 要先被私訊過才能發） | 已實作（待 migrate） |
 | [features/telegram-chat.md](features/telegram-chat.md) | 客服對話窗（Telegram 整合、快速回覆、傳送圖片／檔案含進度條、表情符號選單） | 已完成 |
 | [features/telegram-upload-limit.md](features/telegram-upload-limit.md) | 為什麼機器人只能傳 50MB 而自己的帳號可以傳 2GB（限制在官方的 Bot API 橋接伺服器，自架可到 2000MB）；附帶發現 purge 不刪實體檔 | 調查紀錄 |
 | [features/attendance.md](features/attendance.md) | 打卡出勤 | 已完成（持續迭代） |

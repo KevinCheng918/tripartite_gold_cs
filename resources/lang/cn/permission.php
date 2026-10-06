@@ -19,6 +19,7 @@ return [
         'task_board' => '任务看板',
         'login_log' => '登录记录',
         'daily_rate' => '每日汇率',
+        'shift_notice' => '班表通知',
         'setting' => '全局设置',
     ],
     'dashboard' => [
@@ -74,6 +75,10 @@ return [
     'setting' => [
         'view'   => '查看全局设置',
         'manage' => '修改全局设置（含 Claude 凭证）',
+    ],
+    'shift_notice' => [
+        'view'   => '查看班表通知设置',
+        'manage' => '修改班表通知收件人、测试发送',
     ],
     'telegram_chat' => [
         'reply'           => '回复消息',

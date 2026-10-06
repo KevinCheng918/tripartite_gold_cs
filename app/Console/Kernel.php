@@ -18,6 +18,17 @@ class Kernel extends ConsoleKernel
         // 每日凌晨 1 點標記前一天的曠工
         $schedule->command('attendance:mark-absent')->dailyAt('01:00');
 
+        /*
+         * 每天早上 8:00 私訊今日班表 —— 主管收完整班表、有班的人收自己那份。
+         *
+         * ⚠ **平假日都發**（需求方指定）：假日沒排班時主管那則會寫「今天沒有
+         * 任何排班」。群組裡完全沒動靜時，分不出是「今天本來就沒班」還是
+         * 「排程又壞了」。
+         *
+         * 排在 09:00 匯率報價之前 —— 上班前先知道今天誰在。
+         */
+        $schedule->command('shift:notify-daily')->dailyAt('08:00')->withoutOverlapping();
+
         // 每日凌晨 2 點清理 7 天前的 Telegram 訊息
         $schedule->command('telegram:purge')->dailyAt('02:00');
 

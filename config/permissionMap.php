@@ -105,6 +105,18 @@ return [
         ],
     ],
 
+    /*
+     * 班表通知。跟 shift（排班）分開：這裡管的是「通知發給誰」，
+     * 排班本身誰能改是另一回事 —— 能排班的人不一定該改通知收件人。
+     */
+    'shift_notice' => [
+        'label' => 'permission.group.shift_notice',
+        'keywords' => [
+            'shift_notice.view'   => 'permission.shift_notice.view',
+            'shift_notice.manage' => 'permission.shift_notice.manage',
+        ],
+    ],
+
     'setting' => [
         'label' => 'permission.group.setting',
         'keywords' => [

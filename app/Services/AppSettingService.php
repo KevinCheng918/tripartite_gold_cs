@@ -33,6 +33,13 @@ class AppSettingService
     const KEY_FALLBACK_DAILY_LIMIT = 'auto_reply.fallback_daily_limit';
 
     // 內部支援群組
+    /*
+     * 今日班表要私訊給誰（user.id）。
+     *
+     * 放 app_setting 而不是 config：換人是常態，不該為了換個收件人重新部署。
+     */
+    const KEY_SHIFT_NOTICE_MANAGER = 'shift_notice.manager_user_id';
+
     const KEY_SUPPORT_CHAT_ID       = 'auto_reply.support_chat_id';
     const KEY_SUPPORT_SYSTEM_ID     = 'auto_reply.support_system_id';
     const KEY_REMIND_FIRST_MINUTES  = 'auto_reply.remind_first_minutes';

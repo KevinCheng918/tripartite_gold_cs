@@ -19,6 +19,7 @@ return [
         'task_board' => 'Task Board',
         'login_log' => 'Login Log',
         'daily_rate' => 'Daily Rate',
+        'shift_notice' => 'Shift Notice',
         'setting' => 'Global Settings',
     ],
     'dashboard' => [
@@ -74,6 +75,10 @@ return [
     'setting' => [
         'view'   => 'View global settings',
         'manage' => 'Modify global settings (incl. Claude credentials)',
+    ],
+    'shift_notice' => [
+        'view'   => 'View shift notice settings',
+        'manage' => 'Change shift notice recipient, send test',
     ],
     'telegram_chat' => [
         'ignore_manage'   => 'Manage auto-reply exclusions',

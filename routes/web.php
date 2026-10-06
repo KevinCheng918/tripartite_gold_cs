@@ -18,6 +18,7 @@ use App\Http\Controllers\Admin\StaffManageController;
 use App\Http\Controllers\Admin\ProjectController;
 use App\Http\Controllers\Admin\QuickReplyController;
 use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\ShiftNoticeController;
 use App\Http\Controllers\Admin\FinanceController;
 use App\Http\Controllers\Admin\SharedFileController;
 use App\Http\Controllers\Admin\TaskBoardController;
@@ -130,6 +131,13 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::post('/ajax-toggle-auto-reply', [TelegramChatController::class, 'ajaxToggleAutoReply'])->middleware('can:telegram_chat.reply')->name('ajax-toggle-auto-reply');
         Route::get('/ajax-ignore-members', [TelegramChatController::class, 'ajaxIgnoreMembers'])->middleware('can:telegram_chat.ignore_manage')->name('ajax-ignore-members');
         Route::post('/ajax-toggle-ignore', [TelegramChatController::class, 'ajaxToggleIgnore'])->middleware('can:telegram_chat.ignore_manage')->name('ajax-toggle-ignore');
+    });
+
+    // 班表通知（今日班表每天早上私訊）
+    Route::prefix('shift-notice')->name('shift-notice.')->group(function () {
+        Route::get('/', [ShiftNoticeController::class, 'index'])->middleware('can:shift_notice.view')->name('index');
+        Route::put('/ajax-update', [ShiftNoticeController::class, 'ajaxUpdate'])->middleware('can:shift_notice.manage')->name('ajax-update');
+        Route::post('/ajax-test', [ShiftNoticeController::class, 'ajaxTest'])->middleware('can:shift_notice.manage')->name('ajax-test');
     });
 
     // 全域設定（Claude 憑證、內部支援群組、對客話術、用量流量）

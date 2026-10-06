@@ -8,6 +8,7 @@ use App\Repositories\AutoReplyTicketRepository;
 use App\Repositories\SharedFileRepository;
 use App\Repositories\ShiftAssignmentRepository;
 use App\Repositories\TelegramRepository;
+use App\Repositories\UserRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
@@ -30,6 +31,7 @@ class TelegramChatService
     private $memberService;
     private $staffIgnoreService;
     private $progressService;
+    private $userRepository;
 
     public function __construct(
         TelegramRepository $telegramRepository,
@@ -40,7 +42,8 @@ class TelegramChatService
         AutoReplyTicketRepository $ticketRepository,
         TelegramGroupMemberService $memberService,
         StaffIgnoreService $staffIgnoreService,
-        AutoReplyProgressService $progressService
+        AutoReplyProgressService $progressService,
+        UserRepository $userRepository
     ) {
         $this->telegramRepository = $telegramRepository;
         $this->botService = $botService;
@@ -52,6 +55,8 @@ class TelegramChatService
         // 後台帳號的全域屏蔽；與 memberService 的每對話名單並存
         $this->staffIgnoreService = $staffIgnoreService;
         $this->progressService = $progressService;
+        // 私訊綁定要用：對 username、寫 telegram_dm_ready
+        $this->userRepository = $userRepository;
     }
 
     /**
@@ -206,6 +211,63 @@ class TelegramChatService
         }
     }
 
+    /**
+     * 同事私訊 bot：記下他的 chat id，之後才發得了班表通知
+     *
+     * ⚠ **這是唯一能確認「可以私訊這個人」的時機。** Telegram 不提供
+     * 「查某人有沒有跟我對話過」的 API，只能在收到他的訊息時記下來。
+     *
+     * 用 username 對後台帳號（`telegram_username` 是人工填的，所以可能
+     * 對不到）。對不到就回一句請他去設定 —— 靜默的話他會以為綁好了，
+     * 到時候收不到班表還不知道為什麼。
+     *
+     * ⚠ 整段 try/catch：這是 webhook 的路徑，綁定失敗不能影響其他訊息處理。
+     *
+     * @param array $message Telegram 的 message
+     * @return void
+     */
+    private function bindPrivateChat(array $message)
+    {
+        $from = (array) Arr::get($message, 'from', []);
+        $username = Arr::get($from, 'username');
+        $userId = Arr::get($from, 'id');
+        $chatId = Arr::get($message, 'chat.id');
+
+        if (blank($userId) || blank($chatId)) {
+            return;
+        }
+
+        try {
+            $user = filled($username) ? $this->userRepository->findByTelegramUsername($username) : null;
+
+            if (blank($user)) {
+                Log::info('收到私訊但對不到後台帳號', ['username' => $username, 'telegram_user_id' => $userId]);
+                $this->botService->sendMessage($chatId, (string) config('constants.TELEGRAM.DM_BIND.UNKNOWN'));
+
+                return;
+            }
+
+            // 已經綁過就不重複寫，也不重複回覆 —— 他每次私訊都回一樣的話很吵
+            if ((bool) $user->telegram_dm_ready && (string) $user->telegram_user_id === (string) $userId) {
+                return;
+            }
+
+            $this->userRepository->markDmReady($user, $userId);
+
+            Log::info('私訊綁定完成', ['user_id' => $user->id, 'telegram_user_id' => $userId]);
+
+            $this->botService->sendMessage($chatId, strtr(
+                (string) config('constants.TELEGRAM.DM_BIND.DONE'),
+                ['{name}' => (string) $user->nickname]
+            ));
+        } catch (\Exception $e) {
+            Log::error('私訊綁定失敗', [
+                'telegram_user_id' => $userId,
+                'error'            => $e->getMessage(),
+            ]);
+        }
+    }
+
     public function handleIncomingMessage($payload)
     {
         $message = $payload['message'] ?? null;
@@ -214,9 +276,18 @@ class TelegramChatService
             return;
         }
 
-        // 只接收群組對話，忽略私人訊息
+        /*
+         * 私訊不建立客服對話 —— 不擋的話，同事私訊 bot 會被當成客戶對話
+         * 建進列表，他的話會被存成客戶訊息。
+         *
+         * 但**不能無聲丟掉**：Telegram 規定 bot 只能發訊給主動對話過的人，
+         * 而「收到他的私訊」是唯一能確認這件事的時機。班表通知就靠這一刻
+         * 記下來的 `telegram_dm_ready`（見 bindPrivateChat）。
+         */
         $chatType = $message['chat']['type'] ?? '';
         if ($chatType === 'private') {
+            $this->bindPrivateChat($message);
+
             return;
         }
 

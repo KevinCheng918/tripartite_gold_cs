@@ -272,6 +272,81 @@ class UserRepository
     }
 
     /**
+     * 取一個人的私訊資料
+     *
+     * ⚠ `telegram_dm_ready` 一定要在 select 裡 —— 少了它
+     * `ShiftNoticeService::canDm()` 讀到的永遠是 null，於是**所有人都被判定
+     * 成沒綁定**，班表一則都發不出去而且不會報錯。
+     *
+     * @param int $id
+     * @return \App\Models\User|null
+     */
+    public function findForDm($id)
+    {
+        return User::query()
+            ->select(['id', 'nickname', 'telegram_user_id', 'telegram_dm_ready', 'status'])
+            ->find($id);
+    }
+
+    /**
+     * 整批取私訊資料（班表通知用）
+     *
+     * @param array $ids
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getForDmByIds($ids)
+    {
+        $ids = array_filter((array) $ids);
+
+        if (blank($ids)) {
+            return User::query()->whereRaw('1 = 0')->get();
+        }
+
+        return User::query()
+            ->select(['id', 'nickname', 'telegram_user_id', 'telegram_dm_ready', 'status'])
+            ->whereIn('id', $ids)
+            ->get();
+    }
+
+    /**
+     * 可以當私訊收件人的帳號清單（設定頁下拉用）
+     *
+     * 跟 `getActiveForDropdown()` 的差別：**不排除管理者**（班表通知的收件人
+     * 很可能就是管理者自己），而且帶著綁定狀態 —— 設定頁要能直接顯示
+     * 「這個人還沒私訊過機器人」，不然選了之後只會默默發不出去。
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getDmCandidates()
+    {
+        return User::query()
+            ->select(['id', 'nickname', 'telegram_user_id', 'telegram_dm_ready'])
+            ->where('status', config('constants.USER.STATUS.NORMAL'))
+            ->orderBy('level')
+            ->orderBy('nickname')
+            ->get();
+    }
+
+    /**
+     * 記下「這個人私訊過 bot，可以被私訊」
+     *
+     * ⚠ 同時更新 `telegram_user_id` —— 私訊的 chat_id 就是他的 user id，
+     * 而這個來源比群組訊息可靠（群組那邊拿到的也是同一個 id，
+     * 但這裡才能確認「可以私訊」）。
+     *
+     * @param \App\Models\User $user
+     * @param int|string        $telegramUserId
+     * @return void
+     */
+    public function markDmReady($user, $telegramUserId)
+    {
+        $user->forceFill([
+            'telegram_user_id'  => (int) $telegramUserId,
+            'telegram_dm_ready' => true,
+        ])->save();
+    }
+
+    /**
      * 依 Telegram 帳號找人
      *
      * Telegram 那邊傳來的 username 不帶 @，而後台可能填成 `@name` 或 `name`，
@@ -292,7 +367,9 @@ class UserRepository
         }
 
         return User::query()
-            ->select(['id', 'nickname', 'telegram_username', 'telegram_user_id', 'level', 'status'])
+            // ⚠ telegram_dm_ready 一定要帶：少了它 TelegramChatService 讀到的永遠是
+            // null，於是每次私訊都被當成「還沒綁定」而重複回覆確認訊息
+            ->select(['id', 'nickname', 'telegram_username', 'telegram_user_id', 'telegram_dm_ready', 'level', 'status'])
             ->whereRaw('LOWER(TRIM(LEADING "@" FROM telegram_username)) = ?', [mb_strtolower($clean)])
             ->first();
     }

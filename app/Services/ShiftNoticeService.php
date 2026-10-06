@@ -1,0 +1,539 @@
+<?php
+
+namespace App\Services;
+
+use App\Repositories\ShiftAssignmentRepository;
+use App\Repositories\ShiftRepository;
+use App\Repositories\UserRepository;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Log;
+
+/**
+ * 每天早上私訊今日班表
+ *
+ * 兩種收件人，內容不一樣（需求方 2026-10-06）：
+ *
+ * | 收件人 | 內容 |
+ * |---|---|
+ * | 設定頁指定的主管 | 今天**每個班次**各是誰，沒人排的班特別標出來 |
+ * | 今天有班的每個人 | 只有自己那一筆，不列同班的其他人 |
+ *
+ * ⚠ **Telegram 不讓 bot 主動私訊沒對話過的人**（403）。所以每個收件人都得
+ * 先私訊 bot 一次，那一刻由 `TelegramChatService::bindPrivateChat()` 記下
+ * `telegram_dm_ready` —— 這裡只發給那個欄位是 true 的人。
+ *
+ * ⚠ **一個人失敗不能讓整輪停掉**：逐人 try/catch，最後把沒收到的彙總成
+ * 一則發到內部支援群組（比照 `StationCreditAlertService::run()`）。
+ */
+class ShiftNoticeService
+{
+    /** @var string 跳過原因：沒有設定主管收件人 */
+    const SKIP_NO_MANAGER = 'no_manager';
+
+    /** @var string 跳過原因：收件人沒私訊過 bot */
+    const SKIP_NOT_BOUND = 'not_bound';
+
+    /** @var string 跳過原因：Telegram 拒收（多半是被封鎖或其實沒綁定） */
+    const SKIP_SEND_FAILED = 'send_failed';
+
+    private $assignmentRepository;
+    private $shiftRepository;
+    private $userRepository;
+    private $botService;
+    private $supportGroup;
+    private $appSettingService;
+
+    public function __construct(
+        ShiftAssignmentRepository $assignmentRepository,
+        ShiftRepository $shiftRepository,
+        UserRepository $userRepository,
+        TelegramBotService $botService,
+        SupportGroupService $supportGroup,
+        AppSettingService $appSettingService
+    ) {
+        $this->assignmentRepository = $assignmentRepository;
+        $this->shiftRepository = $shiftRepository;
+        $this->userRepository = $userRepository;
+        $this->botService = $botService;
+        // 沒收到的人彙總回報到這裡
+        $this->supportGroup = $supportGroup;
+        // 主管收件人存在 app_setting，換人不用動程式
+        $this->appSettingService = $appSettingService;
+    }
+
+    /**
+     * 跑一輪：主管一則 + 今天有班的每個人各一則
+     *
+     * @param string|null $date   哪一天（預設今天）
+     * @param bool        $dryRun 只組訊息不發送（測試按鈕用）
+     * @return array 結果，給 Command 與後台顯示
+     */
+    public function run($date = null, $dryRun = false)
+    {
+        $date = filled($date) ? $date : now()->toDateString();
+
+        $assignments = $this->assignmentRepository->getByDateRange($date, $date);
+        $shifts = $this->shiftRepository->allActive();
+
+        $managerText = $this->buildManagerText($date, $assignments, $shifts);
+        $manager = $this->sendToManager($managerText, $dryRun);
+        $personal = $this->sendToEveryone($assignments, $shifts, $dryRun);
+
+        $failed = array_merge(
+            Arr::get($manager, 'failed', []),
+            Arr::get($personal, 'failed', [])
+        );
+
+        if (!$dryRun && filled($failed)) {
+            $this->reportFailures($failed);
+        }
+
+        return [
+            'date'          => $date,
+            'manager_text'  => $managerText,
+            'manager_sent'  => Arr::get($manager, 'sent', false),
+            'manager_skip'  => Arr::get($manager, 'reason'),
+            'personal_sent' => Arr::get($personal, 'sent', 0),
+            'personal_text' => Arr::get($personal, 'sample'),
+            'failed'        => $failed,
+        ];
+    }
+
+    /**
+     * 設定頁要的資料
+     *
+     * 候選人帶 `dm_ready` —— 設定頁要能當場看出「選了這個人也發不出去」，
+     * 不然要等到隔天早上八點沒收到才知道。
+     *
+     * @return array
+     */
+    public function forPage()
+    {
+        $candidates = [];
+
+        foreach ($this->userRepository->getDmCandidates() as $user) {
+            $candidates[] = [
+                'id'       => (int) $user->id,
+                'nickname' => (string) $user->nickname,
+                'dm_ready' => filled($user->telegram_user_id) && (bool) $user->telegram_dm_ready,
+            ];
+        }
+
+        return [
+            'manager_user_id' => $this->appSettingService->getInt(AppSettingService::KEY_SHIFT_NOTICE_MANAGER),
+            'candidates'      => $candidates,
+            'send_at'         => (string) config('constants.SHIFT_NOTICE.SEND_AT'),
+        ];
+    }
+
+    /**
+     * 存設定頁
+     *
+     * @param array $params
+     * @param int   $operatorId
+     * @return void
+     */
+    public function updateSetting(array $params, $operatorId)
+    {
+        $managerId = (int) Arr::get($params, 'manager_user_id', 0);
+
+        $this->appSettingService->put(
+            AppSettingService::KEY_SHIFT_NOTICE_MANAGER,
+            // 清空用 null 而不是 '0'：getInt 讀回來都是 0，但資料庫裡留個 '0'
+            // 看起來像「指定了 id 0 的人」
+            $managerId > 0 ? (string) $managerId : null,
+            $operatorId
+        );
+    }
+
+    /**
+     * 測試發送：真的把今天的班表私訊給設定的主管
+     *
+     * ⚠ 刻意**不是** dry-run —— 測試按鈕要回答的是「訊息到得了他手機嗎」，
+     * 只組字串不發送的話，沒綁定、被封鎖這些真正會出事的狀況全都測不到。
+     * 只發主管那一則，不會去打擾今天有班的同仁。
+     *
+     * @return array sent / reason
+     */
+    public function test()
+    {
+        $date = now()->toDateString();
+        $assignments = $this->assignmentRepository->getByDateRange($date, $date);
+        $shifts = $this->shiftRepository->allActive();
+
+        $text = (string) config('constants.SHIFT_NOTICE.TEST_PREFIX')
+            . $this->buildManagerText($date, $assignments, $shifts);
+
+        $result = $this->sendToManager($text, false);
+
+        return [
+            'sent'   => Arr::get($result, 'sent', false),
+            'reason' => Arr::get($result, 'reason'),
+        ];
+    }
+
+    /**
+     * 組主管那份：每個班次各是誰
+     *
+     * ⚠ **走的是「所有啟用中的班別」而不是「今天有排班的班別」** ——
+     * 需求方要的是「哪個班沒人」，那種班在 `$assignments` 裡根本不存在，
+     * 只看排班資料永遠列不出來。
+     *
+     * @param string     $date
+     * @param iterable   $assignments 今天的排班
+     * @param iterable   $shifts      啟用中的班別
+     * @return string
+     */
+    private function buildManagerText($date, $assignments, $shifts)
+    {
+        $text = strtr((string) config('constants.SHIFT_NOTICE.MANAGER_HEADER'), [
+            '{date}' => $this->formatDate($date),
+        ]);
+
+        if (blank($shifts)) {
+            return $text . (string) config('constants.SHIFT_NOTICE.MANAGER_NO_SHIFT');
+        }
+
+        // 先把今天的排班依班別分組，下面逐班取用
+        $byShift = [];
+
+        foreach ($assignments as $assignment) {
+            $byShift[(int) $assignment->shift_id][] = $assignment->user_id;
+        }
+
+        $names = $this->namesOf($assignments);
+        $hasAny = false;
+
+        foreach ($shifts as $shift) {
+            $userIds = (array) Arr::get($byShift, (int) $shift->id, []);
+            $hasAny = $hasAny || filled($userIds);
+
+            $members = filled($userIds)
+                ? implode('、', $this->pickNames($names, $userIds))
+                : (string) config('constants.SHIFT_NOTICE.MANAGER_EMPTY_SHIFT');
+
+            $text .= strtr((string) config('constants.SHIFT_NOTICE.MANAGER_SHIFT'), [
+                '{shift}'      => (string) $this->shiftLabel($shift),
+                '{work_time}'  => $this->timeRange($shift->start_time, $shift->end_time),
+                '{reply_time}' => $this->timeRange($shift->reply_start_time, $shift->reply_end_time),
+                '{members}'    => $members,
+            ]);
+        }
+
+        if (!$hasAny) {
+            $text .= (string) config('constants.SHIFT_NOTICE.MANAGER_NO_SHIFT');
+        }
+
+        return $text;
+    }
+
+    /**
+     * 發給主管
+     *
+     * @param string $text
+     * @param bool   $dryRun
+     * @return array sent / reason / failed
+     */
+    private function sendToManager($text, $dryRun)
+    {
+        $managerId = $this->appSettingService->getInt(AppSettingService::KEY_SHIFT_NOTICE_MANAGER);
+
+        if ($managerId < 1) {
+            return ['sent' => false, 'reason' => self::SKIP_NO_MANAGER, 'failed' => []];
+        }
+
+        $manager = $this->userRepository->findForDm($managerId);
+
+        if (blank($manager) || !$this->canDm($manager)) {
+            return [
+                'sent'   => false,
+                'reason' => self::SKIP_NOT_BOUND,
+                'failed' => [filled($manager) ? $manager->nickname : "#{$managerId}"],
+            ];
+        }
+
+        if ($dryRun) {
+            return ['sent' => true, 'reason' => null, 'failed' => []];
+        }
+
+        if ($this->dm($manager, $text)) {
+            return ['sent' => true, 'reason' => null, 'failed' => []];
+        }
+
+        return ['sent' => false, 'reason' => self::SKIP_SEND_FAILED, 'failed' => [$manager->nickname]];
+    }
+
+    /**
+     * 發給今天每個有班的人
+     *
+     * @param iterable $assignments
+     * @param iterable $shifts
+     * @param bool     $dryRun
+     * @return array sent / sample / failed
+     */
+    private function sendToEveryone($assignments, $shifts, $dryRun)
+    {
+        $shiftMap = [];
+
+        foreach ($shifts as $shift) {
+            $shiftMap[(int) $shift->id] = $shift;
+        }
+
+        $users = $this->userRepository->getForDmByIds($this->userIdsOf($assignments));
+        $userMap = [];
+
+        foreach ($users as $user) {
+            $userMap[(int) $user->id] = $user;
+        }
+
+        $sent = 0;
+        $failed = [];
+        $sample = null;
+
+        foreach ($assignments as $assignment) {
+            $user = Arr::get($userMap, (int) $assignment->user_id);
+            $shift = Arr::get($shiftMap, (int) $assignment->shift_id);
+
+            // 班別被停用了還留著排班 —— 不是這支該處理的，跳過但記一筆
+            if (blank($shift)) {
+                Log::warning('今日班表：排班的班別已停用，略過', [
+                    'assignment_id' => $assignment->id,
+                    'shift_id'      => $assignment->shift_id,
+                ]);
+
+                continue;
+            }
+
+            $text = $this->buildPersonalText($user, $shift);
+            $sample = filled($sample) ? $sample : $text;
+
+            if (blank($user) || !$this->canDm($user)) {
+                $failed[] = filled($user) ? $user->nickname : "#{$assignment->user_id}";
+
+                continue;
+            }
+
+            if ($dryRun) {
+                $sent++;
+
+                continue;
+            }
+
+            if ($this->dm($user, $text)) {
+                $sent++;
+
+                continue;
+            }
+
+            $failed[] = $user->nickname;
+        }
+
+        return ['sent' => $sent, 'sample' => $sample, 'failed' => $failed];
+    }
+
+    /**
+     * 組個人那份
+     *
+     * ⚠ **不列同班的其他人**（需求方 2026-10-06 指定）—— 那等於把別人的
+     * 班別告訴他。
+     *
+     * @param object|null $user
+     * @param object      $shift
+     * @return string
+     */
+    private function buildPersonalText($user, $shift)
+    {
+        return strtr((string) config('constants.SHIFT_NOTICE.PERSONAL'), [
+            '{name}'       => filled($user) ? (string) $user->nickname : '',
+            '{shift}'      => (string) $this->shiftLabel($shift),
+            '{work_time}'  => $this->timeRange($shift->start_time, $shift->end_time),
+            '{reply_time}' => $this->timeRange($shift->reply_start_time, $shift->reply_end_time),
+        ]);
+    }
+
+    /**
+     * 私訊一個人
+     *
+     * ⚠ 失敗不丟例外：一個人發不出去不能讓整輪停掉。
+     *
+     * @param object $user
+     * @param string $text
+     * @return bool
+     */
+    private function dm($user, $text)
+    {
+        try {
+            $result = $this->botService->sendMessage($user->telegram_user_id, $text);
+
+            if (filled(Arr::get((array) $result, 'result'))) {
+                return true;
+            }
+
+            Log::warning('今日班表私訊未送達', [
+                'user_id'  => $user->id,
+                'response' => $result,
+            ]);
+
+            return false;
+        } catch (\Exception $e) {
+            Log::error('今日班表私訊失敗', [
+                'user_id' => $user->id,
+                'error'   => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
+     * 把沒收到的人彙總回報到內部群組
+     *
+     * ⚠ **彙總成一則**，不逐人發 —— 十個人沒綁定就會洗十則版。
+     *
+     * @param array $names
+     * @return void
+     */
+    private function reportFailures(array $names)
+    {
+        if (!$this->supportGroup->isConfigured()) {
+            return;
+        }
+
+        try {
+            $this->supportGroup->send(strtr((string) config('constants.SHIFT_NOTICE.FAILED_SUMMARY'), [
+                '{count}' => count($names),
+                '{names}' => implode('、', $names),
+            ]));
+        } catch (\Exception $e) {
+            Log::error('今日班表的未送達彙總發不出去', ['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * 這個人可以被私訊嗎
+     *
+     * ⚠ **兩個條件都要**：有 `telegram_user_id`（知道發去哪），
+     * 而且 `telegram_dm_ready`（他私訊過 bot）。
+     * 只看前者會對著一整批沒加過 bot 的人狂發 403 —— 那個欄位從群組訊息
+     * 也會被填上。
+     *
+     * @param object $user
+     * @return bool
+     */
+    private function canDm($user)
+    {
+        return filled($user->telegram_user_id) && (bool) $user->telegram_dm_ready;
+    }
+
+    /**
+     * 班別顯示名稱（沒填 display_name 就用 name）
+     *
+     * @param object $shift
+     * @return string
+     */
+    private function shiftLabel($shift)
+    {
+        return filled($shift->display_name) ? $shift->display_name : $shift->name;
+    }
+
+    /**
+     * 把兩個時間接成「09:00-18:00」
+     *
+     * 任一邊沒設定就整段顯示「未設定」—— 顯示「09:00-」看了只會更困惑。
+     *
+     * @param string|null $start
+     * @param string|null $end
+     * @return string
+     */
+    private function timeRange($start, $end)
+    {
+        if (blank($start) || blank($end)) {
+            return (string) config('constants.SHIFT_NOTICE.TIME_UNSET');
+        }
+
+        return $this->shortTime($start) . '-' . $this->shortTime($end);
+    }
+
+    /**
+     * `09:00:00` → `09:00`
+     *
+     * @param string $time
+     * @return string
+     */
+    private function shortTime($time)
+    {
+        return mb_substr((string) $time, 0, 5);
+    }
+
+    /**
+     * `2026-10-07` → `10/07（週二）`
+     *
+     * @param string $date
+     * @return string
+     */
+    private function formatDate($date)
+    {
+        $weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+        $carbon = \Illuminate\Support\Carbon::parse($date);
+
+        return $carbon->format('n/j') . '（週' . Arr::get($weekdays, (int) $carbon->dayOfWeek, '') . '）';
+    }
+
+    /**
+     * 取這批排班涉及的所有 user_id
+     *
+     * @param iterable $assignments
+     * @return array
+     */
+    private function userIdsOf($assignments)
+    {
+        $ids = [];
+
+        foreach ($assignments as $assignment) {
+            $ids[] = (int) $assignment->user_id;
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * user_id => 暱稱
+     *
+     * ⚠ 不走 `$assignment->user` 關聯 —— 那個關聯的 select 不在這支手上，
+     * 哪天被改掉就會變成一片空白而且不會報錯（這個專案踩過好幾次）。
+     *
+     * @param iterable $assignments
+     * @return array
+     */
+    private function namesOf($assignments)
+    {
+        $names = [];
+
+        foreach ($this->userRepository->getNamesByIds($this->userIdsOf($assignments)) as $user) {
+            $names[(int) $user->id] = $user->nickname;
+        }
+
+        return $names;
+    }
+
+    /**
+     * 依 id 取出名字，查不到的用 `#id` 佔位
+     *
+     * 佔位而不是略過：主管看到「#12」至少知道有人排了班卻查不到資料，
+     * 整個不顯示的話那個班看起來就像少一個人。
+     *
+     * @param array $names
+     * @param array $userIds
+     * @return array
+     */
+    private function pickNames(array $names, array $userIds)
+    {
+        $picked = [];
+
+        foreach ($userIds as $id) {
+            $picked[] = (string) Arr::get($names, (int) $id, "#{$id}");
+        }
+
+        return $picked;
+    }
+}

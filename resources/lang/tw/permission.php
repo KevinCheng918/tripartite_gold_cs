@@ -19,6 +19,7 @@ return [
         'task_board' => '任務看板',
         'login_log' => '登入紀錄',
         'daily_rate' => '每日匯率',
+        'shift_notice' => '班表通知',
         'setting' => '全域設定',
     ],
     'dashboard' => [
@@ -81,6 +82,10 @@ return [
     'setting' => [
         'view'   => '檢視全域設定',
         'manage' => '修改全域設定（含 Claude 憑證）',
+    ],
+    'shift_notice' => [
+        'view'   => '檢視班表通知設定',
+        'manage' => '修改班表通知收件人、測試發送',
     ],
     'staff_manage' => [
         'view' => '檢視內部管理',
