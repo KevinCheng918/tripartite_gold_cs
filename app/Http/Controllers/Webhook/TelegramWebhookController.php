@@ -7,6 +7,7 @@ use App\Services\AutoReplySupportService;
 use App\Services\DailyRateService;
 use App\Services\TelegramChatService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -53,11 +54,22 @@ class TelegramWebhookController extends Controller
         try {
             $payload = $request->all();
 
-            // debug: 記錄 webhook 收到的 payload keys
+            /*
+             * debug：記錄 webhook 收到了什麼。
+             *
+             * ⚠ **`chat_id` 與 `thread_id` 一定要記**。踩過一次：群組開了話題功能
+             * 之後 Telegram 把它升級成 supergroup、**chat_id 換了一個**，設定裡的
+             * 舊 id 於是對不上 —— 內部群組的訊息全被當成客戶訊息處理，而當時的
+             * log 只記 key 名稱，完全看不出 chat_id 已經變了。
+             *
+             * 新的 chat_id 與話題 id 都在這一行，設定頁要填的就是它們。
+             */
             Log::info('Webhook payload', [
                 'keys'      => array_keys($payload),
-                'has_msg'   => isset($payload['message']),
-                'msg_keys'  => isset($payload['message']) ? array_keys($payload['message']) : [],
+                'chat_id'   => Arr::get($payload, 'message.chat.id', Arr::get($payload, 'edited_message.chat.id')),
+                'chat_type' => Arr::get($payload, 'message.chat.type'),
+                'thread_id' => Arr::get($payload, 'message.message_thread_id'),
+                'text'      => Arr::get($payload, 'message.text'),
                 'has_reply' => isset($payload['message']['reply_to_message']),
             ]);
 

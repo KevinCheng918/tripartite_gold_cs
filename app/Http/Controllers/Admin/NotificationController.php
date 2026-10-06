@@ -126,11 +126,26 @@ class NotificationController extends Controller
      */
     public function ajaxTestSupport()
     {
-        if (!$this->settingService->testSupport()) {
-            return response()->json(['message' => trans('notification.msg.support_test_failed')], 422);
+        $result = $this->settingService->testSupport();
+
+        if (Arr::get($result, 'sent')) {
+            return response()->json(['message' => trans('notification.msg.support_test_sent')]);
         }
 
-        return response()->json(['message' => trans('notification.msg.support_test_sent')]);
+        /*
+         * 群組被升級成 supergroup（開話題功能就會）時，Telegram 會在錯誤回應裡
+         * 附上新的 chat_id。把它直接寫進訊息讓人複製貼上 ——
+         * 使用者這時正好站在 chat_id 欄位前面。
+         */
+        $migrated = Arr::get($result, 'migrated_chat_id');
+
+        if (filled($migrated)) {
+            return response()->json([
+                'message' => trans('notification.msg.chat_id_migrated', ['id' => $migrated]),
+            ], 422);
+        }
+
+        return response()->json(['message' => trans('notification.msg.support_test_failed')], 422);
     }
 
     /**

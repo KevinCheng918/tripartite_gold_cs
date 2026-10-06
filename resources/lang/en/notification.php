@@ -93,6 +93,7 @@ return [
         'system_not_found'    => 'System not found',
         'support_test_sent'   => 'Test message sent, please check the group',
         'support_test_failed' => 'Failed to send. Check the chat_id, that the bot is in the group, and that Group Privacy is disabled',
+        'chat_id_migrated'    => 'This group was upgraded to a supergroup (which happens when Topics are enabled) and its chat_id changed. The new one is :id — update the chat_id above and save.',
 
         // Reminders
         'remind_required'      => 'Please enter the reminder interval',

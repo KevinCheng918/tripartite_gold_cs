@@ -186,8 +186,17 @@ class AutoReplySupportService
     {
         $command = (string) config('constants.SUPPORT_TOPIC.ID_COMMAND');
 
-        // 短路：絕大多數訊息都不是這個指令，先比字串再談其他
-        if ($text !== $command) {
+        // 短路：絕大多數訊息連斜線開頭都不是，先擋掉再談其他
+        if (mb_substr($text, 0, 1) !== '/') {
+            return false;
+        }
+
+        /*
+         * ⚠ **群組裡的指令常常帶著機器人名稱**（`/topicid@my_bot`）——
+         * 從指令選單點選、或群組裡不只一個 bot 時，Telegram 就會加上去。
+         * 完整字串相等會對不上，使用者只會看到「輸入了沒反應」。
+         */
+        if (strtolower(strtok($text, '@ ')) !== strtolower($command)) {
             return false;
         }
 
@@ -207,7 +216,16 @@ class AutoReplySupportService
          * 後者會套 NOTICE_TYPE，把回覆丟到「AI 問題」那個話題去，
          * 而這句一定要回在使用者輸入的那個話題裡。
          */
-        $this->supportGroup->sendToThread($reply, $threadId);
+        $result = $this->supportGroup->sendToThread($reply, $threadId);
+
+        /*
+         * 有收到指令就記一筆 —— 「輸入了沒反應」有兩種可能：webhook 沒收到、
+         * 或收到了但回覆送不出去。沒有這行分不出是哪一種。
+         */
+        Log::info('收到話題 id 查詢', [
+            'thread_id' => $threadId,
+            'replied'   => filled(Arr::get((array) $result, 'result')),
+        ]);
 
         return true;
     }

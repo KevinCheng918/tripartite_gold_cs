@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use GuzzleHttp\Client;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -13,6 +14,13 @@ use Illuminate\Support\Facades\Storage;
  */
 class TelegramBotService
 {
+    /*
+     * 群組升級成 supergroup 時 Telegram 給的新 chat_id。
+     *
+     * 每次 `sendMessage()` 開頭重設 —— 它講的是「剛剛那一次」。
+     */
+    private $migratedChatId = null;
+
     private $client;
     private $apiBase;
     private $defaultToken;
@@ -104,6 +112,10 @@ class TelegramBotService
      */
     public function sendMessage($chatId, $text, $replyToMessageId = null, $keyboard = null, $threadId = null)
     {
+        // 每次送出都重設 —— 它講的是「剛剛那一次」，留著舊值會讓成功之後
+        // 或下一次無關的失敗拿到過期的建議
+        $this->migratedChatId = null;
+
         try {
             $params = [
                 'chat_id'    => $chatId,
@@ -144,8 +156,60 @@ class TelegramBotService
                 'error'   => $e->getMessage(),
             ]);
 
+            $this->logMigration($chatId, $e);
+
             return null;
         }
+    }
+
+    /**
+     * 群組升級成 supergroup 時，把新的 chat_id 單獨記一行
+     *
+     * ⚠ **開啟「話題」功能會讓 Telegram 把群組升級成 supergroup，chat_id 跟著換**。
+     * 舊 id 之後一律回 `group chat was upgraded to a supergroup chat`，新 id 放在
+     * 回應的 `parameters.migrate_to_chat_id`。
+     *
+     * 這支存在的理由：Guzzle 的例外訊息會把 body 截斷，新 id 剛好落在截斷後面 ——
+     * 2026-10-06 查「測試訊息送不出去」時，log 裡看得到錯誤卻看不到新 id。
+     *
+     * @param int|string $chatId
+     * @param \Exception $e
+     * @return void
+     */
+    private function logMigration($chatId, \Exception $e)
+    {
+        if (!($e instanceof \GuzzleHttp\Exception\RequestException) || blank($e->getResponse())) {
+            return;
+        }
+
+        $body = json_decode((string) $e->getResponse()->getBody(), true);
+        $newChatId = Arr::get((array) $body, 'parameters.migrate_to_chat_id');
+
+        if (blank($newChatId)) {
+            return;
+        }
+
+        $this->migratedChatId = (string) $newChatId;
+
+        Log::error('⚠ Telegram 群組已升級為 supergroup，chat_id 變了', [
+            'old_chat_id' => $chatId,
+            'new_chat_id' => $newChatId,
+            'action'      => '請到後台「通訊管理 → 通知設定 → 支援群組與話題」把 chat_id 換成 new_chat_id',
+        ]);
+    }
+
+    /**
+     * 上一次送出失敗時，Telegram 告知的新 chat_id
+     *
+     * ⚠ 刻意不自動改設定：那是**悄悄改掉使用者填的值**。
+     * 改成把新 id 交給呼叫端，由設定頁的測試按鈕當場顯示出來讓人複製貼上 ——
+     * 使用者正好就站在那個欄位前面。
+     *
+     * @return string|null
+     */
+    public function migratedChatId()
+    {
+        return $this->migratedChatId;
     }
 
     /**

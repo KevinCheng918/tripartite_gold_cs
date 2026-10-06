@@ -150,17 +150,27 @@ class NotificationSettingService
     /**
      * 發一則測試訊息到支援群組
      *
-     * @return bool
+     * ⚠ 失敗時要把 `migrated_chat_id` 一起回去：群組開了話題功能會被 Telegram
+     * 升級成 supergroup、**chat_id 換一個**，舊 id 之後一律送不出去。
+     * 使用者這時正好站在 chat_id 欄位前面，把新 id 直接顯示出來最省事 ——
+     * 不然他只會看到「送不出去」，完全不知道要改什麼。
+     *
+     * @return array sent / migrated_chat_id
      */
     public function testSupport()
     {
         try {
-            return $this->supportService->sendTestMessage();
+            $sent = (bool) $this->supportService->sendTestMessage();
         } catch (\Exception $e) {
             Log::error('支援群組測試訊息失敗', ['error' => $e->getMessage()]);
 
-            return false;
+            $sent = false;
         }
+
+        return [
+            'sent'              => $sent,
+            'migrated_chat_id' => $sent ? null : $this->supportGroup->migratedChatId(),
+        ];
     }
 
     // ---------------------------------------------------------------

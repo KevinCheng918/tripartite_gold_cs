@@ -151,6 +151,19 @@ class SupportGroupService
     }
 
     /**
+     * 上一次送出失敗時，Telegram 告知的新 chat_id
+     *
+     * 群組開了話題功能會被升級成 supergroup，chat_id 跟著換 ——
+     * 舊 id 之後一律送不出去。設定頁的測試按鈕靠這個把新 id 直接顯示給使用者。
+     *
+     * @return string|null
+     */
+    public function migratedChatId()
+    {
+        return $this->botService->migratedChatId();
+    }
+
+    /**
      * 設定頁維護的話題清單
      *
      * @return array<int, array{name:string, thread_id:int, types:array}>

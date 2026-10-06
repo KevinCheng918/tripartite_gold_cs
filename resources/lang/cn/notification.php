@@ -93,6 +93,7 @@ return [
         'system_not_found'    => '找不到该系统',
         'support_test_sent'   => '测试消息已发出，请到群组确认',
         'support_test_failed' => '测试消息发送失败，请确认 chat_id、Bot 是否已加入群组、以及 Group Privacy 是否关闭',
+        'chat_id_migrated'    => '这个群组已经升级成 supergroup（开启「话题」功能时会发生），chat_id 换了。新的是 :id —— 请把上面的 chat_id 改成这组再保存。',
 
         // 提醒
         'remind_required'      => '请填写提醒时间',

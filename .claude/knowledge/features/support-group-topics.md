@@ -59,6 +59,10 @@ sendMessage(chat_id=-100…, message_thread_id=42, text=…)
 
 ⚠ 不能用「話題名稱」當設定值：Bot API 沒有「依名稱查話題」的方法。
 
+⚠ **指令在群組裡常常帶著機器人名稱**（`/topicid@my_bot`）—— 從指令選單點選、
+或群組裡不只一個 bot 時 Telegram 就會加上去。比對要切掉 `@` 後面那段，
+不然使用者只會看到「輸入了沒反應」。
+
 ### 客服在話題裡回答求助單還能對上嗎
 
 可以。求助單的對應鍵是 `reply_to_message.message_id`（引用回覆），
@@ -141,6 +145,35 @@ sendMessage(chat_id=-100…, message_thread_id=42, text=…)
   依賴瘦到 3 個。路由前綴仍是 `setting`
 - 刪除：`ShiftNoticeController`、`shift-notice` 的 view/js、`shift_notice.php` 三份語系
 - 所有「請到全域設定…」的指路文字（指令輸出、`/topicid` 的回覆、語系）都改指向新位置
+
+## ⚠⚠ 最大的坑：開啟話題會換掉 chat_id
+
+**幫群組開啟「話題」功能時，Telegram 會把它從一般群組升級成 supergroup，
+`chat_id` 跟著換一個。** 2026-10-06 實際踩到。
+
+症狀有兩層，第二層比第一層嚴重：
+
+1. 所有發到支援群組的訊息失敗，錯誤是
+   `Bad Request: group chat was upgraded to a supergroup chat`
+2. **`isSupportChat()` 用舊 id 比對新群組 → 判定「這不是支援群組」**
+   —— webhook 不再攔截，內部群組的討論會被當成**客戶訊息**建進對話列表
+
+新 id 在失敗回應的 `parameters.migrate_to_chat_id`。規律是
+`-100` 接上舊 id 的絕對值（`-5348388981` → `-1005348388981`）。
+
+### 怎麼拿到新 id
+
+| 方法 | 說明 |
+|---|---|
+| **按「發送測試訊息」**（建議） | 遇到這個錯誤時會直接把新 id 寫在錯誤訊息裡讓人複製 |
+| 查 log | `⚠ Telegram 群組已升級為 supergroup，chat_id 變了` 這一行有新舊 id |
+| 群組連結 | `t.me/c/XXXXXXXXXX/…` → chat_id = `-100` + `XXXXXXXXXX` |
+
+### 為什麼不自動改設定
+
+Telegram 給的 `migrate_to_chat_id` 是權威值，自動寫回技術上可行。
+**刻意不做**：那是悄悄改掉使用者填的值。改成把新 id 交給設定頁顯示出來 ——
+使用者按測試按鈕時正好就站在那個欄位前面，複製貼上一次就好，而且他知道發生了什麼事。
 
 ## ⚠ 上線要做的事
 
