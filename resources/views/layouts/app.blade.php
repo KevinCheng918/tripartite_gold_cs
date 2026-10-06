@@ -233,8 +233,8 @@
                             </li>
                             @endif
                             {{-- 通訊管理：所有「系統主動對外發訊」的設定都收在這裡 --}}
-                            @if(Auth::user()->hasPermission('telegram_chat.reply') || Auth::user()->hasPermission('telegram_chat.assign') || Auth::user()->hasPermission('telegram_chat.broadcast') || Auth::user()->hasPermission('shift_notice.view'))
-                            <li class="app-sidebar__heading">{{ trans('shift_notice.section_label') }}</li>
+                            @if(Auth::user()->hasPermission('telegram_chat.reply') || Auth::user()->hasPermission('telegram_chat.assign') || Auth::user()->hasPermission('telegram_chat.broadcast') || Auth::user()->hasPermission('notification.view'))
+                            <li class="app-sidebar__heading">{{ trans('notification.section_label') }}</li>
                             @if(Auth::user()->hasPermission('telegram_chat.reply') || Auth::user()->hasPermission('telegram_chat.assign') || Auth::user()->hasPermission('telegram_chat.broadcast'))
                             <li>
                                 <a href="{{ route('admin.telegram-chat.index') }}" class="{{ request()->routeIs('admin.telegram-chat.*') ? 'mm-active' : '' }}">
@@ -243,11 +243,11 @@
                                 </a>
                             </li>
                             @endif
-                            @if(Auth::user()->hasPermission('shift_notice.view'))
+                            @if(Auth::user()->hasPermission('notification.view'))
                             <li>
-                                <a href="{{ route('admin.shift-notice.index') }}" class="{{ request()->routeIs('admin.shift-notice.*') ? 'mm-active' : '' }}">
-                                    <i class="metismenu-icon fas fa-paper-plane"></i>
-                                    {{ trans('shift_notice.nav_label') }}
+                                <a href="{{ route('admin.notification.index') }}" class="{{ request()->routeIs('admin.notification.*') ? 'mm-active' : '' }}">
+                                    <i class="metismenu-icon fas fa-bell"></i>
+                                    {{ trans('notification.nav_label') }}
                                 </a>
                             </li>
                             @endif

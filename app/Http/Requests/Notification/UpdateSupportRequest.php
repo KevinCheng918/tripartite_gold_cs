@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Requests\Setting;
+namespace App\Http\Requests\Notification;
 
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -50,21 +50,21 @@ class UpdateSupportRequest extends FormRequest
     public function messages()
     {
         return [
-            'chat_id.regex'                     => trans('setting.msg.chat_id_invalid'),
-            'chat_id.unique'                    => trans('setting.msg.chat_id_is_customer'),
-            'system_id.exists'                  => trans('setting.msg.system_not_found'),
-            'remind_first_minutes.required'     => trans('setting.msg.remind_required'),
-            'remind_first_minutes.min'          => trans('setting.msg.remind_invalid'),
-            'remind_first_minutes.max'          => trans('setting.msg.remind_invalid'),
-            'remind_interval_minutes.required'  => trans('setting.msg.remind_required'),
-            'remind_interval_minutes.min'       => trans('setting.msg.remind_invalid'),
-            'remind_interval_minutes.max'       => trans('setting.msg.remind_invalid'),
-            'remind_max_count.required'         => trans('setting.msg.remind_max_required'),
-            'remind_max_count.min'              => trans('setting.msg.remind_max_invalid'),
-            'remind_max_count.max'              => trans('setting.msg.remind_max_invalid'),
-            'remind_report_user_ids.array'        => trans('setting.msg.report_user_not_found'),
-            'remind_report_user_ids.*.integer'    => trans('setting.msg.report_user_not_found'),
-            'remind_report_user_ids.*.exists'     => trans('setting.msg.report_user_not_found'),
+            'chat_id.regex'                     => trans('notification.msg.chat_id_invalid'),
+            'chat_id.unique'                    => trans('notification.msg.chat_id_is_customer'),
+            'system_id.exists'                  => trans('notification.msg.system_not_found'),
+            'remind_first_minutes.required'     => trans('notification.msg.remind_required'),
+            'remind_first_minutes.min'          => trans('notification.msg.remind_invalid'),
+            'remind_first_minutes.max'          => trans('notification.msg.remind_invalid'),
+            'remind_interval_minutes.required'  => trans('notification.msg.remind_required'),
+            'remind_interval_minutes.min'       => trans('notification.msg.remind_invalid'),
+            'remind_interval_minutes.max'       => trans('notification.msg.remind_invalid'),
+            'remind_max_count.required'         => trans('notification.msg.remind_max_required'),
+            'remind_max_count.min'              => trans('notification.msg.remind_max_invalid'),
+            'remind_max_count.max'              => trans('notification.msg.remind_max_invalid'),
+            'remind_report_user_ids.array'        => trans('notification.msg.report_user_not_found'),
+            'remind_report_user_ids.*.integer'    => trans('notification.msg.report_user_not_found'),
+            'remind_report_user_ids.*.exists'     => trans('notification.msg.report_user_not_found'),
         ];
     }
 }

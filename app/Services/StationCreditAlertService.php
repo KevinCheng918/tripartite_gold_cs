@@ -39,6 +39,14 @@ use Illuminate\Support\Facades\Log;
  */
 class StationCreditAlertService
 {
+    /*
+     * 這支發到內部群組的訊息屬於哪一類通知。
+     *
+     * 決定它進哪個 Telegram 話題 —— 對應 `constants.SUPPORT_TOPIC.TYPES` 的 key，
+     * 由設定頁的話題清單勾選。沒被任何話題勾到就發到群組主區。
+     */
+    const NOTICE_TYPE = 'station_credit';
+
     /** @var int Telegram 圖說上限。超過整則會失敗，不是截斷 */
     private const CAPTION_MAX = 1024;
 
@@ -348,7 +356,7 @@ class StationCreditAlertService
             $text .= (string) config('constants.STATION.CREDIT_ALERT.TEST_NO_RATE_NOTE');
         }
 
-        $sent = $this->supportGroup->send($text);
+        $sent = $this->supportGroup->send($text, null, null, self::NOTICE_TYPE);
 
         if (blank(Arr::get($sent, 'result'))) {
             Log::error('補點訊息測試發送失敗', ['config_id' => $config->id, 'response' => $sent]);
@@ -390,8 +398,8 @@ class StationCreditAlertService
     private function sendTopupToSupportGroup($config, $topupText, $imageUrl)
     {
         $sent = filled($imageUrl)
-            ? $this->supportGroup->sendPhoto($imageUrl, $topupText)
-            : $this->supportGroup->send($topupText);
+            ? $this->supportGroup->sendPhoto($imageUrl, $topupText, self::NOTICE_TYPE)
+            : $this->supportGroup->send($topupText, null, null, self::NOTICE_TYPE);
 
         if (filled(Arr::get($sent, 'result'))) {
             return true;
@@ -668,7 +676,7 @@ class StationCreditAlertService
              * 待審核那則不走這裡（它不轉傳，說明與告警併成一則就好）。
              */
             if (filled($prefix)) {
-                $this->supportGroup->send($prefix);
+                $this->supportGroup->send($prefix, null, null, self::NOTICE_TYPE);
             }
 
             /*
@@ -678,7 +686,7 @@ class StationCreditAlertService
             if ($toStation) {
                 $this->sendToStation($station, $text);
             } else {
-                $this->supportGroup->send($text);
+                $this->supportGroup->send($text, null, null, self::NOTICE_TYPE);
             }
         } catch (\Exception $e) {
             Log::error('站台餘點告警發送失敗', [
@@ -785,13 +793,13 @@ class StationCreditAlertService
     private function sendTopupToInternal($topupText, $imageUrl)
     {
         if (blank($imageUrl)) {
-            $this->supportGroup->send($topupText);
+            $this->supportGroup->send($topupText, null, null, self::NOTICE_TYPE);
 
             return;
         }
 
         if (mb_strlen($topupText) <= self::CAPTION_MAX) {
-            $this->supportGroup->sendPhoto($imageUrl, $topupText);
+            $this->supportGroup->sendPhoto($imageUrl, $topupText, self::NOTICE_TYPE);
 
             return;
         }
@@ -801,8 +809,8 @@ class StationCreditAlertService
             'limit'  => self::CAPTION_MAX,
         ]);
 
-        $this->supportGroup->sendPhoto($imageUrl);
-        $this->supportGroup->send($topupText);
+        $this->supportGroup->sendPhoto($imageUrl, null, self::NOTICE_TYPE);
+        $this->supportGroup->send($topupText, null, null, self::NOTICE_TYPE);
     }
 
     /**

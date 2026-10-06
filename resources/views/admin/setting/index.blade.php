@@ -123,62 +123,6 @@ npm install -g @anthropic-ai/claude-code</code></pre>
             </div>
         </div>
 
-        {{-- 內部支援群組 --}}
-        <div class="main-card mb-3 card">
-            <div class="card-body">
-                <h5 class="card-title">{{ trans('setting.support_title') }}</h5>
-                <p class="text-muted" style="font-size:0.875rem">{{ trans('setting.support_desc') }}</p>
-                <form id="form-support">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label" for="support-chat-id">{{ trans('setting.support_chat_id') }}</label>
-                            <input type="text" class="form-control" id="support-chat-id" placeholder="-1001234567890">
-                            <small class="form-text text-muted">{{ trans('setting.support_chat_id_hint') }}</small>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label" for="support-system">{{ trans('setting.support_system') }}</label>
-                            <select class="form-select" id="support-system"></select>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label" for="support-remind-first">{{ trans('setting.support_remind_first') }}</label>
-                            <input type="number" class="form-control" id="support-remind-first" min="1" max="1440" step="1">
-                            <small class="form-text text-muted">{{ trans('setting.support_remind_first_hint') }}</small>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label" for="support-remind-interval">{{ trans('setting.support_remind_interval') }}</label>
-                            <input type="number" class="form-control" id="support-remind-interval" min="1" max="1440" step="1">
-                            <small class="form-text text-muted">
-                                {{ trans('setting.support_remind_interval_hint', ['escalate' => config('constants.AUTO_REPLY.REMIND.ESCALATE_AT')]) }}
-                            </small>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label" for="support-remind-max">{{ trans('setting.support_remind_max') }}</label>
-                            <input type="number" class="form-control" id="support-remind-max" min="1" max="200" step="1">
-                            <small class="form-text text-muted">{{ trans('setting.support_remind_max_hint') }}</small>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <div class="d-flex align-items-center justify-content-between mb-2">
-                                <label class="form-label mb-0">{{ trans('setting.support_report_user') }}</label>
-                                <div class="form-check mb-0">
-                                    <input class="form-check-input" type="checkbox" id="support-report-all">
-                                    <label class="form-check-label" for="support-report-all">{{ trans('setting.support_report_all') }}</label>
-                                </div>
-                            </div>
-                            {{-- 人多的時候不要把整頁撐長，超過就在框內捲動 --}}
-                            <div id="support-report-list" class="p-2"
-                                 style="max-height:200px;overflow-y:auto;border:1px solid var(--bs-border-color, rgba(0,0,0,0.175));border-radius:6px">
-                            </div>
-                            <small class="form-text text-muted">
-                                {{ trans('setting.support_report_user_hint', ['time' => config('constants.AUTO_REPLY.REMIND.REPORT_AT')]) }}
-                            </small>
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary js-manage-only">{{ trans('setting.action_save') }}</button>
-                    <button type="button" class="btn btn-outline-secondary js-manage-only" id="btn-test-support">{{ trans('setting.support_test') }}</button>
-                </form>
-            </div>
-        </div>
-
         {{-- 用量 --}}
         <div class="main-card mb-3 card">
             <div class="card-body">

@@ -23,6 +23,14 @@ use Illuminate\Support\Facades\Log;
  */
 class TicketHandoverService
 {
+    /*
+     * 這支發到內部群組的訊息屬於哪一類通知。
+     *
+     * 決定它進哪個 Telegram 話題 —— 對應 `constants.SUPPORT_TOPIC.TYPES` 的 key，
+     * 由設定頁的話題清單勾選。沒被任何話題勾到就發到群組主區。
+     */
+    const NOTICE_TYPE = 'ticket_handover';
+
     /** @var string 跳過原因：沒設定內部支援群組 */
     const SKIP_NO_GROUP = 'no_group';
 
@@ -266,7 +274,7 @@ class TicketHandoverService
     private function send($text)
     {
         try {
-            $result = $this->supportGroup->send($text);
+            $result = $this->supportGroup->send($text, null, null, self::NOTICE_TYPE);
 
             if (filled(Arr::get((array) $result, 'result'))) {
                 return true;

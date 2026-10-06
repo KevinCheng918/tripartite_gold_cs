@@ -1,7 +1,9 @@
 /**
  * 全域設定
  *
- * Claude 憑證（訂閱與備援）、內部支援群組、用量流量。
+ * Claude 憑證（訂閱與備援）、用量流量。
+ *
+ * ⚠ 內部支援群組 2026-10-06 搬到「通訊管理 → 通知設定」（notification-setting.js）。
  * 憑證欄位永遠只拿得到遮罩，明文不會從後端送出來。
  *
  * 原本還有一頁「對客話術」，2026-09-30 移除 —— 開頭由 AI 的承接句負責、
@@ -97,7 +99,6 @@
         renderOptions();
         renderClaude();
         renderFallback();
-        renderSupport();
         renderUsage();
         applyPermission();
     }
@@ -132,74 +133,6 @@
         document.getElementById('claude-model').innerHTML = html;
         document.getElementById('fallback-model').innerHTML = html;
 
-        // Bot 來源：沒選就用 .env 的預設 bot
-        var systems = settings.options.systems || [];
-        var systemHtml = '<option value="">' + escapeHtml(i18n.support_system_default) + '</option>';
-
-        systems.forEach(function (system) {
-            // 沒設 bot_token 的系統選了也沒用，直接不列
-            if (!system.has_token) { return; }
-            systemHtml += '<option value="' + system.id + '">' + escapeHtml(system.name) + '</option>';
-        });
-
-        document.getElementById('support-system').innerHTML = systemHtml;
-
-        /*
-         * 每日統計的收件人（可多選 + 全選）。
-         *
-         * 沒私訊過機器人的人標成灰的但**不隱藏** —— 勾了也收不到，
-         * 要在勾之前就看得出來；整個拿掉會變成「名單裡沒這個人」，更難判斷。
-         */
-        var candidates = settings.options.dm_candidates || [];
-        var selected = settings.support.remind_report_user_ids || [];
-        var reportHtml = '';
-
-        candidates.forEach(function (user) {
-            var label = user.dm_ready
-                ? user.nickname
-                : user.nickname + '（' + i18n.support_report_unbound + '）';
-            var checked = selected.indexOf(user.id) !== -1 ? ' checked' : '';
-            var muted = user.dm_ready ? '' : ' text-muted';
-
-            reportHtml += '<div class="form-check">' +
-                '<input class="form-check-input js-report-user" type="checkbox" ' +
-                'id="support-report-' + user.id + '" value="' + user.id + '"' + checked + '>' +
-                '<label class="form-check-label' + muted + '" for="support-report-' + user.id + '">' +
-                escapeHtml(label) + '</label>' +
-                '</div>';
-        });
-
-        document.getElementById('support-report-list').innerHTML = reportHtml;
-        syncReportAll();
-    }
-
-    /**
-     * 目前勾選的統計收件人 id
-     *
-     * @return {Array<number>}
-     */
-    function checkedReportIds() {
-        var ids = [];
-
-        root.querySelectorAll('.js-report-user:checked').forEach(function (el) {
-            ids.push(parseInt(el.value, 10));
-        });
-
-        return ids;
-    }
-
-    /**
-     * 「全選」的勾選狀態要跟著個別項目走
-     *
-     * 少了這段，手動把人逐一勾完之後「全選」還是沒勾，看起來像壞掉。
-     */
-    function syncReportAll() {
-        var all = document.getElementById('support-report-all');
-        var boxes = root.querySelectorAll('.js-report-user');
-
-        if (!all) { return; }
-
-        all.checked = boxes.length > 0 && checkedReportIds().length === boxes.length;
     }
 
     function renderClaude() {
@@ -222,16 +155,6 @@
         document.getElementById('fallback-api-key').placeholder = fallback.has_api_key
             ? fallback.api_key_masked
             : i18n.claude_not_set;
-    }
-
-    function renderSupport() {
-        var support = settings.support;
-
-        document.getElementById('support-chat-id').value = support.chat_id || '';
-        document.getElementById('support-system').value = support.system_id || '';
-        document.getElementById('support-remind-first').value = support.remind_first_minutes;
-        document.getElementById('support-remind-interval').value = support.remind_interval_minutes;
-        document.getElementById('support-remind-max').value = support.remind_max_count;
     }
 
     function renderUsage() {
@@ -297,9 +220,6 @@
         root.querySelectorAll('input, select, textarea, button.js-manage-only').forEach(function (el) {
             el.disabled = true;
         });
-
-        var testBtn = document.getElementById('btn-test-support');
-        if (testBtn) { testBtn.disabled = true; }
     }
 
     // ===== 儲存 =====
@@ -352,50 +272,6 @@
             }, e.target.querySelector('button[type="submit"]'));
         });
 
-        document.getElementById('form-support').addEventListener('submit', function (e) {
-            e.preventDefault();
-            submit('/admin/setting/ajax-update-support', {
-                chat_id: value('support-chat-id'),
-                system_id: value('support-system') || null,
-                remind_first_minutes: parseInt(value('support-remind-first'), 10) || 10,
-                remind_interval_minutes: parseInt(value('support-remind-interval'), 10) || 10,
-                remind_max_count: parseInt(value('support-remind-max'), 10) || 30,
-                // 空陣列代表「不發統計」，後端的 nullable|array 規則接得住
-                remind_report_user_ids: checkedReportIds()
-            }, e.target.querySelector('button[type="submit"]'));
-        });
-
-        // 統計收件人的全選：一次勾完或一次清空
-        document.getElementById('support-report-all').addEventListener('change', function () {
-            var checked = this.checked;
-
-            root.querySelectorAll('.js-report-user').forEach(function (el) { el.checked = checked; });
-        });
-
-        // 個別勾選要回頭同步「全選」
-        document.getElementById('support-report-list').addEventListener('change', function (event) {
-            if (event.target.classList.contains('js-report-user')) { syncReportAll(); }
-        });
-
-        document.getElementById('btn-test-support').addEventListener('click', function () {
-            var button = this;
-            var original = button.textContent;
-
-            button.disabled = true;
-            button.textContent = i18n.action_testing;
-
-            apiFetch('/admin/setting/ajax-test-support', { method: 'POST' })
-                .then(function (body) {
-                    showMessage(body.message || i18n.msg.support_test_sent);
-                })
-                .catch(function (body) {
-                    showMessage(errorMessage(body, i18n.msg.support_test_failed));
-                })
-                .then(function () {
-                    button.disabled = false;
-                    button.textContent = original;
-                });
-        });
     }
 
     bindForms();

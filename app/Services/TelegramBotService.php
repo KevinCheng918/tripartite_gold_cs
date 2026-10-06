@@ -99,9 +99,10 @@ class TelegramBotService
      * @param string     $text              訊息內容
      * @param int|null   $replyToMessageId  引用的訊息
      * @param array|null $keyboard          inline keyboard 按鈕列（見 buildInlineKeyboard）
+     * @param int|null   $threadId          話題 id（Telegram Topics）。null 就發到主區
      * @return array|null API 回傳
      */
-    public function sendMessage($chatId, $text, $replyToMessageId = null, $keyboard = null)
+    public function sendMessage($chatId, $text, $replyToMessageId = null, $keyboard = null, $threadId = null)
     {
         try {
             $params = [
@@ -109,6 +110,17 @@ class TelegramBotService
                 'text'       => $this->escapeHtml($text),
                 'parse_mode' => 'HTML',
             ];
+
+            /*
+             * 話題（Topics）群組要帶 message_thread_id 才會進對的話題。
+             *
+             * ⚠ **填錯或話題被刪，Telegram 會整則拒收**（message thread not found），
+             * 不是退化成發到主區。所以設定錯誤會變成「那一類訊息全部消失」，
+             * 只在這裡的 catch 留下 log。
+             */
+            if (filled($threadId)) {
+                $params['message_thread_id'] = (int) $threadId;
+            }
 
             // 被引用的訊息若已被刪除，Telegram 會整則拒收；
             // allow_sending_without_reply 讓它退化成一般訊息而不是失敗
@@ -249,7 +261,7 @@ class TelegramBotService
      * @param string|null $caption  圖片說明文字
      * @return array|null
      */
-    public function sendPhoto($chatId, $photoUrl, $caption = null)
+    public function sendPhoto($chatId, $photoUrl, $caption = null, $threadId = null)
     {
         try {
             $localPath = $this->resolveLocalPath($photoUrl);
@@ -265,18 +277,22 @@ class TelegramBotService
                         'photo'   => $photoUrl,
                     ]);
 
-                    return $this->sendDocument($chatId, $localPath, basename($localPath), $caption);
+                    return $this->sendDocument($chatId, $localPath, basename($localPath), $caption, $threadId);
                 }
 
                 return $this->postMultipart('sendPhoto', $chatId, [
                     ['name' => 'photo', 'contents' => fopen($localPath, 'r'), 'filename' => basename($localPath)],
-                ], $caption);
+                ], $caption, $threadId);
             }
 
             $data = [
                 'chat_id' => $chatId,
                 'photo'   => $photoUrl,
             ];
+
+            if (filled($threadId)) {
+                $data['message_thread_id'] = (int) $threadId;
+            }
 
             if (filled($caption)) {
                 $data['caption'] = $this->escapeHtml($caption);
@@ -369,12 +385,16 @@ class TelegramBotService
      * @param string|null $caption
      * @return array|null
      */
-    private function postMultipart($method, $chatId, array $parts, $caption = null)
+    private function postMultipart($method, $chatId, array $parts, $caption = null, $threadId = null)
     {
         $multipart = array_merge(
             [['name' => 'chat_id', 'contents' => (string) $chatId]],
             $parts
         );
+
+        if (filled($threadId)) {
+            $multipart[] = ['name' => 'message_thread_id', 'contents' => (string) (int) $threadId];
+        }
 
         if (filled($caption)) {
             $multipart[] = ['name' => 'caption', 'contents' => $this->escapeHtml($caption)];
@@ -451,15 +471,20 @@ class TelegramBotService
      * @param string      $filePath 本地檔案絕對路徑
      * @param string|null $filename 顯示的檔名
      * @param string|null $caption  說明文字
+     * @param int|null    $threadId 話題 id（Telegram Topics）
      * @return array|null
      */
-    public function sendDocument($chatId, $filePath, $filename = null, $caption = null)
+    public function sendDocument($chatId, $filePath, $filename = null, $caption = null, $threadId = null)
     {
         try {
             $multipart = [
                 ['name' => 'chat_id', 'contents' => (string) $chatId],
-                ['name' => 'document', 'contents' => fopen($filePath, 'r'), 'filename' => $filename ?: basename($filePath)],
+                ['name' => 'document', 'contents' => fopen($filePath, 'r'), 'filename' => filled($filename) ? $filename : basename($filePath)],
             ];
+
+            if (filled($threadId)) {
+                $multipart[] = ['name' => 'message_thread_id', 'contents' => (string) (int) $threadId];
+            }
 
             if (filled($caption)) {
                 $multipart[] = ['name' => 'caption', 'contents' => $this->escapeHtml($caption)];

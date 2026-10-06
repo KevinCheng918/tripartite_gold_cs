@@ -3,7 +3,7 @@
 return [
     'nav_label'   => 'Global Settings',
     'page_title'  => 'Global Settings',
-    'subtitle'    => 'Claude credentials, internal support group and customer-facing templates',
+    'subtitle'    => 'Claude credentials, fallback API and usage',
 
     // Claude
     'claude_title'        => 'Claude (Auto Reply)',
@@ -39,25 +39,6 @@ return [
     'fallback_howto_paste'  => '3. Copy the key into the field above and save. The key is shown in full only once — close the dialog and you cannot see it again.',
     'fallback_howto_note'   => 'API billing is separate from your subscription — the account needs credit before the fallback can work.',
 
-    // Support group
-    'support_title'         => 'Internal Support Group',
-    'support_desc'          => 'When the knowledge base has no answer, the question is forwarded here for the team to answer.',
-    'support_chat_id'       => 'Group chat_id',
-    'support_chat_id_hint'  => 'Group chat IDs are negative. The bot must be in the group and Group Privacy must be disabled.',
-    'support_system'        => 'Bot to use',
-    'support_system_default' => 'Default bot (.env)',
-    'support_remind_first'  => 'First reminder (minutes)',
-    'support_remind_first_hint' => 'Tags the staff currently on shift if nobody has answered within this time of the ticket opening.',
-    'support_remind_interval' => 'Then every (minutes)',
-    'support_remind_interval_hint' => 'Reminds again every this many minutes after the first one, until the ticket is handled. From reminder :escalate onward, managers and owners are tagged as well (engineers are always skipped).',
-    'support_remind_max'    => 'Maximum reminders',
-    'support_remind_max_hint' => 'Stops reminding at this count and sends one final notice to managers and owners. Prevents a barrage overnight when nobody is on shift.',
-    'support_report_user'   => 'Full summary goes to (multiple)',
-    'support_report_all'    => 'Select all',
-    'support_report_user_hint' => 'Sends yesterday\'s overdue-reminder summary for *everyone* (by ticket and by person) to the people ticked here at :time daily — managers and above is the usual choice. Anyone who was reminded also receives their own personal summary automatically, with no setup. Staff marked "not linked" cannot receive it — ask them to message the bot once.',
-    'support_report_unbound' => 'not linked',
-    'support_test'          => 'Send test message',
-
     // Usage
     'usage_title'        => 'Usage',
     'usage_desc'         => 'Every call to Claude is counted — successes, failures and rate limits alike.',
@@ -74,7 +55,6 @@ return [
 
     'action_save'   => 'Save',
     'action_saving' => 'Saving...',
-    'action_testing' => 'Testing...',
 
     'msg' => [
         'saved'         => 'Saved',
@@ -87,15 +67,5 @@ return [
         'model_invalid' => 'Unsupported model',
         'daily_limit_required' => 'Please enter a daily call limit',
         'daily_limit_invalid'  => 'Daily call limit must be an integer of 0 or more',
-        'chat_id_invalid' => 'Invalid chat_id format (group IDs are negative)',
-        'chat_id_is_customer' => 'This group is already a customer conversation and cannot be used as the internal support group (all of its customer messages would be intercepted, never delivered and never auto-replied). Please use a separate group, or remove that conversation in Telegram CS first.',
-        'system_not_found' => 'System not found',
-        'remind_required' => 'Please enter the reminder interval',
-        'remind_invalid'  => 'Reminder interval must be between 1 and 1440 minutes',
-        'remind_max_required'    => 'Please enter the maximum number of reminders',
-        'remind_max_invalid'     => 'Maximum reminders must be between 1 and 200',
-        'report_user_not_found'  => 'Account not found',
-        'support_test_sent'   => 'Test message sent, please check the group',
-        'support_test_failed' => 'Failed to send. Check the chat_id, that the bot is in the group, and that Group Privacy is disabled',
     ],
 ];

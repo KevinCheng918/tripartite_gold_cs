@@ -19,6 +19,7 @@
 |------|------|------|
 | [features/rbac.md](features/rbac.md) | 分帳號、權限管理（含最小登入/登出） | 已完成 |
 | [features/scheduling.md](features/scheduling.md) | 排班（報班/換班/三班制） | 已完成 |
+| [features/support-group-topics.md](features/support-group-topics.md) | 內部支援群組分話題發送（話題清單 + 逐話題勾要收哪些通知、`/topicid` 查 id、話題 id 填錯會整則拒收）；附帶把設定頁重整成「通訊管理 → 通知設定」三分頁 | 已完成 |
 | [features/remind-escalation.md](features/remind-escalation.md) | 求助單持續提醒（1-2 次 tag 當班、3 次以後加 tag 主管老闆，到次數上限才停）＋ 08:30 每日統計（勾選的人收全部、被催到的人收自己那份）＋ 07:00 待接手清單發內部群組 tag 當天早班；同時移除對話視窗的超時紅橫幅，留下的告警缺口也記在裡面 | 已完成 |
 | [features/shift-daily-notice.md](features/shift-daily-notice.md) | 班表通知（每天 8:00 私訊今日班表：勾選的人收完整班表含時間與缺人班次、有班的人收自己那份；bot 要先被私訊過才能發） | 已完成 |
 | [features/telegram-chat.md](features/telegram-chat.md) | 客服對話窗（Telegram 整合、快速回覆、傳送圖片／檔案含進度條、表情符號選單） | 已完成 |

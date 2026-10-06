@@ -18,7 +18,7 @@ use App\Http\Controllers\Admin\StaffManageController;
 use App\Http\Controllers\Admin\ProjectController;
 use App\Http\Controllers\Admin\QuickReplyController;
 use App\Http\Controllers\Admin\SettingController;
-use App\Http\Controllers\Admin\ShiftNoticeController;
+use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\FinanceController;
 use App\Http\Controllers\Admin\SharedFileController;
 use App\Http\Controllers\Admin\TaskBoardController;
@@ -133,21 +133,28 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::post('/ajax-toggle-ignore', [TelegramChatController::class, 'ajaxToggleIgnore'])->middleware('can:telegram_chat.ignore_manage')->name('ajax-toggle-ignore');
     });
 
-    // 班表通知（今日班表每天早上私訊）
-    Route::prefix('shift-notice')->name('shift-notice.')->group(function () {
-        Route::get('/', [ShiftNoticeController::class, 'index'])->middleware('can:shift_notice.view')->name('index');
-        Route::put('/ajax-update', [ShiftNoticeController::class, 'ajaxUpdate'])->middleware('can:shift_notice.manage')->name('ajax-update');
-        Route::post('/ajax-test', [ShiftNoticeController::class, 'ajaxTest'])->middleware('can:shift_notice.manage')->name('ajax-test');
+    /*
+     * 通知設定（通訊管理）—— 三個分頁：內部支援群組、話題分流、班表通知。
+     *
+     * 2026-10-06 從「全域設定」與「班表通知」兩頁合併過來。
+     */
+    Route::prefix('notification')->name('notification.')->group(function () {
+        Route::get('/', [NotificationController::class, 'index'])->middleware('can:notification.view')->name('index');
+        Route::get('/ajax-settings', [NotificationController::class, 'ajaxSettings'])->middleware('can:notification.view')->name('ajax-settings');
+        Route::put('/ajax-update-support', [NotificationController::class, 'ajaxUpdateSupport'])->middleware('can:notification.manage')->name('ajax-update-support');
+        Route::post('/ajax-test-support', [NotificationController::class, 'ajaxTestSupport'])->middleware('can:notification.manage')->name('ajax-test-support');
+        Route::put('/ajax-update-topics', [NotificationController::class, 'ajaxUpdateTopics'])->middleware('can:notification.manage')->name('ajax-update-topics');
+        Route::post('/ajax-test-topics', [NotificationController::class, 'ajaxTestTopics'])->middleware('can:notification.manage')->name('ajax-test-topics');
+        Route::put('/ajax-update-shift', [NotificationController::class, 'ajaxUpdateShift'])->middleware('can:notification.manage')->name('ajax-update-shift');
+        Route::post('/ajax-test-shift', [NotificationController::class, 'ajaxTestShift'])->middleware('can:notification.manage')->name('ajax-test-shift');
     });
 
-    // 全域設定（Claude 憑證、內部支援群組、對客話術、用量流量）
+    // 全域設定（只剩 Claude 憑證、備援 API、用量流量 —— 通知相關已搬到上面）
     Route::prefix('setting')->name('setting.')->group(function () {
         Route::get('/', [SettingController::class, 'index'])->middleware('can:setting.view')->name('index');
         Route::get('/ajax-settings', [SettingController::class, 'ajaxSettings'])->middleware('can:setting.view')->name('ajax-settings');
         Route::put('/ajax-update-claude', [SettingController::class, 'ajaxUpdateClaude'])->middleware('can:setting.manage')->name('ajax-update-claude');
         Route::put('/ajax-update-fallback', [SettingController::class, 'ajaxUpdateFallback'])->middleware('can:setting.manage')->name('ajax-update-fallback');
-        Route::put('/ajax-update-support', [SettingController::class, 'ajaxUpdateSupport'])->middleware('can:setting.manage')->name('ajax-update-support');
-        Route::post('/ajax-test-support', [SettingController::class, 'ajaxTestSupport'])->middleware('can:setting.manage')->name('ajax-test-support');
     });
 
     // 站台管理

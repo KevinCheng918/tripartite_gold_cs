@@ -24,6 +24,14 @@ use Illuminate\Support\Facades\Log;
  */
 class DailyRateService
 {
+    /*
+     * 這支發到內部群組的訊息屬於哪一類通知。
+     *
+     * 決定它進哪個 Telegram 話題 —— 對應 `constants.SUPPORT_TOPIC.TYPES` 的 key，
+     * 由設定頁的話題清單勾選。沒被任何話題勾到就發到群組主區。
+     */
+    const NOTICE_TYPE = 'daily_rate';
+
     /** @var array 回覆內容視為「採用建議值」的詞 */
     private const ACCEPT_WORDS = ['好', '好的', 'ok', 'OK', 'Ok', '可以', '就這樣', '同意', 'yes', 'Yes'];
 
@@ -260,18 +268,18 @@ class DailyRateService
     private function sendAsk($text, $shot)
     {
         if (blank($shot)) {
-            return $this->supportGroup->send($text);
+            return $this->supportGroup->send($text, null, null, self::NOTICE_TYPE);
         }
 
         $photoUrl = asset('storage/' . $shot);
 
         if (mb_strlen($text) <= self::CAPTION_MAX) {
-            return $this->supportGroup->sendPhoto($photoUrl, $text);
+            return $this->supportGroup->sendPhoto($photoUrl, $text, self::NOTICE_TYPE);
         }
 
-        $this->supportGroup->sendPhoto($photoUrl);
+        $this->supportGroup->sendPhoto($photoUrl, null, self::NOTICE_TYPE);
 
-        return $this->supportGroup->send($text);
+        return $this->supportGroup->send($text, null, null, self::NOTICE_TYPE);
     }
 
     // ---------------------------------------------------------------
@@ -366,7 +374,8 @@ class DailyRateService
             $this->supportGroup->send(
                 (string) config('constants.DAILY_RATE.REPLY_UNPARSED'),
                 null,
-                $quotedMessageId
+                $quotedMessageId,
+                self::NOTICE_TYPE
             );
 
             return false;
@@ -383,7 +392,8 @@ class DailyRateService
         $this->supportGroup->send(
             $this->buildConfirmText($rate, $previous, $nickname),
             null,
-            $quotedMessageId
+            $quotedMessageId,
+            self::NOTICE_TYPE
         );
 
         Log::info('今日匯率已決定', [
@@ -458,7 +468,8 @@ class DailyRateService
         $this->supportGroup->send(
             $this->buildRemindText($mentions, $record),
             null,
-            $record->ask_message_id
+            $record->ask_message_id,
+            self::NOTICE_TYPE
         );
 
         $this->rateRepository->update($record, [
@@ -600,7 +611,7 @@ class DailyRateService
             '{url}'  => (string) config('constants.DAILY_RATE.SCREENSHOT.URL'),
         ]);
 
-        $result = $this->supportGroup->sendPhoto(asset('storage/' . $shot), $caption);
+        $result = $this->supportGroup->sendPhoto(asset('storage/' . $shot), $caption, self::NOTICE_TYPE);
         $this->screenshotService->forget($shot);
 
         if (blank(Arr::get($result, 'result'))) {

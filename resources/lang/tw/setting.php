@@ -3,7 +3,7 @@
 return [
     'nav_label'   => '全域設定',
     'page_title'  => '全域設定',
-    'subtitle'    => 'Claude 憑證、內部支援群組與對客話術',
+    'subtitle'    => 'Claude 憑證、備援 API 與用量流量',
 
     // Claude 主要設定
     'claude_title'        => 'Claude（自動回覆）',
@@ -39,25 +39,6 @@ return [
     'fallback_howto_paste'  => '3. 複製產生的金鑰貼到上方欄位後儲存。金鑰只會完整顯示一次，關掉視窗就看不到了。',
     'fallback_howto_note'   => 'API 與訂閱是分開計費的兩件事 —— 帳戶要先有餘額，備援才用得起來。',
 
-    // 內部支援群組
-    'support_title'         => '內部支援群組',
-    'support_desc'          => '題庫裡找不到答案時，問題會轉到這個群組請自己人回答。',
-    'support_chat_id'       => '群組 chat_id',
-    'support_chat_id_hint'  => '群組的 chat_id 是負數。Bot 必須已加入群組，且 Group Privacy 要關閉。',
-    'support_system'        => '使用的 Bot',
-    'support_system_default' => '預設 Bot（.env）',
-    'support_remind_first'  => '第一次提醒（分鐘）',
-    'support_remind_first_hint' => '開單後超過這個時間沒人回答，tag 當下排班的人員。',
-    'support_remind_interval' => '之後每隔（分鐘）',
-    'support_remind_interval_hint' => '第一次之後每隔這個時間再提醒一次，一直催到問題被處理。第 :escalate 次起會同時 tag 主管與老闆（都跳過工程）。',
-    'support_remind_max'    => '最多提醒幾次',
-    'support_remind_max_hint' => '到這個次數仍沒處理就停止提醒，並發最後一則通知主管與老闆。避免深夜沒人值班時被連續轟炸。',
-    'support_report_user'   => '完整統計私訊給（可多選）',
-    'support_report_all'    => '全選',
-    'support_report_user_hint' => '每天 :time 把前一天的「全部人」超時提醒統計（依題目、依人員）私訊給勾選的人，建議勾主管以上。被提醒到的同仁另外會各自收到「自己那份」，不需要設定。標示「未綁定」的人收不到，請他先私訊機器人一次。',
-    'support_report_unbound' => '未綁定',
-    'support_test'          => '發送測試訊息',
-
     // 用量
     'usage_title'        => '用量流量',
     'usage_desc'         => '只要有呼叫到 Claude 就計一次，成功、失敗、撞限額都算。',
@@ -74,7 +55,6 @@ return [
 
     'action_save'   => '儲存',
     'action_saving' => '儲存中...',
-    'action_testing' => '測試中...',
 
     'msg' => [
         'saved'         => '已儲存',
@@ -87,15 +67,5 @@ return [
         'model_invalid' => '不支援的模型',
         'daily_limit_required' => '請填寫每日呼叫上限',
         'daily_limit_invalid'  => '每日呼叫上限須為 0 以上的整數',
-        'chat_id_invalid' => 'chat_id 格式不正確（群組為負數）',
-        'chat_id_is_customer' => '這個群組已經是客服對話，不能當內部支援群組使用（該群組的客戶訊息會全部被攔下，收不到也不會自動回覆）。請改用另一個獨立群組，或先到 Telegram 客服刪除該對話。',
-        'system_not_found' => '找不到指定的系統',
-        'remind_required' => '請填寫提醒時間',
-        'remind_invalid'  => '提醒時間須介於 1 到 1440 分鐘',
-        'remind_max_required'    => '請填寫最多提醒幾次',
-        'remind_max_invalid'     => '提醒次數須介於 1 到 200 次',
-        'report_user_not_found'  => '找不到這個帳號',
-        'support_test_sent'   => '測試訊息已送出，請到群組確認',
-        'support_test_failed' => '測試訊息送出失敗，請確認 chat_id、Bot 是否已加入群組、以及 Group Privacy 是否關閉',
     ],
 ];

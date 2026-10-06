@@ -35,6 +35,14 @@ use Illuminate\Support\Facades\Log;
  */
 class VmPaymentNoticeService
 {
+    /*
+     * 這支發到內部群組的訊息屬於哪一類通知。
+     *
+     * 決定它進哪個 Telegram 話題 —— 對應 `constants.SUPPORT_TOPIC.TYPES` 的 key，
+     * 由設定頁的話題清單勾選。沒被任何話題勾到就發到群組主區。
+     */
+    const NOTICE_TYPE = 'vm_payment';
+
     /** @var string 跳過原因：這台主機沒有綁站台，查不到繳款設定 */
     const SKIP_NO_STATION = 'no_station';
 
@@ -402,7 +410,7 @@ class VmPaymentNoticeService
              * 催審核那條不傳 $prefix：它不轉傳，整則就是要給客服看的。
              */
             if (filled($prefix)) {
-                $this->supportGroup->send($prefix);
+                $this->supportGroup->send($prefix, null, null, self::NOTICE_TYPE);
             }
 
             $this->sendInternalBody($text, $imageUrl);
@@ -435,13 +443,13 @@ class VmPaymentNoticeService
     private function sendInternalBody($text, $imageUrl)
     {
         if (blank($imageUrl)) {
-            $this->supportGroup->send($text);
+            $this->supportGroup->send($text, null, null, self::NOTICE_TYPE);
 
             return;
         }
 
         if (mb_strlen($text) <= self::CAPTION_MAX) {
-            $this->supportGroup->sendPhoto($imageUrl, $text);
+            $this->supportGroup->sendPhoto($imageUrl, $text, self::NOTICE_TYPE);
 
             return;
         }
@@ -451,8 +459,8 @@ class VmPaymentNoticeService
             'limit'  => self::CAPTION_MAX,
         ]);
 
-        $this->supportGroup->sendPhoto($imageUrl);
-        $this->supportGroup->send($text);
+        $this->supportGroup->sendPhoto($imageUrl, null, self::NOTICE_TYPE);
+        $this->supportGroup->send($text, null, null, self::NOTICE_TYPE);
     }
 
     /**

@@ -1,6 +1,6 @@
-# 每天 8:00 私訊今日班表（**已實作** 2026-10-06）
+# 每天 7:00 私訊今日班表（**已實作** 2026-10-06）
 
-每天早上 8:00，用 bot **私訊**今日班表：
+每天早上 7:00，用 bot **私訊**今日班表：
 
 | 收件人 | 內容 |
 |---|---|
@@ -54,7 +54,7 @@ private 訊息進來（TelegramChatService）
 
 ### 二、每天 8:00 的排程
 
-`shift:notify-daily`（`Console\Kernel` 的 `dailyAt('08:00')`）：
+`shift:notify-daily`（`Console\Kernel` 的 `dailyAt('07:00')`）：
 
 ```
 ShiftNoticeService::run($date, $dryRun)
@@ -86,13 +86,16 @@ ShiftNoticeService::run($date, $dryRun)
 
 ### 四、設定頁
 
-sidebar 新增**通訊管理**分組，把原本散在上面的「Telegram 客服」一起收進來：
+sidebar 的**通訊管理**分組，把原本散在上面的「Telegram 客服」一起收進來：
 
 ```
 通訊管理
 ├─ Telegram 客服   （原本在最上面那組，移過來）
-└─ 班表通知        （新頁）
+└─ 通知設定        （三個分頁，班表通知是其中一個）
 ```
+
+⚠ **2026-10-06 後續調整**：原本獨立的「班表通知」頁已併入「通知設定」的分頁，
+權限 keyword 從 `shift_notice.*` 改成 `notification.*`。詳見 [[support-group-topics]]。
 
 頁面上只有一個欄位（完整班表的收件人）+ 一顆測試發送。收件人是**可勾多位的清單
 加一個「全選」**，沒綁定的人標成灰的「（未綁定）」但不隱藏 —— 勾了也收不到，
@@ -123,7 +126,7 @@ sidebar 新增**通訊管理**分組，把原本散在上面的「Telegram 客�
 | `app/Services/StaffDmService.php`（新增） | 私訊同仁的共用入口（綁定檢查、逐人送、失敗處理），班表與提醒統計共用 |
 | `app/Services/AppSettingService.php` | `KEY_SHIFT_NOTICE_MANAGER`、`getIntList()` / `idListValue()` |
 | `app/Console/Commands/NotifyDailyShiftCommand.php`（新增） | `shift:notify-daily` |
-| `app/Console/Kernel.php` | `dailyAt('08:00')` |
+| `app/Console/Kernel.php` | `dailyAt('07:00')` |
 | `app/Http/Controllers/Admin/ShiftNoticeController.php`（新增） | 設定頁 + ajax |
 | `app/Http/Requests/ShiftNotice/UpdateShiftNoticeRequest.php`（新增） | `manager_user_ids` 陣列驗證（`exists:user,id`，表名沒有 s） |
 | `app/Repositories/UserRepository.php` | `markDmReady()` / `findForDm()` / `getForDmByIds()` / `getDmCandidates()` |
@@ -140,7 +143,7 @@ sidebar 新增**通訊管理**分組，把原本散在上面的「Telegram 客�
 
 1. `php artisan migrate`（新欄位 `telegram_dm_ready`）
 2. `php artisan optimize`（動過 `config/`）
-3. 到「通訊管理 → 班表通知」勾選收件人（可多位／全選）
+3. 到「通訊管理 → 通知設定 → 班表通知」勾選收件人（可多位／全選）
 4. **請收件人先私訊機器人一次**，否則清單會顯示「（未綁定）」、測試發送會失敗
 5. 按「測試發送」確認真的收到
 
@@ -149,7 +152,7 @@ sidebar 新增**通訊管理**分組，把原本散在上面的「Telegram 客�
 ## ⚠ `SEND_AT` 是兩個地方
 
 `constants.SHIFT_NOTICE.SEND_AT`（設定頁顯示的字）和 `Console\Kernel` 的
-`dailyAt('08:00')`（真正的排程）**各自獨立**。改時間要兩邊一起改，
+`dailyAt('07:00')`（真正的排程）**各自獨立**。改時間要兩邊一起改，
 不然設定頁會寫著錯的時間。
 
 ## 相關

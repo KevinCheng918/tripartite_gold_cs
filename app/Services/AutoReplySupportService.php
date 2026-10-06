@@ -40,6 +40,18 @@ class AutoReplySupportService
     /** @var int 候選按鈕上標題的字數上限，超過 Telegram 會自己截掉 */
     private const BUTTON_LABEL_CHARS = 24;
 
+    /*
+     * 這個 class 發到內部群組的訊息屬於哪一類通知。
+     *
+     * 決定它進哪個 Telegram 話題 —— 對應 `constants.SUPPORT_TOPIC.TYPES` 的 key，
+     * 由設定頁的話題清單勾選。沒被任何話題勾到就發到群組主區。
+     *
+     * ⚠ 這一類被標成 `needs_reply`：求助單要靠 `ask_message_id` 對回客服的
+     * 引用回覆，所以**只能勾一個話題**（設定頁會驗證）。發到兩個話題會有兩個
+     * message_id、只記得到一個，另一個話題的回覆就沒反應了。
+     */
+    const NOTICE_TYPE = 'auto_reply_ticket';
+
     private $ticketRepository;
     private $remindRepository;
     private $telegramRepository;
@@ -160,6 +172,47 @@ class AutoReplySupportService
     }
 
     /**
+     * 回答「這個話題的 id 是多少」
+     *
+     * 設定頁要填話題 id，但 Telegram 介面上看不到那個數字。請人去複製訊息連結
+     * 數第幾段很容易看錯 —— webhook 的 update 本來就帶 `message_thread_id`，
+     * 在話題裡輸入指令直接回答最可靠。
+     *
+     * @param array  $message
+     * @param string $text
+     * @return bool 有處理就回 true（呼叫端要跳過後續的作答判斷）
+     */
+    private function answerTopicId(array $message, $text)
+    {
+        $command = (string) config('constants.SUPPORT_TOPIC.ID_COMMAND');
+
+        // 短路：絕大多數訊息都不是這個指令，先比字串再談其他
+        if ($text !== $command) {
+            return false;
+        }
+
+        $threadId = Arr::get($message, 'message_thread_id');
+
+        /*
+         * 主區（General）沒有 thread id。
+         *
+         * ⚠ 不能靜默 —— 使用者會以為指令壞了，然後去填一個錯的 id。
+         */
+        $reply = filled($threadId)
+            ? strtr((string) config('constants.SUPPORT_TOPIC.ID_REPLY'), ['{id}' => (int) $threadId])
+            : (string) config('constants.SUPPORT_TOPIC.ID_REPLY_GENERAL');
+
+        /*
+         * ⚠ 直接走 SupportGroupService 而不是 sendToSupport() ——
+         * 後者會套 NOTICE_TYPE，把回覆丟到「AI 問題」那個話題去，
+         * 而這句一定要回在使用者輸入的那個話題裡。
+         */
+        $this->supportGroup->sendToThread($reply, $threadId);
+
+        return true;
+    }
+
+    /**
      * 組求助訊息
      *
      * @param TelegramGroup $group
@@ -261,13 +314,31 @@ class AutoReplySupportService
     public function handleSupportMessage($payload)
     {
         $message = Arr::get($payload, 'message');
-        $quotedId = Arr::get($payload, 'message.reply_to_message.message_id');
 
-        if (blank($message) || blank($quotedId)) {
+        if (blank($message)) {
             return;
         }
 
-        $answer = trim((string) Arr::get($message, 'text', ''));
+        $text = trim((string) Arr::get($message, 'text', ''));
+
+        // 話題 id 查詢要在「必須引用回覆」之前攔 —— 它是直接輸入的，沒有引用
+        if ($this->answerTopicId($message, $text)) {
+            return;
+        }
+
+        $quotedId = Arr::get($payload, 'message.reply_to_message.message_id');
+
+        /*
+         * ⚠ 群組開了話題功能之後，**話題裡的每則訊息都會帶 `reply_to_message`**
+         * （指向話題的建立訊息），不只是真的引用別人的那些 ——
+         * 所以這道判斷在 forum 群組裡幾乎擋不掉閒聊了。
+         * 真正的過濾是下面的 `findByAskMessageId()` 查不到就 return。
+         */
+        if (blank($quotedId)) {
+            return;
+        }
+
+        $answer = $text;
 
         if (blank($answer)) {
             return;
@@ -1206,7 +1277,7 @@ class AutoReplySupportService
      */
     private function sendToSupport($text, $keyboard = null, $replyTo = null)
     {
-        return $this->supportGroup->send($text, $keyboard, $replyTo);
+        return $this->supportGroup->send($text, $keyboard, $replyTo, self::NOTICE_TYPE);
     }
 
     /**

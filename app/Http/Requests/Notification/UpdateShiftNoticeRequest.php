@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Requests\ShiftNotice;
+namespace App\Http\Requests\Notification;
 
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -32,9 +32,9 @@ class UpdateShiftNoticeRequest extends FormRequest
     public function messages()
     {
         return [
-            'manager_user_ids.array'      => trans('shift_notice.msg.manager_invalid'),
-            'manager_user_ids.*.integer'  => trans('shift_notice.msg.manager_invalid'),
-            'manager_user_ids.*.exists'   => trans('shift_notice.msg.manager_not_found'),
+            'manager_user_ids.array'      => trans('notification.msg.manager_invalid'),
+            'manager_user_ids.*.integer'  => trans('notification.msg.manager_invalid'),
+            'manager_user_ids.*.exists'   => trans('notification.msg.manager_not_found'),
         ];
     }
 }

@@ -26,6 +26,14 @@ use Illuminate\Support\Facades\Log;
  */
 class ShiftNoticeService
 {
+    /*
+     * 這支發到內部群組的訊息屬於哪一類通知。
+     *
+     * 決定它進哪個 Telegram 話題 —— 對應 `constants.SUPPORT_TOPIC.TYPES` 的 key，
+     * 由設定頁的話題清單勾選。沒被任何話題勾到就發到群組主區。
+     */
+    const NOTICE_TYPE = 'shift_notice';
+
     /** @var string 跳過原因：沒有設定任何收件人 */
     const SKIP_NO_MANAGER = 'no_manager';
 
@@ -362,7 +370,7 @@ class ShiftNoticeService
             $this->supportGroup->send(strtr((string) config('constants.SHIFT_NOTICE.FAILED_SUMMARY'), [
                 '{count}' => count($names),
                 '{names}' => implode('、', $names),
-            ]));
+            ]), null, null, self::NOTICE_TYPE);
         } catch (\Exception $e) {
             Log::error('今日班表的未送達彙總發不出去', ['error' => $e->getMessage()]);
         }

@@ -1,0 +1,239 @@
+@extends('layouts.app')
+
+@section('title', trans('notification.page_title'))
+@section('icon', 'bell')
+@section('subtitle', trans('notification.subtitle'))
+
+@section('content')
+
+    {{-- 三個分頁的資料隨頁面一起送出，切分頁不必再等 ajax --}}
+    {{-- ⚠️ data 屬性用單引號包，JSON 內的單引號會提早結束屬性、讓前端解析失敗，
+         所以一律用 JSON_HEX_APOS 轉義 --}}
+    <div id="notification-app"
+         data-i18n='@json(trans("notification"), JSON_HEX_APOS | JSON_HEX_QUOT)'
+         data-initial='@json($initialSettings, JSON_HEX_APOS | JSON_HEX_QUOT)'
+         data-can-manage="{{ Auth::user()->hasPermission('notification.manage') ? '1' : '0' }}">
+
+        <ul class="nav nav-tabs mb-3" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" data-bs-toggle="tab" href="#tab-support" role="tab">
+                    <i class="fas fa-users me-1"></i>{{ trans('notification.tab_support') }}
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#tab-topic" role="tab">
+                    <i class="fas fa-comment-dots me-1"></i>{{ trans('notification.tab_topic') }}
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#tab-shift" role="tab">
+                    <i class="fas fa-calendar-alt me-1"></i>{{ trans('notification.tab_shift') }}
+                </a>
+            </li>
+        </ul>
+
+        <div class="tab-content">
+
+            {{-- ============ 分頁一：內部支援群組 ============ --}}
+            <div class="tab-pane fade show active" id="tab-support" role="tabpanel">
+                <div class="main-card mb-3 card">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ trans('notification.support_title') }}</h5>
+                        <p class="text-muted" style="font-size:0.875rem">{{ trans('notification.support_desc') }}</p>
+                        <form id="form-support">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label" for="support-chat-id">{{ trans('notification.support_chat_id') }}</label>
+                                    <input type="text" class="form-control" id="support-chat-id" placeholder="-1001234567890">
+                                    <small class="form-text text-muted">{{ trans('notification.support_chat_id_hint') }}</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label" for="support-system">{{ trans('notification.support_system') }}</label>
+                                    <select class="form-select" id="support-system"></select>
+                                </div>
+                            </div>
+
+                            <hr>
+                            <h6 class="mb-3">{{ trans('notification.remind_title') }}</h6>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label" for="support-remind-first">{{ trans('notification.remind_first') }}</label>
+                                    <input type="number" class="form-control" id="support-remind-first" min="1" max="1440" step="1">
+                                    <small class="form-text text-muted">{{ trans('notification.remind_first_hint') }}</small>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label" for="support-remind-interval">{{ trans('notification.remind_interval') }}</label>
+                                    <input type="number" class="form-control" id="support-remind-interval" min="1" max="1440" step="1">
+                                    <small class="form-text text-muted">
+                                        {{ trans('notification.remind_interval_hint', ['escalate' => config('constants.AUTO_REPLY.REMIND.ESCALATE_AT')]) }}
+                                    </small>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label" for="support-remind-max">{{ trans('notification.remind_max') }}</label>
+                                    <input type="number" class="form-control" id="support-remind-max" min="1" max="200" step="1">
+                                    <small class="form-text text-muted">{{ trans('notification.remind_max_hint') }}</small>
+                                </div>
+                            </div>
+
+                            <hr>
+                            <h6 class="mb-2">{{ trans('notification.report_title') }}</h6>
+                            <p class="text-muted" style="font-size:0.875rem">
+                                {{ trans('notification.report_desc', ['time' => config('constants.AUTO_REPLY.REMIND.REPORT_AT')]) }}
+                            </p>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <label class="form-label mb-0">{{ trans('notification.report_user') }}</label>
+                                        <div class="form-check mb-0">
+                                            <input class="form-check-input" type="checkbox" id="support-report-all">
+                                            <label class="form-check-label" for="support-report-all">{{ trans('notification.select_all') }}</label>
+                                        </div>
+                                    </div>
+                                    {{-- 人多的時候不要把整頁撐長，超過就在框內捲動 --}}
+                                    <div id="support-report-list" class="p-2"
+                                         style="max-height:200px;overflow-y:auto;border:1px solid var(--bs-border-color, rgba(0,0,0,0.175));border-radius:6px">
+                                    </div>
+                                    <small class="form-text text-muted">{{ trans('notification.report_user_hint') }}</small>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary js-manage-only">{{ trans('notification.action_save') }}</button>
+                            <button type="button" class="btn btn-outline-secondary js-manage-only" id="btn-test-support">{{ trans('notification.support_test') }}</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            {{-- ============ 分頁二：話題分流 ============ --}}
+            <div class="tab-pane fade" id="tab-topic" role="tabpanel">
+                <div class="row">
+                    <div class="col-lg-8">
+                        <div class="main-card mb-3 card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ trans('notification.topic_title') }}</h5>
+                                <p class="text-muted" style="font-size:0.875rem">{{ trans('notification.topic_desc') }}</p>
+
+                                <form id="form-topic">
+                                    <div id="topic-list"></div>
+
+                                    <button type="button" class="btn btn-outline-primary btn-sm js-manage-only mb-3" id="btn-add-topic">
+                                        <i class="fas fa-plus me-1"></i>{{ trans('notification.topic_add') }}
+                                    </button>
+
+                                    <div>
+                                        <button type="submit" class="btn btn-primary js-manage-only">{{ trans('notification.action_save') }}</button>
+                                        <button type="button" class="btn btn-outline-secondary js-manage-only" id="btn-test-topic">{{ trans('notification.topic_test') }}</button>
+                                    </div>
+                                    <div class="form-text mt-2">{{ trans('notification.topic_test_hint') }}</div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- 怎麼取得話題 id。這是這一頁最常被問的事，所以常駐在旁邊 --}}
+                    <div class="col-lg-4">
+                        <div class="main-card mb-3 card">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="fas fa-info-circle me-1"></i>{{ trans('notification.topic_howto_title') }}
+                                </h5>
+                                <ol class="mb-2 ps-3" style="font-size:0.875rem;line-height:1.9">
+                                    <li>{{ trans('notification.topic_howto_1') }}</li>
+                                    <li>
+                                        {{ trans('notification.topic_howto_2') }}
+                                        <code>{{ config('constants.SUPPORT_TOPIC.ID_COMMAND') }}</code>
+                                    </li>
+                                    <li>{{ trans('notification.topic_howto_3') }}</li>
+                                </ol>
+                                <p class="mb-0 text-danger" style="font-size:0.875rem">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>{{ trans('notification.topic_howto_note') }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- ============ 分頁三：班表通知 ============ --}}
+            <div class="tab-pane fade" id="tab-shift" role="tabpanel">
+                <div class="row">
+                    <div class="col-lg-7">
+                        <div class="main-card mb-3 card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ trans('notification.shift_title') }}</h5>
+                                <p class="text-muted" style="font-size:0.875rem">
+                                    {{ trans('notification.shift_desc', ['time' => config('constants.SHIFT_NOTICE.SEND_AT')]) }}
+                                </p>
+                                <form id="form-shift">
+                                    <div class="mb-3">
+                                        <div class="d-flex align-items-center justify-content-between mb-2">
+                                            <label class="form-label mb-0">{{ trans('notification.shift_user') }}</label>
+                                            <div class="form-check mb-0">
+                                                <input class="form-check-input" type="checkbox" id="shift-user-all">
+                                                <label class="form-check-label" for="shift-user-all">{{ trans('notification.select_all') }}</label>
+                                            </div>
+                                        </div>
+                                        <div id="shift-user-list" class="p-2"
+                                             style="max-height:260px;overflow-y:auto;border:1px solid var(--bs-border-color, rgba(0,0,0,0.175));border-radius:6px">
+                                        </div>
+                                        <small class="form-text text-muted">{{ trans('notification.shift_user_hint') }}</small>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary js-manage-only">{{ trans('notification.action_save') }}</button>
+                                    <button type="button" class="btn btn-outline-secondary js-manage-only" id="btn-test-shift">{{ trans('notification.shift_test') }}</button>
+                                    <div class="form-text mt-2">{{ trans('notification.shift_test_hint') }}</div>
+                                </form>
+                            </div>
+                        </div>
+
+                        {{-- 個人班表（純說明，沒有東西要設定） --}}
+                        <div class="main-card mb-3 card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ trans('notification.shift_personal_title') }}</h5>
+                                <p class="text-muted mb-0" style="font-size:0.875rem">
+                                    {{ trans('notification.shift_personal_desc', ['time' => config('constants.SHIFT_NOTICE.SEND_AT')]) }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- 綁定說明。「為什麼他沒收到」是這一頁最常被問的事 --}}
+                    <div class="col-lg-5">
+                        <div class="main-card mb-3 card">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="fas fa-info-circle me-1"></i>{{ trans('notification.bind_title') }}
+                                </h5>
+                                <ol class="mb-2 ps-3" style="font-size:0.875rem;line-height:1.9">
+                                    <li>{{ trans('notification.bind_step1') }}</li>
+                                    <li>{{ trans('notification.bind_step2') }}</li>
+                                    <li>{{ trans('notification.bind_step3') }}</li>
+                                </ol>
+                                <p class="mb-0 text-danger" style="font-size:0.875rem">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>{{ trans('notification.bind_note') }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    {{-- 訊息 Modal（不用 alert） --}}
+    <div class="modal fade" id="modal-notification-msg" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-body text-center py-4"></div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+@endsection
+
+@section('scripts')
+    <script src="{{ asset('js/notification-setting.js') }}?v={{ filemtime(public_path('js/notification-setting.js')) }}"></script>
+@endsection

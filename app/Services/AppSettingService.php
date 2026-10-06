@@ -47,6 +47,16 @@ class AppSettingService
     const KEY_SUPPORT_SYSTEM_ID = 'auto_reply.support_system_id';
 
     /*
+     * 內部支援群組的話題分流（Telegram Topics）。
+     *
+     * 存 JSON：`[{"name":"排程通知","thread_id":42,"types":["ticket_handover",…]}, …]`
+     *
+     * ⚠ 這裡用 JSON 而不是像收件人那樣的逗號串接 —— 這是**有結構的清單**
+     * （每筆有名稱、id、一組勾選的類型），不是單純一串整數。
+     */
+    const KEY_SUPPORT_TOPICS = 'auto_reply.support_topics';
+
+    /*
      * 求助單超時提醒。
      *
      * FIRST    = 開單後多久送第一次提醒
@@ -183,6 +193,55 @@ class AppSettingService
         }
 
         return array_values(array_unique($ids));
+    }
+
+    /**
+     * 讀取 JSON 設定
+     *
+     * ⚠ **解析失敗要回預設值而不是讓它炸開**：設定是人填的，手動改壞過一次
+     * 就會讓每一次讀取都丟例外 —— 而這些設定在排程裡被讀，炸開等於整輪排程停擺。
+     *
+     * @param string $key
+     * @param array  $default
+     * @return array
+     */
+    public function getJson($key, $default = [])
+    {
+        $value = $this->get($key);
+
+        if (blank($value)) {
+            return $default;
+        }
+
+        $decoded = json_decode($value, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+            \Log::warning('設定值不是合法的 JSON，已退回預設值', ['key' => $key]);
+
+            return $default;
+        }
+
+        return $decoded;
+    }
+
+    /**
+     * 把陣列寫成 JSON 設定值
+     *
+     * 空陣列存 null 而不是 `[]` —— 理由同 `idListValue()`。
+     *
+     * @param array $value
+     * @return string|null
+     */
+    public function jsonValue($value)
+    {
+        $value = (array) $value;
+
+        if (blank($value)) {
+            return null;
+        }
+
+        // UNESCAPED_UNICODE：話題名稱是中文，不轉義才看得懂資料庫裡存了什麼
+        return json_encode($value, JSON_UNESCAPED_UNICODE);
     }
 
     /**
