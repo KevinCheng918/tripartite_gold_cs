@@ -41,7 +41,6 @@ return [
     'assigned_to'        => '值班客服',
     'unassigned'         => '未指派',
     'select_group'       => '请选择左侧对话',
-    'alert_unreplied'    => '有未回复消息超过 :minutes 分钟',
 
     'auto_reply'             => '自动回复',
     'auto_reply_placeholder' => '自动回复中，取消勾选才能人工输入',

@@ -36,6 +36,5 @@
     <script src="{{ asset('js/telegram-chat/quick-reply.js') }}?v={{ filemtime(public_path('js/telegram-chat/quick-reply.js')) }}"></script>
     {{-- 必須排在 main.js 之前：renderHeader 實際執行時要看得到 T.openIgnorePanel --}}
     <script src="{{ asset('js/telegram-chat/ignore-member.js') }}?v={{ filemtime(public_path('js/telegram-chat/ignore-member.js')) }}"></script>
-    <script src="{{ asset('js/telegram-chat/alert.js') }}?v={{ filemtime(public_path('js/telegram-chat/alert.js')) }}"></script>
     <script src="{{ asset('js/telegram-chat/main.js') }}?v={{ filemtime(public_path('js/telegram-chat/main.js')) }}"></script>
 @endsection

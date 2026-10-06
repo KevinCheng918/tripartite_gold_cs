@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Repositories\StationRepository;
+use App\Repositories\UserRepository;
 use App\Services\AutoReply\ClaudeCodeMatcher;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -22,19 +24,26 @@ class SettingService
     private $llmUsageService;
     private $supportService;
     private $stationRepository;
+    private $userRepository;
+    private $staffDm;
 
     public function __construct(
         AppSettingService $appSettingService,
         ClaudeCodeMatcher $matcher,
         LlmUsageService $llmUsageService,
         AutoReplySupportService $supportService,
-        StationRepository $stationRepository
+        StationRepository $stationRepository,
+        UserRepository $userRepository,
+        StaffDmService $staffDm
     ) {
         $this->appSettingService = $appSettingService;
         $this->matcher = $matcher;
         $this->llmUsageService = $llmUsageService;
         $this->supportService = $supportService;
         $this->stationRepository = $stationRepository;
+        $this->userRepository = $userRepository;
+        // 統計收件人下拉要標出「還沒私訊過機器人」的人，判斷在這支
+        $this->staffDm = $staffDm;
     }
 
     /**
@@ -53,6 +62,8 @@ class SettingService
             'usage'    => $this->llmUsageService->summary(),
             'options'   => [
                 'models'  => config('auto_reply.models'),
+                // 統計收件人候選，帶綁定狀態 —— 選了沒綁定的人會默默發不出去
+                'dm_candidates' => $this->dmCandidates(),
                 'systems' => $this->stationRepository->getActiveSystems()
                     ->map(function ($system) {
                         return [
@@ -131,11 +142,16 @@ class SettingService
      */
     public function updateSupport($params, $userId = null)
     {
+        $reportUserId = (int) Arr::get($params, 'remind_report_user_id', 0);
+
         $this->appSettingService->putMany([
-            AppSettingService::KEY_SUPPORT_CHAT_ID       => isset($params['chat_id']) ? trim((string) $params['chat_id']) : null,
-            AppSettingService::KEY_SUPPORT_SYSTEM_ID     => isset($params['system_id']) ? (string) $params['system_id'] : null,
-            AppSettingService::KEY_REMIND_FIRST_MINUTES  => (string) $params['remind_first_minutes'],
-            AppSettingService::KEY_REMIND_SECOND_MINUTES => (string) $params['remind_second_minutes'],
+            AppSettingService::KEY_SUPPORT_CHAT_ID        => trim((string) Arr::get($params, 'chat_id')),
+            AppSettingService::KEY_SUPPORT_SYSTEM_ID      => (string) Arr::get($params, 'system_id'),
+            AppSettingService::KEY_REMIND_FIRST_MINUTES   => (string) Arr::get($params, 'remind_first_minutes'),
+            AppSettingService::KEY_REMIND_INTERVAL_MINUTES => (string) Arr::get($params, 'remind_interval_minutes'),
+            AppSettingService::KEY_REMIND_MAX_COUNT       => (string) Arr::get($params, 'remind_max_count'),
+            // 清空用 null 而不是 '0'：資料庫裡留個 '0' 看起來像「指定了 id 0 的人」
+            AppSettingService::KEY_REMIND_REPORT_MANAGER  => $reportUserId > 0 ? (string) $reportUserId : null,
         ], $userId);
     }
 
@@ -189,15 +205,45 @@ class SettingService
     }
 
     /**
+     * 可以當統計收件人的帳號（下拉用）
+     *
+     * ⚠ `dm_ready` 一定要帶：沒私訊過機器人的人收不到任何東西，
+     * 要在選之前就看得出來，不然要等到隔天沒收到才發現。
+     *
+     * @return array
+     */
+    private function dmCandidates()
+    {
+        $candidates = [];
+
+        foreach ($this->userRepository->getDmCandidates() as $user) {
+            $candidates[] = [
+                'id'       => (int) $user->id,
+                'nickname' => (string) $user->nickname,
+                'dm_ready' => $this->staffDm->canDm($user),
+            ];
+        }
+
+        return $candidates;
+    }
+
+    /**
      * @return array
      */
     private function supportSection()
     {
         return [
-            'chat_id'               => $this->appSettingService->get(AppSettingService::KEY_SUPPORT_CHAT_ID),
-            'system_id'             => $this->appSettingService->getInt(AppSettingService::KEY_SUPPORT_SYSTEM_ID),
-            'remind_first_minutes'  => $this->appSettingService->getInt(AppSettingService::KEY_REMIND_FIRST_MINUTES, 10),
-            'remind_second_minutes' => $this->appSettingService->getInt(AppSettingService::KEY_REMIND_SECOND_MINUTES, 10),
+            'chat_id'                 => $this->appSettingService->get(AppSettingService::KEY_SUPPORT_CHAT_ID),
+            'system_id'               => $this->appSettingService->getInt(AppSettingService::KEY_SUPPORT_SYSTEM_ID),
+            'remind_first_minutes'    => $this->appSettingService->getInt(AppSettingService::KEY_REMIND_FIRST_MINUTES, 10),
+            'remind_interval_minutes' => $this->appSettingService->getInt(AppSettingService::KEY_REMIND_INTERVAL_MINUTES, 10),
+            'remind_max_count'        => $this->appSettingService->getInt(
+                AppSettingService::KEY_REMIND_MAX_COUNT,
+                (int) config('constants.AUTO_REPLY.REMIND.MAX_COUNT')
+            ),
+            'remind_report_user_id'   => $this->appSettingService->getInt(AppSettingService::KEY_REMIND_REPORT_MANAGER),
+            'escalate_at'             => (int) config('constants.AUTO_REPLY.REMIND.ESCALATE_AT'),
+            'report_at'               => (string) config('constants.AUTO_REPLY.REMIND.REPORT_AT'),
         ];
     }
 

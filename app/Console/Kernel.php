@@ -29,11 +29,19 @@ class Kernel extends ConsoleKernel
          */
         $schedule->command('shift:notify-daily')->dailyAt('08:00')->withoutOverlapping();
 
+        /*
+         * 每天早上 8:30 把前一天的求助單超時提醒統計私訊給指定主管。
+         *
+         * 排在班表通知（08:00）之後、匯率報價（09:00）之前 ——
+         * 三則主動訊息錯開，主管不會在同一分鐘收到一串。
+         *
+         * ⚠ 沒有任何提醒的日子也會發（寫「昨天沒有超時」）：安靜不動時
+         * 分不出「昨天沒事」還是「排程壞了」。
+         */
+        $schedule->command('remind:report')->dailyAt('08:30')->withoutOverlapping();
+
         // 每日凌晨 2 點清理 7 天前的 Telegram 訊息
         $schedule->command('telegram:purge')->dailyAt('02:00');
-
-        // 每分鐘檢查 Telegram 未回覆訊息告警
-        $schedule->command('telegram:alert')->everyMinute();
 
         // 每分鐘送出已到期的預約群發公告（withoutOverlapping 避免上一輪還在送就再跑一次）
         $schedule->command('telegram:send-scheduled')->everyMinute()->withoutOverlapping();

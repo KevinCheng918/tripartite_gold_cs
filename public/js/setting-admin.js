@@ -143,6 +143,24 @@
         });
 
         document.getElementById('support-system').innerHTML = systemHtml;
+
+        /*
+         * 每日統計的收件人。
+         *
+         * 沒私訊過機器人的人後面掛「未綁定」但**不隱藏** —— 選了也收不到，
+         * 要在選之前就看得出來；整個拿掉會變成「名單裡沒這個人」，更難判斷。
+         */
+        var candidates = settings.options.dm_candidates || [];
+        var reportHtml = '<option value="">' + escapeHtml(i18n.support_report_none) + '</option>';
+
+        candidates.forEach(function (user) {
+            var label = user.dm_ready
+                ? user.nickname
+                : user.nickname + '（' + i18n.support_report_unbound + '）';
+            reportHtml += '<option value="' + user.id + '">' + escapeHtml(label) + '</option>';
+        });
+
+        document.getElementById('support-report-user').innerHTML = reportHtml;
     }
 
     function renderClaude() {
@@ -173,7 +191,9 @@
         document.getElementById('support-chat-id').value = support.chat_id || '';
         document.getElementById('support-system').value = support.system_id || '';
         document.getElementById('support-remind-first').value = support.remind_first_minutes;
-        document.getElementById('support-remind-second').value = support.remind_second_minutes;
+        document.getElementById('support-remind-interval').value = support.remind_interval_minutes;
+        document.getElementById('support-remind-max').value = support.remind_max_count;
+        document.getElementById('support-report-user').value = support.remind_report_user_id || '';
     }
 
     function renderUsage() {
@@ -300,7 +320,12 @@
                 chat_id: value('support-chat-id'),
                 system_id: value('support-system') || null,
                 remind_first_minutes: parseInt(value('support-remind-first'), 10) || 10,
-                remind_second_minutes: parseInt(value('support-remind-second'), 10) || 10
+                remind_interval_minutes: parseInt(value('support-remind-interval'), 10) || 10,
+                remind_max_count: parseInt(value('support-remind-max'), 10) || 30,
+                // 空字串代表「不發統計」，後端的 nullable 規則接得住
+                remind_report_user_id: value('support-report-user') === ''
+                    ? null
+                    : parseInt(value('support-report-user'), 10)
             }, e.target.querySelector('button[type="submit"]'));
         });
 

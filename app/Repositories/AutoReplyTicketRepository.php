@@ -111,20 +111,49 @@ class AutoReplyTicketRepository
     }
 
     /**
-     * 取得超時未回答、且還沒提醒到指定階段的單（排程提醒用）
+     * 取得「該提醒了」的未回答求助單（排程提醒用）
      *
-     * @param int $minutes      超時分鐘數
-     * @param int $remindCount  目前的提醒階段（見 constants.AUTO_REPLY.REMIND）
+     * 2026-10-06 從固定兩階段改成持續提醒，所以判斷依據從
+     * 「`remind_count` 等於某個階段」換成「**距離上次提醒已超過間隔**」。
+     *
+     * @param int $firstMinutes    開單後多久送第一次
+     * @param int $intervalMinutes 之後每隔多久一次
+     * @param int $maxCount        最多催幾次（含收尾那則）
      * @return Collection
      */
-    public function getTimeoutTickets($minutes, $remindCount)
+    public function getTicketsDueForRemind($firstMinutes, $intervalMinutes, $maxCount)
     {
+        $now = now();
+
         return AutoReplyTicket::query()
             ->select(self::COLUMNS)
             ->with('group')
             ->where('status', config('constants.AUTO_REPLY.TICKET_STATUS.PENDING'))
-            ->where('remind_count', $remindCount)
-            ->where('created_at', '<=', now()->subMinutes($minutes))
+            /*
+             * 到上限的單也要撈出來 —— 還差一次就是「收尾那則」。
+             * 真正停下來是 `remind_count > $maxCount`，不是 `>=`。
+             */
+            ->where('remind_count', '<=', $maxCount)
+            ->where(function ($query) use ($now, $firstMinutes, $intervalMinutes) {
+                // 還沒催過：從開單時間起算
+                $query->where(function ($first) use ($now, $firstMinutes) {
+                    $first->where('remind_count', 0)
+                        ->where('created_at', '<=', $now->copy()->subMinutes($firstMinutes));
+                })
+                // 催過了：從上次提醒起算，所以間隔是「每隔」而不是「開單後第 N 分鐘」
+                ->orWhere(function ($again) use ($now, $intervalMinutes) {
+                    $again->where('remind_count', '>', 0)
+                        ->whereNotNull('last_reminded_at')
+                        ->where('last_reminded_at', '<=', $now->copy()->subMinutes($intervalMinutes));
+                })
+                /*
+                 * 催過了卻沒有 last_reminded_at —— 不該發生，但真的發生時
+                 * 這張單會永遠撈不到、永遠不再被催。寧可當成「該催了」。
+                 */
+                ->orWhere(function ($broken) {
+                    $broken->where('remind_count', '>', 0)->whereNull('last_reminded_at');
+                });
+            })
             ->orderBy('id')
             ->get();
     }

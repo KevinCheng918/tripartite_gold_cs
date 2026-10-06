@@ -41,7 +41,6 @@ return [
     'assigned_to'        => 'On Duty',
     'unassigned'         => 'Unassigned',
     'select_group'       => 'Select a conversation',
-    'alert_unreplied'    => 'Unreplied message over :minutes minutes',
 
     'auto_reply'             => 'Auto reply',
     'auto_reply_placeholder' => 'Auto reply is on. Uncheck it to type manually.',

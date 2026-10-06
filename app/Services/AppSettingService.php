@@ -32,7 +32,6 @@ class AppSettingService
     const KEY_FALLBACK_MODEL       = 'auto_reply.fallback_model';
     const KEY_FALLBACK_DAILY_LIMIT = 'auto_reply.fallback_daily_limit';
 
-    // 內部支援群組
     /*
      * 今日班表要私訊給誰（user.id）。
      *
@@ -40,10 +39,33 @@ class AppSettingService
      */
     const KEY_SHIFT_NOTICE_MANAGER = 'shift_notice.manager_user_id';
 
-    const KEY_SUPPORT_CHAT_ID       = 'auto_reply.support_chat_id';
-    const KEY_SUPPORT_SYSTEM_ID     = 'auto_reply.support_system_id';
-    const KEY_REMIND_FIRST_MINUTES  = 'auto_reply.remind_first_minutes';
-    const KEY_REMIND_SECOND_MINUTES = 'auto_reply.remind_second_minutes';
+    // 內部支援群組
+    const KEY_SUPPORT_CHAT_ID   = 'auto_reply.support_chat_id';
+    const KEY_SUPPORT_SYSTEM_ID = 'auto_reply.support_system_id';
+
+    /*
+     * 求助單超時提醒。
+     *
+     * FIRST    = 開單後多久送第一次提醒
+     * INTERVAL = 之後每隔多久再提醒一次（會一直催到單被處理）
+     * MAX      = 最多催幾次，到上限就停並發一則收尾（深夜沒人值班時的煞車）
+     *
+     * ⚠ `KEY_REMIND_INTERVAL_MINUTES` 存的字串**刻意沿用舊的
+     * `remind_second_minutes`**：2026-10-06 之前它的意思是「第二次提醒要再等
+     * 多久」，改成「之後每隔」之後語意變了，但換掉字串會讓既有設定值歸零、
+     * 悄悄退回預設值。常數名稱表達新語意，儲存鍵維持穩定。
+     */
+    const KEY_REMIND_FIRST_MINUTES    = 'auto_reply.remind_first_minutes';
+    const KEY_REMIND_INTERVAL_MINUTES = 'auto_reply.remind_second_minutes';
+    const KEY_REMIND_MAX_COUNT        = 'auto_reply.remind_max_count';
+
+    /*
+     * 每日提醒統計要私訊給誰（user.id）。
+     *
+     * 跟 KEY_SHIFT_NOTICE_MANAGER 分開（需求方 2026-10-06 指定）——
+     * 班表給排班的人看、超時統計給管績效的人看，不一定是同一位。
+     */
+    const KEY_REMIND_REPORT_MANAGER = 'auto_reply.remind_report_user_id';
 
     // 每日匯率報價（匯率頁維護）
     const KEY_DAILY_RATE_TEMPLATE = 'daily_rate.ask_template';

@@ -139,15 +139,29 @@ npm install -g @anthropic-ai/claude-code</code></pre>
                             <label class="form-label" for="support-system">{{ trans('setting.support_system') }}</label>
                             <select class="form-select" id="support-system"></select>
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label" for="support-remind-first">{{ trans('setting.support_remind_first') }}</label>
                             <input type="number" class="form-control" id="support-remind-first" min="1" max="1440" step="1">
                             <small class="form-text text-muted">{{ trans('setting.support_remind_first_hint') }}</small>
                         </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label" for="support-remind-interval">{{ trans('setting.support_remind_interval') }}</label>
+                            <input type="number" class="form-control" id="support-remind-interval" min="1" max="1440" step="1">
+                            <small class="form-text text-muted">
+                                {{ trans('setting.support_remind_interval_hint', ['escalate' => config('constants.AUTO_REPLY.REMIND.ESCALATE_AT')]) }}
+                            </small>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label" for="support-remind-max">{{ trans('setting.support_remind_max') }}</label>
+                            <input type="number" class="form-control" id="support-remind-max" min="1" max="200" step="1">
+                            <small class="form-text text-muted">{{ trans('setting.support_remind_max_hint') }}</small>
+                        </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label" for="support-remind-second">{{ trans('setting.support_remind_second') }}</label>
-                            <input type="number" class="form-control" id="support-remind-second" min="1" max="1440" step="1">
-                            <small class="form-text text-muted">{{ trans('setting.support_remind_second_hint') }}</small>
+                            <label class="form-label" for="support-report-user">{{ trans('setting.support_report_user') }}</label>
+                            <select class="form-select" id="support-report-user"></select>
+                            <small class="form-text text-muted">
+                                {{ trans('setting.support_report_user_hint', ['time' => config('constants.AUTO_REPLY.REMIND.REPORT_AT')]) }}
+                            </small>
                         </div>
                     </div>
                     <button type="submit" class="btn btn-primary js-manage-only">{{ trans('setting.action_save') }}</button>

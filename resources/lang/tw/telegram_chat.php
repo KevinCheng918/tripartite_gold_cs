@@ -42,7 +42,6 @@ return [
     'assigned_to'        => '值班客服',
     'unassigned'         => '未指派',
     'select_group'       => '請選擇左側對話',
-    'alert_unreplied'    => '有未回覆訊息超過 :minutes 分鐘',
 
     'auto_reply'             => '自動回覆',
     'auto_reply_placeholder' => '自動回覆中，取消勾選才能人工輸入',

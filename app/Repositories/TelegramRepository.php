@@ -356,23 +356,6 @@ class TelegramRepository
     }
 
     /**
-     * 取得超過指定分鐘未回覆的 inbound 訊息（告警用）
-     *
-     * @param int $minutes
-     * @return Collection
-     */
-    public function getUnrepliedMessages($minutes)
-    {
-        return TelegramMessage::query()
-            ->select(['id', 'telegram_group_id', 'sender_name', 'content', 'created_at'])
-            ->with(['group:id,chat_id,title'])
-            ->where('direction', config('constants.TELEGRAM.DIRECTION.INBOUND'))
-            ->where('replied', false)
-            ->where('created_at', '<', now()->subMinutes($minutes))
-            ->get();
-    }
-
-    /**
      * 取得某個對話的近期訊息（自動回覆的脈絡用）
      *
      * 客人常常分兩則講一件事：先貼系統異常訊息，再問「這是什麼錯誤呢」。

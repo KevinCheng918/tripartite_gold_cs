@@ -2309,26 +2309,6 @@ input[type="time"].form-control {
     cursor: not-allowed;
 }
 
-/* 告警條 */
-.tg-alert-bar {
-    position: fixed;
-    top: 0;
-    left: 240px;
-    right: 0;
-    padding: 0.625rem 1.5rem;
-    background: #fef2f2;
-    border-bottom: 2px solid #ef4444;
-    color: #991b1b;
-    font-size: 0.9375rem;
-    font-weight: 600;
-    z-index: 999;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.tg-alert__icon { font-size: 1.25rem; }
-
 /* 桌面版隱藏手機元素 */
 .account-cards { display: none; }
 .shift-cards { display: none; }
@@ -2606,11 +2586,6 @@ input[type="time"].form-control {
         padding: 0.5rem 0.75rem;
     }
 
-    /* ---- 告警條 ---- */
-    .tg-alert-bar {
-        left: 0;
-    }
-
     /* ---- 按鈕 ---- */
     .btn-primary, .btn-danger-full {
         font-size: 0.875rem;
@@ -2797,6 +2772,5 @@ input[type="time"].form-control {
 [data-theme="dark"] .tg-chat__input { border-color: #2d3039; }
 [data-theme="dark"] .tg-chat__input textarea { background: #151821; border-color: #2d3039; color: #e5e7eb; }
 [data-theme="dark"] .tg-chat__input textarea:focus { border-color: #a67c00; }
-[data-theme="dark"] .tg-alert-bar { background: rgba(239, 68, 68, 0.15); border-color: #ef4444; color: #f87171; }
 [data-theme="dark"] .tg-header__back { color: #d1d5db; }
 [data-theme="dark"] .tg-header__back:hover { color: #f3f4f6; }

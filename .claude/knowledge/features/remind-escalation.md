@@ -1,6 +1,6 @@
-# 求助單持續提醒 + 每日提醒統計（設計稿，**尚未實作**）
+# 求助單持續提醒 + 每日提醒統計
 
-> **狀態：等需求方確認。** 下面「待釐清」那幾項定了才動工。
+> **狀態：已實作（2026-10-06）。** 上線前置作業見最後一節。
 
 ## 需求（2026-10-06）
 
@@ -41,14 +41,26 @@ telegram:alert（每分鐘）
 | `resources/lang/{tw,cn,en}/telegram_chat.php` | 移掉 `alert_unreplied` |
 | `app/Repositories/TelegramRepository.php` | `getUnrepliedMessages()` 沒有別的呼叫端 → 一起刪 |
 
-⚠ **這兩套的判斷依據不一樣**，不是單純搬家：
-- 舊的：**客人訊息** 5 分鐘沒人回 → 整個群組一則橫幅
-- 新的：**求助單** 超時沒人回答 → 內部群組 tag 人
+### ⚠ 刪掉之後留下的缺口（重要）
 
-也就是說「客人訊息沒人回但 AI 沒開求助單」的狀況，刪掉之後就**不再有任何告警**。
-AI 直接答掉的不需要告警，但**客服自己接手處理中的對話**也不會再被盯。
+**這兩套的判斷依據不一樣**，不是單純搬家：
 
-> 需求方的原話是「換方法」，所以照上面全刪。若希望那層也留著，要另外講。
+| | 舊的（已移除） | 新的 |
+|---|---|---|
+| 看什麼 | **客人訊息** 沒人回 | **求助單** 沒人回答 |
+| 門檻 | 平日 5 分 / 週末 30 分（寫死） | 設定頁可調 |
+| 怎麼告警 | 對話視窗紅橫幅，5 秒後消失 | 內部群組 tag 人，一路催到處理完 |
+| 涵蓋範圍 | 所有沒回的客人訊息 | **只有 AI 開了求助單的** |
+
+所以下面這幾條路**現在沒有任何自動告警**：
+
+1. **AI 判成寒暄／不需回應（SILENT）** —— 不開單，所以提醒撈不到。
+   判錯的時候只能靠客服看對話列表發現（見 [[auto-reply-natural]]）
+2. **AI 追問客人補資料** —— 客人不回就一直掛著（見 [[auto-reply-ask-info]]）
+3. **客服自己接手處理中的對話** —— AI 沒介入，也就沒有單
+
+需求方的原話是「換方法」，所以照上面全刪。**上面這三條如果也要盯，要另外做**
+（最直接的作法是讓這幾條路也開一張單，提醒就自動接上）。
 
 ## 二、持續提醒
 
@@ -114,73 +126,128 @@ remind:report（每天固定時間）
 沒有任何提醒的日子**也要發**（寫「昨天沒有超時的求助單」）—— 理由同班表通知：
 安靜不動時分不出「沒事發生」還是「排程壞了」。
 
-## ⚠ 待釐清
+## 已確認的決策（2026-10-06）
 
-### 1. 第 3 次之後，每隔多久提醒一次？
-
-現在設定頁有兩個欄位：`remind_first_minutes`、`remind_second_minutes`。
-
-| 選項 | 說明 |
+| 題目 | 決定 |
 |---|---|
-| **A. 沿用第二個欄位當固定間隔**（建議） | 不動設定頁。第 1 次在首次間隔後，之後每隔 `second` 分鐘一次 |
-| B. 設定頁改成「首次 / 之後每隔」兩個欄位 | 語意更清楚，但要改設定頁與語系 |
-| C. 遞增（5 → 10 → 20 分…） | 不會洗版，但「越晚越不急」跟需求相反 |
+| 深夜無人值班 | **提醒次數設上限**（預設 30 次）。到上限就停，並發一則「已提醒 N 次仍未處理」收尾 |
+| 第 3 次之後的間隔 | **設定頁改成「首次 / 之後每隔」** 兩個欄位 |
+| 統計維度 | **按單 ＋ 按人都要** → 需要新表記錄每一次提醒 tag 到誰 |
+| 統計收件人 | **另設一個欄位**，不跟班表通知共用 |
 
-### 2. ⚠ 深夜沒人值班時要照樣一直提醒嗎？
+### 上限到了之後
 
-這是最需要先決定的一題。每分鐘跑的排程 + 「不斷提醒」＝
-客人半夜丟一題沒人處理，到早上會累積**上百則** tag 主管老闆的訊息。
+停止提醒，但**發最後一則**（tag 主管與老闆）說明「這張單已提醒 N 次仍未處理」——
+直接安靜停掉的話，那張單就從所有人的視線裡消失了。
+隔天的統計也會把「撞到上限」的單單獨列出來。
 
-| 選項 | 說明 |
+### 設定放哪裡
+
+全部放**全域設定頁的「內部支援群組」區塊**（首次 / 之後每隔 / 上限次數 / 統計收件人）。
+提醒間隔本來就在那裡，拆到兩頁反而更難找。
+
+### 統計發送時間
+
+08:30 —— 班表通知（08:00）之後、匯率報價（09:00）之前，三則錯開。
+
+## 實作結果
+
+### 資料
+
+`auto_reply_ticket.remind_count` 的語意從「階段」（0/1/2）改成**真正的累計次數**，
+階段由次數推導。撞到上限時推成 `max + 1`，查詢用 `remind_count <= $max` 收單。
+
+新表 `auto_reply_ticket_remind`：**每送出一次提醒、每 tag 到一個人就是一列**。
+`user_id` 可為 null —— tag 不到人時也要記一列，那代表「催了但沒人被叫到」，
+是最該被看見的狀況，不記的話統計上會看起來像那次提醒沒發生。
+
+### 一輪的流程
+
+```
+auto-reply:remind（每分鐘）
+  ├─ getTicketsDueForRemind(首次, 間隔, 上限)
+  │    remind_count = 0 → created_at + 首次 已到
+  │    remind_count ≥ 1 → last_reminded_at + 間隔 已到
+  ├─ 當班人員**整輪只查一次**（十張單卡住不該查十次排班）
+  └─ 逐張 remindOne()
+       ├─ seq = remind_count + 1，決定 stage
+       ├─ 送出（失敗只記 log，不中斷整輪）
+       └─ DB::transaction：寫提醒紀錄 + 推進 remind_count
+```
+
+⚠ **不論送不送得出去，`remind_count` 都要往前推進**：tag 不到人就不更新的話，
+這張單每分鐘都會被重試，整晚下來是幾百次查詢與送信。
+
+⚠ **第 3 次之後是「當班人員 ＋ 主管與老闆」，不是「換成主管」**——
+改之前是後者，當班的人會以為事情已經不關他了。id 去重，主管自己在值班時不會被 tag 兩次。
+
+### 設定頁（全域設定 → 內部支援群組）
+
+| 欄位 | 說明 |
 |---|---|
-| **A. 無人值班時段只提醒、不 tag**（建議） | 訊息還是留著，但不會半夜一直響；早上有人上班後恢復 tag |
-| B. 提醒次數設上限（例如 30 次） | 簡單，但「一直提醒到解決」就不成立了 |
-| C. 照提醒照 tag | 完全照需求字面，但主管半夜會被轟炸 |
+| 第一次提醒（分鐘） | 開單後多久送第一次 |
+| 之後每隔（分鐘） | 第一次之後的固定間隔 |
+| 最多提醒幾次 | 到這個次數就停並發收尾那則 |
+| 每日統計私訊給 | 收件人下拉，沒綁定的標「（未綁定）」 |
 
-另一個相關問題：**同一時間多張單都超時**時，現在是**每張單各發一則**。
-五張單同時卡住就是五則 —— 要不要合併成一則？
+⚠ `KEY_REMIND_INTERVAL_MINUTES` 存的字串**刻意沿用舊的 `remind_second_minutes`**：
+語意變了（「第二次要再等多久」→「之後每隔」），但換掉字串會讓既有設定值歸零、
+悄悄退回預設。常數名表達新語意，儲存鍵維持穩定。
 
-### 3. 統計報給誰、什麼時候發？
+### 每日統計
 
-| 問題 | 選項 |
-|---|---|
-| 收件人 | **A. 沿用班表通知的收件人**（建議，不用再設一次）／ B. 另設一個欄位 |
-| 時間 | **A. 跟班表通知同一時間 08:00**（建議，一次看完）／ B. 另設時間 |
-| 統計範圍 | **A. 昨天一整天**（建議）／ B. 今天到現在 |
+```
+remind:report（每天 08:30）
+  ├─ 按單：getTicketsForDate() —— 問題前 40 字、群組、幾次、現在狀態
+  ├─ 按人：countByUserForDate() —— 誰被催幾次、涉及幾題
+  │         user_id 為 null 的那列單獨顯示「沒 tag 到任何人」
+  └─ StaffDmService 私訊給設定的收件人
+```
 
-### 4. 統計要「按單」還是「按人」？
+- 兩段各最多 15 行，超出只報「另外還有 N 筆」—— Telegram 單則上限 4096 字
+- 暱稱**另外查**，不在統計查詢裡 join：帳號被刪時 `user_id` 變 null，
+  join 進來那幾列會整個從統計消失
+- 日期條件用 `whereBetween` 而不是 `whereDate`：後者等於 `DATE(created_at) = ?`，
+  欄位被函式包住就吃不到索引
 
-需求的原話是「這個被提醒，我要紀錄次數，然後每天報給主管」。
-「被提醒的人」＝當班人員，但**當班人員會隨時段換人**，
-同一張單提醒五次可能 tag 到三組不同的人。
+### StaffDmService
 
-| 選項 | 說明 |
-|---|---|
-| **A. 按單統計**（建議） | 「這張單被提醒 5 次」—— 資料現成，`remind_count` 就是 |
-| B. 按人統計 | 「小明被提醒 7 次」—— 要新開一張提醒紀錄表（每次提醒一列，記下 tag 到誰） |
-| C. 兩者都要 | 同 B，報表多一段 |
+`ShiftNoticeService::dm()` 抽出來共用（班表通知 + 每日統計）。
+綁定檢查（`telegram_user_id` **且** `telegram_dm_ready`）、送出、失敗處理都在這支。
 
-⚠ **選 B/C 就需要新表**（`auto_reply_ticket_remind`：ticket_id、第幾次、tag 到的 user_id、送出時間），
-工作量差一截。A 的話不用新表，`remind_count` 直接拿來用。
-
-### 5. 第 1 次和第 2 次的提醒內容完全一樣嗎？
-
-兩次都 tag 當班人員，差別只有「第幾次」。
-建議文案帶上次數（「⏰ 第 2 次提醒」），不然同仁看不出已經被催第二次了。
-
-## 會動到的檔案（預估）
+## 檔案
 
 | 檔案 | 內容 |
 |---|---|
 | 上面「要移除的東西」整張表 | 刪除舊告警 |
 | `app/Services/AutoReplySupportService.php` | `remindTimeoutTickets()` 改成依間隔持續提醒、文案帶次數 |
-| `app/Repositories/AutoReplyTicketRepository.php` | `getTimeoutTickets()` 改成依 `last_reminded_at` 判斷 |
+| `app/Repositories/AutoReplyTicketRepository.php` | `getTimeoutTickets()` → `getTicketsDueForRemind()`，依 `last_reminded_at` 判斷 |
+| `app/Repositories/AutoReplyTicketRemindRepository.php`（新增） | 寫入提醒紀錄、兩個維度的統計 |
+| `app/Models/AutoReplyTicketRemind.php`（新增） | 提醒紀錄 Model |
+| `database/migrations/2026_10_06_000002_create_auto_reply_ticket_remind_table.php`（新增） | 提醒紀錄表 |
+| `app/Services/AppSettingService.php` | `KEY_REMIND_INTERVAL_MINUTES`／`KEY_REMIND_MAX_COUNT`／`KEY_REMIND_REPORT_MANAGER` |
+| `app/Services/SettingService.php` | 設定頁多四個欄位 + 收件人候選 |
+| `app/Http/Requests/Setting/UpdateSupportRequest.php` | 新欄位驗證 |
+| `resources/views/admin/setting/index.blade.php`、`public/js/setting-admin.js` | 設定頁 UI |
+| `resources/lang/{tw,cn,en}/setting.php` | 新欄位語系 |
+| `app/Console/Commands/AutoReplyRemindCommand.php` | 說明改寫 |
 | `config/constants.php` | `AUTO_REPLY.REMIND` 語意改寫、報表文案 |
 | `app/Services/StaffDmService.php`（新增） | 從 `ShiftNoticeService::dm()` 抽出來共用 |
 | `app/Services/RemindReportService.php`（新增） | 每日統計 |
 | `app/Console/Commands/RemindReportCommand.php`（新增） | `remind:report` |
 | `app/Console/Kernel.php` | 加 `remind:report`、移掉 `telegram:alert` |
-| `database/migrations/*`（看第 4 題） | 按人統計才需要新表 |
+
+
+## 上線要做的事
+
+1. `php artisan migrate`（`auto_reply_ticket_remind` 新表；`telegram_dm_ready` 若還沒跑也要）
+2. `php artisan optimize`（動過 `config/`）
+3. 到「全域設定 → 內部支援群組」設定：之後每隔幾分鐘、最多幾次、統計私訊給誰
+4. **請統計收件人先私訊機器人一次**，否則下拉顯示「（未綁定）」、統計發不出去
+5. `php artisan remind:report --dry-run` 看一眼排版
+
+⚠ **沒跑 migration 的話全域設定頁會 500**（`getDmCandidates()` 讀
+`telegram_dm_ready`）—— 這是既有頁面，不能只部署程式不跑 migration。
 
 ## 相關
 

@@ -37,8 +37,7 @@
             '</div>' +
 
             '</div>' +
-            '</div>' +
-            '<div class="tg-alert-bar" id="tg-alert-bar" style="display:none"></div>';
+            '</div>';
     };
 
     // 安全逾時：broadcast 可能丟失（Pusher 斷線、worker 在送出結束事件前就被砍），

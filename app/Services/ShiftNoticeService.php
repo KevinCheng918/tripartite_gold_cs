@@ -18,12 +18,11 @@ use Illuminate\Support\Facades\Log;
  * | 設定頁指定的主管 | 今天**每個班次**各是誰，沒人排的班特別標出來 |
  * | 今天有班的每個人 | 只有自己那一筆，不列同班的其他人 |
  *
- * ⚠ **Telegram 不讓 bot 主動私訊沒對話過的人**（403）。所以每個收件人都得
- * 先私訊 bot 一次，那一刻由 `TelegramChatService::bindPrivateChat()` 記下
- * `telegram_dm_ready` —— 這裡只發給那個欄位是 true 的人。
+ * ⚠ **Telegram 不讓 bot 主動私訊沒對話過的人**（403）。綁定與送出都交給
+ * `StaffDmService`，這裡只負責組內容與決定發給誰。
  *
- * ⚠ **一個人失敗不能讓整輪停掉**：逐人 try/catch，最後把沒收到的彙總成
- * 一則發到內部支援群組（比照 `StationCreditAlertService::run()`）。
+ * ⚠ **一個人失敗不能讓整輪停掉**：逐人送、逐人判斷結果，最後把沒收到的
+ * 彙總成一則發到內部支援群組（比照 `StationCreditAlertService::run()`）。
  */
 class ShiftNoticeService
 {
@@ -39,7 +38,7 @@ class ShiftNoticeService
     private $assignmentRepository;
     private $shiftRepository;
     private $userRepository;
-    private $botService;
+    private $staffDm;
     private $supportGroup;
     private $appSettingService;
 
@@ -47,14 +46,15 @@ class ShiftNoticeService
         ShiftAssignmentRepository $assignmentRepository,
         ShiftRepository $shiftRepository,
         UserRepository $userRepository,
-        TelegramBotService $botService,
+        StaffDmService $staffDm,
         SupportGroupService $supportGroup,
         AppSettingService $appSettingService
     ) {
         $this->assignmentRepository = $assignmentRepository;
         $this->shiftRepository = $shiftRepository;
         $this->userRepository = $userRepository;
-        $this->botService = $botService;
+        // 私訊的綁定檢查與失敗處理都在這支，班表與提醒統計共用
+        $this->staffDm = $staffDm;
         // 沒收到的人彙總回報到這裡
         $this->supportGroup = $supportGroup;
         // 主管收件人存在 app_setting，換人不用動程式
@@ -115,7 +115,7 @@ class ShiftNoticeService
             $candidates[] = [
                 'id'       => (int) $user->id,
                 'nickname' => (string) $user->nickname,
-                'dm_ready' => filled($user->telegram_user_id) && (bool) $user->telegram_dm_ready,
+                'dm_ready' => $this->staffDm->canDm($user),
             ];
         }
 
@@ -244,7 +244,7 @@ class ShiftNoticeService
 
         $manager = $this->userRepository->findForDm($managerId);
 
-        if (blank($manager) || !$this->canDm($manager)) {
+        if (blank($manager) || !$this->staffDm->canDm($manager)) {
             return [
                 'sent'   => false,
                 'reason' => self::SKIP_NOT_BOUND,
@@ -256,7 +256,7 @@ class ShiftNoticeService
             return ['sent' => true, 'reason' => null, 'failed' => []];
         }
 
-        if ($this->dm($manager, $text)) {
+        if ($this->staffDm->send($manager, $text)) {
             return ['sent' => true, 'reason' => null, 'failed' => []];
         }
 
@@ -307,7 +307,7 @@ class ShiftNoticeService
             $text = $this->buildPersonalText($user, $shift);
             $sample = filled($sample) ? $sample : $text;
 
-            if (blank($user) || !$this->canDm($user)) {
+            if (blank($user) || !$this->staffDm->canDm($user)) {
                 $failed[] = filled($user) ? $user->nickname : "#{$assignment->user_id}";
 
                 continue;
@@ -319,7 +319,7 @@ class ShiftNoticeService
                 continue;
             }
 
-            if ($this->dm($user, $text)) {
+            if ($this->staffDm->send($user, $text)) {
                 $sent++;
 
                 continue;
@@ -352,40 +352,6 @@ class ShiftNoticeService
     }
 
     /**
-     * 私訊一個人
-     *
-     * ⚠ 失敗不丟例外：一個人發不出去不能讓整輪停掉。
-     *
-     * @param object $user
-     * @param string $text
-     * @return bool
-     */
-    private function dm($user, $text)
-    {
-        try {
-            $result = $this->botService->sendMessage($user->telegram_user_id, $text);
-
-            if (filled(Arr::get((array) $result, 'result'))) {
-                return true;
-            }
-
-            Log::warning('今日班表私訊未送達', [
-                'user_id'  => $user->id,
-                'response' => $result,
-            ]);
-
-            return false;
-        } catch (\Exception $e) {
-            Log::error('今日班表私訊失敗', [
-                'user_id' => $user->id,
-                'error'   => $e->getMessage(),
-            ]);
-
-            return false;
-        }
-    }
-
-    /**
      * 把沒收到的人彙總回報到內部群組
      *
      * ⚠ **彙總成一則**，不逐人發 —— 十個人沒綁定就會洗十則版。
@@ -407,22 +373,6 @@ class ShiftNoticeService
         } catch (\Exception $e) {
             Log::error('今日班表的未送達彙總發不出去', ['error' => $e->getMessage()]);
         }
-    }
-
-    /**
-     * 這個人可以被私訊嗎
-     *
-     * ⚠ **兩個條件都要**：有 `telegram_user_id`（知道發去哪），
-     * 而且 `telegram_dm_ready`（他私訊過 bot）。
-     * 只看前者會對著一整批沒加過 bot 的人狂發 403 —— 那個欄位從群組訊息
-     * 也會被填上。
-     *
-     * @param object $user
-     * @return bool
-     */
-    private function canDm($user)
-    {
-        return filled($user->telegram_user_id) && (bool) $user->telegram_dm_ready;
     }
 
     /**

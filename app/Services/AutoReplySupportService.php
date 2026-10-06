@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Jobs\ReplyTicketJob;
 use App\Models\AutoReplyTicket;
 use App\Models\TelegramGroup;
+use App\Repositories\AutoReplyTicketRemindRepository;
 use App\Repositories\AutoReplyTicketRepository;
 use App\Repositories\QuickReplyRepository;
 use App\Repositories\TelegramRepository;
@@ -40,6 +41,7 @@ class AutoReplySupportService
     private const BUTTON_LABEL_CHARS = 24;
 
     private $ticketRepository;
+    private $remindRepository;
     private $telegramRepository;
     private $quickReplyRepository;
     private $userRepository;
@@ -52,6 +54,7 @@ class AutoReplySupportService
 
     public function __construct(
         AutoReplyTicketRepository $ticketRepository,
+        AutoReplyTicketRemindRepository $remindRepository,
         TelegramRepository $telegramRepository,
         QuickReplyRepository $quickReplyRepository,
         UserRepository $userRepository,
@@ -63,6 +66,8 @@ class AutoReplySupportService
         AnswerSplitter $splitter
     ) {
         $this->ticketRepository = $ticketRepository;
+        // 每次提醒 tag 到誰要逐筆落地，才答得出「某個人被催了幾次」
+        $this->remindRepository = $remindRepository;
         $this->telegramRepository = $telegramRepository;
         $this->quickReplyRepository = $quickReplyRepository;
         $this->userRepository = $userRepository;
@@ -923,10 +928,17 @@ class AutoReplySupportService
     // ---------------------------------------------------------------
 
     /**
-     * 掃描超時未回答的求助單並提醒
+     * 掃描該提醒的求助單並提醒
      *
-     * 分兩級：第一次 tag 當下排班的人，再沒回就 tag 主管與老闆。
-     * 兩級都跳過工程 —— 客服問題不該去吵工程。
+     * 2026-10-06 從「固定催兩次」改成**一直催到單被處理**：
+     *
+     *   第 1、2 次   → 只 tag 當班人員
+     *   第 3 次以後   → tag 當班人員 ＋ 主管與老闆（都跳過工程，客服問題不吵工程）
+     *   超過上限      → 發一則收尾就停
+     *
+     * ⚠ **「問題解決」＝ status 離開 PENDING**，四種出口都算（已回答、已回客人、
+     * 已入題庫、已忽略）。客服自己在後台回了客人會把單標成 IGNORED，所以
+     * 提醒也會自己停，不必再去內部群組處理一次。
      *
      * @return int 送出的提醒數
      */
@@ -937,82 +949,207 @@ class AutoReplySupportService
         }
 
         $first = $this->appSettingService->getInt(AppSettingService::KEY_REMIND_FIRST_MINUTES, 10);
-        $second = $this->appSettingService->getInt(AppSettingService::KEY_REMIND_SECOND_MINUTES, 10);
-        $remind = config('constants.AUTO_REPLY.REMIND');
+        $interval = $this->appSettingService->getInt(AppSettingService::KEY_REMIND_INTERVAL_MINUTES, 10);
+        $max = $this->appSettingService->getInt(
+            AppSettingService::KEY_REMIND_MAX_COUNT,
+            (int) config('constants.AUTO_REPLY.REMIND.MAX_COUNT')
+        );
 
-        $sent = 0;
-        $sent += $this->remindStage($first, $remind['NONE'], $remind['ON_DUTY']);
-        $sent += $this->remindStage($first + $second, $remind['ON_DUTY'], $remind['MANAGER']);
-
-        return $sent;
-    }
-
-    /**
-     * 送出某一階段的提醒
-     *
-     * @param int $minutes   從開單起算的超時分鐘數
-     * @param int $fromStage 目前的提醒階段
-     * @param int $toStage   要推進到的階段
-     * @return int
-     */
-    private function remindStage($minutes, $fromStage, $toStage)
-    {
-        $tickets = $this->ticketRepository->getTimeoutTickets($minutes, $fromStage);
+        $tickets = $this->ticketRepository->getTicketsDueForRemind($first, $interval, $max);
 
         if ($tickets->isEmpty()) {
             return 0;
         }
 
-        $mentions = $this->buildMentions($toStage);
+        /*
+         * 當班人員整輪只查一次 —— 逐張單查的話，同時卡住十張單就是十次
+         * 排班查詢，而這支每分鐘都在跑。一分鐘內當班的人不會換。
+         */
+        $onDutyIds = $this->chatService->getOnDutyUserIds();
         $sent = 0;
 
         foreach ($tickets as $ticket) {
-            // tag 不到人時仍要推進階段，否則每分鐘都會重試同一張單
-            if (filled($mentions)) {
-                $this->sendToSupport($this->buildRemindText($mentions, $minutes), null, $ticket->ask_message_id);
+            if ($this->remindOne($ticket, $onDutyIds, $max)) {
                 $sent++;
             }
-
-            $this->ticketRepository->update($ticket, [
-                'remind_count'     => $toStage,
-                'last_reminded_at' => now(),
-            ]);
         }
 
         return $sent;
     }
 
     /**
-     * 組這一階段要 @ 的人
+     * 提醒一張單
      *
-     * @param int $stage
-     * @return array username 陣列（已含 @）
+     * ⚠ **不論送不送得出去，`remind_count` 都要往前推進**：tag 不到人就不更新的話，
+     * 這張單每分鐘都會被重試一次，整晚下來是幾百次查詢與送信。
+     *
+     * @param \App\Models\AutoReplyTicket $ticket
+     * @param array                       $onDutyIds 當班人員的 user.id
+     * @param int                         $max       次數上限
+     * @return bool 有送出訊息才算 true
      */
-    private function buildMentions($stage)
+    private function remindOne($ticket, array $onDutyIds, $max)
     {
-        $users = $stage === config('constants.AUTO_REPLY.REMIND.MANAGER')
-            ? $this->userRepository->getManagersForMention()
-            : $this->userRepository->getMentionableByIds($this->chatService->getOnDutyUserIds());
+        $stageConfig = config('constants.AUTO_REPLY.REMIND.STAGE');
+        $seq = (int) $ticket->remind_count + 1;
+        $isFinal = $seq > $max;
+
+        // 收尾那則一定要 tag 到主管老闆 —— 系統要放手了，總得有人知道
+        $stage = $isFinal
+            ? (int) Arr::get($stageConfig, 'FINAL')
+            : ($seq >= (int) config('constants.AUTO_REPLY.REMIND.ESCALATE_AT')
+                ? (int) Arr::get($stageConfig, 'MANAGER')
+                : (int) Arr::get($stageConfig, 'ON_DUTY'));
+
+        $users = $this->remindTargets($stage, $onDutyIds);
+        $text = $isFinal
+            ? $this->buildFinalText($users, $seq - 1)
+            : $this->buildRemindText($users, $ticket, $seq);
+
+        $ok = $this->sendRemind($ticket, $text);
+
+        /*
+         * 提醒紀錄與單上的次數要一起成立。
+         *
+         * 少了交易：紀錄寫進去但次數沒推進，這張單下一分鐘會再催一次，
+         * 統計上就多出一筆不存在的提醒。
+         */
+        DB::transaction(function () use ($ticket, $seq, $users, $stage, $isFinal, $max) {
+            $this->remindRepository->record($ticket->id, $seq, $users->pluck('id')->all(), $stage);
+
+            $this->ticketRepository->update($ticket, [
+                /*
+                 * 收尾那則把次數推到 max + 1 —— 查詢用 `remind_count <= $max`
+                 * 收單，推過去之後這張單就不會再被撈出來。
+                 */
+                'remind_count'     => $isFinal ? $max + 1 : $seq,
+                'last_reminded_at' => now(),
+            ]);
+        });
+
+        Log::info('求助單超時提醒', [
+            'ticket_id' => $ticket->id,
+            'seq'       => $seq,
+            'stage'     => $stage,
+            'final'     => $isFinal,
+            'mentioned' => $users->pluck('nickname')->all(),
+            'sent'      => $ok,
+        ]);
+
+        return $ok;
+    }
+
+    /**
+     * 把提醒送出去
+     *
+     * ⚠ 失敗不丟例外：一張單送不出去不能讓整輪停掉（同時卡住十張單時，
+     * 第一張失敗就全部不催了）。回傳只用來統計「真的送出幾則」，
+     * 次數推進與紀錄不受影響 —— 理由見 `remindOne()`。
+     *
+     * @param \App\Models\AutoReplyTicket $ticket
+     * @param string                      $text
+     * @return bool
+     */
+    private function sendRemind($ticket, $text)
+    {
+        try {
+            $result = $this->sendToSupport($text, null, $ticket->ask_message_id);
+
+            if (filled(Arr::get((array) $result, 'result'))) {
+                return true;
+            }
+
+            Log::warning('求助單提醒未送達', ['ticket_id' => $ticket->id, 'response' => $result]);
+
+            return false;
+        } catch (\Exception $e) {
+            Log::error('求助單提醒送出失敗', ['ticket_id' => $ticket->id, 'error' => $e->getMessage()]);
+
+            return false;
+        }
+    }
+
+    /**
+     * 這一階段要 tag 的人
+     *
+     * ⚠ 第 3 次之後是「當班人員 **＋** 主管與老闆」，不是「換成主管」——
+     * 2026-10-06 以前的版本是後者，當班的人會以為事情已經不關他了。
+     *
+     * @param int   $stage
+     * @param array $onDutyIds
+     * @return \Illuminate\Support\Collection
+     */
+    private function remindTargets($stage, array $onDutyIds)
+    {
+        $onDuty = $this->userRepository->getMentionableByIds($onDutyIds);
+        $stageConfig = config('constants.AUTO_REPLY.REMIND.STAGE');
+
+        if ((int) $stage === (int) Arr::get($stageConfig, 'ON_DUTY')) {
+            return collect($onDuty);
+        }
+
+        // id 去重：主管自己也在值班時，不要被 tag 兩次
+        return collect($onDuty)
+            ->concat($this->userRepository->getManagersForMention())
+            ->unique('id')
+            ->values();
+    }
+
+    /**
+     * 一般提醒的文案
+     *
+     * @param \Illuminate\Support\Collection $users
+     * @param \App\Models\AutoReplyTicket    $ticket
+     * @param int                            $seq
+     * @return string
+     */
+    private function buildRemindText($users, $ticket, $seq)
+    {
+        return strtr((string) config('constants.AUTO_REPLY.REMIND.TEXT'), [
+            '{mentions}' => $this->buildMentions($users),
+            // 從開單起算，不是從上次提醒起算 —— 客人等的是前者
+            '{minutes}'  => (int) now()->diffInMinutes($ticket->created_at),
+            '{count}'    => $seq,
+        ]);
+    }
+
+    /**
+     * 撞到上限、不再提醒的收尾文案
+     *
+     * @param \Illuminate\Support\Collection $users
+     * @param int                            $count 總共催了幾次
+     * @return string
+     */
+    private function buildFinalText($users, $count)
+    {
+        return strtr((string) config('constants.AUTO_REPLY.REMIND.FINAL_TEXT'), [
+            '{mentions}' => $this->buildMentions($users),
+            '{count}'    => $count,
+        ]);
+    }
+
+    /**
+     * 組 @ 字串
+     *
+     * tag 不到任何人時給一句說明 —— 直接空字串的話訊息會以空行開頭，
+     * 看起來像系統壞了。
+     *
+     * @param \Illuminate\Support\Collection $users
+     * @return string
+     */
+    private function buildMentions($users)
+    {
+        if (blank($users)) {
+            return (string) config('constants.AUTO_REPLY.REMIND.NO_MENTION');
+        }
 
         $mentions = [];
+
         foreach ($users as $user) {
             $mentions[] = '@' . ltrim($user->telegram_username, '@');
         }
 
-        return $mentions;
-    }
-
-    /**
-     * @param array $mentions
-     * @param int   $minutes
-     * @return string
-     */
-    private function buildRemindText(array $mentions, $minutes)
-    {
-        return implode("\n", [
-            implode(' ', $mentions),
-            "⏰ 上面這題已經等 {$minutes} 分鐘了，客人還在線上等回覆，麻煩協助看一下 🙏",
-        ]);
+        return implode(' ', $mentions);
     }
 
     // ---------------------------------------------------------------
