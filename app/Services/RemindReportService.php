@@ -190,7 +190,7 @@ class RemindReportService
              */
             $text = filled($rows)
                 ? $this->buildPersonalText($date, (string) $user->nickname, $rows)
-                : $this->buildClearText((string) $user->nickname, $dryRun);
+                : $this->buildClearText($date, (string) $user->nickname, $dryRun);
 
             $sample = filled($sample) ? $sample : $text;
 
@@ -215,11 +215,12 @@ class RemindReportService
     /**
      * 組「昨天沒事」那份
      *
+     * @param string $date
      * @param string $name
      * @param bool   $dryRun 空跑時不叫模型，直接用公版
      * @return string
      */
-    private function buildClearText($name, $dryRun)
+    private function buildClearText($date, $name, $dryRun)
     {
         $report = (array) config('constants.AUTO_REPLY.REMIND.REPORT');
         $praise = $dryRun
@@ -228,6 +229,7 @@ class RemindReportService
 
         return strtr((string) Arr::get($report, 'PERSONAL_CLEAR'), [
             '{name}'   => $name,
+            '{date}'   => $this->noticeText->date($date),
             '{praise}' => $praise,
         ]);
     }
@@ -261,11 +263,9 @@ class RemindReportService
     {
         $report = (array) config('constants.AUTO_REPLY.REMIND.REPORT');
         $statusLabels = (array) Arr::get($report, 'STATUS_LABEL');
+        $statusIcons = (array) Arr::get($report, 'STATUS_ICON');
 
-        $text = strtr((string) Arr::get($report, 'PERSONAL_HEADER'), [
-            '{name}' => $name,
-            '{date}' => $this->noticeText->date($date),
-        ]);
+        $text = strtr((string) Arr::get($report, 'PERSONAL_HEADER'), ['{name}' => $name]);
 
         $times = 0;
         $lines = '';
@@ -279,6 +279,7 @@ class RemindReportService
             }
 
             $lines .= strtr((string) Arr::get($report, 'PERSONAL_LINE'), [
+                '{icon}'     => (string) Arr::get($statusIcons, (int) $ticket->status, '•'),
                 '{question}' => $this->noticeText->shorten($ticket->question, (int) Arr::get($report, 'QUESTION_CHARS')),
                 '{group}'    => filled($ticket->group) ? (string) $ticket->group->title : '-',
                 '{times}'    => (int) $row->times,
@@ -291,10 +292,11 @@ class RemindReportService
          * 對收件人來說結果一樣（他確實沒有要處理的東西）。
          */
         if (blank($lines)) {
-            return $this->buildClearText($name, false);
+            return $this->buildClearText($date, $name, false);
         }
 
         $text .= strtr((string) Arr::get($report, 'PERSONAL_SUMMARY'), [
+            '{date}'    => $this->noticeText->date($date),
             '{tickets}' => count($rows),
             '{times}'   => $times,
         ]);
@@ -368,6 +370,7 @@ class RemindReportService
     private function buildByTicket(array $report, $tickets)
     {
         $statusLabels = (array) Arr::get($report, 'STATUS_LABEL');
+        $statusIcons = (array) Arr::get($report, 'STATUS_ICON');
         $max = (int) Arr::get($report, 'MAX_LINES');
         $text = (string) Arr::get($report, 'BY_TICKET_TITLE');
         $shown = 0;
@@ -388,6 +391,7 @@ class RemindReportService
             }
 
             $text .= strtr((string) Arr::get($report, 'BY_TICKET_LINE'), [
+                '{icon}'     => (string) Arr::get($statusIcons, (int) $ticket->status, '•'),
                 '{question}' => $this->noticeText->shorten($ticket->question, (int) Arr::get($report, 'QUESTION_CHARS')),
                 '{group}'    => filled($ticket->group) ? (string) $ticket->group->title : '-',
                 '{times}'    => (int) $row->times,

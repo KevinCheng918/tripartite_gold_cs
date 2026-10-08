@@ -136,7 +136,8 @@ return [
          * 「今天沒有任何排班」，不是整天不發。群組裡完全沒動靜時，
          * 分不出是「今天本來就沒班」還是「排程又壞了」。
          */
-        'MANAGER_HEADER' => "📋 <b>今日班表</b>（{date}）\n",
+        // ⚠ 日期不要再包括號 —— `NoticeText::date()` 回來的已經有了
+        'MANAGER_HEADER' => "📋 <b>今日班表</b>\n{date}\n",
 
         /*
          * 每個班次一段。上班時間與核心回訊時間都要列（需求方 2026-10-06 補充）
@@ -190,7 +191,8 @@ return [
      * 而且 tag 得到人就不必擔心對方有沒有私訊過 bot。
      */
     'SHIFT_HANDOVER' => [
-        'HEADER' => "☀️ <b>早安，這是今天的待接手清單</b>（{date}）\n"
+        // ⚠ 日期不要再包括號 —— `NoticeText::date()` 回來的已經有了
+        'HEADER' => "☀️ <b>早安，這是今天的待接手清單</b>\n{date}\n"
             . "{mentions}\n",
 
         'SUMMARY' => "\n目前有 <b>{count}</b> 題還在等人回覆：\n",
@@ -895,7 +897,12 @@ return [
                  */
                 'TEST_PREFIX' => "🧪 <b>這是測試發送</b>（不用處理）\n",
 
-                'HEADER' => "📊 <b>超時提醒統計</b>（{date}）\n",
+                /*
+                 * ⚠ **日期不要再包一層括號**：`NoticeText::date()` 回來的已經是
+                 * 「10/7（週三）」，外面再包就變成「（10/7（週三））」。
+                 * 三則通知（統計、班表、待接手）原本都犯這個毛病。
+                 */
+                'HEADER' => "📊 <b>超時提醒統計</b>\n{date}\n",
 
                 /*
                  * ⚠ **不要寫「升級到通知主管」**（需求方 2026-10-08）。
@@ -904,25 +911,35 @@ return [
                  * 但講成「通知主管」會讓這則統計看起來像在告狀。
                  * 改成講次數 —— 一樣是同一件事，而且更具體。
                  */
-                'SUMMARY' => "\n共 {tickets} 題被提醒、累計 {times} 次"
-                    . "，其中 {escalated} 題催了 {escalate_at} 次以上。\n",
+                /*
+                 * ⚠ **一行講一件事、數字加粗**。原本擠成一句，數字埋在文字裡
+                 * 要讀兩遍才找得到 —— 這則是早上掃一眼的東西。
+                 */
+                'SUMMARY' => "\n共 <b>{tickets}</b> 題被提醒、累計 <b>{times}</b> 次\n"
+                    . "其中 <b>{escalated}</b> 題催超過 {escalate_at} 次\n",
 
                 // {praise} 由模型當天生成，失敗時退 ENCOURAGE.TEAM_FALLBACK
-                'EMPTY' => "\n昨天沒有任何超時的求助單。\n{praise}",
+                'EMPTY' => "\n昨天沒有任何超時的求助單\n\n{praise}",
 
-                // 按單
+                /*
+                 * 按單。每題三行：狀態＋題目／客人群組／催幾次。
+                 *
+                 * ⚠ 狀態用**顏色圖示開頭**而不是塞在行尾的「｜⚠️ 仍未處理」——
+                 * 一排紅燈綠燈掃一眼就知道哪幾題還沒好，不必逐行讀到底。
+                 * 原本把三件事用「｜」擠在同一行，中英數與全形符號混在一起很難讀。
+                 */
                 'BY_TICKET_TITLE' => "\n<b>依題目</b>\n",
-                'BY_TICKET_LINE'  => "• {question}\n　{group}｜{times} 次｜{status}\n",
+                'BY_TICKET_LINE'  => "\n{icon} {question}\n　{group}\n　催 {times} 次 · {status}\n",
 
-                // 按人
-                'BY_USER_TITLE' => "\n<b>依人員</b>\n",
-                'BY_USER_LINE'  => "• {name}：{times} 次（{tickets} 題）\n",
+                // 按人。名字後面接全形空格，比「：」好讀
+                'BY_USER_TITLE' => "\n<b>依人員</b>\n\n",
+                'BY_USER_LINE'  => "• {name}　{times} 次（{tickets} 題）\n",
 
                 /*
                  * 提醒發出去卻沒 tag 到人 —— 那代表當班沒人、或當班的人沒填
                  * Telegram 帳號。要單獨列出來，這是最該修的狀況。
                  */
-                'NO_TARGET_LINE' => "• ⚠️ 沒 tag 到任何人：{times} 次\n",
+                'NO_TARGET_LINE' => "• ⚠️ 沒 tag 到任何人　{times} 次\n",
 
                 // 帳號已被刪，但統計要留著（user_id 變 null 以外的那種）
                 'UNKNOWN_USER' => '（已離職）',
@@ -944,11 +961,12 @@ return [
                  * 這則的用途是讓同仁知道哪幾題還沒結案，不是責備。
                  * 完整版（誰被催最多）才是整體回顧。
                  */
-                'PERSONAL_HEADER' => "📬 {name} 早安，這是您昨天（{date}）的提醒統計\n",
+                'PERSONAL_HEADER' => "📬 <b>{name} 早安</b>\n",
 
-                'PERSONAL_SUMMARY' => "\n昨天有 {tickets} 題曾經提醒到您，共 {times} 次。\n",
+                // ⚠ {date} 結尾是全形「）」，後面不要再加半形空格 —— 看起來會像斷開
+                'PERSONAL_SUMMARY' => "昨天 {date}有 <b>{tickets}</b> 題提醒到您，共 <b>{times}</b> 次\n",
 
-                'PERSONAL_LINE' => "• {question}\n　{group}｜提醒 {times} 次｜{status}\n",
+                'PERSONAL_LINE' => "\n{icon} {question}\n　{group}\n　催 {times} 次 · {status}\n",
 
                 /*
                  * ⚠ **個人版只報前一天的統計，不交辦事情**（需求方 2026-10-06）。
@@ -962,7 +980,7 @@ return [
                  * 昨天沒被提醒到的人也要收（需求方 2026-10-06）——
                  * 那則不是統計，是一句肯定。
                  */
-                'PERSONAL_CLEAR' => "📬 {name} 早安\n\n昨天沒有任何問題提醒到您。\n{praise}",
+                'PERSONAL_CLEAR' => "📬 <b>{name} 早安</b>\n昨天 {date}沒有任何問題提醒到您\n\n{praise}",
 
                 /*
                  * 鼓勵文案。**不用公版，讓模型自由發揮**（需求方指定）——
@@ -1017,13 +1035,26 @@ return [
                 ],
 
                 // 題目的狀態顯示。key 對 constants.AUTO_REPLY.TICKET_STATUS
+                /*
+                 * ⚠ 圖示與文字分開：圖示放行首讓人掃，文字放行尾說清楚。
+                 * 紅＝還沒好、黃＝處理中、綠＝結案、灰＝不處理了。
+                 */
+                'STATUS_ICON' => [
+                    0 => '⚪',
+                    1 => '🔴',
+                    2 => '🟡',
+                    3 => '🟢',
+                    4 => '🟢',
+                    5 => '⚫',
+                ],
+
                 'STATUS_LABEL' => [
                     0 => '客服已自行處理',
-                    1 => '⚠️ 仍未處理',
+                    1 => '仍未處理',
                     2 => '已回答待處理',
                     3 => '已回覆客人',
                     4 => '已加入題庫',
-                    5 => '⚠️ 放太久已自動收掉',
+                    5 => '放太久已收掉',
                 ],
             ],
         ],
