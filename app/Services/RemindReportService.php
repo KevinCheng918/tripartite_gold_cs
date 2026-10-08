@@ -16,7 +16,7 @@ use Illuminate\Support\Arr;
  * | 收件人 | 內容 |
  * |---|---|
  * | 設定頁勾選的人（主管以上，可多位） | **全部人的**：按單 ＋ 按人兩段 |
- * | **所有在職同仁** | 自己那份：被催到就是統計，沒被催到就是一句肯定 |
+ * | **所有在職同仁**（扣掉上面那批） | 自己那份：被催到就是統計，沒被催到就是一句肯定 |
  *
  * ⚠ 按單與按人**不能互相換算**：當班人員會隨時段換人，同一張單催五次可能
  * tag 到三組不同的人，所以每次 tag 到誰在 `auto_reply_ticket_remind` 逐筆落地。
@@ -160,12 +160,26 @@ class RemindReportService
          * 「同仁」而不是「昨天出事的人」。`getDmCandidates()` 已經排除管理者
          * 與停用帳號，跟設定頁的收件人清單同一份名單。
          */
+
+        /*
+         * ⚠ **勾了完整統計的人不再收個人版**（需求方 2026-10-08）。
+         *
+         * 完整版已經包含「依人員」那一段，他在裡面看得到自己 ——
+         * 再發一則個人版只是同一件事講兩遍，而且兩則同時間到，看起來像重複發送。
+         */
+        $fullRecipients = $this->appSettingService->getIntList(AppSettingService::KEY_REMIND_REPORT_MANAGER);
+
         $sent = 0;
         $failed = [];
         $sample = null;
 
         foreach ($this->userRepository->getDmCandidates() as $user) {
             $userId = (int) $user->id;
+
+            if (in_array($userId, $fullRecipients, true)) {
+                continue;
+            }
+
             $rows = (array) Arr::get($byUser, $userId, []);
 
             /*
@@ -336,9 +350,11 @@ class RemindReportService
         }
 
         return strtr((string) Arr::get($report, 'SUMMARY'), [
-            '{tickets}'   => count($tickets),
-            '{times}'     => $times,
-            '{escalated}' => $escalated,
+            '{tickets}'     => count($tickets),
+            '{times}'       => $times,
+            '{escalated}'   => $escalated,
+            // 用 config 的門檻而不是寫死 3 —— 改設定時這句話要跟著對
+            '{escalate_at}' => (int) config('constants.AUTO_REPLY.REMIND.ESCALATE_AT'),
         ]);
     }
 
