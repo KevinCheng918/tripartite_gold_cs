@@ -88,6 +88,8 @@ class AutoReplyTicket extends Model
             config('constants.AUTO_REPLY.TICKET_STATUS.REPLIED'),
             config('constants.AUTO_REPLY.TICKET_STATUS.SAVED'),
             config('constants.AUTO_REPLY.TICKET_STATUS.IGNORED'),
+            // 放太久被系統收掉的也算結束 —— 不然同仁回覆它還會跑作答流程
+            config('constants.AUTO_REPLY.TICKET_STATUS.EXPIRED'),
         ];
 
         return in_array($this->status, $closed, false);

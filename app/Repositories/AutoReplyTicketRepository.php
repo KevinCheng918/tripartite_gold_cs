@@ -180,6 +180,51 @@ class AutoReplyTicketRepository
     }
 
     /**
+     * 放太久還沒人處理的單（清理用）
+     *
+     * ⚠ 跟 `getPendingTickets()`（待接手清單）看的是同一批，差別只在多一個
+     * 「開單超過 N 天」的條件 —— 那份清單列的就是這些還沒結束的單。
+     *
+     * @param int $days 開單超過幾天
+     * @return Collection
+     */
+    public function getStalePending($days)
+    {
+        return AutoReplyTicket::query()
+            ->select(self::COLUMNS)
+            ->with('group')
+            ->where('status', config('constants.AUTO_REPLY.TICKET_STATUS.PENDING'))
+            ->where('created_at', '<', now()->subDays($days))
+            ->orderBy('created_at')
+            ->get();
+    }
+
+    /**
+     * 整批標成「放太久自動收掉」
+     *
+     * ⚠ 用一次 update 而不是逐筆 —— 積了兩週的單可能有上百張，
+     * 逐筆更新就是上百次查詢。
+     *
+     * @param array $ids
+     * @return int 實際更新幾筆
+     */
+    public function markExpired(array $ids)
+    {
+        if (blank($ids)) {
+            return 0;
+        }
+
+        return AutoReplyTicket::query()
+            ->whereIn('id', $ids)
+            // 再確認一次狀態：撈出來到更新之間，可能剛好有人處理掉了
+            ->where('status', config('constants.AUTO_REPLY.TICKET_STATUS.PENDING'))
+            ->update([
+                'status'     => config('constants.AUTO_REPLY.TICKET_STATUS.EXPIRED'),
+                'updated_at' => now(),
+            ]);
+    }
+
+    /**
      * 更新求助單
      *
      * @param AutoReplyTicket $ticket

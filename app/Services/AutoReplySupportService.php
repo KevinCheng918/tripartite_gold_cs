@@ -1074,6 +1074,58 @@ class AutoReplySupportService
     }
 
     /**
+     * 把放太久還沒人處理的求助單收掉
+     *
+     * ⚠ **存在的理由不是「清資料」，是「待接手清單要能反映現況」。**
+     * 那份清單每天 7:30 發給早班，列的是所有還沒人處理的單 —— 混進兩週前的
+     * 舊單，早班看到的就是一份沒人想認領的長清單，真正該處理的那幾題反而被埋掉。
+     *
+     * ⚠ 標成 `EXPIRED` 而不是 `IGNORED`：後者的語意是「客服自己處理掉了」，
+     * 統計上會顯示「客服已自行處理」—— 把逾期的單標成那樣，報表就在說謊。
+     *
+     * ⚠ **不通知客人。** 那些客人早就不在線上等了（所以才會放到過期），
+     * 現在補一句「您的問題我們不處理了」只會把已經冷掉的事情重新點燃。
+     *
+     * @param int  $days   開單超過幾天
+     * @param bool $dryRun 只列出不實際關閉
+     * @return array count / tickets
+     */
+    public function closeStaleTickets($days, $dryRun = false)
+    {
+        $tickets = $this->ticketRepository->getStalePending($days);
+
+        if (blank($tickets)) {
+            return ['count' => 0, 'tickets' => []];
+        }
+
+        $list = [];
+
+        foreach ($tickets as $ticket) {
+            $list[] = [
+                'id'       => (int) $ticket->id,
+                'group'    => $this->ticketGroupTitle($ticket),
+                'question' => $this->noticeText->shorten($ticket->question, self::BUTTON_LABEL_CHARS * 2),
+                'waited'   => $this->noticeText->waited($ticket->created_at, (array) config('constants.AUTO_REPLY.REMIND')),
+                'reminded' => (int) $ticket->remind_count,
+            ];
+        }
+
+        if ($dryRun) {
+            return ['count' => count($list), 'tickets' => $list];
+        }
+
+        $closed = $this->ticketRepository->markExpired($tickets->pluck('id')->all());
+
+        Log::warning('求助單放太久，已自動收掉', [
+            'days'    => $days,
+            'closed'  => $closed,
+            'ticket_ids' => $tickets->pluck('id')->all(),
+        ]);
+
+        return ['count' => $closed, 'tickets' => $list];
+    }
+
+    /**
      * 提醒一張單
      *
      * ⚠ **不論送不送得出去，`remind_count` 都要往前推進**：tag 不到人就不更新的話，
