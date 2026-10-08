@@ -11,6 +11,7 @@ return [
     'tab_remind' => '求助单提醒',
     'tab_shift'  => '班表通知',
     'tab_report' => '超时提醒统计',
+    'tab_task'   => '任务卡通知',
 
     'select_all' => '全选',
     'unbound'    => '未绑定',
@@ -64,6 +65,17 @@ return [
     'topic_howto_2'     => '在话题里直接输入：',
     'topic_howto_3'     => '机器人会回复那个话题的 id，把数字填到左边即可。',
     'topic_howto_note'  => '一定要在话题「里面」输入。在群组主区输入会回复「这里没有话题 id」。',
+
+    // ===== 任务卡通知 =====
+    'task_title'          => '任务卡总览收件人',
+    'task_desc'           => '每天 :time 私信一份全部人的任务卡总览（每人各有几项已过期、今日到期、进行中）。可以勾多位，没勾任何人时不会发送。',
+    'task_user'           => '收件人（可多选）',
+    'task_user_hint'      => '标示「未绑定」的同事收不到消息，请他先私信机器人一次。勾选的人不会再另外收到个人版。',
+    'task_test'           => '测试发送',
+    'task_test_hint'      => '会立刻把今天的总览私信给上面勾选的人。只发总览，不会打扰其他同事。',
+    'task_personal_title' => '个人任务卡',
+    'task_personal_desc'  => '每位在职同事每天 :time 会各自收到自己的那一份：已过期几项、今日到期几项、进行中几项，以及要留意的卡片清单。手上没卡的人收到的是一句轻松的话。这部分自动发送，不需要设置。',
+    'task_count_note'     => '一张卡可以指派给多个人，所以各人的数字加起来会大于卡片总张数 —— 那是对的，他们每个人都该知道。',
 
     // ===== 班表通知 =====
     'shift_title'          => '完整班表收件人',
@@ -131,6 +143,14 @@ return [
         'report_test_no_user'   => '请先勾选收件人并保存',
         'report_test_not_bound' => '勾选的同事都还没私信过机器人，所以收不到消息',
         'report_test_failed'    => '发送失败，请确认同事没有屏蔽机器人',
+
+        // 任务卡
+        'task_user_not_found' => '找不到这个账号',
+        'task_test_sent'      => '测试总览已发出 :sent 则，请确认 Telegram 有收到',
+        'task_test_partial'   => '已发出 :sent 则，但这几位没收到：:failed（请他们先私信机器人一次）',
+        'task_test_no_user'   => '请先勾选收件人并保存',
+        'task_test_not_bound' => '勾选的同事都还没私信过机器人，所以收不到消息',
+        'task_test_failed'    => '发送失败，请确认同事没有屏蔽机器人',
 
         // 话题
         'topic_too_many'       => '话题数量超过上限',

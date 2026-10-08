@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Log;
 /**
  * 通知設定（通訊管理 → 通知設定）
  *
- * 2026-10-06 把原本散在兩頁的通知設定收成一頁四個分頁：
+ * 2026-10-06 把原本散在兩頁的通知設定收成一頁（2026-10-08 增為五個分頁）：
  *
  * | 分頁 | 內容 |
  * |---|---|
@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Log;
  * | 求助單提醒 | 首次／之後每隔／上限次數 |
  * | 班表通知 | 完整班表的收件人 |
  * | 超時提醒統計 | 完整統計的收件人 |
+ * | 任務卡通知 | 任務卡總覽的收件人 |
  *
  * 「AI 引擎」頁（原本的全域設定）只留 Claude 憑證、備援 API、用量 ——
  * 那些跟「通知發到哪」無關。
@@ -36,6 +37,7 @@ class NotificationSettingService
     private $supportService;
     private $shiftNotice;
     private $remindReport;
+    private $taskNotice;
 
     public function __construct(
         AppSettingService $appSettingService,
@@ -45,7 +47,8 @@ class NotificationSettingService
         SupportGroupService $supportGroup,
         AutoReplySupportService $supportService,
         ShiftNoticeService $shiftNotice,
-        RemindReportService $remindReport
+        RemindReportService $remindReport,
+        TaskNoticeService $taskNotice
     ) {
         $this->appSettingService = $appSettingService;
         $this->stationRepository = $stationRepository;
@@ -55,6 +58,7 @@ class NotificationSettingService
         $this->supportService = $supportService;
         $this->shiftNotice = $shiftNotice;
         $this->remindReport = $remindReport;
+        $this->taskNotice = $taskNotice;
     }
 
     /**
@@ -70,6 +74,10 @@ class NotificationSettingService
             'support' => $this->supportSection(),
             'topics'  => $this->topicSection(),
             'shift'   => $this->shiftNotice->forPage(),
+            'task'    => [
+                'user_ids' => $this->appSettingService->getIntList(AppSettingService::KEY_TASK_NOTICE_MANAGER),
+                'send_at'  => (string) config('constants.TASK_NOTICE.SEND_AT'),
+            ],
             'options' => [
                 'systems'       => $this->systemOptions(),
                 'dm_candidates' => $this->dmCandidates(),
@@ -319,6 +327,36 @@ class NotificationSettingService
 
             return false;
         }
+    }
+
+    // ---------------------------------------------------------------
+    //  任務卡通知
+    // ---------------------------------------------------------------
+
+    /**
+     * 存任務卡總覽的收件人
+     *
+     * @param array    $params
+     * @param int|null $userId
+     * @return void
+     */
+    public function updateTask($params, $userId = null)
+    {
+        $this->appSettingService->put(
+            AppSettingService::KEY_TASK_NOTICE_MANAGER,
+            $this->appSettingService->idListValue(Arr::get($params, 'task_notice_user_ids', [])),
+            $userId
+        );
+    }
+
+    /**
+     * 任務卡通知的測試發送
+     *
+     * @return array
+     */
+    public function testTask()
+    {
+        return $this->taskNotice->test();
     }
 
     // ---------------------------------------------------------------

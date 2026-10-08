@@ -1,7 +1,7 @@
 /**
  * 通知設定（通訊管理 → 通知設定）
  *
- * 四個分頁：支援群組與話題、求助單提醒、班表通知、超時提醒統計。
+ * 五個分頁：支援群組與話題、求助單提醒、班表通知、超時提醒統計、任務卡通知。
  *
  * ⚠ 每個分頁各自一支 ajax —— 合成一支的話，存一個分頁會把其他分頁的值
  * 一起寫掉（那些欄位在這次送出裡是空的）。
@@ -457,6 +457,32 @@
         });
     }
 
+    // ===== 分頁五：任務卡通知 =====
+
+    function renderTask() {
+        renderUserList('task-user-list', 'js-task-user', settings.task.user_ids);
+        syncAll('task-user-all', 'js-task-user');
+    }
+
+    function bindTask() {
+        bindSelectAll('task-user-all', 'task-user-list', 'js-task-user');
+
+        document.getElementById('form-task').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            var ids = checkedIds('js-task-user');
+
+            submit('/admin/notification/ajax-update-task', { task_notice_user_ids: ids },
+                event.target.querySelector('button[type="submit"]'), function () {
+                    settings.task.user_ids = ids;
+                });
+        });
+
+        document.getElementById('btn-test-task').addEventListener('click', function () {
+            runTest('/admin/notification/ajax-test-task', this, i18n.msg.task_test_failed);
+        });
+    }
+
     // ===== 權限 =====
 
     /**
@@ -479,6 +505,7 @@
     renderTopics();
     renderShift();
     renderReport();
+    renderTask();
     applyPermission();
 
     if (canManage) {
@@ -487,5 +514,6 @@
         bindTopics();
         bindShift();
         bindReport();
+        bindTask();
     }
 }());

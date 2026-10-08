@@ -11,6 +11,7 @@ return [
     'tab_remind' => 'Ticket Reminders',
     'tab_shift'  => 'Shift Notice',
     'tab_report' => 'Reminder Summary',
+    'tab_task'   => 'Task Cards',
 
     'select_all' => 'Select all',
     'unbound'    => 'not linked',
@@ -64,6 +65,17 @@ return [
     'topic_howto_2'     => 'Type this inside the topic:',
     'topic_howto_3'     => 'The bot replies with that topic\'s id — put the number in the field on the left.',
     'topic_howto_note'  => 'It must be typed INSIDE the topic. Typing it in the General area replies "there is no topic id here".',
+
+    // ===== Task card notice =====
+    'task_title'          => 'Task overview recipients',
+    'task_desc'           => 'A team-wide task overview (how many overdue, due today and in progress each person has) is sent by direct message at :time daily. Pick as many recipients as you like; nothing is sent while none are ticked.',
+    'task_user'           => 'Recipients (multiple)',
+    'task_user_hint'      => 'Staff marked "not linked" cannot receive messages — ask them to message the bot once. People ticked here do not also receive the personal version.',
+    'task_test'           => 'Send test',
+    'task_test_hint'      => 'Sends today\'s overview to everyone ticked above right now. Only the overview — nobody else is disturbed.',
+    'task_personal_title' => 'Personal task cards',
+    'task_personal_desc'  => 'Every active member receives their own summary at :time daily: how many overdue, due today and in progress, plus the cards that need attention. People with no cards get a light-hearted line instead. This is automatic and needs no setup.',
+    'task_count_note'     => 'A card can be assigned to several people, so the per-person numbers add up to more than the total card count — that is correct, each of them needs to know.',
 
     // ===== Shift notice =====
     'shift_title'          => 'Full roster recipients',
@@ -131,6 +143,14 @@ return [
         'report_test_no_user'   => 'Please tick at least one recipient and save first',
         'report_test_not_bound' => 'None of the ticked recipients has messaged the bot yet, so they cannot receive messages',
         'report_test_failed'    => 'Send failed, please check the bot is not blocked',
+
+        // Task cards
+        'task_user_not_found' => 'Account not found',
+        'task_test_sent'      => ':sent test overview message(s) sent, please check Telegram',
+        'task_test_partial'   => ':sent sent, but these people did not receive it: :failed (ask them to message the bot once)',
+        'task_test_no_user'   => 'Please tick at least one recipient and save first',
+        'task_test_not_bound' => 'None of the ticked recipients has messaged the bot yet, so they cannot receive messages',
+        'task_test_failed'    => 'Send failed, please check the bot is not blocked',
 
         // Topics
         'topic_too_many'       => 'Too many topics',

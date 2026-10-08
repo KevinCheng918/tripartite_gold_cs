@@ -6,7 +6,7 @@
 
 @section('content')
 
-    {{-- 四個分頁的資料隨頁面一起送出，切分頁不必再等 ajax --}}
+    {{-- 五個分頁的資料隨頁面一起送出，切分頁不必再等 ajax --}}
     {{-- ⚠️ data 屬性用單引號包，JSON 內的單引號會提早結束屬性、讓前端解析失敗，
          所以一律用 JSON_HEX_APOS 轉義 --}}
     <div id="notification-app"
@@ -33,6 +33,11 @@
             <li class="nav-item">
                 <a class="nav-link" data-bs-toggle="tab" href="#tab-report" role="tab">
                     <i class="fas fa-chart-bar me-1"></i>{{ trans('notification.tab_report') }}
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#tab-task" role="tab">
+                    <i class="fas fa-columns me-1"></i>{{ trans('notification.tab_task') }}
                 </a>
             </li>
         </ul>
@@ -247,6 +252,54 @@
                                 <h5 class="card-title">{{ trans('notification.report_personal_title') }}</h5>
                                 <p class="text-muted mb-0" style="font-size:0.875rem">
                                     {{ trans('notification.report_personal_desc', ['time' => config('constants.AUTO_REPLY.REMIND.REPORT_AT')]) }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            {{-- ============ 分頁五：任務卡通知 ============ --}}
+            <div class="tab-pane fade" id="tab-task" role="tabpanel">
+                <div class="row">
+                    <div class="col-lg-7">
+                        <div class="main-card mb-3 card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ trans('notification.task_title') }}</h5>
+                                <p class="text-muted" style="font-size:0.875rem">
+                                    {{ trans('notification.task_desc', ['time' => config('constants.TASK_NOTICE.SEND_AT')]) }}
+                                </p>
+                                <form id="form-task">
+                                    <div class="mb-3">
+                                        <div class="d-flex align-items-center justify-content-between mb-2">
+                                            <label class="form-label mb-0">{{ trans('notification.task_user') }}</label>
+                                            <div class="form-check mb-0">
+                                                <input class="form-check-input" type="checkbox" id="task-user-all">
+                                                <label class="form-check-label" for="task-user-all">{{ trans('notification.select_all') }}</label>
+                                            </div>
+                                        </div>
+                                        <div id="task-user-list" class="notice-check-list p-2"></div>
+                                        <small class="form-text text-muted">{{ trans('notification.task_user_hint') }}</small>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary js-manage-only">{{ trans('notification.action_save') }}</button>
+                                    <button type="button" class="btn btn-outline-secondary js-manage-only" id="btn-test-task">{{ trans('notification.task_test') }}</button>
+                                    <div class="form-text mt-2">{{ trans('notification.task_test_hint') }}</div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- 個人版（純說明，沒有東西要設定） --}}
+                    <div class="col-lg-5">
+                        <div class="main-card mb-3 card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ trans('notification.task_personal_title') }}</h5>
+                                <p class="text-muted" style="font-size:0.875rem">
+                                    {{ trans('notification.task_personal_desc', ['time' => config('constants.TASK_NOTICE.SEND_AT')]) }}
+                                </p>
+                                <p class="mb-0 text-muted" style="font-size:0.875rem">
+                                    <i class="fas fa-info-circle me-1"></i>{{ trans('notification.task_count_note') }}
                                 </p>
                             </div>
                         </div>

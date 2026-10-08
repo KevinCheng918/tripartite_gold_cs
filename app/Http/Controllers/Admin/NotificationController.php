@@ -7,6 +7,7 @@ use App\Http\Requests\Notification\UpdateGroupRequest;
 use App\Http\Requests\Notification\UpdateRemindRequest;
 use App\Http\Requests\Notification\UpdateReportRequest;
 use App\Http\Requests\Notification\UpdateShiftNoticeRequest;
+use App\Http\Requests\Notification\UpdateTaskNoticeRequest;
 use App\Http\Requests\Notification\UpdateTopicRequest;
 use App\Services\NotificationSettingService;
 use App\Services\ShiftNoticeService;
@@ -18,7 +19,7 @@ use Illuminate\Support\Facades\Log;
 /**
  * 通知設定（通訊管理 → 通知設定）
  *
- * 四個分頁：支援群組與話題、求助單提醒、班表通知、超時提醒統計。
+ * 五個分頁：支援群組與話題、求助單提醒、班表通知、超時提醒統計、任務卡通知。
  * 2026-10-06 從「全域設定」（現已改名「AI 引擎」）與「班表通知」兩頁合併過來。
  *
  * ⚠ 每個分頁各自一支 ajax —— 合成一支的話，存一個分頁會把其他分頁的值
@@ -243,6 +244,69 @@ class NotificationController extends Controller
         return response()->json([
             'message' => trans('notification.msg.topic_test_sent', ['sent' => $sent]),
         ]);
+    }
+
+    /**
+     * Ajax 更新任務卡通知的收件人
+     *
+     * @param UpdateTaskNoticeRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxUpdateTask(UpdateTaskNoticeRequest $request)
+    {
+        $params = $request->validated();
+
+        try {
+            $this->settingService->updateTask($params, Auth::id());
+
+            return response()->json(['message' => trans('notification.msg.saved')]);
+        } catch (\Exception $e) {
+            Log::error('任務卡通知設定更新失敗', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
+
+            return response()->json(['message' => trans('notification.msg.save_failed')], 500);
+        }
+    }
+
+    /**
+     * Ajax 任務卡通知測試發送
+     *
+     * 真的發出去（不是空跑），且只發總覽 —— 不會打擾每一位同仁。
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxTestTask()
+    {
+        $result = $this->settingService->testTask();
+        $sent = (int) Arr::get($result, 'sent', 0);
+
+        if ($sent > 0) {
+            // 有人收到就算成功，但沒收到的人也要講 —— 理由同 ajaxTestShift()
+            $failed = (array) Arr::get($result, 'failed', []);
+
+            if (filled($failed)) {
+                return response()->json([
+                    'message' => trans('notification.msg.task_test_partial', [
+                        'sent'   => $sent,
+                        'failed' => implode('、', $failed),
+                    ]),
+                ]);
+            }
+
+            return response()->json([
+                'message' => trans('notification.msg.task_test_sent', ['sent' => $sent]),
+            ]);
+        }
+
+        $reason = (string) Arr::get($result, 'reason');
+        $messages = [
+            StaffDmService::SKIP_NO_RECIPIENT => trans('notification.msg.task_test_no_user'),
+            StaffDmService::SKIP_NOT_BOUND    => trans('notification.msg.task_test_not_bound'),
+            StaffDmService::SKIP_SEND_FAILED  => trans('notification.msg.task_test_failed'),
+        ];
+
+        return response()->json([
+            'message' => Arr::get($messages, $reason, trans('notification.msg.task_test_failed')),
+        ], 422);
     }
 
     /**

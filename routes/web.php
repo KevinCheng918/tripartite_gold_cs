@@ -152,6 +152,8 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::put('/ajax-update-remind', [NotificationController::class, 'ajaxUpdateRemind'])->middleware('can:notification.manage')->name('ajax-update-remind');
         Route::put('/ajax-update-report', [NotificationController::class, 'ajaxUpdateReport'])->middleware('can:notification.manage')->name('ajax-update-report');
         Route::post('/ajax-test-report', [NotificationController::class, 'ajaxTestReport'])->middleware('can:notification.manage')->name('ajax-test-report');
+        Route::put('/ajax-update-task', [NotificationController::class, 'ajaxUpdateTask'])->middleware('can:notification.manage')->name('ajax-update-task');
+        Route::post('/ajax-test-task', [NotificationController::class, 'ajaxTestTask'])->middleware('can:notification.manage')->name('ajax-test-task');
         Route::put('/ajax-update-shift', [NotificationController::class, 'ajaxUpdateShift'])->middleware('can:notification.manage')->name('ajax-update-shift');
         Route::post('/ajax-test-shift', [NotificationController::class, 'ajaxTestShift'])->middleware('can:notification.manage')->name('ajax-test-shift');
     });

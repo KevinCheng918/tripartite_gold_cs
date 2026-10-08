@@ -46,6 +46,13 @@ class AppSettingService
      */
     const KEY_SHIFT_NOTICE_MANAGER = 'shift_notice.manager_user_id';
 
+    /*
+     * 任務卡總覽要私訊給誰。同樣**可以指定多個人**（逗號串接）。
+     *
+     * 跟班表、提醒統計各自分開 —— 三件事關心的人不一定是同一批。
+     */
+    const KEY_TASK_NOTICE_MANAGER = 'task_notice.manager_user_ids';
+
     // 內部支援群組
     const KEY_SUPPORT_CHAT_ID   = 'auto_reply.support_chat_id';
     const KEY_SUPPORT_SYSTEM_ID = 'auto_reply.support_system_id';

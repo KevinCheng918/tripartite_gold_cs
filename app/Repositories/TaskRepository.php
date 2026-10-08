@@ -93,6 +93,35 @@ class TaskRepository
     }
 
     /**
+     * 每日任務通知要統計的卡片
+     *
+     * 只撈**還沒結束**的（排除已解決與已封存）—— 通知要講的是「手上還有什麼」，
+     * 結案的卡不該出現在明天早上的訊息裡。
+     *
+     * ⚠ 一次撈完再在 PHP 分組，不逐人查：`assignee_ids` 是 JSON 陣列，
+     * 逐人 `whereJsonContains` 就是一人一趟查詢，而卡片總數在內部看板的量級
+     * 本來就不大。
+     *
+     * @return Collection
+     */
+    public function getOpenForNotice()
+    {
+        $closed = [
+            config('constants.TASK.STATUS.RESOLVED'),
+            config('constants.TASK.STATUS.ARCHIVED'),
+        ];
+
+        return Task::query()
+            ->select(['id', 'project_id', 'title', 'status', 'priority', 'assignee_ids', 'due_date'])
+            ->with('project')
+            ->whereNotIn('status', $closed)
+            // 逾期最久的排前面；沒設期限的排最後
+            ->orderByRaw('due_date IS NULL, due_date ASC')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
      * 依 ID 查詢（含詳細描述）
      *
      * @param int $id
