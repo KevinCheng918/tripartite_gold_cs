@@ -79,10 +79,13 @@ custom.css 的 `.row-actions__*`）。如果以後真要重做收合，
 | 頁面 | 從 | 到 | 怎麼併 |
 |---|---|---|---|
 | 帳號管理 | 7 | 6 | 帳號＋暱稱 → 成員；TG 署名＋TG 綁定 → Telegram |
-| 站台補點 | 11 | 11 | 圖片＋備註 → 附件（兩個 `.cell-chip` 小圖示鈕）；操作只留通過／拒絕 |
+| 站台補點 | 11 | 11 | 圖片＋備註 → 附件（兩個 `.cell-chip` 小 chip）；操作只留通過／拒絕 |
 | 虛擬機 | 12 | 8 | 系統＋站台、主機＋機型、內網＋外網 IP、開關機＋啟用狀態 |
 | 虛擬機帳單 | 9 | 7 | 系統併進站台；逾期天數併進收款狀態（逾期時 badge 本來就會變成「逾期」） |
 | 群發公告 | 9 | 7 | 總數＋成功＋失敗 → 送達（手機卡片本來就是這樣顯示，兩邊終於一致） |
+
+⚠ 「成員」那一格**暱稱與帳號相同時只顯示一次** —— 沒改過暱稱的帳號
+（預設就等於帳號）會變成同一個字上下疊兩行，看起來像畫面壞掉。
 
 ### 3. 全站統一的表格樣式
 
@@ -93,6 +96,43 @@ custom.css 的 `.row-actions__*`）。如果以後真要重做收合，
 手機卡片同時統一成 `.data-card__head` / `.data-card__row` / `.data-card__text`，
 取代原本每一列都手寫的
 `d-flex justify-content-between mb-1 style="font-size:0.875rem"`。
+
+## ⚠ 操作欄的四個坑（都是實際開瀏覽器看才發現的）
+
+前三版都是憑想像排版，上線一看才知道哪裡醜。這四條是實測後才定下來的：
+
+### 1. `flex-wrap: wrap` 會讓按鈕被擠成兩排
+
+`.row-actions` 一開始寫 `flex-wrap: wrap`，結果五顆按鈕在 1180px 的表格裡
+被擠成**兩排、而且兩排各自靠右對齊彼此對不齊**，列高變兩倍 —— 比原本還醜。
+
+原因不是寬度不夠，而是 `flex-wrap: wrap` 等於告訴瀏覽器「這一格可以再窄」，
+表格就把寬度分給了其他欄。改成 `nowrap` 之後這一欄拿到它需要的 ~500px，
+其他欄自己縮，整列回到單行。**手機卡片才需要 wrap**（media query）。
+
+### 2. `btn-transition` 的淡框在這裡沒有生效
+
+Architect 的 `.btn-transition` 設了 `border-color: #e9ecef`，但 base.css
+**第 11596 行又定義了一次 `.btn-outline-secondary`**（深灰 `#6c757d`），
+位置比 `.btn-transition`（第 10993 行）晚、特異性相同 → 後來居上。
+所以 `.row-actions` 裡要自己指定淡框，而且得 `!important`。
+
+### 3. 圖示比文字大一號太突兀
+
+`.btn-group-sm > .btn-icon.btn .btn-icon-wrapper` 是 16px，配 12.8px 的文字
+頭重腳輕。覆寫的選擇器要跟它一樣深，只寫 `.row-actions .btn-icon-wrapper`
+特異性不夠。
+
+### 4. 停用的按鈕滑過去會亮起來
+
+為了讓 `title` 顯示而開著 `pointer-events`（見下方「disabled 的按鈕看不到
+停用原因」），代價是 hover 樣式也跟著生效。要擋的有**兩條**：
+
+- `.row-actions` 自己那條金色 hover → 加 `:not(.disabled)`
+- 全站那條 `.btn-outline-secondary:hover { background-color: #212529 !important }`
+  → 它沒有排除 disabled，停用的按鈕滑過去會變近黑底，乘上 `opacity: 0.5`
+  變成一塊灰色實心方塊，看起來反而更像「正在按」。只能再寫一條
+  `.row-actions .btn.disabled:hover` 把它鎖回透明。
 
 ## ⚠ 過程中修掉的三個既有問題
 

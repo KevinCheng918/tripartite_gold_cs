@@ -1202,16 +1202,61 @@ a:hover { color: #85640a; }
  * 要再動這一點之前先問過。所以這裡**沒有** .btn-icon-only 的樣式 ——
  * 不是漏寫，是刻意不給，免得又有人拿去用。
  */
+/*
+ * ⚠ **桌機不可以換行。**
+ *
+ * 一開始寫 `flex-wrap: wrap`，結果五顆按鈕在 1180px 的表格裡被擠成兩排，
+ * 而且兩排都靠右對齊、彼此對不齊，列高變兩倍 —— 比原本還醜。
+ *
+ * 原因是 `flex-wrap: wrap` 等於告訴瀏覽器「這一格可以再窄一點」，
+ * 於是表格把寬度分給了其他欄。改成 nowrap 之後這一欄會拿到它需要的
+ * 500px，其他欄自己縮，整列回到單行。
+ *
+ * 手機卡片沒有欄寬的問題，而且一行放不下五顆，所以那邊才換行（見下方 media）。
+ */
 .row-actions {
     display: inline-flex;
     align-items: center;
-    flex-wrap: wrap;
-    gap: 0.5rem;
+    flex-wrap: nowrap;
+    gap: 0.625rem;
+}
+
+@media (max-width: 767.98px) {
+    .row-actions {
+        flex-wrap: wrap;
+    }
 }
 
 /* 按鈕文字本身不要被拆成兩行 */
 .row-actions .btn {
     white-space: nowrap;
+}
+
+/*
+ * 外框壓淡。
+ *
+ * ⚠ `btn-transition` 自己設的 `border-color: #e9ecef` **在這裡沒有生效** ——
+ * base.css 第 11596 行又定義了一次 `.btn-outline-secondary`（深灰 #6c757d），
+ * 位置比 `.btn-transition`（第 10993 行）晚，同特異性後來居上。
+ * 所以要在這裡明確指定，而且得用 !important 才蓋得過它後面那些 hover 規則。
+ *
+ * 一列五顆深灰外框的方塊太吵；淡下來之後整欄安靜，hover 才亮起來。
+ */
+.row-actions .btn-outline-secondary {
+    border-color: #e3e6ea !important;
+    color: #5b6570 !important;
+}
+
+/*
+ * 圖示縮小。
+ *
+ * Architect 的 `.btn-group-sm > .btn-icon.btn .btn-icon-wrapper` 是 16px，
+ * 配 12.8px 的文字頭重腳輕（圖示比字大 1.25 倍）。選擇器要跟它一樣深
+ * 才蓋得過去 —— 只寫 `.row-actions .btn-icon-wrapper` 的特異性不夠。
+ */
+.row-actions .btn-group-sm > .btn-icon.btn .btn-icon-wrapper {
+    font-size: 0.875rem;
+    margin-right: 0.375rem;
 }
 
 /* 同一段裡的按鈕共用邊框，hover 的那顆要浮到上層 ——
@@ -1230,9 +1275,12 @@ a:hover { color: #85640a; }
  *
  * 只在 .row-actions 裡覆寫，不動全站那條。要 !important 才蓋得過它。
  */
-.row-actions .btn-outline-secondary:hover,
-.row-actions .btn-outline-secondary:focus,
-.row-actions .btn-outline-secondary:active {
+/* ⚠ 一定要排除 .disabled。停用的按鈕為了讓 title 顯示而開著 pointer-events
+   （見下方 .btn.disabled），少了這個 :not() 它滑過去也會亮成金色，
+   看起來完全像能按 —— 站台還沒設 API 時的「補點通知」就是這一顆。 */
+.row-actions .btn-outline-secondary:not(.disabled):hover,
+.row-actions .btn-outline-secondary:not(.disabled):focus,
+.row-actions .btn-outline-secondary:not(.disabled):active {
     background-color: rgba(166, 124, 0, 0.12) !important;
     border-color: #a67c00 !important;
     color: #7a5c00 !important;
@@ -1253,6 +1301,23 @@ a:hover { color: #85640a; }
 .row-actions .btn.disabled {
     pointer-events: auto;
     cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/*
+ * ⚠ 停用的按鈕滑過去必須**完全不變**。
+ *
+ * 上面那條金色 hover 已經用 `:not(.disabled)` 排除它了，但全站還有一條
+ * `.btn-outline-secondary:hover { background-color: #212529 !important }`
+ * 沒有排除 —— 於是停用的按鈕滑過去會變成近黑底，再乘上 opacity 0.5
+ * 變成一塊灰色實心方塊，看起來反而更像「正在按」。
+ */
+.row-actions .btn.disabled:hover,
+.row-actions .btn.disabled:focus,
+.row-actions .btn.disabled:active {
+    background-color: transparent !important;
+    border-color: #e3e6ea !important;
+    color: #5b6570 !important;
 }
 
 /* ---- 手機版卡片 ----
@@ -1383,18 +1448,34 @@ a:hover { color: #85640a; }
     color: #f3f4f6;
 }
 
+/* ⚠ 上面把外框壓淡那條帶 !important，會一路蓋到深色模式 ——
+   深底配 #e3e6ea 的淺灰框等於畫了五個白框，比原本還刺眼。
+   這裡把深色模式該有的金色系邊框與文字補回來（同樣要 !important）。 */
+[data-theme="dark"] .row-actions .btn-outline-secondary {
+    border-color: rgba(212, 175, 55, 0.3) !important;
+    color: rgba(255, 255, 255, 0.7) !important;
+}
+
 /* 列操作：hover 的淡金色要有深色配對，否則深色模式會落回全站那條
    近黑色填滿（深底上滑過去等於整顆消失） */
-[data-theme="dark"] .row-actions .btn-outline-secondary:hover,
-[data-theme="dark"] .row-actions .btn-outline-secondary:focus,
-[data-theme="dark"] .row-actions .btn-outline-secondary:active {
+[data-theme="dark"] .row-actions .btn-outline-secondary:not(.disabled):hover,
+[data-theme="dark"] .row-actions .btn-outline-secondary:not(.disabled):focus,
+[data-theme="dark"] .row-actions .btn-outline-secondary:not(.disabled):active {
     background-color: rgba(212, 175, 55, 0.16) !important;
     border-color: #d4af37 !important;
     color: #f0e6c8 !important;
 }
 
 /* 停用狀態：深色模式下外框與文字都要再淡一階，
-   不然「不能按」看起來跟「可以按」一樣 */
+   不然「不能按」看起來跟「可以按」一樣。hover 鎖死的理由同淺色版 */
 [data-theme="dark"] .row-actions .btn.disabled {
     opacity: 0.4;
+}
+
+[data-theme="dark"] .row-actions .btn.disabled:hover,
+[data-theme="dark"] .row-actions .btn.disabled:focus,
+[data-theme="dark"] .row-actions .btn.disabled:active {
+    background-color: transparent !important;
+    border-color: rgba(212, 175, 55, 0.3) !important;
+    color: rgba(255, 255, 255, 0.7) !important;
 }

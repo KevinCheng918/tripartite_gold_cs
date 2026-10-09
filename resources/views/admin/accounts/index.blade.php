@@ -144,10 +144,16 @@
                             <tr>
                                 <td class="col-idx">{{ $idx }}</td>
                                 {{-- 暱稱是同事之間互稱的名字，帳號是登入用的 ——
-                                     前者當主要資訊、後者壓成灰色小字 --}}
+                                     前者當主要資訊、後者壓成灰色小字。
+
+                                     ⚠ 兩者相同時只顯示一次：沒改過暱稱的帳號
+                                     （預設就等於帳號）會變成同一個字上下疊兩行，
+                                     看起來像畫面壞掉。 --}}
                                 <td>
                                     <div class="cell-stack__main">{{ $account->nickname }}</div>
-                                    <div class="cell-stack__sub">{{ $account->account }}</div>
+                                    @if($account->nickname !== $account->account)
+                                        <div class="cell-stack__sub">{{ $account->account }}</div>
+                                    @endif
                                 </td>
                                 {{-- Telegram 一格講兩件事：綁定狀態（收不收得到私訊通知）
                                      與署名（在對話裡附在訊息結尾的名字）。
@@ -218,9 +224,12 @@
                  原本下半部是 2×2 的四顆等寬按鈕，佔掉半張卡片 --}}
             <div class="card mb-2 shadow-sm">
                 <div class="card-body py-3">
+                    {{-- 暱稱與帳號相同時只顯示一次，理由同桌機版 --}}
                     <div class="mb-2">
                         <div class="cell-stack__main">{{ $account->nickname }}</div>
-                        <div class="cell-stack__sub">{{ $account->account }}</div>
+                        @if($account->nickname !== $account->account)
+                            <div class="cell-stack__sub">{{ $account->account }}</div>
+                        @endif
                     </div>
                     <div class="d-flex flex-wrap gap-1 mb-2">
                         @if($account->status == config('constants.USER.STATUS.NORMAL'))
