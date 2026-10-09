@@ -330,15 +330,31 @@ class TaskRepository
     /**
      * 刪除超過指定天數的封存任務
      *
+     * ⚠ **這是真的 delete，不是改狀態。**
+     *
+     * ⚠ **停用專案的卡片不刪**（2026-10-10）。這支是在打開封存清單時順手跑的
+     * （`TaskBoardService::getArchivedTasks()`），不是排程 —— 而封存清單現在
+     * 不顯示停用專案的卡片。少了這個條件就會變成：
+     *
+     *   專案一關 → 它的封存卡從清單上消失（看不到、也救不回來）
+     *   → 有人打開封存清單 → 超過 30 天的那些被永久刪掉
+     *   → 專案重新啟用，那幾張再也回不來
+     *
+     * 需求方要的是「專案改回正常，卡片就要全部回來」，所以專案關著的期間
+     * 一筆都不能刪。重新啟用之後它們會回到清單上，30 天的規則才繼續算。
+     *
      * @param int $days
      * @return void
      */
     public function deleteArchivedOlderThan($days)
     {
-        Task::query()
+        $query = Task::query()
             ->where('status', config('constants.TASK.STATUS.ARCHIVED'))
-            ->where('updated_at', '<', now()->subDays($days))
-            ->delete();
+            ->where('updated_at', '<', now()->subDays($days));
+
+        $this->onlyActiveProject($query);
+
+        $query->delete();
     }
 
     public function createActivity($attributes)

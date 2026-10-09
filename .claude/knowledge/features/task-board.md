@@ -129,12 +129,47 @@ inline 無法表達 `[data-theme="dark"]` 選擇器。
 | `getBoard()` | 看板四欄 |
 | `getOpenForNotice()` | 每日 08:00 任務卡通知 |
 | `getArchived()` | 封存清單 |
+| `deleteArchivedOlderThan()` | 30 天封存清理 —— **專案關著的期間一筆都不刪** |
 
 封存清單也要濾的理由：它是看板同一頁的分頁，每一列都有「還原」——
 還原會把卡片丟回「待處理」，也就是丟回一個看板上根本不顯示的專案，
 按下去之後那張卡就人間蒸發了。
 
 ⚠ **只是不顯示，資料一筆都不動。** 專案重新啟用，卡片原樣全部回來。
+
+### ⚠ 30 天清理也要排除停用專案，否則「回來」是假的
+
+`deleteArchivedOlderThan()` 是**真的 delete**，而且它不是排程 ——
+是打開封存清單時順手跑的（`TaskBoardService::getArchivedTasks()` 先刪再撈）。
+
+少了專案條件就會變成：
+
+```
+專案一關 → 封存卡從清單消失（看不到也救不回來）
+        → 有人打開封存清單 → 超過 30 天的那些被永久刪掉
+        → 專案重新啟用，那幾張再也回不來
+```
+
+所以 `deleteArchivedOlderThan()` 也掛 `onlyActiveProject()`。
+產生的語句（用 `DB::pretend()` 驗過）：
+
+```sql
+delete from `task`
+where `status` = ?            -- 6 ARCHIVED
+  and `updated_at` < ?
+  and exists (select * from `project` where `task`.`project_id` = `project`.`id` and `status` = ?)  -- 1 ACTIVE
+```
+
+⚠ 重新啟用之後 30 天的規則**才繼續算**，不會倒扣關閉的那段時間 ——
+啟用當下就已經超過 30 天的封存卡，下一次有人打開封存清單時仍會被清掉。
+這是封存本來的規則，不是停用造成的。
+
+### 其他會動到卡片資料的路徑（都確認過）
+
+- `TaskRepository::delete()` —— **沒有任何呼叫端**，卡片一律走封存不走刪除
+- 專案**沒有刪除功能**（只有停用），所以不會觸發 `project` FK 的 cascadeOnDelete
+- `ProjectRepository::update()` 只寫 `project` 那一列，沒有連動 `task`；
+  專案也沒有 Observer／model event
 
 ⚠ 用 `whereHas` 而不是 join：`Task::project()` 這個關聯自己帶了
 `select(['id', 'name'])`、**沒有 `status`**，join 進來讀不到要比的欄位，
