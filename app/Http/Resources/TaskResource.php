@@ -88,10 +88,41 @@ class TaskResource extends JsonResource
             'sort_order'   => $this->sort_order,
             'created_at'   => $this->created_at->format('Y-m-d H:i'),
             'updated_at'   => $this->updated_at ? $this->updated_at->format('Y-m-d H:i') : null,
+            'purge_at'     => $this->purgeAt(),
             'previous_status' => $this->whenLoaded('latestArchivedActivity', function () {
                 $changes = $this->latestArchivedActivity->changes ?? [];
                 return isset($changes['狀態']['from']) ? (int) $changes['狀態']['from'] : null;
             }),
         ];
+    }
+
+    /**
+     * 這張封存卡什麼時候會被真的刪掉
+     *
+     * ⚠ **跟 `TaskRepository::deleteArchivedOlderThan()` 是同一條規則，改一邊
+     * 就要改另一邊。** 封存清單的「剩餘天數」直接讀這個值 —— 兩邊算法不同步的話，
+     * 畫面上寫著還剩幾天、實際上早就被刪了（或反過來，寫 0 天卻一直都在）。
+     *
+     * 規則：封存後 N 天刪；但專案重新啟用後整個專案再給 N 天，取晚的那個。
+     *
+     * @return string|null 封存中才有值，其餘狀態回 null
+     */
+    private function purgeAt()
+    {
+        if ((int) $this->status !== (int) config('constants.TASK.STATUS.ARCHIVED') || blank($this->updated_at)) {
+            return null;
+        }
+
+        $days = (int) config('constants.TASK.ARCHIVE_PURGE_DAYS');
+        $from = $this->updated_at;
+
+        $reactivatedAt = filled($this->project) ? $this->project->reactivated_at : null;
+
+        // 重新啟用得比封存還晚才有意義 —— 早於封存時間的那次啟用跟這張卡無關
+        if (filled($reactivatedAt) && $reactivatedAt->greaterThan($from)) {
+            $from = $reactivatedAt;
+        }
+
+        return $from->copy()->addDays($days)->format('Y-m-d H:i');
     }
 }

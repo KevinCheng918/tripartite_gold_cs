@@ -8,19 +8,25 @@ use App\Http\Requests\StaffManage\UpdateProjectRequest;
 use App\Http\Resources\ProjectResource;
 use App\Models\Project;
 use App\Repositories\ProjectRepository;
+use App\Services\ProjectService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 /**
  * 專案管理控制器
+ *
+ * ⚠ 讀走 Repository、寫走 Service。寫入有連動邏輯
+ * （停用改回啟用時要重算封存卡的清理期限），那不能放在 Controller。
  */
 class ProjectController extends Controller
 {
     private $projectRepository;
+    private $projectService;
 
-    public function __construct(ProjectRepository $projectRepository)
+    public function __construct(ProjectRepository $projectRepository, ProjectService $projectService)
     {
         $this->projectRepository = $projectRepository;
+        $this->projectService = $projectService;
     }
 
     /**
@@ -60,11 +66,7 @@ class ProjectController extends Controller
         $params = $request->validated();
 
         try {
-            $project = $this->projectRepository->create([
-                'name'        => $params['name'],
-                'description' => $params['description'] ?? null,
-                'created_by'  => Auth::id(),
-            ]);
+            $project = $this->projectService->store($params, Auth::id());
 
             return response()->json([
                 'message' => '專案已新增',
@@ -89,7 +91,7 @@ class ProjectController extends Controller
         $params = $request->validated();
 
         try {
-            $updated = $this->projectRepository->update($project, $params);
+            $updated = $this->projectService->update($project, $params);
 
             return response()->json([
                 'message' => '專案已更新',

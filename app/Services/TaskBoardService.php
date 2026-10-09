@@ -249,8 +249,10 @@ class TaskBoardService
      */
     public function getArchivedTasks()
     {
-        // 自動清理超過 30 天的封存任務
-        $this->taskRepository->deleteArchivedOlderThan(30);
+        // 自動清理放太久的封存任務（天數走 config，前端算剩餘天數也是讀同一個值）
+        $this->taskRepository->deleteArchivedOlderThan(
+            (int) config('constants.TASK.ARCHIVE_PURGE_DAYS')
+        );
 
         return $this->taskRepository->getArchived();
     }

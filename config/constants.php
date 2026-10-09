@@ -866,6 +866,15 @@ return [
             'HIGH'   => 3,
             'URGENT' => 4,
         ],
+
+        /*
+         * 封存的卡片放多久會被真的刪掉。
+         *
+         * ⚠ 原本這個 30 散在三個地方：Service 呼叫 `deleteArchivedOlderThan(30)`、
+         * Resource 算 `purge_at`、前端算「剩餘天數」。改一個漏兩個的話，
+         * 畫面上會寫還剩幾天、實際上早就被刪了。
+         */
+        'ARCHIVE_PURGE_DAYS' => 30,
     ],
 
     'PROJECT' => [

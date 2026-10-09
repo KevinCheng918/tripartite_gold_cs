@@ -47,9 +47,14 @@ class Task extends Model
     /**
      * @return BelongsTo
      */
+    /**
+     * ⚠ `reactivated_at` 一定要 select：封存清單的「剩餘天數」要靠它算
+     * （專案重新啟用後 30 天內不清理，見 TaskResource::purgeAt()）。
+     * 少了它那一欄永遠是 null，畫面會寫「剩 0 天」但其實不會被刪。
+     */
     public function project(): BelongsTo
     {
-        return $this->belongsTo(Project::class)->select(['id', 'name']);
+        return $this->belongsTo(Project::class)->select(['id', 'name', 'reactivated_at']);
     }
 
     /**

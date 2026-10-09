@@ -160,9 +160,9 @@ where `status` = ?            -- 6 ARCHIVED
   and exists (select * from `project` where `task`.`project_id` = `project`.`id` and `status` = ?)  -- 1 ACTIVE
 ```
 
-⚠ 重新啟用之後 30 天的規則**才繼續算**，不會倒扣關閉的那段時間 ——
-啟用當下就已經超過 30 天的封存卡，下一次有人打開封存清單時仍會被清掉。
-這是封存本來的規則，不是停用造成的。
+⚠ 重新啟用之後，**整個專案重新給 30 天**（`project.reactivated_at`）——
+否則停用當下就已經封存 60 天的卡，啟用那一刻就到期、立刻被清掉，
+等於「改回正常了卡片卻回不來」。細節見 [[task-archive-purge-pause]]。
 
 ### 其他會動到卡片資料的路徑（都確認過）
 

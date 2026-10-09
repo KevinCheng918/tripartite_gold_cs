@@ -340,19 +340,35 @@ class TaskRepository
      *   → 有人打開封存清單 → 超過 30 天的那些被永久刪掉
      *   → 專案重新啟用，那幾張再也回不來
      *
-     * 需求方要的是「專案改回正常，卡片就要全部回來」，所以專案關著的期間
-     * 一筆都不能刪。重新啟用之後它們會回到清單上，30 天的規則才繼續算。
+     * ⚠ **停用那段時間不計入那 30 天**（需求方 2026-10-10）。光是停用期間不刪
+     * 還不夠：重新啟用的那一刻，已經放超過 30 天的卡還是會在下一次有人打開
+     * 封存清單時立刻被清掉 —— 對使用者來說就是「改回正常了，卡片卻回不來」。
+     *
+     * 做法是重新啟用後**整個專案重新給 30 天**：`project.reactivated_at`
+     * 距今未滿 30 天的專案，它的封存卡一張都不刪。
+     *
+     * 這比「扣掉實際暫停幾天」寬鬆（停用 2 天也是重新給 30 天），
+     * 換來的是只需要一個欄位、而且 `task` 表完全不用動。
      *
      * @param int $days
      * @return void
      */
     public function deleteArchivedOlderThan($days)
     {
+        $active = config('constants.PROJECT.STATUS.ACTIVE');
+        $graceUntil = now()->subDays($days);
+
         $query = Task::query()
             ->where('status', config('constants.TASK.STATUS.ARCHIVED'))
-            ->where('updated_at', '<', now()->subDays($days));
-
-        $this->onlyActiveProject($query);
+            ->where('updated_at', '<', $graceUntil)
+            ->whereHas('project', function ($q) use ($active, $graceUntil) {
+                $q->where('status', $active)
+                  // 從來沒重新啟用過 → 照舊規則；剛啟用不久 → 整個專案先不動
+                  ->where(function ($p) use ($graceUntil) {
+                      $p->whereNull('reactivated_at')
+                        ->orWhere('reactivated_at', '<', $graceUntil);
+                  });
+            });
 
         $query->delete();
     }

@@ -1951,10 +1951,20 @@ $(function () {
         var html = '';
         list.forEach(function (t) {
             var updatedAt = new Date(t.updated_at);
-            var now = new Date();
-            var diffDays = Math.ceil((now - updatedAt) / (1000 * 60 * 60 * 24));
-            var remaining = 30 - diffDays;
-            if (remaining < 0) remaining = 0;
+            /*
+             * ⚠ 剩餘天數讀後端算好的 `purge_at`，**不要**在這裡自己算
+             * 「30 -（今天 - 封存日）」—— 專案重新啟用之後整個專案會重新給
+             * 30 天，期限是往後推的。自己算會寫著「剩 0 天」但其實還早得很
+             * （規則在 TaskResource::purgeAt() 與 deleteArchivedOlderThan()）。
+             *
+             * `replace(' ', 'T')` 是給嚴格的日期解析用的：後端吐的是
+             * 「2026-11-09 12:30」，少了 T 在部分瀏覽器會解析成 Invalid Date。
+             */
+            var remaining = 0;
+            if (t.purge_at) {
+                var purgeAt = new Date(t.purge_at.replace(' ', 'T'));
+                remaining = Math.max(0, Math.ceil((purgeAt - new Date()) / (1000 * 60 * 60 * 24)));
+            }
             var badgeClass = remaining <= 7 ? 'bg-danger' : (remaining <= 14 ? 'bg-warning text-dark' : 'bg-secondary');
             var prevStatus = t.previous_status ? (statusLabels[t.previous_status] || '-') : '-';
             var assigneeNames = (t.assignees && t.assignees.length)

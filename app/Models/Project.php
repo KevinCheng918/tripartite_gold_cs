@@ -9,11 +9,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * 專案 Model
  *
- * @property int         $id
- * @property string      $name
- * @property string|null $description
- * @property int         $status
- * @property int         $created_by
+ * @property int                             $id
+ * @property string                          $name
+ * @property string|null                     $description
+ * @property int                             $status
+ * @property \Illuminate\Support\Carbon|null $reactivated_at 上次由停用改回啟用的時間
+ * @property int                             $created_by
  */
 class Project extends Model
 {
@@ -22,7 +23,8 @@ class Project extends Model
     protected $guarded = ['id'];
 
     protected $casts = [
-        'status' => 'integer',
+        'status'         => 'integer',
+        'reactivated_at' => 'datetime',
     ];
 
     /**

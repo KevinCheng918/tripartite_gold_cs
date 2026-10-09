@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Collection;
 class ProjectRepository
 {
     /** @var array 列表欄位 */
-    private const LIST_COLUMNS = ['id', 'name', 'description', 'status', 'created_by', 'created_at', 'updated_at'];
+    private const LIST_COLUMNS = ['id', 'name', 'description', 'status', 'reactivated_at', 'created_by', 'created_at', 'updated_at'];
 
     /**
      * 取得所有專案（含建立者）
