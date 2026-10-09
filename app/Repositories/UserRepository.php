@@ -325,21 +325,69 @@ class UserRepository
     }
 
     /**
-     * 記下「這個人私訊過 bot，可以被私訊」
+     * 依 Telegram 身份找人（擋多重綁定用）
      *
-     * ⚠ 同時更新 `telegram_user_id` —— 私訊的 chat_id 就是他的 user id，
-     * 而這個來源比群組訊息可靠（群組那邊拿到的也是同一個 id，
-     * 但這裡才能確認「可以私訊」）。
+     * ⚠ `telegram_user_id` 只有 index、**沒有 unique**，所以同一個 Telegram
+     * 身份理論上可以出現在多列 —— 那會讓那個人每天收到兩份班表與任務卡。
+     * 綁定前用這支擋住。
      *
-     * @param \App\Models\User $user
-     * @param int|string        $telegramUserId
+     * @param int|string $telegramUserId
+     * @param int|null   $exceptUserId 排除誰（通常是正要綁的那個人自己）
+     * @return User|null
+     */
+    public function findByTelegramUserId($telegramUserId, $exceptUserId = null)
+    {
+        $query = User::query()
+            ->select(['id', 'nickname', 'account', 'telegram_user_id'])
+            ->where('telegram_user_id', (int) $telegramUserId);
+
+        if (filled($exceptUserId)) {
+            $query->where('id', '!=', (int) $exceptUserId);
+        }
+
+        return $query->first();
+    }
+
+    /**
+     * 驗證碼綁定成功：寫入 Telegram 身份
+     *
+     * ⚠ **順便回填 `telegram_username`**，所以管理者不必再手動輸入那個欄位。
+     * 它仍然有用（求助單提醒要在群組 `@` 他），只是不再是綁定的依據。
+     * Telegram 那邊沒設 username 的人會是 null，那不影響私訊。
+     *
+     * @param User        $user
+     * @param int|string  $telegramUserId
+     * @param string|null $username
      * @return void
      */
-    public function markDmReady($user, $telegramUserId)
+    public function bindTelegram(User $user, $telegramUserId, $username = null)
     {
-        $user->forceFill([
+        $attributes = [
             'telegram_user_id'  => (int) $telegramUserId,
             'telegram_dm_ready' => true,
+        ];
+
+        if (filled($username)) {
+            $attributes['telegram_username'] = ltrim(trim((string) $username), '@');
+        }
+
+        $user->forceFill($attributes)->save();
+    }
+
+    /**
+     * 解除 Telegram 綁定
+     *
+     * ⚠ **不清 `telegram_username`**：那是在群組 `@` 他用的，
+     * 跟「能不能私訊」是兩件事。
+     *
+     * @param User $user
+     * @return void
+     */
+    public function clearTelegramBinding(User $user)
+    {
+        $user->forceFill([
+            'telegram_user_id'  => null,
+            'telegram_dm_ready' => false,
         ])->save();
     }
 
@@ -348,6 +396,10 @@ class UserRepository
      *
      * Telegram 那邊傳來的 username 不帶 @，而後台可能填成 `@name` 或 `name`，
      * 所以兩邊都去掉 @ 再比。大小寫不敏感 —— Telegram 的 username 本來就是。
+     *
+     * ⚠ **這支不再用於私訊綁定**（2026-10-09 改走驗證碼，見 `TelegramBindService`）。
+     * 剩下的用途是「認出群組裡發言的是哪位同仁」—— 匯率決定者、不自動回覆名單。
+     * 那些只是辨識，認錯的後果是記錯名字，不像綁定會把內部通知送給外人。
      *
      * 帶 `telegram_user_id` 是給 StaffIgnoreService 的回填用的：
      * 它要判斷這筆有沒有補過 ID，少了這欄會每次都重寫一遍。

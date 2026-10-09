@@ -153,19 +153,34 @@
                                 {{-- TG 綁定狀態。三態而不是兩態：「沒填 Telegram 帳號」與
                                      「填了但還沒私訊機器人」要做的事完全不同 —— 前者要後台補資料，
                                      後者要請他本人去私訊一次 --}}
+                                {{-- TG 綁定狀態。2026-10-09 改成驗證碼綁定之後只剩兩態：
+                                     綁好了（有 telegram_user_id）或沒綁 ——
+                                     `telegram_username` 不再是綁定的依據，所以不看它 --}}
                                 <td>
-                                    @if(blank($account->telegram_username))
-                                        <span class="badge bg-secondary" title="{{ trans('account.telegram_bind_no_account_hint') }}">
-                                            {{ trans('account.telegram_bind_no_account') }}
-                                        </span>
-                                    @elseif($account->telegram_dm_ready)
+                                    @if($account->telegram_dm_ready)
                                         <span class="badge bg-success" title="{{ trans('account.telegram_bind_ready_hint') }}">
                                             <i class="fas fa-check me-1"></i>{{ trans('account.telegram_bind_ready') }}
                                         </span>
+                                        @can('account.update')
+                                        <button class="btn btn-sm btn-link p-0 ms-1 js-telegram-unbind"
+                                                data-id="{{ $account->id }}"
+                                                data-name="{{ $account->nickname }}"
+                                                title="{{ trans('account.telegram_unbind_hint') }}">
+                                            {{ trans('account.action_telegram_unbind') }}
+                                        </button>
+                                        @endcan
                                     @else
                                         <span class="badge bg-warning text-dark" title="{{ trans('account.telegram_bind_pending_hint') }}">
                                             {{ trans('account.telegram_bind_pending') }}
                                         </span>
+                                        @can('account.update')
+                                        <button class="btn btn-sm btn-link p-0 ms-1 js-telegram-code"
+                                                data-id="{{ $account->id }}"
+                                                data-name="{{ $account->nickname }}"
+                                                title="{{ trans('account.telegram_code_hint') }}">
+                                            {{ trans('account.action_telegram_code') }}
+                                        </button>
+                                        @endcan
                                     @endif
                                 </td>
                                 <td>
@@ -248,9 +263,7 @@
                                 <span class="badge bg-danger">{{ trans('account.status_deactivate') }}</span>
                             @endif
                             {!! \App\Presenters\UserPresenter::levelBadge($account->level) !!}
-                            @if(blank($account->telegram_username))
-                                <span class="badge bg-secondary">{{ trans('account.telegram_bind_no_account') }}</span>
-                            @elseif($account->telegram_dm_ready)
+                            @if($account->telegram_dm_ready)
                                 <span class="badge bg-success">
                                     <i class="fas fa-check me-1"></i>{{ trans('account.telegram_bind_ready') }}
                                 </span>
@@ -477,6 +490,51 @@
         </div>
     </div>
 
+
+    {{-- 綁定碼 --}}
+    <div class="modal fade" id="modal-bind-code" tabindex="-1">
+        <div class="modal-content-wrapper modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">{{ trans('account.telegram_code_title') }}</h5>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2"><strong id="bind-code-name"></strong></p>
+                    {{-- 可選取複製：同仁多半在另一台裝置開 Telegram，用看的抄六個字容易抄錯 --}}
+                    <input type="text" class="form-control text-center fw-bold mb-2"
+                           id="bind-code-value" readonly
+                           style="font-size:1.75rem;letter-spacing:0.5rem" onclick="this.select()">
+                    <p class="text-muted mb-0" style="font-size:0.875rem">
+                        {{ trans('account.telegram_code_steps') }}
+                    </p>
+                    <p class="text-danger mb-0 mt-2" style="font-size:0.875rem">
+                        <i class="fas fa-clock me-1"></i>{!! trans('account.telegram_code_expires', ['minutes' => '<span id="bind-code-expires"></span>']) !!}
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- 解除綁定確認 --}}
+    <div class="modal fade" id="modal-telegram-unbind" tabindex="-1">
+        <div class="modal-content-wrapper modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-body py-4">
+                    <input type="hidden" id="unbind-user-id">
+                    <p class="mb-2">{{ trans('account.telegram_unbind_confirm') }}<strong id="unbind-user-name"></strong></p>
+                    <p class="text-muted mb-0" style="font-size:0.875rem">{{ trans('account.telegram_unbind_warning') }}</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ trans('account.action_cancel') }}</button>
+                    <button type="button" class="btn btn-danger" id="btn-confirm-unbind">{{ trans('account.action_telegram_unbind') }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 @endsection
 
 @section('scripts')
@@ -527,6 +585,58 @@ $(function () {
         $('#status-user-id').val($btn.data('id'));
         $('input[name="status"][value="' + $btn.data('status') + '"]').prop('checked', true);
         showBsModal('modal-change-status');
+    });
+
+    /*
+     * Telegram 綁定碼。
+     *
+     * ⚠ 碼要能**複製**：同仁多半在另一台裝置上操作 Telegram，
+     * 用看的抄六個字很容易抄錯。所以顯示在可選取的欄位裡。
+     */
+    $('.js-telegram-code').on('click', function () {
+        var $btn = $(this);
+        $btn.prop('disabled', true);
+
+        $.ajax({
+            url: '/admin/accounts/ajax-telegram-code/' + $btn.data('id'),
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') }
+        }).done(function (res) {
+            $('#bind-code-name').text($btn.data('name'));
+            $('#bind-code-value').val(res.code);
+            $('#bind-code-expires').text(res.expires_in);
+            showBsModal('modal-bind-code');
+        }).fail(function (xhr) {
+            showMessage((xhr.responseJSON && xhr.responseJSON.message) || @json(trans('account.msg.telegram_code_failed')));
+        }).always(function () {
+            $btn.prop('disabled', false);
+        });
+    });
+
+    // 解除綁定。會讓對方收不到班表與任務卡，所以先確認
+    $('.js-telegram-unbind').on('click', function () {
+        var $btn = $(this);
+        $('#unbind-user-id').val($btn.data('id'));
+        $('#unbind-user-name').text($btn.data('name'));
+        showBsModal('modal-telegram-unbind');
+    });
+
+    $('#btn-confirm-unbind').on('click', function () {
+        var id = $('#unbind-user-id').val();
+        var $btn = $(this);
+        $btn.prop('disabled', true);
+
+        $.ajax({
+            url: '/admin/accounts/ajax-telegram-unbind/' + id,
+            method: 'DELETE',
+            headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') }
+        }).done(function (res) {
+            location.reload();
+        }).fail(function (xhr) {
+            showMessage((xhr.responseJSON && xhr.responseJSON.message) || @json(trans('account.msg.telegram_unbind_failed')));
+        }).always(function () {
+            $btn.prop('disabled', false);
+        });
     });
 
     // 帳密僅接受半形可列印字元，含全形（如＠！、全形空白）先擋下並提示

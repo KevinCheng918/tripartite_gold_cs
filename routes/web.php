@@ -61,6 +61,15 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::post('/ajax-assign-permissions/{user}', [AccountController::class, 'ajaxAssignPermissions'])->middleware('can:account.assign_permission')->name('ajax-assign-permissions');
         Route::get('/permissions/{user}', [AccountController::class, 'permissionsPage'])->middleware('can:account.assign_permission')->name('permissions');
         Route::get('/ajax-login-log/{user}', [AccountController::class, 'ajaxLoginLog'])->middleware('can:account.view')->name('ajax-login-log');
+        /*
+         * Telegram 綁定。
+         *
+         * ⚠ 產碼那支**不掛 can:** —— 同仁要能產自己的碼（「我的帳號」那顆按鈕）。
+         * 「幫別人產」的權限檢查在 Controller 裡，因為同一支要服務兩種情況。
+         * 解綁只有管理者能做（需求方指定），所以掛 can:account.update。
+         */
+        Route::post('/ajax-telegram-code/{user?}', [AccountController::class, 'ajaxTelegramCode'])->name('ajax-telegram-code');
+        Route::delete('/ajax-telegram-unbind/{user}', [AccountController::class, 'ajaxTelegramUnbind'])->middleware('can:account.update')->name('ajax-telegram-unbind');
     });
 
     // 排班管理

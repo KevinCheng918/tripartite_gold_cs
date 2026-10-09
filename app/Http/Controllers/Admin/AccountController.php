@@ -14,7 +14,9 @@ use App\Repositories\ProjectRepository;
 use App\Services\AccountService;
 use App\Services\LoginLogService;
 use App\Services\PermissionMapService;
+use App\Services\TelegramBindService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
@@ -31,17 +33,20 @@ class AccountController extends Controller
     private $permissionMapService;
     private $projectRepository;
     private $loginLogService;
+    private $bindService;
 
     public function __construct(
         AccountService $accountService,
         PermissionMapService $permissionMapService,
         ProjectRepository $projectRepository,
-        LoginLogService $loginLogService
+        LoginLogService $loginLogService,
+        TelegramBindService $bindService
     ) {
         $this->accountService = $accountService;
         $this->permissionMapService = $permissionMapService;
         $this->projectRepository = $projectRepository;
         $this->loginLogService = $loginLogService;
+        $this->bindService = $bindService;
     }
 
     /**
@@ -68,6 +73,61 @@ class AccountController extends Controller
             'accountStats' => $accountStats,
             'projects'     => $projects,
         ]);
+    }
+
+    /**
+     * Ajax 產生 Telegram 綁定碼
+     *
+     * ⚠ **兩個入口共用這一支**：`{user}` 有值是管理者代為產生，沒值是同仁
+     * 在「我的帳號」自助。自助那條不需要 `account.update` ——
+     * 產自己的碼不是管理行為。
+     *
+     * @param \App\Models\User|null $user
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxTelegramCode(?User $user = null)
+    {
+        $target = filled($user) ? $user : Auth::user();
+
+        /*
+         * ⚠ 幫**別人**產碼要權限。沒這道的話，任何登入的人都能產出別人的碼，
+         * 拿去私訊 bot 就綁到對方帳號、開始收他的班表與任務卡。
+         */
+        if (filled($user) && (int) $user->id !== (int) Auth::id() && !Auth::user()->hasPermission('account.update')) {
+            return response()->json(['message' => trans('account.msg.telegram_code_forbidden')], 403);
+        }
+
+        $result = $this->bindService->issueCode($target->id);
+
+        return response()->json([
+            'code'       => Arr::get($result, 'code'),
+            'expires_in' => Arr::get($result, 'expires_in'),
+            'message'    => trans('account.msg.telegram_code_issued', [
+                'minutes' => Arr::get($result, 'expires_in'),
+            ]),
+        ]);
+    }
+
+    /**
+     * Ajax 解除 Telegram 綁定
+     *
+     * ⚠ **只有管理者能解**（需求方 2026-10-09）—— 同仁自己解掉之後收不到
+     * 班表與任務卡卻不自知，而那些是工作要用的。路由已掛 `can:account.update`。
+     *
+     * @param \App\Models\User $user
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxTelegramUnbind(User $user)
+    {
+        try {
+            $this->bindService->unbind($user, Auth::id());
+
+            return response()->json(['message' => trans('account.msg.telegram_unbound')]);
+        } catch (\Exception $e) {
+            Log::error('解除 Telegram 綁定失敗', ['user_id' => $user->id, 'error' => $e->getMessage()]);
+
+            return response()->json(['message' => trans('account.msg.telegram_unbind_failed')], 500);
+        }
     }
 
     /**

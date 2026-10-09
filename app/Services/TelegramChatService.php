@@ -32,6 +32,7 @@ class TelegramChatService
     private $staffIgnoreService;
     private $progressService;
     private $userRepository;
+    private $bindService;
 
     public function __construct(
         TelegramRepository $telegramRepository,
@@ -43,9 +44,12 @@ class TelegramChatService
         TelegramGroupMemberService $memberService,
         StaffIgnoreService $staffIgnoreService,
         AutoReplyProgressService $progressService,
-        UserRepository $userRepository
+        UserRepository $userRepository,
+        TelegramBindService $bindService
     ) {
         $this->telegramRepository = $telegramRepository;
+        // 私訊綁定走驗證碼，實作在那支
+        $this->bindService = $bindService;
         $this->botService = $botService;
         $this->assignmentRepository = $assignmentRepository;
         $this->webPushService = $webPushService;
@@ -212,24 +216,22 @@ class TelegramChatService
     }
 
     /**
-     * 同事私訊 bot：記下他的 chat id，之後才發得了班表通知
+     * 同仁私訊 bot —— 用驗證碼完成綁定
      *
-     * ⚠ **這是唯一能確認「可以私訊這個人」的時機。** Telegram 不提供
-     * 「查某人有沒有跟我對話過」的 API，只能在收到他的訊息時記下來。
+     * ⚠ **2026-10-09 之前是「username 對得上就綁」**，已移除。那個做法只看一個
+     * 條件，於是「後台打錯一個字」「同仁改過 handle 被別人註冊走」「離職沒清
+     * 資料」三種不需要攻擊、只要剛好就成立的情況，都會讓陌生人開始收到班表與
+     * 任務卡。現在一律要他從後台拿一組碼貼過來。
      *
-     * 用 username 對後台帳號（`telegram_username` 是人工填的，所以可能
-     * 對不到）。對不到就回一句請他去設定 —— 靜默的話他會以為綁好了，
-     * 到時候收不到班表還不知道為什麼。
+     * ⚠ **不建立客服對話**（維持原本行為）—— 不擋的話同事的私訊會被當成客戶
+     * 對話建進列表。
      *
-     * ⚠ 整段 try/catch：這是 webhook 的路徑，綁定失敗不能影響其他訊息處理。
-     *
-     * @param array $message Telegram 的 message
+     * @param array $message
      * @return void
      */
     private function bindPrivateChat(array $message)
     {
         $from = (array) Arr::get($message, 'from', []);
-        $username = Arr::get($from, 'username');
         $userId = Arr::get($from, 'id');
         $chatId = Arr::get($message, 'chat.id');
 
@@ -238,34 +240,77 @@ class TelegramChatService
         }
 
         try {
-            $user = filled($username) ? $this->userRepository->findByTelegramUsername($username) : null;
+            $result = $this->bindService->redeem(
+                Arr::get($message, 'text'),
+                $userId,
+                Arr::get($from, 'username')
+            );
 
-            if (blank($user)) {
-                Log::info('收到私訊但對不到後台帳號', ['username' => $username, 'telegram_user_id' => $userId]);
-                $this->botService->sendMessage($chatId, (string) config('constants.TELEGRAM.DM_BIND.UNKNOWN'));
+            // 不是綁定碼 —— 當成陌生訊息處理（只回第一次）
+            if (blank($result)) {
+                $this->replyStranger($chatId, $userId);
 
                 return;
             }
 
-            // 已經綁過就不重複寫，也不重複回覆 —— 他每次私訊都回一樣的話很吵
-            if ((bool) $user->telegram_dm_ready && (string) $user->telegram_user_id === (string) $userId) {
-                return;
-            }
-
-            $this->userRepository->markDmReady($user, $userId);
-
-            Log::info('私訊綁定完成', ['user_id' => $user->id, 'telegram_user_id' => $userId]);
-
-            $this->botService->sendMessage($chatId, strtr(
-                (string) config('constants.TELEGRAM.DM_BIND.DONE'),
-                ['{name}' => (string) $user->nickname]
-            ));
+            $this->botService->sendMessage($chatId, $this->bindReply($result));
         } catch (\Exception $e) {
             Log::error('私訊綁定失敗', [
                 'telegram_user_id' => $userId,
                 'error'            => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * 綁定結果要回什麼
+     *
+     * @param array $result
+     * @return string
+     */
+    private function bindReply(array $result)
+    {
+        $bind = (array) config('constants.TELEGRAM.BIND');
+        $action = (string) Arr::get($result, 'result');
+
+        if ($action === TelegramBindService::RESULT_BOUND) {
+            return strtr((string) Arr::get($bind, 'DONE'), [
+                '{name}' => (string) Arr::get($result, 'user.nickname'),
+            ]);
+        }
+
+        /*
+         * ⚠ 已經綁在別人身上時**要講明是誰**，不要只說「綁不了」——
+         * 那通常是後台資料沒清乾淨，講出名字管理者才知道要去解哪一個。
+         */
+        if ($action === TelegramBindService::RESULT_TAKEN) {
+            return strtr((string) Arr::get($bind, 'TAKEN'), [
+                '{name}' => (string) Arr::get($result, 'taken_by.nickname'),
+            ]);
+        }
+
+        return (string) Arr::get($bind, 'EXPIRED');
+    }
+
+    /**
+     * 陌生人私訊 —— 只回第一次
+     *
+     * @param int|string $chatId
+     * @param int|string $telegramUserId
+     * @return void
+     */
+    private function replyStranger($chatId, $telegramUserId)
+    {
+        $reply = $this->bindService->strangerReply($telegramUserId);
+
+        // null = 這個人最近回過了，靜默
+        if (blank($reply)) {
+            return;
+        }
+
+        Log::info('收到陌生人私訊，已回覆一次', ['telegram_user_id' => $telegramUserId]);
+
+        $this->botService->sendMessage($chatId, $reply);
     }
 
     public function handleIncomingMessage($payload)

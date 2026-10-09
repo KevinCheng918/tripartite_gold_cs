@@ -422,6 +422,31 @@
                                    value="{{ Auth::user()->telegram_username }}" placeholder="{{ trans('profile.telegram_username_ph') }}">
                             <div class="form-text">{{ trans('profile.telegram_username_hint') }}</div>
                         </div>
+
+                        {{-- Telegram 綁定。自助產碼，不必找管理者 --}}
+                        <div class="mb-3">
+                            <label class="form-label">{{ trans('profile.telegram_bind_label') }}</label>
+                            @if(Auth::user()->telegram_dm_ready)
+                                <div>
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check me-1"></i>{{ trans('profile.telegram_bind_ready') }}
+                                    </span>
+                                </div>
+                                {{-- 解綁只有管理者能做（需求方指定）：自己解掉之後收不到通知卻不自知 --}}
+                                <div class="form-text">{{ trans('profile.telegram_bind_ready_hint') }}</div>
+                            @else
+                                <div>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="btn-profile-bind-code">
+                                        <i class="fas fa-key me-1"></i>{{ trans('profile.telegram_bind_action') }}
+                                    </button>
+                                </div>
+                                <div class="form-text">{{ trans('profile.telegram_bind_hint') }}</div>
+                                {{-- 可選取複製：多半在另一台裝置開 Telegram，用看的抄六個字容易抄錯 --}}
+                                <input type="text" class="form-control text-center fw-bold mt-2 d-none"
+                                       id="profile-bind-code" readonly
+                                       style="font-size:1.5rem;letter-spacing:0.4rem" onclick="this.select()">
+                            @endif
+                        </div>
                         <div class="mb-3">
                             <label class="form-label" for="profile-password">{{ trans('profile.field_password') }}（{{ trans('profile.password_hint') }}）</label>
                             <input id="profile-password" type="password" class="form-control" name="password" minlength="8" autocomplete="new-password">
@@ -923,6 +948,27 @@
             if (target) { localStorage.setItem(storageKey, target); }
         });
     })();
+
+    // 「我的帳號」的 Telegram 綁定碼 —— 自助產生，不必找管理者
+    $(document).on('click', '#btn-profile-bind-code', function () {
+        var $btn = $(this);
+        $btn.prop('disabled', true);
+
+        $.ajax({
+            url: '/admin/accounts/ajax-telegram-code',
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') }
+        }).done(function (res) {
+            $('#profile-bind-code').val(res.code).removeClass('d-none');
+            $('#modal-profile-msg .modal-body').text(res.message);
+            showBsModal('modal-profile-msg');
+        }).fail(function (xhr) {
+            $('#modal-profile-msg .modal-body').text((xhr.responseJSON && xhr.responseJSON.message) || 'Error');
+            showBsModal('modal-profile-msg');
+        }).always(function () {
+            $btn.prop('disabled', false);
+        });
+    });
     </script>
 
     @yield('scripts')

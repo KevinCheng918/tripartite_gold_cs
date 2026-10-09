@@ -77,7 +77,7 @@ class WaitWriter
             return null;
         }
 
-        return $this->sanitizer->sanitize($text, 'WAIT');
+        return $this->sanitizer->sanitize($text, 'AUTO_REPLY.WAIT');
     }
 
     /**

@@ -25,34 +25,35 @@ class OpeningSanitizer
     /**
      * 檢查一句模型寫的話能不能送給客人
      *
-     * ⚠ **規則可以換一套**（`$configKey`）。承接句與「轉人工時的稍等」的禁語
+     * ⚠ **規則可以換一套**（`$rule`，`constants.` 底下的完整路徑）。
+     * 承接句、「轉人工時的稍等」、「陌生人的回覆」各有各的禁語
      * 不完全一樣：前者禁止「幫您轉給專員」這類替人承諾的話（模型保證不了真的
      * 有人會做），後者那句卻是**事實**（求助單已經開出來了）。
      * 共用的是「認帳」與「保證」那幾組 —— 那兩組在任何情況下都不能說。
      *
      * @param string|null $text
-     * @param string      $configKey `constants.AUTO_REPLY` 底下哪一組規則
+     * @param string      $rule `constants.` 底下的完整路徑，例如 `AUTO_REPLY.WAIT`
      * @return string|null 可用的句子（已去頭尾空白）；不可用時為 null
      */
-    public function sanitize($text, $configKey = 'OPENING')
+    public function sanitize($text, $rule = 'AUTO_REPLY.OPENING')
     {
         if (blank($text)) {
             return null;
         }
 
         $text = trim($text);
-        $maxLength = (int) config("constants.AUTO_REPLY.{$configKey}.MAX_LENGTH");
+        $maxLength = (int) config("constants.{$rule}.MAX_LENGTH");
 
         if ($maxLength > 0 && mb_strlen($text) > $maxLength) {
-            Log::warning('模型寫的句子過長，退回固定話術', ['rule' => $configKey, 'text' => $text]);
+            Log::warning('模型寫的句子過長，退回固定話術', ['rule' => $rule, 'text' => $text]);
 
             return null;
         }
 
-        foreach ((array) config("constants.AUTO_REPLY.{$configKey}.BLACKLIST") as $word) {
+        foreach ((array) config("constants.{$rule}.BLACKLIST") as $word) {
             if (mb_strpos($text, $word) !== false) {
                 Log::warning('模型寫的句子含不該由系統說的話，退回固定話術', [
-                    'rule' => $configKey,
+                    'rule' => $rule,
                     'word' => $word,
                     'text' => $text,
                 ]);
