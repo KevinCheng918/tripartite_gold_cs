@@ -68,14 +68,14 @@
     <div class="row g-3 mb-3">
         <div class="col">
             <div class="card shadow-sm">
-                <div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong style="font-size:1.0625rem"><i class="fas fa-users me-2" style="color:#d4af37"></i>{{ trans('account.field_level') }}</strong></div>
+                <div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong class="stat-card__title"><i class="fas fa-users me-2 text-gold"></i>{{ trans('account.field_level') }}</strong></div>
                 <div class="card-body py-2">
                     <div class="d-flex flex-wrap text-center">
                         @foreach(config('constants.USER.LEVEL') as $key => $val)
                             @if($val !== config('constants.USER.LEVEL.ADMIN'))
                                 <div class="flex-fill">
                                     <div class="mb-1">{!! \App\Presenters\UserPresenter::levelBadge($val) !!}</div>
-                                    <div class="fw-bold" style="font-size:1.25rem">{{ $accountStats['by_level'][$val] ?? 0 }}</div>
+                                    <div class="stat-card__value">{{ Arr::get($accountStats, "by_level.{$val}", 0) }}</div>
                                 </div>
                             @endif
                         @endforeach
@@ -85,30 +85,30 @@
         </div>
         <div class="col">
             <div class="card shadow-sm">
-                <div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong style="font-size:1.0625rem"><i class="fas fa-toggle-on me-2" style="color:#28a745"></i>{{ trans('account.field_status') }}</strong></div>
+                <div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong class="stat-card__title"><i class="fas fa-toggle-on me-2 text-success"></i>{{ trans('account.field_status') }}</strong></div>
                 <div class="card-body py-2">
                     <div class="d-flex flex-wrap text-center">
                         <div class="flex-fill">
                             <div class="mb-1"><span class="badge bg-success">{{ trans('account.status_normal') }}</span></div>
-                            <div class="fw-bold" style="font-size:1.25rem">{{ $accountStats['normal'] }}</div>
+                            <div class="stat-card__value">{{ Arr::get($accountStats, 'normal', 0) }}</div>
                         </div>
                         <div class="flex-fill">
                             <div class="mb-1"><span class="badge bg-warning text-dark">{{ trans('account.status_lock') }}</span></div>
-                            <div class="fw-bold" style="font-size:1.25rem">{{ $accountStats['lock'] }}</div>
+                            <div class="stat-card__value">{{ Arr::get($accountStats, 'lock', 0) }}</div>
                         </div>
                         <div class="flex-fill">
                             <div class="mb-1"><span class="badge bg-danger">{{ trans('account.status_deactivate') }}</span></div>
-                            <div class="fw-bold" style="font-size:1.25rem">{{ $accountStats['deactivate'] }}</div>
+                            <div class="stat-card__value">{{ Arr::get($accountStats, 'deactivate', 0) }}</div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
         <div class="col-auto d-flex">
-            <div class="card shadow-sm d-flex justify-content-center" style="min-width:100px">
-                <div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong style="font-size:1.0625rem"><i class="fas fa-chart-bar me-2" style="color:#0284c7"></i>{{ trans('account.stat_total') }}</strong></div>
+            <div class="card shadow-sm d-flex justify-content-center stat-card--narrow">
+                <div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong class="stat-card__title"><i class="fas fa-chart-bar me-2 text-info"></i>{{ trans('account.stat_total') }}</strong></div>
                 <div class="card-body py-2 d-flex flex-column align-items-center justify-content-center">
-                    <div class="fw-bold" style="font-size:1.25rem">{{ $accountStats['total'] }}</div>
+                    <div class="stat-card__value">{{ Arr::get($accountStats, 'total', 0) }}</div>
                     <small class="text-muted">{{ trans('account.unit_person') }}</small>
                 </div>
             </div>
@@ -119,17 +119,19 @@
         {{-- 桌面版：表格 --}}
         <div class="card-body p-0 d-none d-md-block">
             <div class="table-responsive">
-                <table class="table table-hover table-striped align-middle mb-0">
+                {{-- 2026-10-10 重排：原本七欄裡有四欄在講同一個人（帳號／暱稱／
+                     TG 署名／TG 綁定），五顆同樣灰框的按鈕又全擺在最後一欄。
+                     現在識別資訊疊成一格、Telegram 兩件事合成一格，
+                     操作全部留著，但按分類黏成幾段 btn-group（見 partials/row-actions）。 --}}
+                <table class="table table-hover align-middle data-table">
                     <thead class="thead-gold">
                         <tr>
-                            <th>#</th>
-                            <th>{{ trans('account.field_account') }}</th>
-                            <th>{{ trans('account.field_nickname') }}</th>
-                            <th>{{ trans('account.label_telegram_nickname') }}</th>
-                            <th>{{ trans('account.label_telegram_bind') }}</th>
+                            <th class="col-idx">#</th>
+                            <th>{{ trans('account.col_member') }}</th>
+                            <th>{{ trans('account.col_telegram') }}</th>
                             <th>{{ trans('account.field_status') }}</th>
                             <th>{{ trans('account.field_level') }}</th>
-                            <th>{{ trans('account.field_action') }}</th>
+                            <th class="col-actions">{{ trans('account.field_action') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -140,48 +142,36 @@
                             @endif
                             @php $idx++; @endphp
                             <tr>
-                                <td>{{ $idx }}</td>
-                                <td>{{ $account->account }}</td>
-                                <td><strong>{{ $account->nickname }}</strong></td>
+                                <td class="col-idx">{{ $idx }}</td>
+                                {{-- 暱稱是同事之間互稱的名字，帳號是登入用的 ——
+                                     前者當主要資訊、後者壓成灰色小字 --}}
                                 <td>
-                                    @if(filled($account->telegram_nickname))
-                                        <span class="badge bg-secondary">-{{ $account->telegram_nickname }}</span>
-                                    @else
-                                        <span class="text-muted">{{ trans('account.not_set') }}</span>
-                                    @endif
+                                    <div class="cell-stack__main">{{ $account->nickname }}</div>
+                                    <div class="cell-stack__sub">{{ $account->account }}</div>
                                 </td>
-                                {{-- TG 綁定狀態。三態而不是兩態：「沒填 Telegram 帳號」與
-                                     「填了但還沒私訊機器人」要做的事完全不同 —— 前者要後台補資料，
-                                     後者要請他本人去私訊一次 --}}
-                                {{-- TG 綁定狀態。2026-10-09 改成驗證碼綁定之後只剩兩態：
+                                {{-- Telegram 一格講兩件事：綁定狀態（收不收得到私訊通知）
+                                     與署名（在對話裡附在訊息結尾的名字）。
+
+                                     綁定狀態 2026-10-09 改成驗證碼之後只剩兩態：
                                      綁好了（有 telegram_user_id）或沒綁 ——
-                                     `telegram_username` 不再是綁定的依據，所以不看它 --}}
+                                     `telegram_username` 不再是綁定的依據，所以不看它。 --}}
                                 <td>
                                     @if($account->telegram_dm_ready)
                                         <span class="badge bg-success" title="{{ trans('account.telegram_bind_ready_hint') }}">
                                             <i class="fas fa-check me-1"></i>{{ trans('account.telegram_bind_ready') }}
                                         </span>
-                                        @can('account.update')
-                                        <button class="btn btn-sm btn-link p-0 ms-1 js-telegram-unbind"
-                                                data-id="{{ $account->id }}"
-                                                data-name="{{ $account->nickname }}"
-                                                title="{{ trans('account.telegram_unbind_hint') }}">
-                                            {{ trans('account.action_telegram_unbind') }}
-                                        </button>
-                                        @endcan
                                     @else
                                         <span class="badge bg-warning text-dark" title="{{ trans('account.telegram_bind_pending_hint') }}">
                                             {{ trans('account.telegram_bind_pending') }}
                                         </span>
-                                        @can('account.update')
-                                        <button class="btn btn-sm btn-link p-0 ms-1 js-telegram-code"
-                                                data-id="{{ $account->id }}"
-                                                data-name="{{ $account->nickname }}"
-                                                title="{{ trans('account.telegram_code_hint') }}">
-                                            {{ trans('account.action_telegram_code') }}
-                                        </button>
-                                        @endcan
                                     @endif
+                                    <div class="cell-stack__sub">
+                                        @if(filled($account->telegram_nickname))
+                                            -{{ $account->telegram_nickname }}
+                                        @else
+                                            {{ trans('account.not_set') }}
+                                        @endif
+                                    </div>
                                 </td>
                                 <td>
                                     @if($account->status == config('constants.USER.STATUS.NORMAL'))
@@ -193,38 +183,15 @@
                                     @endif
                                 </td>
                                 <td>{!! \App\Presenters\UserPresenter::levelBadge($account->level) !!}</td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-secondary js-edit"
-                                            data-id="{{ $account->id }}"
-                                            data-nickname="{{ $account->nickname }}"
-                                            data-telegram-nickname="{{ $account->telegram_nickname }}"
-                                            data-telegram-username="{{ $account->telegram_username }}"
-                                            data-level="{{ $account->level }}"
-                                            data-project-ids="{{ json_encode($account->project_ids ?? []) }}">
-                                        <i class="fas fa-edit me-1"></i>{{ trans('account.action_edit') }}
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-secondary js-change-status"
-                                            data-id="{{ $account->id }}"
-                                            data-status="{{ $account->status }}">
-                                        <i class="fas fa-exchange-alt me-1"></i>{{ trans('account.action_change_status') }}
-                                    </button>
-                                    <a href="{{ route('admin.accounts.permissions', $account->id) }}"
-                                       class="btn btn-sm btn-outline-secondary">
-                                        <i class="fas fa-key me-1"></i>{{ trans('account.action_assign_permissions') }}
-                                    </a>
-                                    {{-- outline-secondary 與同一列的「指派權限」「停用」一致。
-                                         不要用 outline-info：custom.css 只替深色模式定義了它的
-                                         hover，淺色模式沒有覆蓋，滑上去文字不會變色 --}}
-                                    <button class="btn btn-sm btn-outline-secondary js-login-log"
-                                            data-id="{{ $account->id }}"
-                                            data-account="{{ $account->account }}">
-                                        <i class="fas fa-sign-in-alt me-1"></i>{{ trans('login_log.nav_label') }}
-                                    </button>
+                                <td class="col-actions">
+                                    @include('admin.accounts.partials.row-actions', ['account' => $account])
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="text-center text-muted py-4">{{ trans('account.no_data') }}</td>
+                                <td colspan="6" class="table-empty">
+                                    <i class="fas fa-user-slash"></i>{{ trans('account.no_data') }}
+                                </td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -247,57 +214,38 @@
                 @continue
             @endif
             @php $idx++; @endphp
+            {{-- 卡片結構跟桌機表格對齊：姓名／帳號疊兩行、操作用同一份 partial。
+                 原本下半部是 2×2 的四顆等寬按鈕，佔掉半張卡片 --}}
             <div class="card mb-2 shadow-sm">
                 <div class="card-body py-3">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <div>
-                            <strong style="font-size:1.0625rem">{{ $account->nickname }}</strong>
-                            <div class="text-muted" style="font-size:0.8125rem">{{ $account->account }}</div>
-                        </div>
-                        <div class="d-flex gap-1 align-items-center">
-                            @if($account->status == config('constants.USER.STATUS.NORMAL'))
-                                <span class="badge bg-success">{{ trans('account.status_normal') }}</span>
-                            @elseif($account->status == config('constants.USER.STATUS.LOCK'))
-                                <span class="badge bg-warning text-dark">{{ trans('account.status_lock') }}</span>
-                            @else
-                                <span class="badge bg-danger">{{ trans('account.status_deactivate') }}</span>
-                            @endif
-                            {!! \App\Presenters\UserPresenter::levelBadge($account->level) !!}
-                            @if($account->telegram_dm_ready)
-                                <span class="badge bg-success">
-                                    <i class="fas fa-check me-1"></i>{{ trans('account.telegram_bind_ready') }}
-                                </span>
-                            @else
-                                <span class="badge bg-warning text-dark">{{ trans('account.telegram_bind_pending') }}</span>
-                            @endif
-                        </div>
+                    <div class="mb-2">
+                        <div class="cell-stack__main">{{ $account->nickname }}</div>
+                        <div class="cell-stack__sub">{{ $account->account }}</div>
                     </div>
-                    <div class="d-grid gap-1" style="grid-template-columns: 1fr 1fr">
-                        <button class="btn btn-sm btn-outline-secondary js-edit"
-                                data-id="{{ $account->id }}"
-                                data-nickname="{{ $account->nickname }}"
-                                data-telegram-nickname="{{ $account->telegram_nickname }}"
-                                data-telegram-username="{{ $account->telegram_username }}"
-                                data-level="{{ $account->level }}"
-                                data-project-ids="{{ json_encode($account->project_ids ?? []) }}">
-                            <i class="fas fa-edit me-1"></i>{{ trans('account.action_edit') }}
-                        </button>
-                        <button class="btn btn-sm btn-outline-secondary js-change-status"
-                                data-id="{{ $account->id }}"
-                                data-status="{{ $account->status }}">
-                            <i class="fas fa-exchange-alt me-1"></i>{{ trans('account.action_change_status') }}
-                        </button>
-                        <a href="{{ route('admin.accounts.permissions', $account->id) }}"
-                           class="btn btn-sm btn-outline-secondary">
-                            <i class="fas fa-key me-1"></i>{{ trans('account.action_assign_permissions') }}
-                        </a>
-                        {{-- 理由同桌機版那顆 --}}
-                        <button class="btn btn-sm btn-outline-secondary js-login-log"
-                                data-id="{{ $account->id }}"
-                                data-account="{{ $account->account }}">
-                            <i class="fas fa-sign-in-alt me-1"></i>{{ trans('login_log.nav_label') }}
-                        </button>
+                    <div class="d-flex flex-wrap gap-1 mb-2">
+                        @if($account->status == config('constants.USER.STATUS.NORMAL'))
+                            <span class="badge bg-success">{{ trans('account.status_normal') }}</span>
+                        @elseif($account->status == config('constants.USER.STATUS.LOCK'))
+                            <span class="badge bg-warning text-dark">{{ trans('account.status_lock') }}</span>
+                        @else
+                            <span class="badge bg-danger">{{ trans('account.status_deactivate') }}</span>
+                        @endif
+                        {!! \App\Presenters\UserPresenter::levelBadge($account->level) !!}
+                        @if($account->telegram_dm_ready)
+                            <span class="badge bg-success">
+                                <i class="fas fa-check me-1"></i>{{ trans('account.telegram_bind_ready') }}
+                            </span>
+                        @else
+                            <span class="badge bg-warning text-dark">{{ trans('account.telegram_bind_pending') }}</span>
+                        @endif
+                        @if(filled($account->telegram_nickname))
+                            <span class="badge bg-secondary">-{{ $account->telegram_nickname }}</span>
+                        @endif
                     </div>
+                    {{-- 操作放最後一行而不是擠在標題右邊：五顆按鈕在 360px 的手機上
+                         會把暱稱壓到剩幾個字。.row-actions 本身會換行，
+                         段與段之間斷開，不會變成一團 --}}
+                    @include('admin.accounts.partials.row-actions', ['account' => $account])
                 </div>
             </div>
         @empty
@@ -455,12 +403,12 @@
                 </div>
                 <div class="modal-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover table-striped align-middle mb-0">
+                        <table class="table table-hover align-middle data-table">
                             <thead class="thead-gold">
                                 <tr>
-                                    <th class="text-nowrap" style="width:1%;white-space:nowrap">{{ trans('login_log.field_created_at') }}</th>
-                                    <th class="text-nowrap" style="width:1%;white-space:nowrap">{{ trans('login_log.field_ip') }}</th>
-                                    <th class="text-nowrap text-center" style="width:1%;white-space:nowrap">{{ trans('login_log.field_is_success') }}</th>
+                                    <th class="col-tight">{{ trans('login_log.field_created_at') }}</th>
+                                    <th class="col-tight">{{ trans('login_log.field_ip') }}</th>
+                                    <th class="col-tight text-center">{{ trans('login_log.field_is_success') }}</th>
                                     <th>{{ trans('login_log.field_device') }}</th>
                                     <th>{{ trans('login_log.field_fail_reason') }}</th>
                                 </tr>

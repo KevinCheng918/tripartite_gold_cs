@@ -136,18 +136,18 @@
             <div class="main-card mb-3 card d-none d-md-block">
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover table-striped align-middle mb-0">
-                            <thead class="table-light">
+                        {{-- 2026-10-10：總數／成功／失敗三欄併成「送達」一欄，
+                             thead 從 table-light 換成全站統一的 thead-gold --}}
+                        <table class="table table-hover align-middle data-table">
+                            <thead class="thead-gold">
                                 <tr>
                                     <th>{{ trans('broadcast.field_status') }}</th>
                                     <th>{{ trans('broadcast.field_time') }}</th>
                                     <th>{{ trans('broadcast.field_sender') }}</th>
                                     <th>{{ trans('broadcast.field_target') }}</th>
                                     <th>{{ trans('broadcast.field_content') }}</th>
-                                    <th>{{ trans('broadcast.field_total') }}</th>
-                                    <th>{{ trans('broadcast.field_success') }}</th>
-                                    <th>{{ trans('broadcast.field_fail') }}</th>
-                                    <th>{{ trans('broadcast.field_action') }}</th>
+                                    <th>{{ trans('broadcast.field_result') }}</th>
+                                    <th class="col-actions">{{ trans('broadcast.field_action') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -165,29 +165,39 @@
                                         <td>{{ $record->sender ? $record->sender->nickname : '-' }}</td>
                                         <td>@include('admin.telegram-broadcast.partials.target-badge', ['record' => $record, 'groups' => $groups])</td>
                                         <td>{{ Str::limit($record->content, 50) }}</td>
-                                        <td>{{ $record->total_count }}</td>
-                                        <td><span class="badge bg-success">{{ $record->success_count }}</span></td>
-                                        <td>
+                                        {{-- 成功／失敗／總數合成一格，跟手機版卡片同一種寫法 --}}
+                                        <td class="text-nowrap">
+                                            <span class="badge bg-success">{{ $record->success_count }}</span>
                                             @if($record->fail_count > 0)
                                                 <span class="badge bg-danger">{{ $record->fail_count }}</span>
-                                            @else
-                                                0
                                             @endif
+                                            <span class="text-muted">/ {{ $record->total_count }}</span>
                                         </td>
-                                        <td>
-                                            <button class="btn btn-sm btn-outline-secondary js-copy-content" data-content="{{ $record->content }}">
-                                                <i class="fas fa-copy me-1"></i>{{ trans('broadcast.btn_copy') }}
-                                            </button>
-                                            @if($record->status === \App\Models\TelegramBroadcast::STATUS_PENDING)
-                                                <button class="btn btn-sm btn-outline-secondary text-danger js-cancel-schedule ms-1" data-id="{{ $record->id }}">
-                                                    <i class="fas fa-ban me-1"></i>{{ trans('broadcast.btn_cancel_schedule') }}
-                                                </button>
-                                            @endif
+                                        {{-- 取消預約自己一段、圖示用 text-danger ——
+                                             取消之後那則公告就不會發了 --}}
+                                        <td class="col-actions">
+                                            <div class="row-actions">
+                                                <div class="btn-group btn-group-sm" role="group" aria-label="{{ trans('common.row_actions.view') }}">
+                                                    <button class="btn btn-outline-secondary btn-icon btn-transition js-copy-content"
+                                                            data-content="{{ $record->content }}">
+                                                        <i class="fas fa-copy btn-icon-wrapper"></i>{{ trans('broadcast.btn_copy') }}
+                                                    </button>
+                                                </div>
+                                                @if($record->status === \App\Models\TelegramBroadcast::STATUS_PENDING)
+                                                    <div class="btn-group btn-group-sm" role="group" aria-label="{{ trans('common.row_actions.danger') }}">
+                                                        <button class="btn btn-outline-secondary btn-icon btn-transition js-cancel-schedule" data-id="{{ $record->id }}">
+                                                            <i class="fas fa-ban btn-icon-wrapper text-danger"></i>{{ trans('broadcast.btn_cancel_schedule') }}
+                                                        </button>
+                                                    </div>
+                                                @endif
+                                            </div>
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="9" class="text-center text-muted py-4">{{ trans('broadcast.no_history') }}</td>
+                                        <td colspan="7" class="table-empty">
+                                            <i class="fas fa-bullhorn"></i>{{ trans('broadcast.no_history') }}
+                                        </td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -204,11 +214,11 @@
                 @forelse($history as $record)
                     <div class="card mb-2 shadow-sm">
                         <div class="card-body py-3">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div class="data-card__head mb-2">
                                 <div>
-                                    <strong>{{ $record->sender ? $record->sender->nickname : '-' }}</strong>
+                                    <span class="cell-stack__main">{{ $record->sender ? $record->sender->nickname : '-' }}</span>
                                     @include('admin.telegram-broadcast.partials.status-badge', ['record' => $record])
-                                    <div class="text-muted" style="font-size:0.8125rem">
+                                    <div class="cell-stack__sub">
                                         @if($record->status === \App\Models\TelegramBroadcast::STATUS_PENDING && $record->scheduled_at)
                                             <i class="far fa-clock me-1"></i>{{ $record->scheduled_at->format('m/d H:i') }}
                                         @else
@@ -218,22 +228,22 @@
                                 </div>
                                 @include('admin.telegram-broadcast.partials.target-badge', ['record' => $record, 'groups' => $groups])
                             </div>
-                            <div class="mb-2" style="font-size:0.875rem; white-space:pre-wrap; word-break:break-all">{{ $record->content }}</div>
+                            <div class="mb-2 data-card__text">{{ $record->content }}</div>
                             <div class="d-flex justify-content-between align-items-center">
-                                <div style="font-size:0.8125rem">
+                                <div class="cell-stack__sub">
                                     <span class="badge bg-success">{{ $record->success_count }}</span>
                                     @if($record->fail_count > 0)
                                         <span class="badge bg-danger">{{ $record->fail_count }}</span>
                                     @endif
                                     <span class="text-muted">/ {{ $record->total_count }}</span>
                                 </div>
-                                <div class="d-flex gap-1">
-                                    <button class="btn btn-sm btn-outline-secondary js-copy-content" data-content="{{ $record->content }}">
-                                        <i class="fas fa-copy me-1"></i>{{ trans('broadcast.btn_copy') }}
+                                <div class="row-actions">
+                                    <button class="btn btn-sm btn-outline-secondary btn-icon btn-transition js-copy-content" data-content="{{ $record->content }}">
+                                        <i class="fas fa-copy btn-icon-wrapper"></i>{{ trans('broadcast.btn_copy') }}
                                     </button>
                                     @if($record->status === \App\Models\TelegramBroadcast::STATUS_PENDING)
-                                        <button class="btn btn-sm btn-outline-secondary text-danger js-cancel-schedule" data-id="{{ $record->id }}">
-                                            <i class="fas fa-ban"></i>
+                                        <button class="btn btn-sm btn-outline-secondary btn-icon btn-transition js-cancel-schedule" data-id="{{ $record->id }}">
+                                            <i class="fas fa-ban btn-icon-wrapper text-danger"></i>{{ trans('broadcast.btn_cancel_schedule') }}
                                         </button>
                                     @endif
                                 </div>

@@ -14,6 +14,12 @@ return [
     'field_hostname'     => '主機名稱',
     'field_internal_ip'  => '內網 IP',
     'field_external_ip'  => '外網 IP',
+    /*
+     * 2026-10-10 重排：虛擬機列表原本十二欄，其中四組是同一件事的兩半
+     * （系統＋站台、主機＋機型、內網＋外網 IP、開關機＋啟用狀態）。
+     * 合併之後只剩八欄，Modal 裡仍然分開顯示，所以上面那些 key 都留著。
+     */
+    'field_ip'           => 'IP',
     'field_model_type'   => '機型',
     'field_spec'         => '規格',
     'field_monthly_fee'  => '主機月費',

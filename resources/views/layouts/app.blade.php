@@ -473,12 +473,12 @@
                 </div>
                 <div class="modal-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover table-striped align-middle mb-0">
-                            <thead class="table-light">
+                        <table class="table table-hover align-middle data-table">
+                            <thead class="thead-gold">
                                 <tr>
-                                    <th class="text-nowrap" style="width:1%;white-space:nowrap">{{ trans('login_log.field_created_at') }}</th>
-                                    <th class="text-nowrap" style="width:1%;white-space:nowrap">{{ trans('login_log.field_ip') }}</th>
-                                    <th class="text-nowrap text-center" style="width:1%;white-space:nowrap">{{ trans('login_log.field_is_success') }}</th>
+                                    <th class="col-tight">{{ trans('login_log.field_created_at') }}</th>
+                                    <th class="col-tight">{{ trans('login_log.field_ip') }}</th>
+                                    <th class="col-tight text-center">{{ trans('login_log.field_is_success') }}</th>
                                     <th>{{ trans('login_log.field_device') }}</th>
                                     <th>{{ trans('login_log.field_fail_reason') }}</th>
                                 </tr>

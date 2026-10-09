@@ -30,9 +30,28 @@ return [
     'status_active'    => 'Active',
     'status_frozen'    => 'Frozen',
     'status_disabled'  => 'Disabled',
+    'no_data'          => 'No data',
     'action_create'    => 'New Station',
     'action_edit'      => 'Edit',
     'action_detail'    => 'Detail',
+    /*
+     * Added on 2026-10-10 while reworking the action column.
+     *
+     * The last two column headings both read "Sync" — one was the last sync
+     * time, the other the action column holding the sync button. The time
+     * column is now "Last sync".
+     */
+    'action_change_status' => 'Change Status',
+    'field_synced_at'      => 'Last Sync',
+    'field_action'         => 'Actions',
+    /*
+     * The top-up list used to have separate "Images" and "Actions" columns,
+     * with the read-only "Note" button mixed into the latter. On 2026-10-10
+     * images and notes merged into one "Attachments" column (two small icon
+     * chips), leaving only approve/reject — the actions that change data.
+     */
+    'topup_field_attachment' => 'Attachments',
+    'topup_image_count'      => ':count image(s)',
 
     // Detail modal (4 cards: station / features / deposit / withdraw)
     'detail' => [

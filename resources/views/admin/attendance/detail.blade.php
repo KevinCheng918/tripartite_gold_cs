@@ -85,8 +85,8 @@
     <div class="main-card mb-3 card">
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover table-striped align-middle mb-0">
-                    <thead class="table-light">
+                <table class="table table-hover align-middle data-table">
+                    <thead class="thead-gold">
                         <tr>
                             <th>{{ trans('attendance.field_date') }}</th>
                             <th>{{ trans('attendance.field_shift') }}</th>

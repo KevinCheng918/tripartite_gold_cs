@@ -130,13 +130,13 @@ npm install -g @anthropic-ai/claude-code</code></pre>
                 <p class="text-muted" style="font-size:0.875rem">{{ trans('setting.usage_desc') }}</p>
                 <div id="usage-summary"></div>
                 <div class="table-responsive mt-3">
-                    <table class="table table-sm align-middle">
-                        <thead>
+                    <table class="table table-sm align-middle data-table">
+                        <thead class="thead-gold">
                             <tr>
-                                <th>{{ trans('setting.usage_today') }}</th>
-                                <th>{{ trans('setting.usage_subscription') }}</th>
-                                <th>{{ trans('setting.usage_fallback') }}</th>
-                                <th>{{ trans('setting.usage_rate_limited') }}</th>
+                                <th class="col-tight">{{ trans('setting.usage_today') }}</th>
+                                <th class="col-num">{{ trans('setting.usage_subscription') }}</th>
+                                <th class="col-num">{{ trans('setting.usage_fallback') }}</th>
+                                <th class="col-num">{{ trans('setting.usage_rate_limited') }}</th>
                             </tr>
                         </thead>
                         <tbody id="usage-daily"></tbody>

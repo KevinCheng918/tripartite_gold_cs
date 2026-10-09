@@ -355,16 +355,19 @@
                         <i class="fas fa-inbox fa-2x mb-2 d-block"></i>目前沒有封存任務
                     </div>
                     <div class="table-responsive" id="archived-list-table-wrap" style="display:none">
-                        <table class="table table-hover table-sm align-middle mb-0">
-                            <thead>
+                        {{-- 欄寬原本寫在每個 th 的 inline style（width + nowrap 各七份），
+                             改用 .col-tight／.col-actions：寬度交給瀏覽器依內容算，
+                             寫死 90px 的欄位換個語系就會被字撐開 --}}
+                        <table class="table table-hover table-sm align-middle data-table">
+                            <thead class="thead-gold">
                                 <tr>
-                                    <th style="width:90px;white-space:nowrap">專案</th>
-                                    <th style="white-space:nowrap">標題</th>
-                                    <th style="width:90px;white-space:nowrap">原始狀態</th>
+                                    <th class="col-tight">專案</th>
+                                    <th>標題</th>
+                                    <th class="col-tight">原始狀態</th>
                                     <th>指派人員</th>
-                                    <th style="width:100px;white-space:nowrap">封存時間</th>
-                                    <th style="width:80px;white-space:nowrap">剩餘天數</th>
-                                    <th style="width:60px;white-space:nowrap">操作</th>
+                                    <th class="col-tight">封存時間</th>
+                                    <th class="col-tight">剩餘天數</th>
+                                    <th class="col-actions">操作</th>
                                 </tr>
                             </thead>
                             <tbody id="archived-list-body"></tbody>
@@ -1958,13 +1961,13 @@ $(function () {
                 ? t.assignees.map(function (a) { return $('<span>').text(a.nickname).html(); }).join(', ')
                 : '-';
             html += '<tr>';
-            html += '<td style="white-space:nowrap"><span class="badge bg-info text-dark" style="font-size:0.75rem">' + (t.project ? $('<span>').text(t.project).html() : '-') + '</span></td>';
-            html += '<td style="white-space:nowrap">' + $('<span>').text(t.title).html() + '</td>';
-            html += '<td style="white-space:nowrap"><span class="badge bg-secondary" style="font-size:0.75rem">' + prevStatus + '</span></td>';
-            html += '<td style="font-size:0.875rem">' + assigneeNames + '</td>';
-            html += '<td style="white-space:nowrap">' + updatedAt.toLocaleDateString('zh-TW') + '</td>';
-            html += '<td style="white-space:nowrap"><span class="badge ' + badgeClass + '">' + remaining + ' 天</span></td>';
-            html += '<td style="white-space:nowrap"><button class="btn btn-sm btn-outline-secondary js-restore-task" data-id="' + t.id + '" title="還原"><i class="fas fa-undo me-1"></i>還原</button></td>';
+            html += '<td class="col-tight"><span class="badge bg-info text-dark">' + (t.project ? $('<span>').text(t.project).html() : '-') + '</span></td>';
+            html += '<td><span class="cell-stack__main">' + $('<span>').text(t.title).html() + '</span></td>';
+            html += '<td class="col-tight"><span class="badge bg-secondary">' + prevStatus + '</span></td>';
+            html += '<td>' + assigneeNames + '</td>';
+            html += '<td class="col-tight">' + updatedAt.toLocaleDateString('zh-TW') + '</td>';
+            html += '<td class="col-tight"><span class="badge ' + badgeClass + '">' + remaining + ' 天</span></td>';
+            html += '<td class="col-actions"><div class="row-actions"><button class="btn btn-sm btn-outline-secondary btn-icon btn-transition js-restore-task" data-id="' + t.id + '"><i class="fas fa-undo btn-icon-wrapper"></i>還原</button></div></td>';
             html += '</tr>';
         });
         $('#archived-list-body').html(html);

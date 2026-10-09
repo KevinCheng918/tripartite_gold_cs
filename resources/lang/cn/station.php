@@ -30,9 +30,26 @@ return [
     'status_active'    => '启用',
     'status_frozen'    => '冻结',
     'status_disabled'  => '停用',
+    'no_data'          => '暂无资料',
     'action_create'    => '新增站台',
     'action_edit'      => '编辑',
     'action_detail'    => '详细',
+    /*
+     * 2026-10-10 重排操作栏时补的两个词。
+     *
+     * 原本表格最后两栏的标题都写「同步」—— 一个是最后同步时间、一个是
+     * 同步动作所在的操作栏，看起来像重复；时间那栏改叫「最后同步」。
+     */
+    'action_change_status' => '调整状态',
+    'field_synced_at'      => '最后同步',
+    'field_action'         => '操作',
+    /*
+     * 补点列表原本「图片」与「操作」是两栏，操作栏里又混了只读的「备注」。
+     * 2026-10-10 把图片与备注并成「附件」一栏（两个小图示钮），
+     * 操作栏只留会改资料的通过／拒绝。
+     */
+    'topup_field_attachment' => '附件',
+    'topup_image_count'      => ':count 张',
 
     // 详细信息 Modal（四格：站台信息 / 功能 / 代收 / 代付）
     'detail' => [

@@ -125,10 +125,10 @@
                 <p class="text-muted p-3 mb-0">{{ trans('dashboard.my_no_shift') }}</p>
             @else
                 <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead>
+                    <table class="table table-hover align-middle data-table">
+                        <thead class="thead-gold">
                             <tr>
-                                <th>{{ trans('dashboard.rank') }}</th>
+                                <th class="col-idx">{{ trans('dashboard.rank') }}</th>
                                 <th>{{ trans('dashboard.field_user') }}</th>
                                 <th>{{ trans('dashboard.field_shift_count') }}</th>
                             </tr>
@@ -136,10 +136,10 @@
                         <tbody>
                             @foreach($weekUserRanking as $userName => $count)
                                 <tr>
-                                    <td>{{ $loop->iteration }}</td>
-                                    <td><strong>{{ $userName }}</strong></td>
+                                    <td class="col-idx">{{ $loop->iteration }}</td>
+                                    <td><span class="cell-stack__main">{{ $userName }}</span></td>
                                     <td>
-                                        <span class="fw-bold" style="font-size:1.125rem">{{ $count }}</span>
+                                        <span class="fw-bold">{{ $count }}</span>
                                         <small class="text-muted ms-1">{{ trans('dashboard.week_shift_count') }}</small>
                                     </td>
                                 </tr>
@@ -217,10 +217,10 @@
         </div>
         <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead>
+                    <table class="table table-hover align-middle data-table">
+                        <thead class="thead-gold">
                             <tr>
-                                <th>{{ trans('dashboard.field_date') }}</th>
+                                <th class="col-tight">{{ trans('dashboard.field_date') }}</th>
                                 <th>{{ trans('dashboard.field_shift') }}</th>
                                 <th>{{ trans('dashboard.field_time') }}</th>
                             </tr>
@@ -228,7 +228,7 @@
                         <tbody>
                             @foreach($weekByDate as $dateKey => $info)
                                 <tr>
-                                    <td>{{ $info['date']->format('m/d（D）') }}</td>
+                                    <td class="col-tight">{{ $info['date']->format('m/d（D）') }}</td>
                                     @if($info['is_allday'])
                                         <td><span class="badge bg-success">{{ trans('dashboard.allday') }}</span></td>
                                         <td>-</td>

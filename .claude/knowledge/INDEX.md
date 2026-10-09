@@ -17,6 +17,7 @@
 
 | 文件 | 功能 | 狀態 |
 |------|------|------|
+| [features/admin-table-layout.md](features/admin-table-layout.md) | 後台表格與操作欄重排（操作按分類黏成幾段 `btn-group`、用 Architect 的 `btn-transition` 淡框，但**每顆都留在畫面上且都帶文字** —— 收合選單與純圖示兩版都被退回；同一件事的欄位合成一格、`.data-table` 全站統一樣式）；順手修掉 Bootstrap 列底色其實是 box-shadow（淺色模式 hover 一直是淡藍）、金色 inline style 在深色模式看不到、disabled 按鈕的 title 永遠不顯示 | 已完成 |
 | [features/rbac.md](features/rbac.md) | 分帳號、權限管理（含最小登入/登出） | 已完成 |
 | [features/scheduling.md](features/scheduling.md) | 排班（報班/換班/三班制） | 已完成 |
 | [features/support-group-topics.md](features/support-group-topics.md) | 內部支援群組分話題發送（話題清單 + 逐話題勾要收哪些通知、`/topicid` 查 id、話題 id 填錯會整則拒收）；附帶把設定頁重整成「通訊管理 → 通知設定」三分頁 | 已完成 |

@@ -17,6 +17,13 @@ return [
     'field_total'     => 'Total',
     'field_success'   => 'Success',
     'field_fail'      => 'Failed',
+    /*
+     * 2026-10-10: total / success / failed each had their own column, so three
+     * of nine columns were plain numbers. They are now one "Delivered" column
+     * (a badge each for success and failure, then / total) — which is how the
+     * mobile card already showed it, so the two views finally match.
+     */
+    'field_result'    => 'Delivered',
     'no_history'      => 'No history',
 
     'field_image'      => 'Images (optional, multiple)',

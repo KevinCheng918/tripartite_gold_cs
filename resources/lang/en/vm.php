@@ -12,6 +12,13 @@ return [
     'field_hostname'     => 'Hostname',
     'field_internal_ip'  => 'Internal IP',
     'field_external_ip'  => 'External IP',
+    /*
+     * Reworked on 2026-10-10: the VM list had twelve columns, four pairs of
+     * which were two halves of one thing (system + station, host + model,
+     * internal + external IP, power + enabled). Merging leaves eight. The
+     * modal still shows them separately, so the keys above all stay.
+     */
+    'field_ip'           => 'IP',
     'field_model_type'   => 'Model',
     'field_spec'         => 'Spec',
     'field_monthly_fee'  => 'Server Fee',

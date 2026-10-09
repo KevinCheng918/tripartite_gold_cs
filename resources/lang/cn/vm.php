@@ -12,6 +12,12 @@ return [
     'field_hostname'     => '主机名称',
     'field_internal_ip'  => '内网 IP',
     'field_external_ip'  => '外网 IP',
+    /*
+     * 2026-10-10 重排：虚拟机列表原本十二栏，其中四组是同一件事的两半
+     * （系统＋站台、主机＋机型、内网＋外网 IP、开关机＋启用状态）。
+     * 合并之后只剩八栏，Modal 里仍然分开显示，所以上面那些 key 都留着。
+     */
+    'field_ip'           => 'IP',
     'field_model_type'   => '机型',
     'field_spec'         => '规格',
     'field_monthly_fee'  => '主机月费',

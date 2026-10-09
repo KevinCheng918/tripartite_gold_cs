@@ -9,6 +9,13 @@ return [
     'updated' => '帳號已更新',
     'field_account' => '帳號',
     'field_nickname' => '暱稱',
+    /*
+     * 表格欄名。2026-10-10 把原本四欄（帳號／暱稱／TG 署名／TG 綁定）
+     * 收成兩欄：同一個人的識別資訊疊在一格、Telegram 的兩件事合成一格 ——
+     * 七欄裡有四欄在講同一個人，橫向掃不出重點。
+     */
+    'col_member'   => '成員',
+    'col_telegram' => 'Telegram',
     'field_telegram_nickname' => 'Telegram 對話暱稱',
     'label_telegram_nickname' => 'TG 署名',
     'telegram_nickname_hint'  => '設定後，該帳號在 Telegram 對話送出的訊息結尾會附上「-暱稱」；留空則不附加。',

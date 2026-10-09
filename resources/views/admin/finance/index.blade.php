@@ -32,8 +32,8 @@
                             <span class="fw-bold text-success" style="font-size:1.375rem"><span id="summary-topup-credit">0</span> 點</span>
                         </div>
                         <div class="text-end text-muted" style="font-size:0.75rem">
-                            實收 <span class="fw-bold" style="color:#a67c00" id="summary-topup-usdt">0</span> USDT
-                            ＋ <span class="fw-bold" style="color:#a67c00" id="summary-topup-twd">0</span> TWD
+                            實收 <span class="fw-bold text-gold" id="summary-topup-usdt">0</span> USDT
+                            ＋ <span class="fw-bold text-gold" id="summary-topup-twd">0</span> TWD
                             <span class="ms-1">（<span id="summary-topup-count">0</span> 筆）</span>
                         </div>
                         <div class="d-flex justify-content-between align-items-baseline mt-2 pt-2 border-top">
@@ -41,7 +41,7 @@
                             <span class="fw-bold" style="font-size:1rem;color:#0d9488"><span id="summary-vm-credit">0</span> 點</span>
                         </div>
                         <div class="text-end text-muted" style="font-size:0.75rem">
-                            實收 <span class="fw-bold" style="color:#a67c00" id="summary-vm-usdt">0</span> USDT
+                            實收 <span class="fw-bold text-gold" id="summary-vm-usdt">0</span> USDT
                             <span class="ms-1">（<span id="summary-vm-count">0</span> 筆）</span>
                         </div>
                     </div>
@@ -80,7 +80,7 @@
                         <div class="d-flex justify-content-between align-items-center py-2 border-bottom" style="font-size:0.9375rem">
                             <span class="fw-bold">補點收入</span>
                             <div class="d-flex align-items-center gap-2">
-                                <span class="fw-bold" style="color:#a67c00"><span id="income-topup-credit">0</span> 點</span>
+                                <span class="fw-bold text-gold"><span id="income-topup-credit">0</span> 點</span>
                                 @if(Auth::user()->hasPermission('finance.edit'))
                                 <button class="btn btn-outline-secondary py-0 px-1" id="btn-edit-topup" style="font-size:0.7rem" title="調整"><i class="fas fa-edit"></i></button>
                                 <button class="btn btn-outline-secondary py-0 px-1" id="btn-reset-topup" style="font-size:0.7rem;display:none" title="重置"><i class="fas fa-undo"></i></button>
@@ -106,7 +106,7 @@
                         </div>
                         <div class="d-flex justify-content-between align-items-center py-1 border-bottom" style="font-size:0.8125rem;background:rgba(166,124,0,0.06)">
                             <span class="ps-3">補點實收</span>
-                            <span class="fw-bold" style="color:#a67c00">
+                            <span class="fw-bold text-gold">
                                 <span id="income-sum-usdt">0</span> USDT ＋ <span id="income-sum-twd">0</span> TWD
                             </span>
                         </div>
@@ -115,7 +115,7 @@
                         <div class="d-flex justify-content-between align-items-center py-2 border-bottom mt-1" style="font-size:0.9375rem">
                             <span class="fw-bold">虛擬機服務收入</span>
                             <div class="d-flex align-items-center gap-2">
-                                <span class="fw-bold" style="color:#a67c00"><span id="income-vm-credit">0</span> 點</span>
+                                <span class="fw-bold text-gold"><span id="income-vm-credit">0</span> 點</span>
                                 @if(Auth::user()->hasPermission('finance.edit'))
                                 <button class="btn btn-outline-secondary py-0 px-1" id="btn-edit-vm" style="font-size:0.7rem" title="調整"><i class="fas fa-edit"></i></button>
                                 <button class="btn btn-outline-secondary py-0 px-1" id="btn-reset-vm" style="font-size:0.7rem;display:none" title="重置"><i class="fas fa-undo"></i></button>
@@ -159,19 +159,19 @@
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
-                            <table class="table table-sm table-hover align-middle mb-0" style="white-space:nowrap">
+                            <table class="table table-sm table-hover align-middle data-table data-table--nowrap">
                                 <thead class="thead-gold">
                                     <tr>
-                                        <th>日期</th>
+                                        <th class="col-tight">日期</th>
                                         <th>分類</th>
                                         <th>項目</th>
-                                        <th class="text-end">金額</th>
+                                        <th class="col-num">金額</th>
                                         <th class="text-center">請款</th>
-                                        <th>操作</th>
+                                        <th class="col-actions">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody id="expense-table-body">
-                                    <tr><td colspan="6" class="text-center text-muted py-3">尚無支出</td></tr>
+                                    <tr><td colspan="6" class="table-empty"><i class="fas fa-receipt"></i>尚無支出</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -225,7 +225,7 @@
                                     <i class="fas fa-sync-alt me-1"></i>即時匯率
                                 </button>
                             </div>
-                            <div class="form-text">換算後 <span class="fw-bold" style="color:#a67c00" id="expense-rate-preview">0</span> TWD</div>
+                            <div class="form-text">換算後 <span class="fw-bold text-gold" id="expense-rate-preview">0</span> TWD</div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">日期 <span class="text-danger">*</span></label>
@@ -438,24 +438,24 @@ $(function () {
 
         var $body = $('#expense-table-body');
         if (allExpenses.length === 0) {
-            $body.html('<tr><td colspan="6" class="text-center text-muted py-3">尚無支出</td></tr>');
+            $body.html('<tr><td colspan="6" class="table-empty"><i class="fas fa-receipt"></i>尚無支出</td></tr>');
         } else {
             var html = '';
             allExpenses.forEach(function (e) {
                 var catLabel = e.type === 'server' ? '伺服器' : (categoryMap[e.category] || e.category || '-');
                 var cur = e.currency || 'TWD';
                 html += '<tr>';
-                html += '<td>' + (e.expense_date ? e.expense_date.substring(5, 10) : '-') + '</td>';
+                html += '<td class="col-tight">' + (e.expense_date ? e.expense_date.substring(5, 10) : '-') + '</td>';
                 html += '<td><span class="badge bg-info text-dark">' + catLabel + '</span></td>';
                 html += '<td>' + $('<span>').text(e.name).html() + '</td>';
                 // 外幣支出同時列出原幣金額與換算後的台幣，方便對帳
-                html += '<td class="text-end">';
+                html += '<td class="col-num">';
                 if (cur === 'TWD') {
                     html += trimFmt(e.amount, 2);
                 } else {
                     html += trimFmt(e.amount, 2) + ' <span class="text-muted">' + cur + '</span>';
-                    html += '<br><span class="text-muted" style="font-size:0.75rem">× ' + trimFmt(e.exchange_rate, 4)
-                         + ' ＝ ' + trimFmt(e.twd_amount, 2) + ' TWD</span>';
+                    html += '<div class="cell-stack__sub">× ' + trimFmt(e.exchange_rate, 4)
+                         + ' ＝ ' + trimFmt(e.twd_amount, 2) + ' TWD</div>';
                 }
                 html += '</td>';
                 html += '<td class="text-center">';
@@ -465,9 +465,14 @@ $(function () {
                         : '<span class="badge bg-secondary">未請款</span>';
                 } else { html += '-'; }
                 html += '</td>';
-                html += '<td><div class="d-flex gap-1">';
-                html += '<button class="btn btn-sm btn-outline-secondary js-edit-expense" data-id="' + e.id + '" data-type="' + e.type + '" data-category="' + (e.category || '') + '" data-name="' + $('<span>').text(e.name).html() + '" data-amount="' + e.amount + '" data-currency="' + (e.currency || 'TWD') + '" data-rate="' + (e.exchange_rate || '') + '" data-date="' + (e.expense_date ? e.expense_date.substring(0, 10) : '') + '" data-reimbursed="' + (e.reimbursed || 0) + '" data-note="' + $('<span>').text(e.note || '').html() + '"><i class="fas fa-edit me-1"></i>編輯</button>';
-                html += '<button class="btn btn-sm btn-outline-secondary js-del-expense" data-id="' + e.id + '"><i class="fas fa-trash-alt text-danger me-1"></i>刪除</button>';
+                // 編輯與刪除分兩段：刪除自己一段、圖示用 text-danger（刪掉要重新打一次）
+                html += '<td class="col-actions"><div class="row-actions">';
+                html += '<div class="btn-group btn-group-sm" role="group" aria-label="{{ trans("common.row_actions.manage") }}">';
+                html += '<button class="btn btn-outline-secondary btn-icon btn-transition js-edit-expense" data-id="' + e.id + '" data-type="' + e.type + '" data-category="' + (e.category || '') + '" data-name="' + $('<span>').text(e.name).html() + '" data-amount="' + e.amount + '" data-currency="' + (e.currency || 'TWD') + '" data-rate="' + (e.exchange_rate || '') + '" data-date="' + (e.expense_date ? e.expense_date.substring(0, 10) : '') + '" data-reimbursed="' + (e.reimbursed || 0) + '" data-note="' + $('<span>').text(e.note || '').html() + '"><i class="fas fa-edit btn-icon-wrapper"></i>編輯</button>';
+                html += '</div>';
+                html += '<div class="btn-group btn-group-sm" role="group" aria-label="{{ trans("common.row_actions.danger") }}">';
+                html += '<button class="btn btn-outline-secondary btn-icon btn-transition js-del-expense" data-id="' + e.id + '"><i class="fas fa-trash-alt btn-icon-wrapper text-danger"></i>刪除</button>';
+                html += '</div>';
                 html += '</div></td>';
                 html += '</tr>';
             });

@@ -106,17 +106,17 @@
     <div class="main-card mb-3 card">
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead>
+                <table class="table table-hover align-middle data-table">
+                    <thead class="thead-gold">
                         <tr>
-                            <th>{{ trans('daily_rate.field_date') }}</th>
-                            <th class="text-end">{{ trans('daily_rate.field_rate') }}</th>
-                            <th class="text-end d-none d-md-table-cell">{{ trans('daily_rate.field_reference_rate') }}</th>
-                            <th class="text-end d-none d-md-table-cell">{{ trans('daily_rate.field_suggested_rate') }}</th>
+                            <th class="col-tight">{{ trans('daily_rate.field_date') }}</th>
+                            <th class="col-num">{{ trans('daily_rate.field_rate') }}</th>
+                            <th class="col-num d-none d-md-table-cell">{{ trans('daily_rate.field_reference_rate') }}</th>
+                            <th class="col-num d-none d-md-table-cell">{{ trans('daily_rate.field_suggested_rate') }}</th>
                             <th class="d-none d-lg-table-cell">{{ trans('daily_rate.field_replier') }}</th>
-                            <th class="d-none d-lg-table-cell">{{ trans('daily_rate.field_replied_at') }}</th>
+                            <th class="col-tight d-none d-lg-table-cell">{{ trans('daily_rate.field_replied_at') }}</th>
                             <th class="text-center d-none d-lg-table-cell">{{ trans('daily_rate.field_remind_count') }}</th>
-                            @if($canManage)<th></th>@endif
+                            @if($canManage)<th class="col-actions"></th>@endif
                         </tr>
                     </thead>
                     <tbody>
@@ -124,32 +124,38 @@
                             <tr>
                                 {{-- 用 DatePresenter 而不是 isoFormat：沒設 Carbon locale 的話
                                      isoFormat 會吐英文星期，而且格式要跟出勤那邊一致 --}}
-                                <td>{{ \App\Presenters\DatePresenter::withWeekday($row->date) }}</td>
-                                <td class="text-end">
+                                <td class="col-tight">{{ \App\Presenters\DatePresenter::withWeekday($row->date) }}</td>
+                                <td class="col-num">
                                     @if(filled($row->rate))
                                         <strong>{{ rtrim(rtrim(number_format($row->rate, 4, '.', ''), '0'), '.') }}</strong>
                                     @else
                                         <span class="badge bg-warning text-dark">{{ trans('daily_rate.today_pending') }}</span>
                                     @endif
                                 </td>
-                                <td class="text-end text-muted d-none d-md-table-cell">{{ filled($row->reference_rate) ? rtrim(rtrim(number_format($row->reference_rate, 4, '.', ''), '0'), '.') : '-' }}</td>
-                                <td class="text-end text-muted d-none d-md-table-cell">{{ filled($row->suggested_rate) ? rtrim(rtrim(number_format($row->suggested_rate, 4, '.', ''), '0'), '.') : '-' }}</td>
+                                <td class="col-num text-muted d-none d-md-table-cell">{{ filled($row->reference_rate) ? rtrim(rtrim(number_format($row->reference_rate, 4, '.', ''), '0'), '.') : '-' }}</td>
+                                <td class="col-num text-muted d-none d-md-table-cell">{{ filled($row->suggested_rate) ? rtrim(rtrim(number_format($row->suggested_rate, 4, '.', ''), '0'), '.') : '-' }}</td>
                                 <td class="d-none d-lg-table-cell">{{ $row->replier ? $row->replier->nickname : '-' }}</td>
-                                <td class="d-none d-lg-table-cell text-muted small">{{ filled($row->replied_at) ? $row->replied_at->format('Y-m-d H:i') : '-' }}</td>
+                                <td class="col-tight d-none d-lg-table-cell text-muted small">{{ filled($row->replied_at) ? $row->replied_at->format('Y-m-d H:i') : '-' }}</td>
                                 <td class="text-center d-none d-lg-table-cell">{{ $row->remind_count > 0 ? $row->remind_count : '-' }}</td>
                                 @if($canManage)
-                                    <td class="text-end">
-                                        <button class="btn btn-sm btn-outline-secondary js-dr-edit"
-                                                data-date="{{ $row->date->toDateString() }}"
-                                                data-rate="{{ $row->rate }}">
-                                            <i class="fas fa-pen"></i>
-                                        </button>
+                                    {{-- 原本只有一支筆的圖示，看不出按下去會做什麼；
+                                         每顆按鈕都要有文字說明 --}}
+                                    <td class="col-actions">
+                                        <div class="row-actions">
+                                            <button class="btn btn-sm btn-outline-secondary btn-icon btn-transition js-dr-edit"
+                                                    data-date="{{ $row->date->toDateString() }}"
+                                                    data-rate="{{ $row->rate }}">
+                                                <i class="fas fa-pen btn-icon-wrapper"></i>{{ trans('daily_rate.action_edit') }}
+                                            </button>
+                                        </div>
                                     </td>
                                 @endif
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="{{ $canManage ? 8 : 7 }}" class="text-center text-muted py-4">{{ trans('daily_rate.empty') }}</td>
+                                <td colspan="{{ $canManage ? 8 : 7 }}" class="table-empty">
+                                    <i class="fas fa-chart-line"></i>{{ trans('daily_rate.empty') }}
+                                </td>
                             </tr>
                         @endforelse
                     </tbody>

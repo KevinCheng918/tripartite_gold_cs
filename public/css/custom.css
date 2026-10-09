@@ -1011,3 +1011,390 @@ a:hover { color: #85640a; }
 
 [data-theme="dark"] .notice-check-list,
 [data-theme="dark"] .notice-topic-row { border-color: #2d3039; }
+
+/* ================================================================
+   資料表格（.data-table）與列操作（.row-actions）
+   ================================================================
+
+   為什麼要有這一套：後台每加一個功能就在「操作」欄多塞一顆
+   `btn btn-sm btn-outline-secondary`，站台與帳號都長到五顆，一列裡五個
+   同樣灰框的方塊沒有任何主次，寬度不夠時還會換行把列高撐成兩倍。
+
+   兩個方向一起收：
+     1. **動作按分類黏成幾段** —— 同一類用 btn-group 共用邊框、段間留空隙。
+        動作全部留在畫面上，只是看得出哪幾顆是一組（詳見下方 .row-actions）。
+     2. **欄位數收斂** —— 同一件事的兩欄（帳號＋暱稱、TG 署名＋TG 綁定、
+        內網＋外網 IP…）合成一格，主要資訊粗體、次要壓成灰色小字。 */
+
+/* ---- 表格本體 ---- */
+
+/*
+ * ⚠ **列的底色一定要走 `--bs-table-accent-bg`，不要直接設 `background-color`。**
+ *
+ * Bootstrap 5 把列底色畫成
+ *   `.table > :not(caption) > * > * { box-shadow: inset 0 0 0 9999px var(--bs-table-accent-bg) }`
+ * 那層 box-shadow 蓋在 background-color 上面，所以直接設 background-color 完全看不到。
+ *
+ * 順便修掉兩個一直在的問題：
+ *   - `.table` 的 accent-bg 預設是 `rgba(0,0,0,0.03)`，每一格本來就蒙著一層灰
+ *   - `.table-hover` 的預設 hover 色是 **`#e0f3ff` 淡藍**；深色模式有覆寫成金色，
+ *     淺色模式沒有 —— 一個號稱沒有藍色的介面，滑過任何一列都會亮一條淡藍
+ */
+.table.data-table {
+    --bs-table-accent-bg: transparent;
+    --bs-table-hover-bg: rgba(166, 124, 0, 0.07);
+    --bs-table-hover-color: inherit;
+
+    margin-bottom: 0;
+}
+
+/* thead 保留金色識別（.thead-gold），但字級縮小、加字距並轉成小標語氣 ——
+   欄名是標籤不是內容，跟儲存格同一個字級會搶走注意力。
+
+   ⚠ 這裡只收細底線的「粗細」（原本 2px）。顏色不在這裡設：Bootstrap 的
+   `.table > :not(:last-child) > :last-child > * { border-bottom-color: currentColor }`
+   特異性比這條高（三個 class 層級對兩個），寫了也會被蓋掉 ——
+   實際顏色就是欄名本身的金棕色，剛好是想要的。 */
+.table.data-table > thead > tr > th {
+    padding: 0.5625rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    border-bottom-width: 1px;
+}
+
+.table.data-table > tbody > tr > td {
+    padding: 0.6875rem 1rem;
+    border-bottom: 1px solid #eceff3;
+    vertical-align: middle;
+}
+
+/* 最後一列不要那條比較粗的收邊 —— 卡片本身已經有邊界了，
+   兩條線疊在一起看起來像表格沒畫完 */
+.table.data-table > tbody > tr:last-child > td {
+    border-bottom: 0;
+}
+
+/* hover 時左側浮出一條金色指示線。用 box-shadow 內嵌而不是 border-left：
+   border 會把那一格的內容往右推 1px，整列看起來在抖。
+
+   ⚠ 兩層 shadow 要一起寫：第二層就是 Bootstrap 原本那層底色
+   （上面那條註解說的 accent-bg），只寫金線會把整列的 hover 底色擦掉。
+   先寫的畫在上面，所以金線蓋在底色之上。 */
+.table.data-table > tbody > tr:hover > td:first-child {
+    box-shadow: inset 2px 0 0 #a67c00, inset 0 0 0 9999px var(--bs-table-accent-bg);
+}
+
+/* 序號欄：固定窄寬並壓成灰色，它只是定位用的 */
+.data-table .col-idx {
+    width: 3.5rem;
+    color: #9ca3af;
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+}
+
+/* 數字欄右對齊 + 等寬數字，上下列的位數才對得齊 */
+.data-table .col-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* 操作欄：靠右、不換行、不被內容撐寬 */
+.data-table .col-actions {
+    width: 1%;
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* 內容寬度固定的窄欄（時間、IP 這種）。`width: 1%` 是表格的慣用寫法：
+   瀏覽器會把這一欄縮到內容的最小寬度，剩下的寬度留給真正需要的欄位 */
+.data-table .col-tight {
+    width: 1%;
+    white-space: nowrap;
+}
+
+/* 主要資訊 + 次要資訊疊兩行的身分格 */
+.cell-stack__main {
+    font-weight: 600;
+    color: #212529;
+}
+
+.cell-stack__sub {
+    margin-top: 0.125rem;
+    font-size: 0.8125rem;
+    color: #6b7280;
+}
+
+/* 儲存格裡的小圖示鈕 —— 「點開來看」的唯讀動作（圖片、備註）。
+   刻意跟 btn 長得不一樣：同一列右邊是「通過／拒絕」這種會改資料的按鈕，
+   兩者長成一樣的灰方塊時，分不出哪一顆按下去有後果 */
+.cell-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin: 0 0.125rem;
+    padding: 0.1875rem 0.5rem;
+    border: 1px solid #dee2e6;
+    border-radius: 9999px;
+    background: transparent;
+    color: #4b5563;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.cell-chip:hover {
+    border-color: #a67c00;
+    color: #a67c00;
+}
+
+[data-theme="dark"] .cell-chip {
+    border-color: rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.65);
+}
+
+[data-theme="dark"] .cell-chip:hover {
+    border-color: #d4af37;
+    color: #d4af37;
+}
+
+/* 欄位很多的表格（補點列表十一欄、支出列表六欄還帶換算式），
+   任何一格換行整列就變兩倍高。原本靠 blade 的 inline style，收進 class */
+.data-table--nowrap {
+    white-space: nowrap;
+}
+
+/* 空資料列：不要只是一行灰字，給它圖示與留白才像「刻意的空狀態」 */
+.data-table .table-empty {
+    padding: 2.5rem 1rem !important;
+    text-align: center;
+    color: #9ca3af;
+}
+
+.data-table .table-empty i {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 1.75rem;
+    opacity: 0.45;
+}
+
+/* ---- 列操作：Architect 的 btn-group + btn-transition ---- */
+
+/*
+ * 用的是 theme 自己的語彙（`vendors/architect-ui/styles/css/base.css`）：
+ *
+ *   .btn-icon / .btn-icon-wrapper   圖示鈕與圖示本體（圖示比文字大一號）
+ *   .btn-transition                 灰字 + #e9ecef 淡框，hover 才上色
+ *   .btn-group                      同一類黏成一段，共用邊框、只有兩端圓角
+ *
+ * 原本是五顆深灰外框、各自獨立的 btn-sm 平鋪：五顆長得一模一樣、
+ * 看不出哪幾顆是同一類，寬度不夠還會換行把列高撐成兩倍。
+ *
+ * 改法是「安靜下來 + 分段」：外框換成 btn-transition 的淡灰（滑過去才亮），
+ * 同一類黏成一段共用邊框，段與段之間留 0.5rem。
+ *
+ * ⚠ **每顆按鈕都要有文字說明，不可以只留圖示。**
+ * 2026-10-10 做過兩版都被退回：
+ *   · 「只留兩顆常用的、其餘收進 ⋯ 選單」→「按鈕不應該全部收合，有點醜」
+ *   · 「純圖示鈕（btn-icon-only）+ title」→「每個按鈕旁邊還是要有說明，不能隱藏」
+ * 要再動這一點之前先問過。所以這裡**沒有** .btn-icon-only 的樣式 ——
+ * 不是漏寫，是刻意不給，免得又有人拿去用。
+ */
+.row-actions {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+/* 按鈕文字本身不要被拆成兩行 */
+.row-actions .btn {
+    white-space: nowrap;
+}
+
+/* 同一段裡的按鈕共用邊框，hover 的那顆要浮到上層 ——
+   否則右邊那顆的左框會壓在它的右框上面，看起來少一條邊 */
+.row-actions .btn-group > .btn:hover,
+.row-actions .btn-group > .btn:focus {
+    z-index: 2;
+}
+
+/*
+ * hover 收斂成淡金色。
+ *
+ * 全站的 `.btn-outline-secondary:hover` 是近黑色實心填滿（`#212529`，
+ * 帶 !important）—— 那是給版面上獨立一兩顆按鈕用的。一列裡有五顆時，
+ * 滑過去整塊變黑太搶眼，跟 btn-transition 的淡框也完全接不上。
+ *
+ * 只在 .row-actions 裡覆寫，不動全站那條。要 !important 才蓋得過它。
+ */
+.row-actions .btn-outline-secondary:hover,
+.row-actions .btn-outline-secondary:focus,
+.row-actions .btn-outline-secondary:active {
+    background-color: rgba(166, 124, 0, 0.12) !important;
+    border-color: #a67c00 !important;
+    color: #7a5c00 !important;
+    box-shadow: none !important;
+}
+
+/*
+ * 停用的動作（例如站台還沒設 API 就不能發補點通知）。
+ *
+ * ⚠ 用 `.disabled` class 而**不是** `disabled` 屬性：disabled 的元素
+ * 不觸發 hover，掛在它身上的 title 就永遠看不到，使用者只會覺得
+ * 按鈕莫名壞掉。沒有 disabled 屬性，所以也不必靠 pointer-events 擋 ——
+ * 那顆按鈕根本沒掛 js- 事件 class，按下去不會有任何事發生。
+ *
+ * Bootstrap 的 `.btn.disabled` 會把 pointer-events 關掉（tooltip 跟著沒了），
+ * 這裡開回來並換成 not-allowed 游標，一眼看出「不是沒反應，是不能按」。
+ */
+.row-actions .btn.disabled {
+    pointer-events: auto;
+    cursor: not-allowed;
+}
+
+/* ---- 手機版卡片 ----
+   桌機看表格、手機看卡片，兩邊的內容與操作要對得起來，
+   所以卡片也用同一組 .cell-stack__* 與 .row-actions */
+
+.data-card__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+/* 卡片裡的「標籤 — 值」一列。原本每一列都寫
+   `d-flex justify-content-between mb-1 style="font-size:0.875rem"`，
+   同一頁抄七八次、行距還不一致 */
+.data-card__row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.875rem;
+}
+
+.data-card__row > :first-child {
+    flex: 0 0 auto;
+    color: #6b7280;
+}
+
+.data-card__row > :last-child {
+    text-align: right;
+    word-break: break-all;
+}
+
+[data-theme="dark"] .data-card__row > :first-child {
+    color: rgba(255, 255, 255, 0.45);
+}
+
+/* 卡片裡的一段原文（公告內容、備註這種）。
+   pre-wrap 保留使用者打的換行，break-all 讓沒有空白的長網址不會撐破卡片 */
+.data-card__text {
+    font-size: 0.875rem;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+/* ---- 金色文字／圖示 ----
+ *
+ * 淺色模式用 #a67c00（白底與奶油底上都讀得清楚），深色才換亮一階的 #d4af37。
+ *
+ * 全站原本有十處把這個色寫成 inline style，於是：
+ *   - 財務頁七處深色模式下是深金配深底，數字幾乎看不到
+ *   - 帳號與同仁統計卡誤用了深色模式的亮金，在奶油底的標題上糊成一片
+ * 收成 class 才有辦法一次補上深色的那一半。 */
+
+.text-gold {
+    color: #a67c00 !important;
+}
+
+[data-theme="dark"] .text-gold {
+    color: #d4af37 !important;
+}
+
+/* ---- 統計小卡 ----
+   原本數字與標題的字級寫在 blade 的 inline style，每個頁面各抄一份、
+   值還不一樣。收進 class，順便讓數字用等寬字 */
+
+.stat-card__title {
+    font-size: 1.0625rem;
+    font-weight: 700;
+}
+
+.stat-card__value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+/* 只放得下一個數字的那種小卡 */
+.stat-card--narrow {
+    min-width: 100px;
+}
+
+/* 標題圖示的輔助色。Bootstrap 的 text-info（#0dcaf0）在奶油底的卡片標題上
+   太淺，深一階才讀得出來；深色模式再往亮的方向調回去 */
+.stat-card__title .text-info {
+    color: #0284c7 !important;
+}
+
+[data-theme="dark"] .stat-card__title .text-info {
+    color: #38bdf8 !important;
+}
+
+[data-theme="dark"] .stat-card__title .text-success {
+    color: #34d399 !important;
+}
+
+/* ---- Dark mode ----
+   ⚠ 上面每一條有顏色的規則都要在這裡有對應 ——
+   這專案修過好幾次「只補了淺色或只補了深色那一半」 */
+
+/* thead 與 td 的邊框色在深色模式已經有既有規則處理（都帶 !important），
+   這裡不重複覆寫，只補這一套新 class 自己的顏色 */
+
+/* hover 底色由既有的 `[data-theme="dark"] .table-hover > tbody > tr:hover`
+   那組規則負責（帶 !important），這裡只換金線的顏色 */
+[data-theme="dark"] .table.data-table > tbody > tr:hover > td:first-child {
+    box-shadow: inset 2px 0 0 #d4af37, inset 0 0 0 9999px var(--bs-table-accent-bg);
+}
+
+/* ⚠ `.col-idx` 與 `.table-empty` 掛在 `<td>` 本身，而既有的
+   `[data-theme="dark"] .table > tbody > tr > td { color: #e0e0e0 !important }`
+   打的是同一個元素 —— 這兩條非得用 `!important` 才蓋得過。
+   少了它，深色模式下序號與空狀態會跟內文一樣亮（淺色模式卻是對的），
+   正是這專案一再出現的「只補了一半」。 */
+[data-theme="dark"] .data-table .col-idx,
+[data-theme="dark"] .data-table .table-empty {
+    color: rgba(255, 255, 255, 0.45) !important;
+}
+
+/* 這一條打在 td 裡面的 <div>，不跟上面那條 td 規則衝突，不必 !important */
+[data-theme="dark"] .cell-stack__sub {
+    color: rgba(255, 255, 255, 0.45);
+}
+
+[data-theme="dark"] .cell-stack__main {
+    color: #f3f4f6;
+}
+
+/* 列操作：hover 的淡金色要有深色配對，否則深色模式會落回全站那條
+   近黑色填滿（深底上滑過去等於整顆消失） */
+[data-theme="dark"] .row-actions .btn-outline-secondary:hover,
+[data-theme="dark"] .row-actions .btn-outline-secondary:focus,
+[data-theme="dark"] .row-actions .btn-outline-secondary:active {
+    background-color: rgba(212, 175, 55, 0.16) !important;
+    border-color: #d4af37 !important;
+    color: #f0e6c8 !important;
+}
+
+/* 停用狀態：深色模式下外框與文字都要再淡一階，
+   不然「不能按」看起來跟「可以按」一樣 */
+[data-theme="dark"] .row-actions .btn.disabled {
+    opacity: 0.4;
+}

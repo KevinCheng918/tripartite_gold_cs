@@ -207,17 +207,21 @@
     <div class="main-card mb-3 card d-none d-md-block">
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover table-striped align-middle mb-0">
+                {{-- 2026-10-10 重排：操作欄原本並排五顆各自有框的按鈕，
+                     寬度不夠時會換行把列高撐成兩倍。現在五顆都留著，
+                     但按分類黏成三段 btn-group（見 partials/row-actions）。
+                     點數與費率是數字，改成右對齊等寬數字才對得齊。 --}}
+                <table class="table table-hover align-middle data-table">
                     <thead class="thead-gold">
                         <tr>
-                            <th>#</th>
-                            <th>系統</th>
+                            <th class="col-idx">#</th>
+                            <th>{{ trans('station.field_system') }}</th>
                             <th>{{ trans('station.field_name') }}</th>
-                            <th>{{ trans('station.field_credits') }}</th>
-                            <th>費率（收/付）</th>
+                            <th class="col-num">{{ trans('station.field_credits') }}</th>
+                            <th class="col-num">{{ trans('station.field_rate') }}</th>
                             <th>{{ trans('station.field_status') }}</th>
-                            <th>同步</th>
-                            <th>操作</th>
+                            <th>{{ trans('station.field_synced_at') }}</th>
+                            <th class="col-actions">{{ trans('station.field_action') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -242,16 +246,16 @@
                                 }
                             @endphp
                             <tr>
-                                <td>{{ $loop->iteration }}</td>
+                                <td class="col-idx">{{ $loop->iteration }}</td>
                                 <td>{{ $station->system ? $station->system->name : '-' }}</td>
                                 <td>
-                                    <strong>{{ $station->name }}</strong>
+                                    <div class="cell-stack__main">{{ $station->name }}</div>
                                     @if(filled($station->domain))
-                                        <br><small class="text-muted">{{ $station->domain }}</small>
+                                        <div class="cell-stack__sub">{{ $station->domain }}</div>
                                     @endif
                                 </td>
-                                <td><strong>{{ number_format($station->credits, 2) }}</strong></td>
-                                <td>{{ $depositRate }} / {{ $withdrawRate }}</td>
+                                <td class="col-num"><strong>{{ number_format($station->credits, 2) }}</strong></td>
+                                <td class="col-num">{{ $depositRate }} / {{ $withdrawRate }}</td>
                                 <td>
                                     @if($station->status == 1)
                                         <span class="badge bg-success">{{ trans('station.status_active') }}</span>
@@ -262,38 +266,15 @@
                                     @endif
                                 </td>
                                 <td><small class="text-muted">{{ $station->synced_at ? $station->synced_at->format('m/d H:i') : '-' }}</small></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-secondary js-station-detail" data-id="{{ $station->id }}">
-                                        <i class="fas fa-info-circle me-1"></i>詳細
-                                    </button>
-                                    @if(Auth::user()->hasPermission('station.update'))
-                                        <button class="btn btn-sm btn-outline-secondary js-edit-station"
-                                                data-id="{{ $station->id }}"
-                                                data-name="{{ $station->name }}"
-                                                data-domain="{{ $station->domain }}"
-                                                data-system-id="{{ $station->system_id }}"
-                                                data-api-url="{{ $station->api_url }}"
-                                                data-key-masked="{{ filled($station->api_key) ? Str::substr($station->api_key, 0, 4) . str_repeat('*', max(0, Str::length($station->api_key) - 8)) . Str::substr($station->api_key, -4) : '' }}"
-                                                data-tg-masked="{{ $station->telegramGroup && filled($station->telegramGroup->chat_id) ? Str::substr((string)$station->telegramGroup->chat_id, 0, 4) . str_repeat('*', max(0, Str::length((string)$station->telegramGroup->chat_id) - 8)) . Str::substr((string)$station->telegramGroup->chat_id, -4) : '' }}"
-                                                data-credit-alert-threshold="{{ $station->credit_alert_threshold }}"
-                                                data-note="{{ $station->note }}">
-                                            <i class="fas fa-edit me-1"></i>編輯
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-secondary js-sync-credits" data-id="{{ $station->id }}">
-                                            <i class="fas fa-sync-alt me-1"></i>同步
-                                        </button>
-                                        @include('admin.station.partials.topup-notice-button', ['station' => $station])
-                                        <button class="btn btn-sm btn-outline-secondary js-change-station-status"
-                                                data-id="{{ $station->id }}"
-                                                data-status="{{ $station->status }}">
-                                            <i class="fas fa-exchange-alt me-1"></i>狀態
-                                        </button>
-                                    @endif
+                                <td class="col-actions">
+                                    @include('admin.station.partials.row-actions', ['station' => $station])
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="text-center text-muted py-4">暫無資料</td>
+                                <td colspan="8" class="table-empty">
+                                    <i class="fas fa-server"></i>{{ trans('station.no_data') }}
+                                </td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -327,12 +308,13 @@
                     $withdrawRate = '-';
                 }
             @endphp
+            {{-- 卡片結構跟桌機表格對齊：名稱／系統疊兩行、操作用同一份 partial --}}
             <div class="card mb-2 shadow-sm">
                 <div class="card-body py-3">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="data-card__head mb-2">
                         <div>
-                            <strong style="font-size:1.0625rem">{{ $station->name }}</strong>
-                            <div class="text-muted" style="font-size:0.8125rem">{{ $station->system ? $station->system->name : '-' }}</div>
+                            <div class="cell-stack__main">{{ $station->name }}</div>
+                            <div class="cell-stack__sub">{{ $station->system ? $station->system->name : '-' }}</div>
                         </div>
                         @if($station->status == 1)
                             <span class="badge bg-success">{{ trans('station.status_active') }}</span>
@@ -343,51 +325,27 @@
                         @endif
                     </div>
                     @if(filled($station->domain))
-                        <div class="d-flex justify-content-between mb-1" style="font-size:0.875rem">
-                            <span class="text-muted">域名</span>
+                        <div class="data-card__row">
+                            <span>{{ trans('station.field_domain') }}</span>
                             <span>{{ $station->domain }}</span>
                         </div>
                     @endif
-                    <div class="d-flex justify-content-between mb-1" style="font-size:0.875rem">
-                        <span class="text-muted">{{ trans('station.field_credits') }}</span>
+                    <div class="data-card__row">
+                        <span>{{ trans('station.field_credits') }}</span>
                         <strong>{{ number_format($station->credits, 2) }}</strong>
                     </div>
-                    <div class="d-flex justify-content-between mb-2" style="font-size:0.875rem">
-                        <span class="text-muted">費率（收/付）</span>
+                    <div class="data-card__row mb-2">
+                        <span>{{ trans('station.field_rate') }}</span>
                         <span>{{ $depositRate }} / {{ $withdrawRate }}</span>
                     </div>
-                    <div class="d-flex gap-1 flex-wrap">
-                        <button class="btn btn-sm btn-outline-secondary js-station-detail" data-id="{{ $station->id }}">
-                            <i class="fas fa-info-circle me-1"></i>詳細
-                        </button>
-                        @if(Auth::user()->hasPermission('station.update'))
-                            <button class="btn btn-sm btn-outline-secondary js-edit-station"
-                                    data-id="{{ $station->id }}"
-                                    data-name="{{ $station->name }}"
-                                    data-domain="{{ $station->domain }}"
-                                    data-system-id="{{ $station->system_id }}"
-                                    data-api-url="{{ $station->api_url }}"
-                                    data-key-masked="{{ filled($station->api_key) ? Str::substr($station->api_key, 0, 4) . str_repeat('*', max(0, Str::length($station->api_key) - 8)) . Str::substr($station->api_key, -4) : '' }}"
-                                    data-tg-masked="{{ $station->telegramGroup && filled($station->telegramGroup->chat_id) ? Str::substr((string)$station->telegramGroup->chat_id, 0, 4) . str_repeat('*', max(0, Str::length((string)$station->telegramGroup->chat_id) - 8)) . Str::substr((string)$station->telegramGroup->chat_id, -4) : '' }}"
-                                    data-credit-alert-threshold="{{ $station->credit_alert_threshold }}"
-                                    data-note="{{ $station->note }}">
-                                <i class="fas fa-edit me-1"></i>編輯
-                            </button>
-                            <button class="btn btn-sm btn-outline-secondary js-sync-credits" data-id="{{ $station->id }}">
-                                <i class="fas fa-sync-alt me-1"></i>同步
-                            </button>
-                            @include('admin.station.partials.topup-notice-button', ['station' => $station])
-                            <button class="btn btn-sm btn-outline-secondary js-change-station-status"
-                                    data-id="{{ $station->id }}"
-                                    data-status="{{ $station->status }}">
-                                <i class="fas fa-exchange-alt me-1"></i>狀態
-                            </button>
-                        @endif
-                    </div>
+                    {{-- 操作放最後一行而不是擠在標題右邊：五顆按鈕在 360px 的手機上
+                         會把站台名稱壓到剩幾個字。.row-actions 本身會換行，
+                         段與段之間斷開，不會變成一團 --}}
+                    @include('admin.station.partials.row-actions', ['station' => $station])
                 </div>
             </div>
         @empty
-            <div class="text-center text-muted py-4">暫無資料</div>
+            <div class="text-center text-muted py-4">{{ trans('station.no_data') }}</div>
         @endforelse
         @if($stations->hasPages())
             <div class="mt-2">{{ $stations->withQueryString()->links() }}</div>
@@ -509,20 +467,23 @@
         <div class="main-card mb-3 card d-none d-md-block">
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover table-striped align-middle mb-0" style="white-space:nowrap">
+                    {{-- 2026-10-10：原本「圖片」與「操作」各佔一欄，操作欄裡還混了
+                         唯讀的「備註」。現在圖片與備註併成「附件」一欄（兩個小圖示鈕），
+                         操作欄只留會改資料的通過／拒絕。 --}}
+                    <table class="table table-hover align-middle data-table data-table--nowrap">
                         <thead class="thead-gold">
                             <tr>
-                                <th class="text-center">#</th>
-                                <th class="text-center">系統</th>
-                                <th class="text-center">{{ trans('station.topup_field_station') }}</th>
-                                <th class="text-center">{{ trans('station.topup_field_action') }}</th>
-                                <th class="text-center">USDT / 匯率</th>
-                                <th class="text-center">{{ trans('station.topup_field_amount') }}</th>
-                                <th class="text-center">{{ trans('station.topup_field_status') }}</th>
-                                <th class="text-center">申請/審核人</th>
-                                <th class="text-center">申請/審核時間</th>
-                                <th class="text-center">圖片</th>
-                                <th class="text-center">操作</th>
+                                <th class="col-idx text-center">#</th>
+                                <th>{{ trans('station.field_system') }}</th>
+                                <th>{{ trans('station.topup_field_station') }}</th>
+                                <th>{{ trans('station.topup_field_action') }}</th>
+                                <th class="col-num">USDT / {{ trans('station.topup_field_rate') }}</th>
+                                <th class="col-num">{{ trans('station.topup_field_amount') }}</th>
+                                <th>{{ trans('station.topup_field_status') }}</th>
+                                <th>申請/審核人</th>
+                                <th>申請/審核時間</th>
+                                <th class="text-center">{{ trans('station.topup_field_attachment') }}</th>
+                                <th class="col-actions">{{ trans('station.field_action') }}</th>
                             </tr>
                         </thead>
                         <tbody id="topup-table-body">
@@ -859,12 +820,12 @@
                     <div class="card">
                         <div class="card-header fw-bold">現有系統</div>
                         <div class="card-body p-0">
-                            <table class="table table-hover align-middle mb-0">
+                            <table class="table table-hover align-middle data-table">
                                 <thead class="thead-gold">
                                     <tr>
                                         <th>系統名稱</th>
                                         <th>Bot Token</th>
-                                        <th>操作</th>
+                                        <th class="col-actions">{{ trans('station.field_action') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody id="system-list">
@@ -877,7 +838,7 @@
                                                        data-original="{{ $sys->bot_token ? Str::substr($sys->bot_token, 0, 10) . '***' : '' }}"
                                                        placeholder="未設定">
                                             </td>
-                                            <td>
+                                            <td class="col-actions">
                                                 <button class="btn btn-sm btn-primary js-save-system" data-id="{{ $sys->id }}">
                                                     <i class="fas fa-save me-1"></i>儲存
                                                 </button>
@@ -1320,7 +1281,50 @@ $(function () {
         if (parseInt(t.input_type, 10) === 2) {
             return '<span class="badge bg-secondary">{{ trans("station.topup_input_credit") }}</span>';
         }
-        return t.usdt_amount + ' U<br><span class="text-muted">' + t.exchange_rate + '</span>';
+        return t.usdt_amount + ' U<div class="cell-stack__sub">' + t.exchange_rate + '</div>';
+    }
+
+    /**
+     * 附件欄：圖片與備註各一個小 chip，兩者都沒有就回一個破折號
+     *
+     * ⚠ 兩顆都要有文字（「3 張」「備註」），不能只放圖示 ——
+     * 跟列操作的按鈕同一條規則，見 custom.css 的 .row-actions 註解。
+     *
+     * ⚠ 備註要經過 escapeAttr()：它是使用者打的字，直接塞進
+     * `data-note="..."` 只要內容有雙引號就會把屬性截斷、後面變成一堆
+     * 莫名的屬性，甚至能插進 onerror 之類的東西。
+     *
+     * @param {Object} t 一筆補點紀錄
+     * @returns {string} 這一格的 HTML
+     */
+    function topupAttachmentCell(t) {
+        var html = '';
+
+        if (t.images && t.images.length > 0) {
+            // 數量的文案走語系檔，不要在這裡自己接「張」
+            var countLabel = '{{ trans("station.topup_image_count", ["count" => "__COUNT__"]) }}'
+                .replace('__COUNT__', t.images.length);
+
+            html += '<button class="cell-chip js-topup-images" data-images=\'' + JSON.stringify(t.images) + '\'>'
+                + '<i class="fas fa-image"></i>' + countLabel + '</button>';
+        }
+
+        if (t.note) {
+            html += '<button class="cell-chip js-topup-note" data-note="' + escapeAttr(t.note) + '">'
+                + '<i class="fas fa-sticky-note"></i>{{ trans("station.topup_field_note") }}</button>';
+        }
+
+        return html || '<span class="text-muted">-</span>';
+    }
+
+    /**
+     * 把字串變成能安全放進 HTML 屬性的樣子
+     *
+     * @param {string} value
+     * @returns {string}
+     */
+    function escapeAttr(value) {
+        return $('<span>').text(String(value)).html().replace(/"/g, '&quot;');
     }
 
     function formatNum(val, maxDecimals) {
@@ -1458,38 +1462,42 @@ $(function () {
     function renderTopupTable(list) {
         var $tbody = $('#topup-table-body');
         if (!list || list.length === 0) {
-            $tbody.html('<tr><td colspan="11" class="text-center text-muted py-4">暫無資料</td></tr>');
+            $tbody.html('<tr><td colspan="11" class="table-empty"><i class="fas fa-inbox"></i>{{ trans("station.no_data") }}</td></tr>');
             return;
         }
         var html = '';
         list.forEach(function (t, idx) {
             html += '<tr>';
-            html += '<td>' + (idx + 1) + '</td>';
+            html += '<td class="col-idx text-center">' + (idx + 1) + '</td>';
             html += '<td>' + (t.system || '-') + '</td>';
-            html += '<td>' + t.station + '</td>';
+            html += '<td><span class="cell-stack__main">' + t.station + '</span></td>';
             html += '<td>' + topupActionLabel(t.action_type, t.credit_type) + '</td>';
-            html += '<td>' + topupUsdtCell(t) + '</td>';
-            html += '<td><strong>' + t.credit_amount + '</strong></td>';
+            html += '<td class="col-num">' + topupUsdtCell(t) + '</td>';
+            html += '<td class="col-num"><strong>' + t.credit_amount + '</strong></td>';
             html += '<td>' + topupStatusBadge(t.status) + '</td>';
-            html += '<td>' + t.requester + (t.reviewer ? '<br><small class="text-muted">審核：' + t.reviewer + '</small>' : '') + '</td>';
-            html += '<td><small class="text-muted">' + t.created_at + '</small>' + (t.reviewed_at ? '<br><small class="text-muted">' + t.reviewed_at + '</small>' : '') + '</td>';
-            // 圖片
-            html += '<td>';
-            if (t.images && t.images.length > 0) {
-                html += '<button class="btn btn-sm btn-outline-secondary js-topup-images" data-images=\'' + JSON.stringify(t.images) + '\'><i class="fas fa-image me-1"></i>' + t.images.length + '張</button>';
-            } else { html += '-'; }
-            html += '</td>';
-            // 操作按鈕
-            html += '<td><div class="d-flex gap-1">';
-            if (t.note) {
-                html += '<button class="btn btn-sm btn-outline-secondary js-topup-note" data-note="' + t.note.replace(/"/g, '&quot;') + '"><i class="fas fa-sticky-note me-1"></i>備註</button>';
-            }
+            html += '<td>' + t.requester + (t.reviewer ? '<div class="cell-stack__sub">審核：' + t.reviewer + '</div>' : '') + '</td>';
+            html += '<td><small class="text-muted">' + t.created_at + '</small>' + (t.reviewed_at ? '<div class="cell-stack__sub">' + t.reviewed_at + '</div>' : '') + '</td>';
+            /*
+             * 附件：圖片與備註都是「點開來看」的唯讀動作，合成一欄的兩個小圖示鈕。
+             * 跟右邊會改資料的通過／拒絕長得不一樣，才分得出哪些按下去有後果。
+             */
+            html += '<td class="text-center">' + topupAttachmentCell(t) + '</td>';
+            // 操作：只留會改資料的動作
+            html += '<td class="col-actions">';
+            /*
+             * ⚠ 審核這兩顆**不做成純圖示**。判準是「按錯的後果」：通過會真的
+             * 加／扣站台點數，拒絕會直接退掉申請，兩顆又相鄰 ——
+             * 畫成一個勾一個叉是在等人按錯。文字留著，圖示才用綠／紅區分。
+             */
             if (parseInt(t.status, 10) === 0 && hasTopupApprove) {
-                html += '<button class="btn btn-sm btn-outline-secondary js-topup-approve" data-id="' + t.id + '" data-station="' + t.station + '" data-amount="' + t.credit_amount + '" data-action="' + t.action_type + '"><i class="fas fa-check text-success me-1"></i>通過</button>';
-                html += '<button class="btn btn-sm btn-outline-secondary js-topup-reject" data-id="' + t.id + '"><i class="fas fa-times text-danger me-1"></i>拒絕</button>';
+                html += '<div class="row-actions"><div class="btn-group btn-group-sm" role="group" aria-label="{{ trans("station.field_action") }}">';
+                html += '<button class="btn btn-outline-secondary btn-icon btn-transition js-topup-approve" data-id="' + t.id + '" data-station="' + t.station + '" data-amount="' + t.credit_amount + '" data-action="' + t.action_type + '"><i class="fas fa-check btn-icon-wrapper text-success"></i>通過</button>';
+                html += '<button class="btn btn-outline-secondary btn-icon btn-transition js-topup-reject" data-id="' + t.id + '"><i class="fas fa-times btn-icon-wrapper text-danger"></i>拒絕</button>';
+                html += '</div></div>';
+            } else {
+                html += '<span class="text-muted">-</span>';
             }
-            if (!t.note && parseInt(t.status, 10) !== 0) { html += '-'; }
-            html += '</div></td>';
+            html += '</td>';
             html += '</tr>';
         });
         $tbody.html(html);
@@ -1505,29 +1513,25 @@ $(function () {
         var html = '';
         list.forEach(function (t) {
             html += '<div class="card mb-2 shadow-sm"><div class="card-body py-3">';
-            html += '<div class="d-flex justify-content-between align-items-start mb-2">';
-            html += '<div><small class="text-muted">' + (t.system || '-') + '</small><br><strong>' + t.station + '</strong> ' + topupActionLabel(t.action_type, t.credit_type) + '</div>';
+            html += '<div class="data-card__head mb-2">';
+            html += '<div><div class="cell-stack__main">' + t.station + ' ' + topupActionLabel(t.action_type, t.credit_type) + '</div>'
+                + '<div class="cell-stack__sub">' + (t.system || '-') + '</div></div>';
             html += topupStatusBadge(t.status);
             html += '</div>';
             // 直接輸入點數的紀錄沒有 USDT 與匯率，這兩列直接不顯示
             if (parseInt(t.input_type, 10) !== 2) {
-                html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">USDT</span><span>' + t.usdt_amount + '</span></div>';
-                html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">{{ trans("station.topup_field_rate") }}</span><span>' + t.exchange_rate + '</span></div>';
+                html += '<div class="data-card__row"><span>USDT</span><span>' + t.usdt_amount + '</span></div>';
+                html += '<div class="data-card__row"><span>{{ trans("station.topup_field_rate") }}</span><span>' + t.exchange_rate + '</span></div>';
             }
-            html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">{{ trans("station.topup_field_amount") }}</span><strong>' + t.credit_amount + '</strong></div>';
-            html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">申請人</span><span>' + t.requester + '</span></div>';
-            html += '<div class="d-flex justify-content-between mb-2" style="font-size:0.8125rem"><span class="text-muted">' + t.created_at + '</span>';
-            if (t.reviewer) html += '<span class="text-muted">審核：' + t.reviewer + '</span>';
-            html += '</div>';
-            if (t.images && t.images.length > 0) {
-                html += '<div class="mb-2"><button class="btn btn-sm btn-outline-secondary js-topup-images" data-images=\'' + JSON.stringify(t.images) + '\'><i class="fas fa-image me-1"></i>查看圖片（' + t.images.length + '張）</button></div>';
-            }
-            if (t.note) html += '<div class="text-muted mb-2" style="font-size:0.8125rem"><i class="fas fa-sticky-note me-1"></i>' + t.note + '</div>';
+            html += '<div class="data-card__row"><span>{{ trans("station.topup_field_amount") }}</span><strong>' + t.credit_amount + '</strong></div>';
+            html += '<div class="data-card__row"><span>申請人</span><span>' + t.requester + (t.reviewer ? '／審核：' + t.reviewer : '') + '</span></div>';
+            html += '<div class="data-card__row"><span>{{ trans("station.topup_field_attachment") }}</span><span>' + topupAttachmentCell(t) + '</span></div>';
+            html += '<div class="cell-stack__sub mb-2">' + t.created_at + (t.reviewed_at ? '　→　' + t.reviewed_at : '') + '</div>';
             if (parseInt(t.status, 10) === 0 && hasTopupApprove) {
-                html += '<div class="d-flex gap-1">';
-                html += '<button class="btn btn-sm btn-outline-secondary js-topup-approve" data-id="' + t.id + '" data-station="' + t.station + '" data-amount="' + t.credit_amount + '" data-action="' + t.action_type + '"><i class="fas fa-check text-success me-1"></i>通過</button>';
-                html += '<button class="btn btn-sm btn-outline-secondary js-topup-reject" data-id="' + t.id + '"><i class="fas fa-times text-danger me-1"></i>拒絕</button>';
-                html += '</div>';
+                html += '<div class="row-actions"><div class="btn-group btn-group-sm" role="group" aria-label="{{ trans("station.field_action") }}">';
+                html += '<button class="btn btn-outline-secondary btn-icon btn-transition js-topup-approve" data-id="' + t.id + '" data-station="' + t.station + '" data-amount="' + t.credit_amount + '" data-action="' + t.action_type + '"><i class="fas fa-check btn-icon-wrapper text-success"></i>通過</button>';
+                html += '<button class="btn btn-outline-secondary btn-icon btn-transition js-topup-reject" data-id="' + t.id + '"><i class="fas fa-times btn-icon-wrapper text-danger"></i>拒絕</button>';
+                html += '</div></div>';
             }
             html += '</div></div>';
         });

@@ -561,19 +561,20 @@ $(function () {
         // 桌面版表格
         var tableHtml =
             '<div class="main-card mb-3 card d-none d-md-block"><div class="card-body p-0"><div class="table-responsive">' +
-            '<table class="table table-hover table-striped align-middle mb-0"><thead class="table-light"><tr>' +
-            '<th>#</th>' +
-            '<th>' + i18n.field_system + '</th>' +
+            /*
+             * 2026-10-10 重排：原本十二欄，其中四組是同一件事的兩半
+             * （系統＋站台、主機＋機型、內網＋外網 IP、開關機＋啟用狀態）。
+             * 合併成八欄，每格主要資訊粗體、次要壓成灰色小字。
+             */
+            '<table class="table table-hover align-middle data-table"><thead class="thead-gold"><tr>' +
+            '<th class="col-idx">#</th>' +
             '<th>' + '{{ trans("vm.field_station") }}' + '</th>' +
             '<th>' + '{{ trans("vm.field_hostname") }}' + '</th>' +
-            '<th>' + '{{ trans("vm.field_model_type") }}' + '</th>' +
             '<th>' + '{{ trans("vm.field_spec") }}' + '</th>' +
-            '<th>' + '{{ trans("vm.field_internal_ip") }}' + '</th>' +
-            '<th>' + '{{ trans("vm.field_external_ip") }}' + '</th>' +
-            '<th>' + '{{ trans("vm.field_total_fee") }}' + '</th>' +
-            '<th>' + '{{ trans("vm.field_power") }}' + '</th>' +
+            '<th>' + '{{ trans("vm.field_ip") }}' + '</th>' +
+            '<th class="col-num">' + '{{ trans("vm.field_total_fee") }}' + '</th>' +
             '<th>' + '{{ trans("vm.field_status") }}' + '</th>' +
-            '<th>' + i18n.field_action + '</th>' +
+            '<th class="col-actions">' + i18n.field_action + '</th>' +
             '</tr></thead><tbody>';
 
         // 手機版卡片
@@ -588,10 +589,18 @@ $(function () {
             var statusBadge = vm.status === 1
                 ? '<span class="badge bg-success">{{ trans("vm.status_active") }}</span>'
                 : '<span class="badge bg-danger">{{ trans("vm.status_disabled") }}</span>';
+            /*
+             * 編輯與開關機黏成一段（Architect 的 btn-group，共用邊框、
+             * 外框是 btn-transition 的淡灰，滑過去才亮）。兩顆都帶文字 ——
+             * 尤其開關機：它的標籤會在「開機／關機」之間切換，
+             * 一個電源圖示表達不出「現在按下去是要開還是要關」。
+             */
             var actions = '';
+
             if (canUpdate) {
                 actions =
-                    '<button class="btn btn-sm btn-outline-secondary js-edit-vm" ' +
+                    '<div class="btn-group btn-group-sm" role="group" aria-label="' + i18n.field_action + '">' +
+                    '<button class="btn btn-outline-secondary btn-icon btn-transition js-edit-vm" ' +
                     'data-id="' + vm.id + '" data-station-id="' + (vm.station_id || '') + '" ' +
                     'data-hostname="' + vm.hostname + '" data-spec="' + vm.spec + '" ' +
                     'data-internal-ip="' + (vm.internal_ip || '') + '" data-external-ip="' + (vm.external_ip || '') + '" ' +
@@ -599,42 +608,43 @@ $(function () {
                     'data-vpn-fee="' + (vm.vpn_fee || 0) + '" data-google-fee="' + (vm.google_fee || 0) + '" ' +
                     'data-billing-day="' + vm.billing_day + '" data-note="' + (vm.note || '') + '" ' +
                     'data-status="' + vm.status + '">' +
-                    '<i class="fas fa-edit me-1"></i>{{ trans("vm.action_edit") }}</button> ' +
-                    '<button class="btn btn-sm btn-outline-secondary js-toggle-power" data-id="' + vm.id + '"' +
+                    '<i class="fas fa-edit btn-icon-wrapper"></i>{{ trans("vm.action_edit") }}</button>' +
+                    '<button class="btn btn-outline-secondary btn-icon btn-transition js-toggle-power" data-id="' + vm.id + '"' +
                     ' data-system="' + systemName + '" data-station="' + stationName + '" data-hostname="' + vm.hostname + '"' +
                     ' data-power="' + vm.power_status + '">' +
-                    '<i class="fas fa-power-off me-1"></i>' + (vm.power_status === 1 ? i18n.power_off : i18n.power_on) + '</button>';
+                    '<i class="fas fa-power-off btn-icon-wrapper"></i>' +
+                    (vm.power_status === 1 ? i18n.power_off : i18n.power_on) + '</button>' +
+                    '</div>';
             }
 
             tableHtml +=
                 '<tr>' +
-                '<td>' + (idx + 1) + '</td>' +
-                '<td>' + systemName + '</td>' +
-                '<td>' + stationName + '</td>' +
-                '<td><strong>' + vm.hostname + '</strong></td>' +
-                '<td>' + (vm.model_type || '-') + '</td>' +
+                '<td class="col-idx">' + (idx + 1) + '</td>' +
+                '<td><div class="cell-stack__main">' + stationName + '</div>' +
+                '<div class="cell-stack__sub">' + systemName + '</div></td>' +
+                '<td><div class="cell-stack__main">' + vm.hostname + '</div>' +
+                '<div class="cell-stack__sub">' + (vm.model_type || '-') + '</div></td>' +
                 '<td>' + vm.spec + '</td>' +
-                '<td>' + (vm.internal_ip || '-') + '</td>' +
-                '<td>' + (vm.external_ip || '-') + '</td>' +
-                '<td><strong>' + vm.total_fee + '</strong></td>' +
-                '<td>' + powerBadge + '</td>' +
-                '<td>' + statusBadge + '</td>' +
-                '<td>' + actions + '</td>' +
+                '<td><div>' + (vm.internal_ip || '-') + '</div>' +
+                '<div class="cell-stack__sub">' + (vm.external_ip || '-') + '</div></td>' +
+                '<td class="col-num"><strong>' + vm.total_fee + '</strong></td>' +
+                '<td class="text-nowrap">' + powerBadge + ' ' + statusBadge + '</td>' +
+                '<td class="col-actions"><div class="row-actions">' + actions + '</div></td>' +
                 '</tr>';
 
             cardsHtml +=
                 '<div class="card mb-2 shadow-sm"><div class="card-body py-3">' +
-                '<div class="d-flex justify-content-between align-items-start mb-2">' +
-                '<div><strong style="font-size:1.0625rem">' + vm.hostname + '</strong>' +
-                '<div class="text-muted" style="font-size:0.8125rem">' + systemName + ' / ' + stationName + '</div></div>' +
+                '<div class="data-card__head mb-2">' +
+                '<div><div class="cell-stack__main">' + vm.hostname + '</div>' +
+                '<div class="cell-stack__sub">' + systemName + ' / ' + stationName + '</div></div>' +
                 '<div class="d-flex gap-1">' + powerBadge + statusBadge + '</div></div>' +
-                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + i18n.field_model_type + '</span><span>' + (vm.model_type || '-') + '</span></div>' +
-                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + i18n.field_spec + '</span><span>' + vm.spec + '</span></div>' +
-                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + i18n.field_internal_ip + '</span><span>' + (vm.internal_ip || '-') + '</span></div>' +
-                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + i18n.field_external_ip + '</span><span>' + (vm.external_ip || '-') + '</span></div>' +
-                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + i18n.field_total_fee + '</span><strong>' + vm.total_fee + '</strong></div>' +
-                '<div class="d-flex justify-content-between mb-2" style="font-size:0.875rem"><span class="text-muted">' + i18n.field_billing_day + '</span><span>' + transReplace(i18n.billing_day_text, { day: vm.billing_day }) + '</span></div>' +
-                '<div class="d-flex gap-1 flex-wrap">' + actions + '</div>' +
+                '<div class="data-card__row"><span>' + i18n.field_model_type + '</span><span>' + (vm.model_type || '-') + '</span></div>' +
+                '<div class="data-card__row"><span>' + i18n.field_spec + '</span><span>' + vm.spec + '</span></div>' +
+                '<div class="data-card__row"><span>' + i18n.field_internal_ip + '</span><span>' + (vm.internal_ip || '-') + '</span></div>' +
+                '<div class="data-card__row"><span>' + i18n.field_external_ip + '</span><span>' + (vm.external_ip || '-') + '</span></div>' +
+                '<div class="data-card__row"><span>' + i18n.field_total_fee + '</span><strong>' + vm.total_fee + '</strong></div>' +
+                '<div class="data-card__row mb-2"><span>' + i18n.field_billing_day + '</span><span>' + transReplace(i18n.billing_day_text, { day: vm.billing_day }) + '</span></div>' +
+                '<div class="row-actions">' + actions + '</div>' +
                 '</div></div>';
         });
 
@@ -878,6 +888,37 @@ $(function () {
     //  帳務紀錄
     // ---------------------------------------------------------------
 
+    /**
+     * 「查看憑證」按鈕
+     *
+     * 已收款與待審核兩種狀態都要，所以抽出來 —— 兩邊各寫一次的話，
+     * 樣式或 data-* 改了很容易只改到一邊。
+     *
+     * @param {string} image 憑證圖片路徑
+     * @returns {string} 按鈕 HTML
+     */
+    function viewProofButton(image) {
+        return '<button class="btn btn-outline-secondary btn-icon btn-transition js-view-proof"' +
+            ' data-img="' + image + '">' +
+            '<i class="fas fa-image btn-icon-wrapper"></i>{{ trans("vm.action_view_proof") }}</button>';
+    }
+
+    /**
+     * 把這一列的動作包成一段 btn-group（共用邊框、只有兩端圓角）
+     *
+     * ⚠ 空字串要原樣回傳，不要回一個空的 btn-group —— Bootstrap 會把它
+     * 畫成一條沒有內容的細框，看起來像壞掉的按鈕（關機的主機就是這一種）。
+     *
+     * @param {string} buttons 已經串好的按鈕 HTML
+     * @returns {string}
+     */
+    function billingActionGroup(buttons) {
+        if (!buttons) { return ''; }
+
+        return '<div class="btn-group btn-group-sm" role="group" aria-label="' + i18n.field_action + '">' +
+            buttons + '</div>';
+    }
+
     function loadBillings() {
         var month = $('#billing-month').val();
         var filter = $('#billing-filter').val();
@@ -910,16 +951,19 @@ $(function () {
 
         var tableHtml =
             '<div class="main-card mb-3 card d-none d-md-block"><div class="card-body p-0"><div class="table-responsive">' +
-            '<table class="table table-hover table-striped align-middle mb-0"><thead class="table-light"><tr>' +
-            '<th>#</th>' +
-            '<th>' + i18n.field_system + '</th>' +
+            /*
+             * 2026-10-10 重排：系統併進站台那一格（灰色小字），
+             * 逾期天數併進收款狀態那一格 —— 逾期時 badge 本來就會變成「逾期」，
+             * 天數再獨立一欄等於同一件事講兩遍。九欄變七欄。
+             */
+            '<table class="table table-hover align-middle data-table"><thead class="thead-gold"><tr>' +
+            '<th class="col-idx">#</th>' +
             '<th>{{ trans("vm.field_station") }}</th>' +
-            '<th>{{ trans("vm.field_month") }}</th>' +
-            '<th>{{ trans("vm.field_amount") }}</th>' +
-            '<th>{{ trans("vm.field_due_date") }}</th>' +
+            '<th class="col-tight">{{ trans("vm.field_month") }}</th>' +
+            '<th class="col-num">{{ trans("vm.field_amount") }}</th>' +
+            '<th class="col-tight">{{ trans("vm.field_due_date") }}</th>' +
             '<th>{{ trans("vm.field_paid") }}</th>' +
-            '<th>{{ trans("vm.field_overdue_days") }}</th>' +
-            '<th>' + i18n.field_action + '</th>' +
+            '<th class="col-actions">' + i18n.field_action + '</th>' +
             '</tr></thead><tbody>';
 
         var cardsHtml = '<div class="d-md-none">';
@@ -942,16 +986,26 @@ $(function () {
             } else {
                 paidBadge = '<span class="badge bg-warning text-dark">{{ trans("vm.paid_no") }}</span>';
             }
+            /*
+             * 逾期時 badge 換成「逾期」，天數接在同一格的下一行 ——
+             * 原本天數獨立一欄，跟 badge 講的是同一件事。
+             */
             var overdueText = '';
             if (!vmPowerOff && b.paid === 0 && b.overdue_days > 0) {
-                overdueText = '<span class="text-danger fw-bold">' + transReplace(i18n.days_unit, { days: b.overdue_days }) + '</span>';
                 paidBadge = '<span class="badge bg-danger">{{ trans("vm.overdue") }}</span>';
-            } else {
-                overdueText = '-';
+                overdueText = '<div class="cell-stack__sub text-danger">'
+                    + transReplace(i18n.days_unit, { days: b.overdue_days }) + '</div>';
             }
             var systemId = b.vm_server && b.vm_server.station ? b.vm_server.station.system_id : '';
             var hasTelegram = b.vm_server && b.vm_server.station && b.vm_server.station.telegram_group_id;
 
+            /*
+             * 這一欄的按鈕組合隨狀態變（最多四顆），所以照狀態一顆一顆串，
+             * 最後再統一包進一個 btn-group（見下方 billingActionGroup）。
+             *
+             * 每顆都帶文字；「標記已付／審核」維持 btn-primary（實心），
+             * 它是這一列的主要動作，其餘是 btn-transition 的淡框。
+             */
             var actions = '';
             // 關機的不顯示任何按鈕
             if (vmPowerOff) {
@@ -959,86 +1013,85 @@ $(function () {
             }
             // 複製文案 + 發送（僅未收款時顯示）
             else if (systemId && b.paid === 0) {
-                actions += '<button class="btn btn-sm btn-outline-secondary js-copy-billing"' +
+                actions += '<button class="btn btn-outline-secondary btn-icon btn-transition js-copy-billing"' +
                     ' data-system-id="' + systemId + '"' +
                     ' data-station="' + stationName + '"' +
                     ' data-amount="' + b.amount + '"' +
                     ' data-month="' + b.billing_month + '"' +
                     ' data-due-date="' + (b.due_date || '') + '">' +
-                    '<i class="fas fa-copy me-1"></i>{{ trans("payment_config.action_copy") }}</button> ';
+                    '<i class="fas fa-copy btn-icon-wrapper"></i>{{ trans("payment_config.action_copy") }}</button>';
                 if (hasTelegram) {
-                    actions += '<button class="btn btn-sm btn-outline-secondary js-send-billing"' +
+                    actions += '<button class="btn btn-outline-secondary btn-icon btn-transition js-send-billing"' +
                         ' data-system-id="' + systemId + '"' +
                         ' data-station="' + stationName + '"' +
                         ' data-group-id="' + b.vm_server.station.telegram_group_id + '"' +
                         ' data-amount="' + b.amount + '"' +
                         ' data-month="' + b.billing_month + '"' +
                         ' data-due-date="' + (b.due_date || '') + '">' +
-                        '<i class="fas fa-paper-plane me-1"></i>{{ trans("payment_config.action_send") }}</button> ';
+                        '<i class="fas fa-paper-plane btn-icon-wrapper"></i>{{ trans("payment_config.action_send") }}</button>';
                 }
             }
             // 未收款：有上傳權限可上傳證明，有審核權限可直接標記（關機不顯示）
             if (!vmPowerOff && b.paid === 0) {
                 if (canUpload) {
-                    actions += '<button class="btn btn-sm btn-outline-secondary js-upload-proof" data-id="' + b.id + '">' +
-                        '<i class="fas fa-upload me-1"></i>{{ trans("vm.action_upload_proof") }}</button> ';
+                    actions += '<button class="btn btn-outline-secondary btn-icon btn-transition js-upload-proof" data-id="' + b.id + '">' +
+                        '<i class="fas fa-upload btn-icon-wrapper"></i>{{ trans("vm.action_upload_proof") }}</button>';
                 }
                 if (canApprove) {
-                    actions += '<button class="btn btn-sm btn-primary js-mark-paid" data-id="' + b.id + '"' +
+                    actions += '<button class="btn btn-primary btn-icon js-mark-paid" data-id="' + b.id + '"' +
                         ' data-station="' + stationName + '" data-vm="' + vmLabel + '"' +
                         ' data-month="' + b.billing_month + '" data-amount="' + b.amount + '"' +
                         ' data-proof="' + (b.proof_image || '') + '">' +
-                        '<i class="fas fa-check me-1"></i>{{ trans("vm.action_mark_paid") }}</button>';
+                        '<i class="fas fa-check btn-icon-wrapper"></i>{{ trans("vm.action_mark_paid") }}</button>';
                 }
             }
             // 已收款：不再有操作，但繳款證明要留著能查，事後對帳才查得到憑證
             if (!vmPowerOff && b.paid === 1 && b.proof_image) {
-                actions += '<button class="btn btn-sm btn-outline-secondary js-view-proof" data-img="' + b.proof_image + '">' +
-                    '<i class="fas fa-image me-1"></i>{{ trans("vm.action_view_proof") }}</button> ';
+                actions += viewProofButton(b.proof_image);
             }
             // 待審核：可查看證明、重新上傳，有審核權限可審核（關機不顯示）
             if (!vmPowerOff && b.paid === 2) {
                 if (b.proof_image) {
-                    actions += '<button class="btn btn-sm btn-outline-secondary js-view-proof" data-img="' + b.proof_image + '">' +
-                        '<i class="fas fa-image me-1"></i>{{ trans("vm.action_view_proof") }}</button> ';
+                    actions += viewProofButton(b.proof_image);
                 }
                 if (canUpload) {
-                    actions += '<button class="btn btn-sm btn-outline-secondary js-upload-proof" data-id="' + b.id + '">' +
-                        '<i class="fas fa-redo me-1"></i>' + i18n.action_reupload + '</button> ';
+                    actions += '<button class="btn btn-outline-secondary btn-icon btn-transition js-upload-proof" data-id="' + b.id + '">' +
+                        '<i class="fas fa-redo btn-icon-wrapper"></i>' + i18n.action_reupload + '</button>';
                 }
                 if (canApprove) {
-                    actions += '<button class="btn btn-sm btn-primary js-approve-paid" data-id="' + b.id + '"' +
+                    actions += '<button class="btn btn-primary btn-icon js-approve-paid" data-id="' + b.id + '"' +
                         ' data-station="' + stationName + '" data-vm="' + vmLabel + '"' +
                         ' data-month="' + b.billing_month + '" data-amount="' + b.amount + '"' +
                         ' data-proof="' + (b.proof_image || '') + '">' +
-                        '<i class="fas fa-check-double me-1"></i>{{ trans("vm.action_approve") }}</button>';
+                        '<i class="fas fa-check-double btn-icon-wrapper"></i>{{ trans("vm.action_approve") }}</button>';
                 }
             }
 
+            actions = billingActionGroup(actions);
+
             tableHtml +=
                 '<tr>' +
-                '<td>' + (idx + 1) + '</td>' +
-                '<td>' + billingSystemName + '</td>' +
-                '<td>' + stationName + '</td>' +
-                '<td>' + b.billing_month + '</td>' +
-                '<td>' + b.amount + '</td>' +
-                '<td>' + (b.due_date || '-') + '</td>' +
-                '<td>' + paidBadge + '</td>' +
-                '<td>' + overdueText + '</td>' +
-                '<td>' + actions + '</td>' +
+                '<td class="col-idx">' + (idx + 1) + '</td>' +
+                '<td><div class="cell-stack__main">' + stationName + '</div>' +
+                '<div class="cell-stack__sub">' + billingSystemName + '</div></td>' +
+                '<td class="col-tight">' + b.billing_month + '</td>' +
+                '<td class="col-num">' + b.amount + '</td>' +
+                '<td class="col-tight">' + (b.due_date || '-') + '</td>' +
+                '<td class="text-nowrap">' + paidBadge + overdueText + '</td>' +
+                '<td class="col-actions"><div class="row-actions">' + actions + '</div></td>' +
                 '</tr>';
 
             cardsHtml +=
                 '<div class="card mb-2 shadow-sm"><div class="card-body py-3">' +
-                '<div class="d-flex justify-content-between align-items-start mb-2">' +
-                '<div><strong style="font-size:1.0625rem">' + stationName + '</strong>' +
-                '<div class="text-muted" style="font-size:0.8125rem">' + billingSystemName + '</div></div>' +
+                '<div class="data-card__head mb-2">' +
+                '<div><div class="cell-stack__main">' + stationName + '</div>' +
+                '<div class="cell-stack__sub">' + billingSystemName + '</div></div>' +
                 paidBadge + '</div>' +
-                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + i18n.field_month + '</span><span>' + b.billing_month + '</span></div>' +
-                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + i18n.field_amount + '</span><strong>' + b.amount + '</strong></div>' +
-                '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + i18n.field_due_date + '</span><span>' + (b.due_date || '-') + '</span></div>' +
-                (b.paid === 0 && b.overdue_days > 0 ? '<div class="d-flex justify-content-between mb-2" style="font-size:0.875rem"><span class="text-muted">' + i18n.overdue + '</span><span class="text-danger fw-bold">' + b.overdue_days + ' 天</span></div>' : '') +
-                '<div class="d-flex gap-1">' + actions + '</div>' +
+                '<div class="data-card__row"><span>' + i18n.field_month + '</span><span>' + b.billing_month + '</span></div>' +
+                '<div class="data-card__row"><span>' + i18n.field_amount + '</span><strong>' + b.amount + '</strong></div>' +
+                '<div class="data-card__row mb-2"><span>' + i18n.field_due_date + '</span><span>' + (b.due_date || '-') + '</span></div>' +
+                (b.paid === 0 && b.overdue_days > 0 ? '<div class="data-card__row mb-2"><span>' + i18n.overdue + '</span><span class="text-danger fw-bold">' + transReplace(i18n.days_unit, { days: b.overdue_days }) + '</span></div>' : '') +
+                '<div class="row-actions">' + actions + '</div>' +
                 '</div></div>';
         });
 

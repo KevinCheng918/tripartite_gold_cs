@@ -9,6 +9,14 @@ return [
     'updated' => 'Account updated',
     'field_account' => 'Account',
     'field_nickname' => 'Nickname',
+    /*
+     * Table column headings. On 2026-10-09 four columns (account, nickname,
+     * TG sign, TG link) collapsed into two: one cell for who the person is,
+     * one for their Telegram state — four of seven columns described the same
+     * person, which left nothing to scan for.
+     */
+    'col_member'   => 'Member',
+    'col_telegram' => 'Telegram',
     'field_telegram_nickname' => 'Telegram signature',
     'label_telegram_nickname' => 'TG sign',
     'telegram_nickname_hint'  => 'Messages this account sends in Telegram chats will end with "-nickname". Leave blank to disable.',

@@ -12,6 +12,8 @@ $(function () {
 
     var csrfToken = $('meta[name="csrf-token"]').attr('content');
     var i18n = JSON.parse(root.dataset.i18n);
+    /** @type {Object} 操作欄分段的名稱，用在 btn-group 的 aria-label（common.row_actions） */
+    var rowI18n = JSON.parse(root.dataset.rowActions);
     var canUpload = root.dataset.canUpload === '1';
     var canDelete = root.dataset.canDelete === '1';
     var isAdmin = root.dataset.isAdmin === '1';
@@ -217,7 +219,7 @@ $(function () {
         renderFileActions(type, folderId);
 
         if (!files || files.length === 0) {
-            $body.html('<tr><td colspan="5" class="text-center text-muted py-3">' +
+            $body.html('<tr><td colspan="5" class="table-empty"><i class="fas fa-folder-open"></i>' +
                 escapeHtml(i18n.no_files) + '</td></tr>');
             return;
         }
@@ -226,6 +228,7 @@ $(function () {
         files.forEach(function (f) {
             var canDel = (type === 'shared' && canDelete) ||
                 (type === 'personal' && (f.uploaded_by === currentUserId || isAdmin));
+            var canMove = canAddFolder(type);
 
             html += '<tr>';
             html += '<td class="sf-file-name"><a href="javascript:void(0)" class="js-preview-file text-decoration-none"' +
@@ -235,19 +238,43 @@ $(function () {
             html += '<td class="sf-file-meta">' + fmtSize(f.file_size) + '</td>';
             html += '<td class="sf-file-meta">' + escapeHtml(f.uploader ? f.uploader.nickname : '-') + '</td>';
             html += '<td class="sf-file-meta">' + window.formatDateTime(f.created_at) + '</td>';
-            html += '<td class="sf-file-actions"><div class="d-flex gap-1">';
-            if (canAddFolder(type)) {
-                html += '<button class="btn btn-sm btn-outline-secondary js-move-file" data-id="' + f.id +
-                    '" data-name="' + escapeHtml(f.original_name) + '">' +
-                    '<i class="fas fa-folder-open me-1"></i>' + escapeHtml(i18n.action_move) + '</button>';
+
+            /*
+             * 三個動作全部留在畫面上、每顆都帶文字，分兩段（Architect 的 btn-group）：
+             *   · 檢視      下載／搬移
+             *   · 危險操作  刪除 —— 自己一段，圖示用 text-danger（刪掉就沒了）
+             *
+             * 外框換成 btn-transition 的淡灰（滑過去才亮），
+             * 同一段共用邊框 —— 原本三顆深灰外框各自獨立，長檔名會把它們
+             * 擠到換行（「下載」被拆成兩行）。
+             */
+            html += '<td class="sf-file-actions"><div class="row-actions">';
+            html += '<div class="btn-group btn-group-sm" role="group" aria-label="' +
+                escapeHtml(rowI18n.view) + '">';
+            html += '<a href="/storage/' + f.file_path + '" target="_blank"' +
+                ' class="btn btn-outline-secondary btn-icon btn-transition">' +
+                '<i class="fas fa-download btn-icon-wrapper"></i>' +
+                escapeHtml(i18n.action_download) + '</a>';
+
+            if (canMove) {
+                html += '<button type="button"' +
+                    ' class="btn btn-outline-secondary btn-icon btn-transition js-move-file"' +
+                    ' data-id="' + f.id + '" data-name="' + escapeHtml(f.original_name) + '">' +
+                    '<i class="fas fa-folder-open btn-icon-wrapper"></i>' +
+                    escapeHtml(i18n.action_move) + '</button>';
             }
-            html += '<a href="/storage/' + f.file_path + '" target="_blank" class="btn btn-sm btn-outline-secondary">' +
-                '<i class="fas fa-download me-1"></i>' + escapeHtml(i18n.action_download) + '</a>';
+
+            html += '</div>';
+
             if (canDel) {
-                html += '<button class="btn btn-sm btn-outline-secondary js-delete-file" data-id="' + f.id +
-                    '" data-name="' + escapeHtml(f.original_name) + '">' +
-                    '<i class="fas fa-trash-alt text-danger me-1"></i>' + escapeHtml(i18n.action_delete) + '</button>';
+                html += '<div class="btn-group btn-group-sm" role="group" aria-label="' +
+                    escapeHtml(rowI18n.danger) + '">' +
+                    '<button type="button" class="btn btn-outline-secondary btn-icon btn-transition js-delete-file"' +
+                    ' data-id="' + f.id + '" data-name="' + escapeHtml(f.original_name) + '">' +
+                    '<i class="fas fa-trash-alt btn-icon-wrapper text-danger"></i>' +
+                    escapeHtml(i18n.action_delete) + '</button></div>';
             }
+
             html += '</div></td></tr>';
         });
 

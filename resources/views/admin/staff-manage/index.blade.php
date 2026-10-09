@@ -104,18 +104,18 @@
             <div class="main-card mb-3 card">
                 <div class="card-body p-0">
                     <div class="table-responsive d-none d-md-block">
-                        <table class="table table-hover table-striped align-middle mb-0">
+                        <table class="table table-hover align-middle data-table">
                             <thead class="thead-gold">
                                 <tr>
-                                    <th>#</th>
+                                    <th class="col-idx">#</th>
                                     <th>{{ trans('staff_manage.field_account') }}</th>
                                     <th>{{ trans('staff_manage.field_nickname') }}</th>
                                     <th>{{ trans('staff_manage.field_level') }}</th>
-                                    <th>{{ trans('staff_manage.field_hired_at') }}</th>
-                                    <th>{{ trans('staff_manage.field_resigned_at') }}</th>
-                                    <th>{{ trans('staff_manage.field_tenure') }}</th>
+                                    <th class="col-tight">{{ trans('staff_manage.field_hired_at') }}</th>
+                                    <th class="col-tight">{{ trans('staff_manage.field_resigned_at') }}</th>
+                                    <th class="col-tight">{{ trans('staff_manage.field_tenure') }}</th>
                                     @if(Auth::user()->hasPermission('staff_manage.edit'))
-                                    <th>{{ trans('staff_manage.field_action') }}</th>
+                                    <th class="col-actions">{{ trans('staff_manage.field_action') }}</th>
                                     @endif
                                 </tr>
                             </thead>
@@ -214,20 +214,20 @@
             <div class="main-card mb-3 card">
                 <div class="card-body p-0">
                     <div class="table-responsive d-none d-md-block">
-                        <table class="table table-hover table-striped align-middle mb-0">
+                        <table class="table table-hover align-middle data-table">
                             <thead class="thead-gold">
                                 <tr>
-                                    <th>#</th>
+                                    <th class="col-idx">#</th>
                                     <th>{{ trans('staff_manage.field_staff') }}</th>
                                     <th>{{ trans('staff_manage.field_eq_name') }}</th>
                                     <th>{{ trans('staff_manage.field_model') }}</th>
                                     <th>{{ trans('staff_manage.field_serial') }}</th>
-                                    <th>{{ trans('staff_manage.field_received_at') }}</th>
-                                    <th>{{ trans('staff_manage.field_returned_at') }}</th>
-                                    <th>{{ trans('staff_manage.field_duration') }}</th>
+                                    <th class="col-tight">{{ trans('staff_manage.field_received_at') }}</th>
+                                    <th class="col-tight">{{ trans('staff_manage.field_returned_at') }}</th>
+                                    <th class="col-tight">{{ trans('staff_manage.field_duration') }}</th>
                                     <th>{{ trans('staff_manage.field_status') }}</th>
                                     @if(Auth::user()->hasPermission('staff_manage.edit'))
-                                    <th>{{ trans('staff_manage.field_action') }}</th>
+                                    <th class="col-actions">{{ trans('staff_manage.field_action') }}</th>
                                     @endif
                                 </tr>
                             </thead>
@@ -452,26 +452,26 @@ $(function () {
         // 身份卡片
         var levelItems = '';
         Object.keys(levelMap).forEach(function (lv) {
-            levelItems += '<div class="flex-fill text-center"><div class="mb-1">' + levelBadge(parseInt(lv, 10)) + '</div><div class="fw-bold" style="font-size:1.25rem">' + (byLevel[lv] || 0) + '</div></div>';
+            levelItems += '<div class="flex-fill text-center"><div class="mb-1">' + levelBadge(parseInt(lv, 10)) + '</div><div class="stat-card__value">' + (byLevel[lv] || 0) + '</div></div>';
         });
 
         var html = '<div class="col"><div class="card shadow-sm">';
-        html += '<div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong style="font-size:1.0625rem"><i class="fas fa-users me-2" style="color:#d4af37"></i>' + I18N.field_level + '</strong></div>';
+        html += '<div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong class="stat-card__title"><i class="fas fa-users me-2 text-gold"></i>' + I18N.field_level + '</strong></div>';
         html += '<div class="card-body py-2"><div class="d-flex flex-wrap">' + levelItems + '</div></div>';
         html += '</div></div>';
 
         // 狀態卡片
         html += '<div class="col"><div class="card shadow-sm">';
-        html += '<div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong style="font-size:1.0625rem"><i class="fas fa-toggle-on me-2" style="color:#28a745"></i>' + I18N.field_status + '</strong></div>';
+        html += '<div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong class="stat-card__title"><i class="fas fa-toggle-on me-2 text-success"></i>' + I18N.field_status + '</strong></div>';
         html += '<div class="card-body py-2"><div class="d-flex flex-wrap text-center">';
-        html += '<div class="flex-fill"><div class="mb-1"><span class="badge bg-success">' + I18N.status_on_job + '</span></div><div class="fw-bold" style="font-size:1.25rem">' + onJob + '</div></div>';
-        html += '<div class="flex-fill"><div class="mb-1"><span class="badge bg-secondary">' + I18N.status_resigned + '</span></div><div class="fw-bold" style="font-size:1.25rem">' + resigned + '</div></div>';
+        html += '<div class="flex-fill"><div class="mb-1"><span class="badge bg-success">' + I18N.status_on_job + '</span></div><div class="stat-card__value">' + onJob + '</div></div>';
+        html += '<div class="flex-fill"><div class="mb-1"><span class="badge bg-secondary">' + I18N.status_resigned + '</span></div><div class="stat-card__value">' + resigned + '</div></div>';
         html += '</div></div></div></div>';
 
         // 總計
-        html += '<div class="col-auto d-flex"><div class="card shadow-sm d-flex justify-content-center" style="min-width:100px">';
-        html += '<div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong style="font-size:1.0625rem"><i class="fas fa-chart-bar me-2" style="color:#0284c7"></i>' + I18N.total + '</strong></div>';
-        html += '<div class="card-body py-2 text-center"><div class="fw-bold" style="font-size:1.25rem">' + total + '</div><small class="text-muted">' + I18N.unit_person + '</small></div>';
+        html += '<div class="col-auto d-flex"><div class="card shadow-sm d-flex justify-content-center stat-card--narrow">';
+        html += '<div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong class="stat-card__title"><i class="fas fa-chart-bar me-2 text-info"></i>' + I18N.total + '</strong></div>';
+        html += '<div class="card-body py-2 text-center"><div class="stat-card__value">' + total + '</div><small class="text-muted">' + I18N.unit_person + '</small></div>';
         html += '</div></div>';
 
         $('#staff-stats').html(html);
@@ -491,16 +491,16 @@ $(function () {
         });
 
         var html = '<div class="col"><div class="card shadow-sm">';
-        html += '<div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong style="font-size:1.0625rem"><i class="fas fa-laptop me-2" style="color:#17a2b8"></i>' + I18N.eq_status + '</strong></div>';
+        html += '<div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong class="stat-card__title"><i class="fas fa-laptop me-2 text-info"></i>' + I18N.eq_status + '</strong></div>';
         html += '<div class="card-body py-2"><div class="d-flex flex-wrap text-center">';
-        html += '<div class="flex-fill"><div class="mb-1"><span class="badge bg-success">' + I18N.eq_in_use + '</span></div><div class="fw-bold" style="font-size:1.25rem">' + inUse + '</div></div>';
-        html += '<div class="flex-fill"><div class="mb-1"><span class="badge bg-secondary">' + I18N.eq_returned + '</span></div><div class="fw-bold" style="font-size:1.25rem">' + returned + '</div></div>';
-        html += '<div class="flex-fill"><div class="mb-1"><span class="badge bg-warning text-dark">' + I18N.eq_not_received + '</span></div><div class="fw-bold" style="font-size:1.25rem">' + notReceived + '</div></div>';
+        html += '<div class="flex-fill"><div class="mb-1"><span class="badge bg-success">' + I18N.eq_in_use + '</span></div><div class="stat-card__value">' + inUse + '</div></div>';
+        html += '<div class="flex-fill"><div class="mb-1"><span class="badge bg-secondary">' + I18N.eq_returned + '</span></div><div class="stat-card__value">' + returned + '</div></div>';
+        html += '<div class="flex-fill"><div class="mb-1"><span class="badge bg-warning text-dark">' + I18N.eq_not_received + '</span></div><div class="stat-card__value">' + notReceived + '</div></div>';
         html += '</div></div></div></div>';
 
-        html += '<div class="col-auto d-flex"><div class="card shadow-sm d-flex justify-content-center" style="min-width:100px">';
-        html += '<div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong style="font-size:1.0625rem"><i class="fas fa-chart-bar me-2" style="color:#0284c7"></i>' + I18N.total + '</strong></div>';
-        html += '<div class="card-body py-2 text-center"><div class="fw-bold" style="font-size:1.25rem">' + total + '</div><small class="text-muted">' + I18N.unit_item + '</small></div>';
+        html += '<div class="col-auto d-flex"><div class="card shadow-sm d-flex justify-content-center stat-card--narrow">';
+        html += '<div class="card-header py-2 d-flex justify-content-center stat-card-header"><strong class="stat-card__title"><i class="fas fa-chart-bar me-2 text-info"></i>' + I18N.total + '</strong></div>';
+        html += '<div class="card-body py-2 text-center"><div class="stat-card__value">' + total + '</div><small class="text-muted">' + I18N.unit_item + '</small></div>';
         html += '</div></div>';
 
         $('#eq-stats').html(html);
@@ -610,19 +610,19 @@ $(function () {
     function renderStaffTable(list) {
         list = filterStaffData(list);
         var $tbody = $('#staff-table-body');
-        if (!list.length) { $tbody.html('<tr><td colspan="8" class="text-center text-muted py-4">' + I18N.no_data + '</td></tr>'); return; }
+        if (!list.length) { $tbody.html('<tr><td colspan="8" class="table-empty"><i class="fas fa-user-slash"></i>' + I18N.no_data + '</td></tr>'); return; }
         var html = '';
         list.forEach(function (s, idx) {
             html += '<tr>';
-            html += '<td>' + (idx + 1) + '</td>';
+            html += '<td class="col-idx">' + (idx + 1) + '</td>';
             html += '<td>' + s.account + '</td>';
-            html += '<td><strong>' + s.nickname + '</strong></td>';
+            html += '<td><span class="cell-stack__main">' + s.nickname + '</span></td>';
             html += '<td>' + levelBadge(s.level) + '</td>';
-            html += '<td>' + (s.hired_at || '<span class="text-muted">' + I18N.not_set + '</span>') + '</td>';
-            html += '<td>' + (s.resigned_at ? s.resigned_at : '<span class="badge bg-success">' + I18N.status_on_job_now + '</span>') + '</td>';
-            html += '<td>' + (s.tenure || '-') + '</td>';
+            html += '<td class="col-tight">' + (s.hired_at || '<span class="text-muted">' + I18N.not_set + '</span>') + '</td>';
+            html += '<td class="col-tight">' + (s.resigned_at ? s.resigned_at : '<span class="badge bg-success">' + I18N.status_on_job_now + '</span>') + '</td>';
+            html += '<td class="col-tight">' + (s.tenure || '-') + '</td>';
             if (canEdit) {
-                html += '<td><button class="btn btn-sm btn-outline-secondary js-staff-edit" data-id="' + s.id + '" data-nickname="' + s.nickname + '" data-hired="' + (s.hired_at || '') + '" data-resigned="' + (s.resigned_at || '') + '"><i class="fas fa-edit me-1"></i>' + I18N.action_edit + '</button></td>';
+                html += '<td class="col-actions"><div class="row-actions"><button class="btn btn-sm btn-outline-secondary btn-icon btn-transition js-staff-edit" data-id="' + s.id + '" data-nickname="' + s.nickname + '" data-hired="' + (s.hired_at || '') + '" data-resigned="' + (s.resigned_at || '') + '"><i class="fas fa-edit btn-icon-wrapper"></i>' + I18N.action_edit + '</button></div></td>';
             }
             html += '</tr>';
         });
@@ -637,14 +637,14 @@ $(function () {
         var html = '';
         list.forEach(function (s) {
             html += '<div class="card mb-2 shadow-sm"><div class="card-body py-3">';
-            html += '<div class="d-flex justify-content-between align-items-start mb-2"><div><strong style="font-size:1.0625rem">' + s.nickname + '</strong><div class="text-muted" style="font-size:0.8125rem">' + s.account + '</div></div>';
+            html += '<div class="data-card__head mb-2"><div><div class="cell-stack__main">' + s.nickname + '</div><div class="cell-stack__sub">' + s.account + '</div></div>';
             if (canEdit) {
-                html += '<button class="btn btn-sm btn-outline-secondary js-staff-edit" data-id="' + s.id + '" data-nickname="' + s.nickname + '" data-hired="' + (s.hired_at || '') + '" data-resigned="' + (s.resigned_at || '') + '"><i class="fas fa-edit"></i></button>';
+                html += '<button class="btn btn-sm btn-outline-secondary btn-icon btn-transition js-staff-edit" data-id="' + s.id + '" data-nickname="' + s.nickname + '" data-hired="' + (s.hired_at || '') + '" data-resigned="' + (s.resigned_at || '') + '"><i class="fas fa-edit btn-icon-wrapper"></i>' + I18N.action_edit + '</button>';
             }
             html += '</div>';
-            html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + I18N.field_hired_at + '</span><span>' + (s.hired_at || I18N.not_set) + '</span></div>';
-            html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + I18N.field_resigned_at + '</span><span>' + (s.resigned_at || '<span class="badge bg-success">' + I18N.status_on_job_now + '</span>') + '</span></div>';
-            html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + I18N.field_tenure + '</span><span>' + (s.tenure || '-') + '</span></div>';
+            html += '<div class="data-card__row"><span>' + I18N.field_hired_at + '</span><span>' + (s.hired_at || I18N.not_set) + '</span></div>';
+            html += '<div class="data-card__row"><span>' + I18N.field_resigned_at + '</span><span>' + (s.resigned_at || '<span class="badge bg-success">' + I18N.status_on_job_now + '</span>') + '</span></div>';
+            html += '<div class="data-card__row"><span>' + I18N.field_tenure + '</span><span>' + (s.tenure || '-') + '</span></div>';
             html += '</div></div>';
         });
         $c.html(html);
@@ -793,25 +793,25 @@ $(function () {
         var $tbody = $('#eq-table-body');
         var colCount = canEdit ? 10 : 9;
 
-        if (!filtered.length) { $tbody.html('<tr><td colspan="' + colCount + '" class="text-center text-muted py-4">' + I18N.no_equipment + '</td></tr>'); return; }
+        if (!filtered.length) { $tbody.html('<tr><td colspan="' + colCount + '" class="table-empty"><i class="fas fa-laptop"></i>' + I18N.no_equipment + '</td></tr>'); return; }
 
         var html = '';
         filtered.forEach(function (item, idx) {
             var eq = item.eq;
             html += '<tr>';
-            html += '<td>' + (idx + 1) + '</td>';
-            html += '<td><strong>' + item.user.nickname + '</strong></td>';
+            html += '<td class="col-idx">' + (idx + 1) + '</td>';
+            html += '<td><span class="cell-stack__main">' + item.user.nickname + '</span></td>';
             html += '<td>' + (eq.name || '-') + '</td>';
             html += '<td>' + (eq.model || '-') + '</td>';
             html += '<td>' + (eq.serial || '-') + '</td>';
-            html += '<td>' + (eq.received_at || '-') + '</td>';
-            html += '<td>' + (eq.returned_at || '-') + '</td>';
-            html += '<td>' + calcEqDuration(eq.received_at, eq.returned_at) + '</td>';
+            html += '<td class="col-tight">' + (eq.received_at || '-') + '</td>';
+            html += '<td class="col-tight">' + (eq.returned_at || '-') + '</td>';
+            html += '<td class="col-tight">' + calcEqDuration(eq.received_at, eq.returned_at) + '</td>';
             html += '<td>' + eqStatusBadge(eq) + '</td>';
             if (canEdit) {
-                html += '<td>';
+                html += '<td class="col-actions">';
                 if (eq.received_at && !eq.returned_at) {
-                    html += '<button class="btn btn-sm btn-outline-secondary js-eq-return" data-user-id="' + item.user.id + '" data-eq-idx="' + item.eqIdx + '" data-eq-name="' + (item.eq.name || I18N.field_equipment) + '" data-user-name="' + item.user.nickname + '"><i class="fas fa-undo me-1"></i>' + I18N.action_return + '</button>';
+                    html += '<div class="row-actions"><button class="btn btn-sm btn-outline-secondary btn-icon btn-transition js-eq-return" data-user-id="' + item.user.id + '" data-eq-idx="' + item.eqIdx + '" data-eq-name="' + (item.eq.name || I18N.field_equipment) + '" data-user-name="' + item.user.nickname + '"><i class="fas fa-undo btn-icon-wrapper"></i>' + I18N.action_return + '</button></div>';
                 }
                 html += '</td>';
             }
@@ -831,16 +831,16 @@ $(function () {
         filtered.forEach(function (item) {
             var eq = item.eq;
             html += '<div class="card mb-2 shadow-sm"><div class="card-body py-3">';
-            html += '<div class="d-flex justify-content-between align-items-start mb-2"><strong>' + item.user.nickname + '</strong>' + eqStatusBadge(eq) + '</div>';
-            html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + I18N.field_equipment + '</span><span>' + (eq.name || '-') + '</span></div>';
-            html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + I18N.field_model + '</span><span>' + (eq.model || '-') + '</span></div>';
-            html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + I18N.field_serial + '</span><span>' + (eq.serial || '-') + '</span></div>';
-            if (eq.received_at) html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + I18N.field_received + '</span><span>' + eq.received_at + '</span></div>';
-            if (eq.returned_at) html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + I18N.field_returned + '</span><span>' + eq.returned_at + '</span></div>';
+            html += '<div class="data-card__head mb-2"><span class="cell-stack__main">' + item.user.nickname + '</span>' + eqStatusBadge(eq) + '</div>';
+            html += '<div class="data-card__row"><span>' + I18N.field_equipment + '</span><span>' + (eq.name || '-') + '</span></div>';
+            html += '<div class="data-card__row"><span>' + I18N.field_model + '</span><span>' + (eq.model || '-') + '</span></div>';
+            html += '<div class="data-card__row"><span>' + I18N.field_serial + '</span><span>' + (eq.serial || '-') + '</span></div>';
+            if (eq.received_at) html += '<div class="data-card__row"><span>' + I18N.field_received + '</span><span>' + eq.received_at + '</span></div>';
+            if (eq.returned_at) html += '<div class="data-card__row"><span>' + I18N.field_returned + '</span><span>' + eq.returned_at + '</span></div>';
             var dur = calcEqDuration(eq.received_at, eq.returned_at);
-            if (dur) html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + I18N.field_duration_short + '</span><span>' + dur + '</span></div>';
+            if (dur) html += '<div class="data-card__row"><span>' + I18N.field_duration_short + '</span><span>' + dur + '</span></div>';
             if (canEdit && eq.received_at && !eq.returned_at) {
-                html += '<div class="mt-2"><button class="btn btn-sm btn-outline-secondary js-eq-return" data-user-id="' + item.user.id + '" data-eq-idx="' + item.eqIdx + '"><i class="fas fa-undo me-1"></i>' + I18N.action_return + '</button></div>';
+                html += '<div class="row-actions mt-2"><button class="btn btn-sm btn-outline-secondary btn-icon btn-transition js-eq-return" data-user-id="' + item.user.id + '" data-eq-idx="' + item.eqIdx + '"><i class="fas fa-undo btn-icon-wrapper"></i>' + I18N.action_return + '</button></div>';
             }
             html += '</div></div>';
         });

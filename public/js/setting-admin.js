@@ -166,10 +166,10 @@
         var rows = '';
         (usage.daily || []).forEach(function (day) {
             rows += '<tr>' +
-                '<td>' + escapeHtml(day.date) + '</td>' +
-                '<td>' + day.subscription_calls + '</td>' +
-                '<td>' + day.fallback_calls + '</td>' +
-                '<td>' + (day.rate_limited > 0
+                '<td class="col-tight">' + escapeHtml(day.date) + '</td>' +
+                '<td class="col-num">' + day.subscription_calls + '</td>' +
+                '<td class="col-num">' + day.fallback_calls + '</td>' +
+                '<td class="col-num">' + (day.rate_limited > 0
                     ? '<span class="text-danger">' + day.rate_limited + '</span>'
                     : day.rate_limited) + '</td>' +
                 '</tr>';

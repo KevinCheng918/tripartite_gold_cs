@@ -16,6 +16,9 @@
     <div id="shared-file-app"
          {{-- JSON_HEX_APOS：屬性用單引號包，JSON 內的單引號（英文縮寫如 don't）會提早結束屬性 --}}
          data-i18n='@json(trans("shared_file"), JSON_HEX_APOS | JSON_HEX_QUOT)'
+         {{-- 操作欄分段的名稱（btn-group 的 aria-label）。放在 common 語系檔
+              而不是抄進 shared_file ——「檢視」「危險操作」每個表格都會用到 --}}
+         data-row-actions='@json(trans("common.row_actions"), JSON_HEX_APOS | JSON_HEX_QUOT)'
          data-can-upload="{{ Auth::user()->hasPermission('shared_file.upload') ? '1' : '0' }}"
          data-can-delete="{{ Auth::user()->hasPermission('shared_file.delete') ? '1' : '0' }}"
          data-is-admin="{{ Auth::user()->isAdmin() ? '1' : '0' }}"
@@ -64,7 +67,7 @@
                             </div>
                             <div class="card-body p-0">
                                 <div class="table-responsive">
-                                    <table class="table table-sm table-hover align-middle mb-0 sf-file-table">
+                                    <table class="table table-sm table-hover align-middle data-table sf-file-table">
                                         <thead class="thead-gold">
                                             <tr>
                                                 <th>{{ trans('shared_file.field_filename') }}</th>
@@ -120,7 +123,7 @@
                             </div>
                             <div class="card-body p-0">
                                 <div class="table-responsive">
-                                    <table class="table table-sm table-hover align-middle mb-0 sf-file-table">
+                                    <table class="table table-sm table-hover align-middle data-table sf-file-table">
                                         <thead class="thead-gold">
                                             <tr>
                                                 <th>{{ trans('shared_file.field_filename') }}</th>
