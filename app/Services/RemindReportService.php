@@ -415,6 +415,11 @@ class RemindReportService
      * ⚠ 暱稱另外查，不在統計查詢裡 join —— 帳號被刪時 `user_id` 會變 null
      * （nullOnDelete），join 進來那幾列會整個從統計消失。
      *
+     * ⚠ **主管以上不列進這一段**（需求方 2026-10-10）。他們出現在這裡是
+     * 升級機制的副作用：第三次以後的提醒會連主管與老闆一起 tag，於是他們的
+     * 次數跟著累加 —— 但「誰該去回那張單」從來不是他們。
+     * 一份要給主管看的統計，列著主管自己被催了幾次，只會干擾判讀。
+     *
      * @param array  $report
      * @param string $date
      * @return string
@@ -427,7 +432,17 @@ class RemindReportService
             return '';
         }
 
-        $names = $this->nicknamesOf($rows);
+        $users = $this->usersOf($rows);
+
+        // ⚠ 要先濾掉再算，否則下面的「還有 N 人」會把主管也數進去
+        $rows = $this->withoutManagers($rows, $users);
+
+        // 整天只催到主管（例如當班的人沒設 Telegram）時這一段就整段不出現
+        if (blank($rows)) {
+            return '';
+        }
+
+        $names = $this->nicknamesOf($users);
         $max = (int) Arr::get($report, 'MAX_LINES');
         $text = (string) Arr::get($report, 'BY_USER_TITLE');
         $shown = 0;
@@ -465,12 +480,17 @@ class RemindReportService
     }
 
     /**
-     * user_id => 暱稱（從統計列挖出 id）
+     * user_id => User（從統計列挖出 id 一次撈完）
      *
-     * @param iterable $rows
-     * @return array
+     * ⚠ 一次撈完，不要在迴圈裡逐人查 —— 那就是 N+1。
+     *
+     * 回的是整個 User 而不只是暱稱：除了印名字，還要看 `level` 決定
+     * 這個人要不要列進統計（見 withoutManagers()）。
+     *
+     * @param iterable $rows 統計列，每列帶 user_id
+     * @return array<int, \App\Models\User>
      */
-    private function nicknamesOf($rows)
+    private function usersOf($rows)
     {
         $ids = [];
 
@@ -480,23 +500,64 @@ class RemindReportService
             }
         }
 
-        return $this->nicknamesOfIds($ids);
+        $users = [];
+
+        foreach ($this->userRepository->getNamesByIds(array_unique($ids)) as $user) {
+            $users[(int) $user->id] = $user;
+        }
+
+        return $users;
+    }
+
+    /**
+     * 濾掉主管以上的統計列
+     *
+     * `level` 越小官越大（ADMIN 0 / BOSS 1 / LEADER 2 / ENGINEER 3 / CS 4），
+     * 所以「主管以上」是 `level <= LEADER`，留下來的是工程與客服。
+     *
+     * @param iterable                        $rows
+     * @param array<int, \App\Models\User>    $users user_id => User
+     * @return array 留下來的統計列
+     */
+    private function withoutManagers($rows, array $users)
+    {
+        $leader = (int) config('constants.USER.LEVEL.LEADER');
+        $kept = [];
+
+        foreach ($rows as $row) {
+            // user_id 是 null 的那一列是「這次提醒沒 tag 到任何人」，要留著
+            if (blank($row->user_id)) {
+                $kept[] = $row;
+
+                continue;
+            }
+
+            $user = Arr::get($users, (int) $row->user_id);
+
+            /*
+             * ⚠ 查不到的（帳號已刪）要**留著**，不能當成主管濾掉 ——
+             * 不知道他是誰就沉默地少掉一列，統計會對不起來。
+             */
+            if (blank($user) || (int) $user->level > $leader) {
+                $kept[] = $row;
+            }
+        }
+
+        return $kept;
     }
 
     /**
      * user_id => 暱稱
      *
-     * ⚠ 一次撈完，不要在迴圈裡逐人查 —— 那就是 N+1。
-     *
-     * @param array $ids
-     * @return array
+     * @param array<int, \App\Models\User> $users
+     * @return array<int, string>
      */
-    private function nicknamesOfIds(array $ids)
+    private function nicknamesOf(array $users)
     {
         $names = [];
 
-        foreach ($this->userRepository->getNamesByIds(array_unique($ids)) as $user) {
-            $names[(int) $user->id] = $user->nickname;
+        foreach ($users as $id => $user) {
+            $names[(int) $id] = $user->nickname;
         }
 
         return $names;
