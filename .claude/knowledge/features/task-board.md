@@ -117,6 +117,39 @@ inline 無法表達 `[data-theme="dark"]` 選擇器。
 - 看板篩選：專案、人員（assignee_id + assignee_ids 同時查）、優先順序、關鍵字、排序
 - 封存篩選：專案、指派人員、時間範圍（前端過濾）
 
+### ⚠ 停用的專案，它的卡片整個不顯示（2026-10-10）
+
+專案停用＝「這條線結束了」，底下的卡片不該再出現在看板，也不該每天早上
+私訊提醒誰還有幾張沒做 —— 那會讓人以為還要處理。
+
+套用在三個地方，都在 `TaskRepository::onlyActiveProject()`：
+
+| 方法 | 用在哪 |
+|---|---|
+| `getBoard()` | 看板四欄 |
+| `getOpenForNotice()` | 每日 08:00 任務卡通知 |
+| `getArchived()` | 封存清單 |
+
+封存清單也要濾的理由：它是看板同一頁的分頁，每一列都有「還原」——
+還原會把卡片丟回「待處理」，也就是丟回一個看板上根本不顯示的專案，
+按下去之後那張卡就人間蒸發了。
+
+⚠ **只是不顯示，資料一筆都不動。** 專案重新啟用，卡片原樣全部回來。
+
+⚠ 用 `whereHas` 而不是 join：`Task::project()` 這個關聯自己帶了
+`select(['id', 'name'])`、**沒有 `status`**，join 進來讀不到要比的欄位，
+還得處理 `id` 撞名。`whereHas` 走 EXISTS 子查詢，關聯上的 select 會被覆寫：
+
+```sql
+where exists (select * from `project` where `task`.`project_id` = `project`.`id` and `status` = ?)
+```
+
+⚠ 不必處理「沒有專案的卡片」：`task.project_id` 是 NOT NULL，
+FK 又是 cascadeOnDelete，不會有孤兒卡。
+
+⚠ 專案下拉（看板篩選、新增卡片）本來就走 `ProjectRepository::getActive()`，
+所以停用的專案不會出現在選單裡 —— 這次只缺卡片本身那一層。
+
 ## 架構檔案
 
 ### Model / Migration

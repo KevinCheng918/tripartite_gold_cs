@@ -53,7 +53,7 @@
 | `app/Services/TaskNoticeService.php`（新增） | 統計、組訊息、兩種收件人 |
 | `app/Console/Commands/NotifyDailyTaskCommand.php`（新增） | `task:notify-daily` |
 | `app/Console/Kernel.php` | `dailyAt('08:00')` |
-| `app/Repositories/TaskRepository.php` | `getOpenForNotice()` |
+| `app/Repositories/TaskRepository.php` | `getOpenForNotice()`；2026-10-10 起排除停用專案的卡片（`onlyActiveProject()`，理由見 [[task-board]]） |
 | `app/Services/AppSettingService.php` | `KEY_TASK_NOTICE_MANAGER` |
 | `app/Services/NotificationSettingService.php` | 設定頁多一個分頁的讀寫與測試 |
 | `app/Http/Requests/Notification/UpdateTaskNoticeRequest.php`（新增） | 收件人驗證 |

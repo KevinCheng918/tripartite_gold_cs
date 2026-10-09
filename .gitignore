@@ -16,3 +16,7 @@ yarn-error.log
 /storage/debugbar
 .DS_Store
 */.DS_Store
+
+# 臨時驗證腳本。放在專案根目錄是為了讓容器看得到（容器只掛載這個目錄），
+# 但它們是用完就丟的東西 —— verify_tmp.php 就這樣被 `git add -A` 收進 repo 過一次。
+/*_tmp.php

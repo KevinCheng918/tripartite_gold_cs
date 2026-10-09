@@ -38,6 +38,8 @@ class TaskRepository
             ->with(['project', 'station.system', 'assignee', 'creator'])
             ->where('status', '!=', config('constants.TASK.STATUS.ARCHIVED'));
 
+        $this->onlyActiveProject($query);
+
         // 排序
         $sort = $criteria['sort'] ?? 'created_desc';
         $sortMap = [
@@ -96,7 +98,7 @@ class TaskRepository
      * 每日任務通知要統計的卡片
      *
      * 只撈**還沒結束**的（排除已解決與已封存）—— 通知要講的是「手上還有什麼」，
-     * 結案的卡不該出現在明天早上的訊息裡。
+     * 結案的卡不該出現在明天早上的訊息裡。關閉的專案同理，見 onlyActiveProject()。
      *
      * ⚠ 一次撈完再在 PHP 分組，不逐人查：`assignee_ids` 是 JSON 陣列，
      * 逐人 `whereJsonContains` 就是一人一趟查詢，而卡片總數在內部看板的量級
@@ -111,14 +113,46 @@ class TaskRepository
             config('constants.TASK.STATUS.ARCHIVED'),
         ];
 
-        return Task::query()
+        $query = Task::query()
             ->select(['id', 'project_id', 'title', 'status', 'priority', 'assignee_ids', 'due_date'])
             ->with('project')
             ->whereNotIn('status', $closed)
             // 逾期最久的排前面；沒設期限的排最後
             ->orderByRaw('due_date IS NULL, due_date ASC')
-            ->orderBy('id')
-            ->get();
+            ->orderBy('id');
+
+        $this->onlyActiveProject($query);
+
+        return $query->get();
+    }
+
+    /**
+     * 只留下專案還開著的卡片
+     *
+     * 專案停用的意思是「這條線結束了」，它底下的卡片不該再出現在看板，
+     * 也不該每天早上私訊提醒誰還有幾張沒做 —— 那會讓人以為還要處理
+     * （需求方 2026-10-10）。
+     *
+     * ⚠ **只是不顯示，資料一筆都不動。** 專案重新啟用，卡片原樣全部回來。
+     *
+     * ⚠ 用 `whereHas` 而不是 join：`Task::project()` 這個關聯自己帶了
+     * `select(['id', 'name'])`，**沒有 `status`**，join 進來讀不到要比的欄位，
+     * 還得自己處理 `id` 撞名。`whereHas` 走 EXISTS 子查詢，關聯上的 select
+     * 會被覆寫掉，不受影響。
+     *
+     * ⚠ 不必處理「沒有專案的卡片」：`task.project_id` 是 NOT NULL，
+     * 而且 FK 是 cascadeOnDelete —— 專案被刪時卡片跟著刪，不會留下孤兒。
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return void
+     */
+    private function onlyActiveProject($query)
+    {
+        $active = config('constants.PROJECT.STATUS.ACTIVE');
+
+        $query->whereHas('project', function ($q) use ($active) {
+            $q->where('status', $active);
+        });
     }
 
     /**
@@ -277,12 +311,20 @@ class TaskRepository
      */
     public function getArchived()
     {
-        return Task::query()
+        $query = Task::query()
             ->select(self::LIST_COLUMNS)
             ->with(['project', 'creator', 'latestArchivedActivity'])
             ->where('status', config('constants.TASK.STATUS.ARCHIVED'))
-            ->orderByDesc('updated_at')
-            ->get();
+            ->orderByDesc('updated_at');
+
+        /*
+         * ⚠ 封存清單也要濾。它是看板同一頁的分頁，而且每一列都有「還原」——
+         * 還原會把卡片丟回「待處理」，也就是丟回一個已經關閉、看板上根本
+         * 不顯示的專案：按下去之後那張卡就人間蒸發了。
+         */
+        $this->onlyActiveProject($query);
+
+        return $query->get();
     }
 
     /**
