@@ -228,6 +228,10 @@
                                 <p class="text-muted" style="font-size:0.875rem">
                                     {{ trans('notification.report_desc', ['time' => config('constants.AUTO_REPLY.REMIND.REPORT_AT')]) }}
                                 </p>
+                                {{-- 週報與月報用同一份收件人，這裡不講的話勾選的人不會知道自己還會收到 --}}
+                                <p class="text-muted" style="font-size:0.875rem">
+                                    <i class="fas fa-info-circle me-1"></i>{{ trans('notification.report_period') }}
+                                </p>
                                 <form id="form-report">
                                     <div class="mb-3">
                                         <div class="d-flex align-items-center justify-content-between mb-2">

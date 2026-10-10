@@ -113,8 +113,6 @@ class RemindReportService
         return [
             'type'          => $type,
             'range'         => $range,
-            // 相容舊欄位：日報的呼叫端與既有訊息都讀 date
-            'date'          => Arr::get($range, 'start'),
             'text'          => $fullText,
             'sent'          => Arr::get($full, 'sent', 0),
             'reason'        => Arr::get($full, 'reason'),
