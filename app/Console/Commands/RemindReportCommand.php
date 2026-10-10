@@ -18,10 +18,11 @@ use Illuminate\Support\Arr;
 class RemindReportCommand extends Command
 {
     protected $signature = 'remind:report
-                            {--date= : 統計哪一天（Y-m-d），預設昨天}
+                            {--type=daily : daily（前一天）、weekly（上週一～日）或 monthly（上個月）}
+                            {--date= : 以哪一天往回推（Y-m-d），預設今天。補發用}
                             {--dry-run : 只印出內容，不實際發送}';
 
-    protected $description = '私訊前一天的超時提醒統計：勾選的人收全部人的，被提醒到的人各收自己那份';
+    protected $description = '私訊超時提醒統計：勾選的人收全部人的；日報另外逐人發個人版';
 
     /** @var array 沒送出時的原因說明 */
     private const REASONS = [
@@ -44,10 +45,27 @@ class RemindReportCommand extends Command
      */
     public function handle()
     {
-        $dryRun = (bool) $this->option('dry-run');
-        $result = $this->reportService->run($this->option('date'), $dryRun);
+        $type = (string) $this->option('type');
+        $allowed = [
+            RemindReportService::TYPE_DAILY,
+            RemindReportService::TYPE_WEEKLY,
+            RemindReportService::TYPE_MONTHLY,
+        ];
 
-        $this->info('統計日期：' . Arr::get($result, 'date') . ($dryRun ? '（空跑，沒有實際發送）' : ''));
+        if (!in_array($type, $allowed, true)) {
+            $this->error("--type 只能是 daily、weekly 或 monthly，收到的是「{$type}」");
+
+            return 1;
+        }
+
+        $dryRun = (bool) $this->option('dry-run');
+        $result = $this->reportService->run($type, $this->option('date'), $dryRun);
+        $range = (array) Arr::get($result, 'range');
+
+        $this->info(
+            '統計區間：' . Arr::get($range, 'start') . ' ～ ' . Arr::get($range, 'end')
+            . ($dryRun ? '（空跑，沒有實際發送）' : '')
+        );
 
         if (!$dryRun) {
             $sent = (int) Arr::get($result, 'sent', 0);
@@ -59,7 +77,9 @@ class RemindReportCommand extends Command
                 $this->warn('完整版：沒送出 —— ' . Arr::get(self::REASONS, $reason, $reason));
             }
 
-            $this->info('個人版：' . Arr::get($result, 'personal_sent', 0) . ' 則');
+            if ($type === RemindReportService::TYPE_DAILY) {
+                $this->info('個人版：' . Arr::get($result, 'personal_sent', 0) . ' 則');
+            }
 
             // 有人收到、有人沒收到也要講 —— 不然那幾個人會無聲消失
             $failed = (array) Arr::get($result, 'failed', []);
@@ -82,8 +102,15 @@ class RemindReportCommand extends Command
             }
 
             $this->line('');
-            $this->info('個人版會發給 ' . Arr::get($result, 'personal_sent', 0) . ' 位在職同仁'
-                . '（被提醒到的收統計，沒被提醒到的收一句肯定）');
+
+            // ⚠ 週月報不發個人版，印「會發給 0 位」會讓人以為是沒人符合條件
+            if ($type === RemindReportService::TYPE_DAILY) {
+                $this->info('個人版會發給 ' . Arr::get($result, 'personal_sent', 0) . ' 位在職同仁'
+                    . '（被提醒到的收統計，沒被提醒到的收一句肯定）');
+            } else {
+                $this->info('週報與月報只發完整版，不發個人版');
+            }
+
             $this->line('⚠ 空跑的那句肯定是公版 —— 實際發送時由模型逐人生成');
         }
 

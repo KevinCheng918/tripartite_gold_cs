@@ -80,6 +80,24 @@ class Kernel extends ConsoleKernel
             ->monthlyOn(1, '11:00')
             ->withoutOverlapping();
 
+        /*
+         * 超時提醒的週報表與月報表（2026-10-10）。日報維持每天 08:30 不變。
+         *
+         * ⚠ **11:30 是刻意跟打卡報表（11:00）錯開的** —— 兩者的收件人高度重疊，
+         * 排同一分鐘會讓主管同時收到兩則私訊。早上那一串 07:00／07:30／
+         * 08:00／08:30 也是同樣的理由。
+         *
+         * ⚠ 週月報**只發完整版**，不逐人發個人版（需求方指定）——
+         * 日報每天已經逐人講過了，而且週一同仁本來就會收到打卡週報的個人版。
+         */
+        $schedule->command('remind:report --type=weekly')
+            ->weeklyOn(1, '11:30')
+            ->withoutOverlapping();
+
+        $schedule->command('remind:report --type=monthly')
+            ->monthlyOn(1, '11:30')
+            ->withoutOverlapping();
+
         // 每日凌晨 2 點清理 7 天前的 Telegram 訊息
         $schedule->command('telegram:purge')->dailyAt('02:00');
 

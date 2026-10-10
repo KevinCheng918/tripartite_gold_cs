@@ -64,41 +64,43 @@ class AutoReplyTicketRemindRepository
      * `user_id` 會變 null（nullOnDelete），join 進來那幾列會整個消失。
      * 暱稱由呼叫端另外查，查不到的就是離職帳號。
      *
-     * @param string $date Y-m-d
+     * @param string $startDate Y-m-d
+     * @param string $endDate   Y-m-d（含當天）
      * @return Collection<object{user_id:int|null, times:int, tickets:int}>
      */
-    public function countByUserForDate($date)
+    public function countByUserForRange($startDate, $endDate)
     {
         return AutoReplyTicketRemind::query()
             ->selectRaw('user_id, COUNT(*) as times, COUNT(DISTINCT auto_reply_ticket_id) as tickets')
-            ->whereBetween('created_at', $this->dayRange($date))
+            ->whereBetween('created_at', $this->rangeOf($startDate, $endDate))
             ->groupBy('user_id')
             ->orderByDesc(DB::raw('COUNT(*)'))
             ->get();
     }
 
     /**
-     * 某一天被提醒過的求助單（按單統計用）
+     * 某段期間被提醒過的求助單（按單統計用）
      *
-     * `times` 是「那一天催了幾次」，可能小於 `ticket.remind_count`
-     * ——跨夜的單前一天就被催過了。
+     * `times` 是「這段期間催了幾次」，可能小於 `ticket.remind_count`
+     * ——跨夜、跨週的單在前一期就被催過了。
      *
-     * @param string $date Y-m-d
+     * @param string $startDate Y-m-d
+     * @param string $endDate   Y-m-d（含當天）
      * @return Collection
      */
-    public function getTicketsForDate($date)
+    public function getTicketsForRange($startDate, $endDate)
     {
         return AutoReplyTicketRemind::query()
             ->selectRaw('auto_reply_ticket_id, COUNT(DISTINCT seq) as times, MAX(stage) as max_stage')
             ->with('ticket.group')
-            ->whereBetween('created_at', $this->dayRange($date))
+            ->whereBetween('created_at', $this->rangeOf($startDate, $endDate))
             ->groupBy('auto_reply_ticket_id')
             ->orderByDesc(DB::raw('COUNT(DISTINCT seq)'))
             ->get();
     }
 
     /**
-     * 某一天「每個人各自被催了哪幾題」（個人版統計用）
+     * 某段期間「每個人各自被催了哪幾題」（個人版統計用）
      *
      * 一列 = 一個人在一張單上被催的次數，所以同一個人會有多列，
      * 呼叫端依 `user_id` 分組就是他那一份。
@@ -106,15 +108,16 @@ class AutoReplyTicketRemindRepository
      * ⚠ 排除 `user_id` 為 null 的列：那是「沒 tag 到人」的紀錄，
      * 不屬於任何人，只在完整版出現。
      *
-     * @param string $date Y-m-d
+     * @param string $startDate Y-m-d
+     * @param string $endDate   Y-m-d（含當天）
      * @return Collection
      */
-    public function getUserTicketsForDate($date)
+    public function getUserTicketsForRange($startDate, $endDate)
     {
         return AutoReplyTicketRemind::query()
             ->selectRaw('user_id, auto_reply_ticket_id, COUNT(DISTINCT seq) as times, MAX(stage) as max_stage')
             ->with('ticket.group')
-            ->whereBetween('created_at', $this->dayRange($date))
+            ->whereBetween('created_at', $this->rangeOf($startDate, $endDate))
             ->whereNotNull('user_id')
             ->groupBy('user_id', 'auto_reply_ticket_id')
             ->orderBy('user_id')
@@ -123,18 +126,22 @@ class AutoReplyTicketRemindRepository
     }
 
     /**
-     * 一天的起訖時間
+     * 一段期間的起訖時間（含頭尾整天）
      *
      * ⚠ 用區間而不是 `whereDate()`：後者等於 `DATE(created_at) = ?`，
      * 欄位被函式包住就吃不到 `created_at` 的索引，這張表會一直長大。
      *
-     * @param string $date Y-m-d
+     * 日報傳同一天兩次就是「那一天」；週報傳週一～週日。
+     *
+     * @param string $startDate Y-m-d
+     * @param string $endDate   Y-m-d
      * @return array [起, 訖]
      */
-    private function dayRange($date)
+    private function rangeOf($startDate, $endDate)
     {
-        $start = Carbon::parse($date)->startOfDay();
-
-        return [$start, $start->copy()->endOfDay()];
+        return [
+            Carbon::parse($startDate)->startOfDay(),
+            Carbon::parse($endDate)->endOfDay(),
+        ];
     }
 }

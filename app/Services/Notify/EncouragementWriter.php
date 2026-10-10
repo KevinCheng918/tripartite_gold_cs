@@ -79,20 +79,29 @@ class EncouragementWriter
     }
 
     /**
-     * 寫給整個團隊（昨天完全沒有超時）
+     * 寫給整個團隊（這一期完全沒有超時）
      *
+     * ⚠ `$period` 一定要傳：日報說「昨天」、週報說「上週」、月報說「上個月」。
+     * 2026-10-10 加週月報之前這裡寫死「昨天」，週報會變成
+     * 「昨天一題都沒卡住」—— 統計的是一整週，話卻在講昨天。
+     *
+     * @param string $period 這一期的說法
      * @return string
      */
-    public function forTeam()
+    public function forTeam($period)
     {
         $config = (array) config('constants.AUTO_REPLY.REMIND.REPORT.ENCOURAGE');
 
         $text = $this->generate(
             (string) Arr::get($config, 'TEAM_PROMPT'),
-            (string) Arr::get($config, 'TEAM_INPUT')
+            strtr((string) Arr::get($config, 'TEAM_INPUT'), ['{period}' => $period])
         );
 
-        return filled($text) ? $text : (string) Arr::get($config, 'TEAM_FALLBACK');
+        if (filled($text)) {
+            return $text;
+        }
+
+        return strtr((string) Arr::get($config, 'TEAM_FALLBACK'), ['{period}' => $period]);
     }
 
     /**

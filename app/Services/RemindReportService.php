@@ -7,6 +7,7 @@ use App\Repositories\UserRepository;
 use App\Services\Notify\EncouragementWriter;
 use App\Services\Notify\NoticeText;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 
 /**
  * 每日超時提醒統計
@@ -25,9 +26,37 @@ use Illuminate\Support\Arr;
  * 「昨天沒事」還是「排程壞了」。沒事那天的那句肯定**由模型當天生成、不用公版**
  * —— 公版寫久了大家會自動略過，那就失去意義了。
  * 模型不可用時才退公版：沒有鼓勵的話，比整則不發好得多。
+ *
+ * ⚠ **三種期間共用這一支**（2026-10-10 加了週報與月報）：
+ *
+ * | type | 排程 | 統計 | 個人版 |
+ * |---|---|---|---|
+ * | `daily` | 每天 08:30 | 前一天 | ✅ 逐人發 |
+ * | `weekly` | 每週一 11:30 | 上週一～上週日 | ❌ |
+ * | `monthly` | 每月 1 號 11:30 | 上個月 | ❌ |
+ *
+ * ⚠ **週報與月報只發完整版**（需求方 2026-10-10）。日報每天已經逐人告訴
+ * 他自己的狀況了，週月報再逐人發一次是同一件事講兩遍；而且週一那天同仁
+ * 本來就會收到打卡週報的個人版，再多一則只是噪音。
+ *
+ * ⚠ **收件人三種共用同一份**（`KEY_REMIND_REPORT_MANAGER`，需求方指定）：
+ * 同一件事的不同時間尺度，關心的是同一批人，分兩份只是多一個會忘記同步的地方。
+ *
+ * ⚠ 11:30 是刻意跟打卡報表（週一 11:00 / 1 號 11:00）錯開的 —— 排同一分鐘
+ * 會讓收件人同時收到兩則私訊。早上那一串（07:00／07:30／08:00／08:30）
+ * 也是同樣的理由。
  */
 class RemindReportService
 {
+    /** @var string 日報：前一天 */
+    const TYPE_DAILY = 'daily';
+
+    /** @var string 週報：上週一～上週日 */
+    const TYPE_WEEKLY = 'weekly';
+
+    /** @var string 月報：上個月 */
+    const TYPE_MONTHLY = 'monthly';
+
     private $remindRepository;
     private $userRepository;
     private $staffDm;
@@ -54,23 +83,38 @@ class RemindReportService
     }
 
     /**
-     * 跑一輪：完整版給勾選的人，個人版給每個被提醒到的人
+     * 跑一輪：完整版給勾選的人；日報另外逐人發個人版
      *
-     * @param string|null $date   統計哪一天（預設昨天）
+     * ⚠ 簽章在 2026-10-10 變過（原本是 `run($date, $dryRun)`）。
+     * 呼叫端有 `RemindReportCommand` 與 `NotificationSettingService::testReport()`，
+     * 漏改的話是執行期錯誤、不是編譯期。
+     *
+     * @param string      $type   self::TYPE_*
+     * @param string|null $endsOn 以哪一天往回推（預設今天）。補發用
      * @param bool        $dryRun 只組內容不發送
      * @return array 結果，給 Command 顯示
      */
-    public function run($date = null, $dryRun = false)
+    public function run($type = self::TYPE_DAILY, $endsOn = null, $dryRun = false)
     {
-        // 預設昨天：早上發的是「昨天一整天」的結果，今天的還在發生
-        $date = filled($date) ? $date : now()->subDay()->toDateString();
+        $range = $this->resolveRange($type, filled($endsOn) ? $endsOn : now()->toDateString());
 
-        $fullText = $this->buildText($date);
+        $fullText = $this->buildText($type, $range);
         $full = $this->sendFull($fullText, $dryRun);
-        $personal = $this->sendPersonal($date, $dryRun);
+
+        /*
+         * ⚠ **只有日報發個人版**（需求方 2026-10-10）。
+         * 週月報逐人再發一次是同一件事講兩遍，而且週一那天同仁本來就會
+         * 收到打卡週報的個人版。
+         */
+        $personal = $type === self::TYPE_DAILY
+            ? $this->sendPersonal(Arr::get($range, 'start'), $dryRun)
+            : ['sent' => 0, 'sample' => null, 'failed' => []];
 
         return [
-            'date'          => $date,
+            'type'          => $type,
+            'range'         => $range,
+            // 相容舊欄位：日報的呼叫端與既有訊息都讀 date
+            'date'          => Arr::get($range, 'start'),
             'text'          => $fullText,
             'sent'          => Arr::get($full, 'sent', 0),
             'reason'        => Arr::get($full, 'reason'),
@@ -85,6 +129,100 @@ class RemindReportService
     }
 
     /**
+     * 算出要統計哪一段
+     *
+     * ⚠ 都是「上一期」：日報發的是昨天、週一發的是上週、1 號發的是上個月。
+     * 當期還沒過完，統計沒有意義。
+     *
+     * ⚠ 週的起點用 `startOfWeek()`（Carbon 預設週一），**不要用 `-7 days`**
+     * —— 補發時（指定別的日期）那樣算出來的不會對齊週一。
+     *
+     * @param string $type
+     * @param string $endsOn Y-m-d
+     * @return array start / end（都是 Y-m-d）
+     */
+    private function resolveRange($type, $endsOn)
+    {
+        $base = Carbon::parse($endsOn);
+
+        if ($type === self::TYPE_MONTHLY) {
+            $start = $base->copy()->subMonthNoOverflow()->startOfMonth();
+
+            return ['start' => $start->toDateString(), 'end' => $start->copy()->endOfMonth()->toDateString()];
+        }
+
+        if ($type === self::TYPE_WEEKLY) {
+            $start = $base->copy()->startOfWeek()->subWeek();
+
+            return ['start' => $start->toDateString(), 'end' => $start->copy()->addDays(6)->toDateString()];
+        }
+
+        // 日報：前一天一整天
+        $day = $base->copy()->subDay()->toDateString();
+
+        return ['start' => $day, 'end' => $day];
+    }
+
+    /**
+     * 這一期的標題
+     *
+     * @param string $type
+     * @return string
+     */
+    private function title($type)
+    {
+        $map = [
+            self::TYPE_WEEKLY  => 'TITLE_WEEKLY',
+            self::TYPE_MONTHLY => 'TITLE_MONTHLY',
+        ];
+
+        return (string) config(
+            'constants.AUTO_REPLY.REMIND.REPORT.' . Arr::get($map, $type, 'TITLE_DAILY')
+        );
+    }
+
+    /**
+     * 文案裡「這一期」的說法（昨天／上週／上個月）
+     *
+     * @param string $type
+     * @return string
+     */
+    private function periodWord($type)
+    {
+        $map = [
+            self::TYPE_WEEKLY  => 'PERIOD_WEEKLY',
+            self::TYPE_MONTHLY => 'PERIOD_MONTHLY',
+        ];
+
+        return (string) config(
+            'constants.AUTO_REPLY.REMIND.REPORT.' . Arr::get($map, $type, 'PERIOD_DAILY')
+        );
+    }
+
+    /**
+     * 標題底下那一行期間
+     *
+     * ⚠ 日報沿用 `NoticeText::date()` 的「10/9（週五）」—— 那是既有的樣子，
+     * 換成「2026-10-09 ～ 2026-10-09」只會變難讀。
+     *
+     * @param array  $report
+     * @param string $type
+     * @param array  $range
+     * @return string
+     */
+    private function rangeText(array $report, $type, array $range)
+    {
+        if ($type === self::TYPE_DAILY) {
+            return $this->noticeText->date(Arr::get($range, 'start'));
+        }
+
+        return strtr((string) Arr::get($report, 'RANGE'), [
+            '{start}' => (string) Arr::get($range, 'start'),
+            '{end}'   => (string) Arr::get($range, 'end'),
+        ]);
+    }
+
+    /**
      * 測試發送：真的把昨天的完整統計私訊給勾選的收件人
      *
      * ⚠ 刻意**不是** dry-run —— 測試按鈕要回答的是「訊息到得了他手機嗎」，
@@ -95,10 +233,11 @@ class RemindReportService
      *
      * @return array sent / reason / names / failed
      */
-    public function test()
+    public function test($type = self::TYPE_DAILY)
     {
-        $date = now()->subDay()->toDateString();
-        $text = (string) config('constants.AUTO_REPLY.REMIND.REPORT.TEST_PREFIX') . $this->buildText($date);
+        $range = $this->resolveRange($type, now()->toDateString());
+        $text = (string) config('constants.AUTO_REPLY.REMIND.REPORT.TEST_PREFIX')
+            . $this->buildText($type, $range);
 
         $result = $this->sendFull($text, false);
 
@@ -151,7 +290,8 @@ class RemindReportService
      */
     private function sendPersonal($date, $dryRun)
     {
-        $byUser = $this->groupByUser($this->remindRepository->getUserTicketsForDate($date));
+        // 個人版只有日報會走到，所以起訖是同一天
+        $byUser = $this->groupByUser($this->remindRepository->getUserTicketsForRange($date, $date));
 
         /*
          * ⚠ **發給所有在職同仁，不只昨天被提醒到的人**（需求方 2026-10-06）。
@@ -309,22 +449,30 @@ class RemindReportService
      * @param string $date Y-m-d
      * @return string
      */
-    private function buildText($date)
+    private function buildText($type, array $range)
     {
         $report = (array) config('constants.AUTO_REPLY.REMIND.REPORT');
-        $tickets = $this->remindRepository->getTicketsForDate($date);
+        $start = Arr::get($range, 'start');
+        $end = Arr::get($range, 'end');
+        $period = $this->periodWord($type);
 
-        $text = strtr((string) Arr::get($report, 'HEADER'), ['{date}' => $this->noticeText->date($date)]);
+        $tickets = $this->remindRepository->getTicketsForRange($start, $end);
+
+        $text = strtr((string) Arr::get($report, 'HEADER'), [
+            '{title}' => $this->title($type),
+            '{range}' => $this->rangeText($report, $type, $range),
+        ]);
 
         if (blank($tickets)) {
             return $text . strtr((string) Arr::get($report, 'EMPTY'), [
-                '{praise}' => $this->encouragement->forTeam(),
+                '{period}' => $period,
+                '{praise}' => $this->encouragement->forTeam($period),
             ]);
         }
 
         $text .= $this->buildSummary($report, $tickets);
         $text .= $this->buildByTicket($report, $tickets);
-        $text .= $this->buildByUser($report, $date);
+        $text .= $this->buildByUser($report, $start, $end);
 
         return $text;
     }
@@ -421,12 +569,13 @@ class RemindReportService
      * 一份要給主管看的統計，列著主管自己被催了幾次，只會干擾判讀。
      *
      * @param array  $report
-     * @param string $date
+     * @param string $startDate Y-m-d
+     * @param string $endDate   Y-m-d
      * @return string
      */
-    private function buildByUser(array $report, $date)
+    private function buildByUser(array $report, $startDate, $endDate)
     {
-        $rows = $this->remindRepository->countByUserForDate($date);
+        $rows = $this->remindRepository->countByUserForRange($startDate, $endDate);
 
         if (blank($rows)) {
             return '';
