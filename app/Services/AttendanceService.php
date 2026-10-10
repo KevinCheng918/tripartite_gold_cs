@@ -8,6 +8,7 @@ use App\Repositories\ClockAmendmentRepository;
 use App\Repositories\LeaveRequestRepository;
 use App\Repositories\ShiftAssignmentRepository;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -250,17 +251,40 @@ class AttendanceService
     /**
      * 取得所有員工某月的打卡紀錄（管理者月報表）
      *
+     * 只是把月份換算成起訖日期，統計本體在 `getReport()`。
+     *
      * @param string $yearMonth Y-m
      * @return array 按員工分組的統計資料
      */
     public function getMonthlyReport($yearMonth)
     {
-        $records = $this->attendanceRepository->getAllByMonth($yearMonth);
-        $amendCounts = $this->amendmentRepository->getApprovedCountByMonth($yearMonth);
-        $leaveRecords = $this->leaveRepository->getApprovedByMonth($yearMonth);
-
         $monthStart = "{$yearMonth}-01";
-        $monthEnd = date('Y-m-t', strtotime($monthStart));
+
+        return $this->getReport($monthStart, date('Y-m-t', strtotime($monthStart)));
+    }
+
+    /**
+     * 取得所有員工某段期間的出勤統計
+     *
+     * 週報（週一～週日）與月報共用這一支；打卡出勤頁的月報表也是走這裡。
+     *
+     * ⚠ **回傳的陣列只包含「這段期間有打卡紀錄的人」。** 整段期間都請假、
+     * 或根本沒排班的人不會出現 —— 呼叫端如果要「每個人都發一則」，
+     * 得自己從同仁名單出發，查不到就當成全部是 0（見 `AttendanceReportService`）。
+     *
+     * @param string $startDate Y-m-d
+     * @param string $endDate   Y-m-d（含當天）
+     * @return array 按員工分組的統計資料
+     */
+    public function getReport($startDate, $endDate)
+    {
+        $records = $this->attendanceRepository->getAllByDateRange($startDate, $endDate);
+        $amendCounts = $this->amendmentRepository->getApprovedCountByDateRange($startDate, $endDate);
+        $leaveRecords = $this->leaveRepository->getApprovedByDateRange($startDate, $endDate);
+
+        // 下面算請假天數時要跟區間取交集，沿用原本的變數名
+        $monthStart = $startDate;
+        $monthEnd = $endDate;
 
         // 按員工分組統計
         $grouped = $records->groupBy('user_id');
@@ -269,30 +293,10 @@ class AttendanceService
         foreach ($grouped as $userId => $userRecords) {
             $user = $userRecords->first()->user;
 
-            // 計算請假統計
-            $userLeaves = $leaveRecords->where('user_id', $userId);
-            $leaveCount = $userLeaves->count();
-            $leaveDays = 0;
-            $leaveHours = 0;
-
-            foreach ($userLeaves as $leave) {
-                if ((int) $leave->is_full_day === 1) {
-                    // 整天假：計算在本月內的天數
-                    $start = max(strtotime($monthStart), strtotime($leave->start_date->format('Y-m-d')));
-                    $end = min(strtotime($monthEnd), strtotime($leave->end_date->format('Y-m-d')));
-                    $days = (int) round(($end - $start) / 86400) + 1;
-                    $leaveDays += $days;
-                } else {
-                    // 時段假：計算小時數（支援跨日，如 19:30 ~ 00:00）
-                    $startParts = explode(':', $leave->start_time);
-                    $endParts = explode(':', $leave->end_time);
-                    $startMin = (int) $startParts[0] * 60 + (int) $startParts[1];
-                    $endMin = (int) $endParts[0] * 60 + (int) $endParts[1];
-                    $minutes = $endMin - $startMin;
-                    if ($minutes <= 0) { $minutes += 1440; } // 跨日加 24 小時
-                    $leaveHours += $minutes / 60;
-                }
-            }
+            $leave = $this->summariseLeaves($leaveRecords->where('user_id', $userId), $monthStart, $monthEnd);
+            $leaveCount = Arr::get($leave, 'count');
+            $leaveDays = Arr::get($leave, 'days');
+            $leaveHours = Arr::get($leave, 'hours');
 
             $report[] = [
                 'user'                 => $user,
@@ -308,11 +312,78 @@ class AttendanceService
                 'leave_count'          => $leaveCount,
                 'leave_days'           => $leaveDays,
                 'leave_hours'          => round($leaveHours, 1),
+                'leave_ranges'         => Arr::get($leave, 'ranges'),
                 'records'              => $userRecords->values(),
             ];
         }
 
         return $report;
+    }
+
+    /**
+     * 把一個人的請假單彙總成天數、時數與區間
+     *
+     * ⚠ **跟統計區間取交集**：一筆 10/28～11/03 的假，在十月的報表只算
+     * 10/28～10/31、在十一月只算 11/01～11/03。不取交集的話同一筆假
+     * 會在兩份報表裡各算滿天數。
+     *
+     * ⚠ 整天假算「天」、時段假算「小時」，**兩者不互相換算** ——
+     * 一天幾小時取決於班別，硬換會得到一個誰都不認得的數字。
+     *
+     * ⚠ 這支是 public：出勤報表通知要用 `ranges` 寫「10/08 ～ 10/09 請假」，
+     * 而且必須跟這裡算出來的天數是同一套邏輯，不能各算各的。
+     *
+     * @param iterable $leaves    這個人在區間內的已核准請假單
+     * @param string   $startDate Y-m-d
+     * @param string   $endDate   Y-m-d
+     * @return array count / days / hours / ranges（每筆 start、end、is_full_day）
+     */
+    public function summariseLeaves($leaves, $startDate, $endDate)
+    {
+        $count = 0;
+        $days = 0;
+        $hours = 0;
+        $ranges = [];
+
+        foreach ($leaves as $leave) {
+            $count++;
+
+            // 不論整天或時段，顯示用的區間都先跟統計區間夾好
+            $from = max(strtotime($startDate), strtotime($leave->start_date->format('Y-m-d')));
+            $to = min(strtotime($endDate), strtotime($leave->end_date->format('Y-m-d')));
+
+            $ranges[] = [
+                'start'       => date('Y-m-d', $from),
+                'end'         => date('Y-m-d', $to),
+                'is_full_day' => (int) $leave->is_full_day === 1,
+            ];
+
+            if ((int) $leave->is_full_day === 1) {
+                $days += (int) round(($to - $from) / 86400) + 1;
+
+                continue;
+            }
+
+            // 時段假：計算小時數（支援跨日，如 19:30 ~ 00:00）
+            $startParts = explode(':', $leave->start_time);
+            $endParts = explode(':', $leave->end_time);
+            $startMin = (int) $startParts[0] * 60 + (int) $startParts[1];
+            $endMin = (int) $endParts[0] * 60 + (int) $endParts[1];
+            $minutes = $endMin - $startMin;
+
+            if ($minutes <= 0) {
+                $minutes += 1440; // 跨日加 24 小時
+            }
+
+            $hours += $minutes / 60;
+        }
+
+        return [
+            'count'  => $count,
+            'days'   => $days,
+            'hours'  => round($hours, 1),
+            'ranges' => $ranges,
+        ];
     }
 
     // ---------------------------------------------------------------

@@ -82,17 +82,22 @@ class AttendanceRepository
     }
 
     /**
-     * 查詢所有員工某月的打卡紀錄（管理者用月報表）
+     * 查詢所有員工某段期間的打卡紀錄（報表用）
      *
-     * @param string $yearMonth Y-m
+     * ⚠ 用 `whereBetween` 而不是 `where('date', 'like', "{$yearMonth}%")`：
+     * 欄位被 LIKE 包住就吃不到 `date` 的索引，整張表掃過去。
+     * 改成區間之後週報（七天）與月報共用同一支。
+     *
+     * @param string $startDate Y-m-d
+     * @param string $endDate   Y-m-d（含當天）
      * @return Collection
      */
-    public function getAllByMonth($yearMonth)
+    public function getAllByDateRange($startDate, $endDate)
     {
         return AttendanceRecord::query()
             ->select(self::LIST_COLUMNS)
             ->with(['user', 'assignment.shift'])
-            ->where('date', 'like', "{$yearMonth}%")
+            ->whereBetween('date', [$startDate, $endDate])
             ->orderBy('user_id')
             ->orderBy('date')
             ->get();

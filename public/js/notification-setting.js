@@ -483,6 +483,32 @@
         });
     }
 
+    // ===== 分頁六：打卡報表（週報與月報共用同一份收件人） =====
+
+    function renderAttendance() {
+        renderUserList('attendance-user-list', 'js-attendance-user', settings.attendance.user_ids);
+        syncAll('attendance-user-all', 'js-attendance-user');
+    }
+
+    function bindAttendance() {
+        bindSelectAll('attendance-user-all', 'attendance-user-list', 'js-attendance-user');
+
+        document.getElementById('form-attendance').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            var ids = checkedIds('js-attendance-user');
+
+            submit('/admin/notification/ajax-update-attendance', { attendance_report_user_ids: ids },
+                event.target.querySelector('button[type="submit"]'), function () {
+                    settings.attendance.user_ids = ids;
+                });
+        });
+
+        document.getElementById('btn-test-attendance').addEventListener('click', function () {
+            runTest('/admin/notification/ajax-test-attendance', this, i18n.msg.attendance_test_failed);
+        });
+    }
+
     // ===== 權限 =====
 
     /**
@@ -506,6 +532,7 @@
     renderShift();
     renderReport();
     renderTask();
+    renderAttendance();
     applyPermission();
 
     if (canManage) {
@@ -515,5 +542,6 @@
         bindShift();
         bindReport();
         bindTask();
+        bindAttendance();
     }
 }());

@@ -40,6 +40,11 @@
                     <i class="fas fa-columns me-1"></i>{{ trans('notification.tab_task') }}
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#tab-attendance" role="tab">
+                    <i class="fas fa-user-clock me-1"></i>{{ trans('notification.tab_attendance') }}
+                </a>
+            </li>
         </ul>
 
         <div class="tab-content">
@@ -300,6 +305,56 @@
                                 </p>
                                 <p class="mb-0 text-muted" style="font-size:0.875rem">
                                     <i class="fas fa-info-circle me-1"></i>{{ trans('notification.task_count_note') }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- 打卡報表：週報與月報共用同一份收件人 --}}
+            <div class="tab-pane fade" id="tab-attendance" role="tabpanel">
+                <div class="row">
+                    <div class="col-lg-7">
+                        <div class="main-card mb-3 card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ trans('notification.attendance_title') }}</h5>
+                                <p class="text-muted" style="font-size:0.875rem">
+                                    {{ trans('notification.attendance_desc', [
+                                        'weekly'  => config('constants.ATTENDANCE_REPORT.WEEKLY_SEND_AT'),
+                                        'monthly' => config('constants.ATTENDANCE_REPORT.MONTHLY_SEND_AT'),
+                                    ]) }}
+                                </p>
+                                <form id="form-attendance">
+                                    <div class="mb-3">
+                                        <div class="d-flex align-items-center justify-content-between mb-2">
+                                            <label class="form-label mb-0">{{ trans('notification.attendance_user') }}</label>
+                                            <div class="form-check mb-0">
+                                                <input class="form-check-input" type="checkbox" id="attendance-user-all">
+                                                <label class="form-check-label" for="attendance-user-all">{{ trans('notification.select_all') }}</label>
+                                            </div>
+                                        </div>
+                                        <div id="attendance-user-list" class="notice-check-list p-2"></div>
+                                        <small class="form-text text-muted">{{ trans('notification.attendance_user_hint') }}</small>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary js-manage-only">{{ trans('notification.action_save') }}</button>
+                                    <button type="button" class="btn btn-outline-secondary js-manage-only" id="btn-test-attendance">{{ trans('notification.attendance_test') }}</button>
+                                    <div class="form-text mt-2">{{ trans('notification.attendance_test_hint') }}</div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- 個人版（純說明，沒有東西要設定） --}}
+                    <div class="col-lg-5">
+                        <div class="main-card mb-3 card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ trans('notification.attendance_personal_title') }}</h5>
+                                <p class="text-muted" style="font-size:0.875rem">
+                                    {{ trans('notification.attendance_personal_desc') }}
+                                </p>
+                                <p class="mb-0 text-muted" style="font-size:0.875rem">
+                                    <i class="fas fa-info-circle me-1"></i>{{ trans('notification.attendance_leave_note') }}
                                 </p>
                             </div>
                         </div>

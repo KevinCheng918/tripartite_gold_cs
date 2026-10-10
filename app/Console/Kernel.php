@@ -58,6 +58,28 @@ class Kernel extends ConsoleKernel
          */
         $schedule->command('remind:report')->dailyAt('08:30')->withoutOverlapping();
 
+        /*
+         * 打卡週報表：每週一 11:00 發上週一～上週日。
+         *
+         * ⚠ 統計的是**上一週**，不是這一週 —— 當週還沒過完，統計沒有意義。
+         *
+         * 11:00 是需求方指定的。刻意排在早上那一串主動訊息（07:00～08:30）
+         * 之後：報表是「回頭看」的東西，不該跟當天要做的事擠在一起。
+         */
+        $schedule->command('attendance:report --type=weekly')
+            ->weeklyOn(1, '11:00')
+            ->withoutOverlapping();
+
+        /*
+         * 打卡月報表：每月 1 號 11:00 發上個月整個月。
+         *
+         * ⚠ 1 號剛好是週一時，這則會跟週報同一分鐘送出 —— 兩則內容不同
+         * （一則上週、一則上個月），所以是對的，不是重複發送。
+         */
+        $schedule->command('attendance:report --type=monthly')
+            ->monthlyOn(1, '11:00')
+            ->withoutOverlapping();
+
         // 每日凌晨 2 點清理 7 天前的 Telegram 訊息
         $schedule->command('telegram:purge')->dailyAt('02:00');
 

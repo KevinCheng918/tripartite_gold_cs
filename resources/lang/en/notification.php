@@ -12,6 +12,7 @@ return [
     'tab_shift'  => 'Shift Notice',
     'tab_report' => 'Reminder Summary',
     'tab_task'   => 'Task Cards',
+    'tab_attendance' => 'Attendance Reports',
 
     'select_all' => 'Select all',
     'unbound'    => 'not linked',
@@ -76,6 +77,17 @@ return [
     'task_personal_title' => 'Personal task cards',
     'task_personal_desc'  => 'Every active member receives their own summary at :time daily: how many overdue, due today and in progress, plus the cards that need attention. People with no cards get a light-hearted line instead. This is automatic and needs no setup.',
     'task_count_note'     => 'A card can be assigned to several people, so the per-person numbers add up to more than the total card count — that is correct, each of them needs to know.',
+
+    // Attendance reports
+    'attendance_title'          => 'Attendance report recipients',
+    'attendance_desc'           => 'The weekly report (:weekly) covers last Monday to Sunday; the monthly report (:monthly) covers last month. Both DM a summary for everyone (who had perfect attendance, who was late / left early / absent and by how much, who worked overtime). Pick as many people as you like; nothing is sent when no one is selected.',
+    'attendance_user'           => 'Recipients (multiple)',
+    'attendance_user_hint'      => 'The weekly and monthly reports share this list. Anyone marked "not linked" cannot receive messages — ask them to DM the bot once. People selected here do not also get the personal version.',
+    'attendance_test'           => 'Send test',
+    'attendance_test_hint'      => 'DMs last week\'s full report to the people selected above right away. Only the full version is sent, so no one else is disturbed.',
+    'attendance_personal_title' => 'Personal attendance report',
+    'attendance_personal_desc'  => 'Every active staff member receives their own copy: late / early-leave / absence counts and minutes, clock-in amendments, leave dates, and total overtime. Anyone with no lateness, early leave or absence gets a word of encouragement instead. This is sent automatically and needs no configuration.',
+    'attendance_leave_note'     => 'Approved leave does not count as a problem — perfect attendance means no lateness, early leave or absence. Leave is listed separately so managers know which days the person was away.',
 
     // ===== Shift notice =====
     'shift_title'          => 'Full roster recipients',
@@ -151,6 +163,13 @@ return [
         'task_test_no_user'   => 'Please tick at least one recipient and save first',
         'task_test_not_bound' => 'None of the ticked recipients has messaged the bot yet, so they cannot receive messages',
         'task_test_failed'    => 'Send failed, please check the bot is not blocked',
+
+        'attendance_user_not_found' => 'Account not found',
+        'attendance_test_sent'      => 'Test report sent (:sent) — please check Telegram',
+        'attendance_test_partial'   => 'Sent :sent, but these people did not receive it: :failed (ask them to DM the bot once)',
+        'attendance_test_no_user'   => 'Select recipients and save first',
+        'attendance_test_not_bound' => 'None of the selected people have DMed the bot yet, so they cannot receive messages',
+        'attendance_test_failed'    => 'Send failed, please check the bot is not blocked',
 
         // Topics
         'topic_too_many'       => 'Too many topics',

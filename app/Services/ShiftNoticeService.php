@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Repositories\LeaveRequestRepository;
 use App\Repositories\ShiftAssignmentRepository;
 use App\Repositories\ShiftRepository;
 use App\Repositories\UserRepository;
@@ -47,6 +48,7 @@ class ShiftNoticeService
     private $assignmentRepository;
     private $shiftRepository;
     private $userRepository;
+    private $leaveRepository;
     private $staffDm;
     private $supportGroup;
     private $appSettingService;
@@ -56,6 +58,7 @@ class ShiftNoticeService
         ShiftAssignmentRepository $assignmentRepository,
         ShiftRepository $shiftRepository,
         UserRepository $userRepository,
+        LeaveRequestRepository $leaveRepository,
         StaffDmService $staffDm,
         SupportGroupService $supportGroup,
         AppSettingService $appSettingService,
@@ -64,6 +67,8 @@ class ShiftNoticeService
         $this->assignmentRepository = $assignmentRepository;
         $this->shiftRepository = $shiftRepository;
         $this->userRepository = $userRepository;
+        // 請假預告：請假前兩天開始報，一路報到請假結束
+        $this->leaveRepository = $leaveRepository;
         // 私訊的綁定檢查與失敗處理都在這支，班表與提醒統計共用
         $this->staffDm = $staffDm;
         // 沒收到的人彙總回報到這裡
@@ -237,7 +242,101 @@ class ShiftNoticeService
             $text .= (string) config('constants.SHIFT_NOTICE.MANAGER_NO_SHIFT');
         }
 
+        return $text . $this->buildLeaveNotice($date);
+    }
+
+    /**
+     * 請假預告（只附在主管那一則）
+     *
+     * 需求方 2026-10-10：「前兩天到請假結束要報給主管說今天誰請假、請到什麼時候」。
+     *
+     * 所以涵蓋的是一整段：
+     *
+     * ```
+     * 請假開始日 -2 天  ←─── 開始預告
+     * 請假開始日
+     *     …              ←─── 請假中也每天報（主管不會在假期中間忘記）
+     * 請假結束日        ←─── 最後一天
+     * ```
+     *
+     * ⚠ 只附在 `buildManagerText()`，**個人版不動** —— 同仁不需要每天被告知
+     * 別人請假。
+     *
+     * ⚠ 只看已核准的假。待審的還不確定會不會放，先報了反而要收回。
+     *
+     * @param string $date 今天 Y-m-d
+     * @return string 沒有任何人請假時回空字串（整段不出現）
+     */
+    private function buildLeaveNotice($date)
+    {
+        $days = (int) config('constants.SHIFT_NOTICE.LEAVE_NOTICE_DAYS');
+        $leaves = $this->leaveRepository->getUpcomingApproved($date, $days);
+
+        if (blank($leaves)) {
+            return '';
+        }
+
+        $text = (string) config('constants.SHIFT_NOTICE.MANAGER_LEAVE_TITLE');
+
+        foreach ($leaves as $leave) {
+            $text .= strtr((string) config('constants.SHIFT_NOTICE.MANAGER_LEAVE_LINE'), [
+                '{name}'  => filled($leave->user) ? (string) $leave->user->nickname : "#{$leave->user_id}",
+                '{range}' => $this->leaveRange($leave),
+                '{hint}'  => $this->leaveHint($leave, $date),
+            ]);
+        }
+
         return $text;
+    }
+
+    /**
+     * 請假的日期區間字串。同一天就只寫一次
+     *
+     * @param \App\Models\LeaveRequest $leave
+     * @return string
+     */
+    private function leaveRange($leave)
+    {
+        $start = $leave->start_date->format('m/d');
+        $end = $leave->end_date->format('m/d');
+
+        return $start === $end ? $start : "{$start} ～ {$end}";
+    }
+
+    /**
+     * 區間後面那個括號：還沒開始的寫「N 天後開始」，進行中的寫「請假中」
+     *
+     * ⚠ **還沒開始的一定要標出來**，不然主管會以為這個人今天就不在了。
+     *
+     * @param \App\Models\LeaveRequest $leave
+     * @param string                   $date 今天 Y-m-d
+     * @return string
+     */
+    private function leaveHint($leave, $date)
+    {
+        // 時段假：那天他還是會上班，只是缺一段，把時間寫出來
+        if ((int) $leave->is_full_day !== 1 && filled($leave->start_time)) {
+            return strtr((string) config('constants.SHIFT_NOTICE.MANAGER_LEAVE_PARTIAL'), [
+                '{start}' => $this->shortTime($leave->start_time),
+                '{end}'   => $this->shortTime($leave->end_time),
+            ]);
+        }
+
+        $startDate = $leave->start_date->format('Y-m-d');
+
+        if ($startDate === $date) {
+            return (string) config('constants.SHIFT_NOTICE.MANAGER_LEAVE_TODAY');
+        }
+
+        if ($startDate < $date) {
+            return (string) config('constants.SHIFT_NOTICE.MANAGER_LEAVE_ONGOING');
+        }
+
+        $daysLeft = (int) round((strtotime($startDate) - strtotime($date)) / 86400);
+
+        return strtr((string) config('constants.SHIFT_NOTICE.MANAGER_LEAVE_UPCOMING'), [
+            '{days}' => $daysLeft,
+        ]);
     }
 
     /**

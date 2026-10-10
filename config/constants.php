@@ -229,6 +229,27 @@ return [
 
         'MANAGER_NO_SHIFT' => "\n今天沒有任何排班。\n",
 
+        /*
+         * 請假預告（2026-10-10）。只附在**主管那一則**，個人版不動。
+         *
+         * ⚠ 從「請假開始日往前推 LEAVE_NOTICE_DAYS 天」一路報到「請假結束那天」
+         * —— 需求方的原話是「前兩天到請假結束」。所以請假中的每一天也都會報，
+         * 主管才不會在假期中間忘記這個人今天還是不在。
+         *
+         * ⚠ 只看**已核准**的請假。待審的還不確定會不會放。
+         */
+        'LEAVE_NOTICE_DAYS'  => 2,
+        'MANAGER_LEAVE_TITLE' => "\n🌴 <b>請假</b>\n",
+        'MANAGER_LEAVE_LINE'  => "　{name}　{range}{hint}\n",
+
+        // 還沒開始的假要標出來，不然主管會以為這個人今天就不在了
+        'MANAGER_LEAVE_UPCOMING' => '（{days} 天後開始）',
+        'MANAGER_LEAVE_TODAY'    => '（今天起）',
+        'MANAGER_LEAVE_ONGOING'  => '（請假中）',
+
+        // 時段假要把時間寫出來 —— 他那天還是會上班，只是缺一段
+        'MANAGER_LEAVE_PARTIAL' => '（{start}～{end}）',
+
         // 個人那份。只講自己的班，不列同班的人（需求方指定）
         'PERSONAL' => "🌞 {name} 早安，今天是您的<b>{shift}</b>\n"
             . "上班時間：{work_time}\n"
@@ -267,6 +288,125 @@ return [
      * 今天要交幾項），加起來本來就不該等於總卡數。做成互斥的話「進行中」
      * 會少於看板上看到的數量，對不起來更難解釋。
      */
+    /*
+     * 打卡週報表／月報表通知（2026-10-10）
+     *
+     * 週報：每週一 11:00 統計上週一～上週日
+     * 月報：每月 1 號 11:00 統計上個月
+     *
+     * 兩種收件人，比照班表／任務卡／超時統計：
+     *   · 設定頁勾選的人（基本上主管以上）→ 全部人的
+     *   · 其餘在職同仁 → 自己那份
+     *
+     * ⚠ 文案裡的 <b> 是 Telegram 的 HTML parse_mode，**不要寫成 Markdown 的
+     * `**粗體**`** —— 同一則訊息只能有一種 parse_mode，混用會原樣印出星號
+     * （2026-10-09 在超時提醒那邊踩過）。
+     */
+    'ATTENDANCE_REPORT' => [
+        'WEEKLY_TITLE'  => '打卡週報表',
+        'MONTHLY_TITLE' => '打卡月報表',
+
+        // 個人版
+        'PERSONAL_HEADER' => "📋 <b>{name} 您好</b>\n{title}　{range}\n",
+
+        /*
+         * 沒有遲到／早退／曠工時的那一行。
+         *
+         * ⚠ 有請假時要先講請假區間，再講「其餘日子」—— 需求方指定的語序：
+         * 「就直接說幾號到幾號請假，然後剩餘的天數有沒有遲到、早退、曠工」。
+         */
+        'PERSONAL_LEAVE_TITLE' => "\n🌴 <b>請假</b>\n",
+        'PERSONAL_LEAVE_LINE'  => "　{range}\n",
+        'PERSONAL_CLEAN'       => "\n✅ 無遲到、早退、曠工情形\n",
+        'PERSONAL_CLEAN_REST'  => "\n✅ 其餘日子無遲到、早退、曠工情形\n",
+
+        // 有狀況時逐項列，沒有的那一項整行不出現
+        'PERSONAL_ISSUE_TITLE' => "\n<b>出勤狀況</b>\n",
+        'LATE_LINE'            => "　⏰ 遲到 <b>{count}</b> 次，共 {minutes}\n",
+        'EARLY_LINE'           => "　🚪 早退 <b>{count}</b> 次，共 {minutes}\n",
+        'ABSENT_LINE'          => "　🔴 曠工 <b>{days}</b> 天\n",
+
+        // 這兩項不算「狀況」，有就報、沒有就不提
+        'AMEND_LINE'    => "　📝 補打卡 {count} 次\n",
+        'OVERTIME_LINE' => "　💪 加班 {hours}\n",
+
+        // 勉勵的話接在最後（只有乾乾淨淨那幾種情況才會出現）
+        'PERSONAL_PRAISE' => "\n{praise}",
+
+        // 完整版
+        'MANAGER_HEADER' => "📋 <b>{title}</b>\n{range}\n",
+        'MANAGER_EMPTY'  => "\n這段期間沒有任何出勤紀錄。",
+
+        /*
+         * 每人一行。
+         *
+         * ⚠ 需求方指定：「沒有遲到、早退、曠工就報這個人全勤」——
+         * 所以有請假但沒出狀況的人**仍然算全勤**，請假另外附在後面當資訊，
+         * 不然主管會看不懂為什麼「全勤」的人那幾天不在。
+         */
+        'MANAGER_USER_TITLE' => "\n<b>依人員</b>\n",
+        'MANAGER_PERFECT'    => "\n✅ <b>{name}</b>　全勤{extra}\n",
+        'MANAGER_ISSUE'      => "\n⚠️ <b>{name}</b>　{issues}{extra}\n",
+        'MANAGER_LATE'       => '遲到 {count} 次 {minutes}',
+        'MANAGER_EARLY'      => '早退 {count} 次 {minutes}',
+        'MANAGER_ABSENT'     => '曠工 {days} 天',
+        'MANAGER_SEPARATOR'  => '、',
+        'MANAGER_OVERTIME'   => '　💪 加班 {hours}',
+        'MANAGER_LEAVE'      => '　🌴 請假 {leave}',
+
+        // 共用的小單位
+        'UNIT_MINUTES'    => '{minutes} 分鐘',
+        'UNIT_HOURS'      => '{hours} 小時',
+        'UNIT_LEAVE_DAYS' => '{days} 天',
+        'UNIT_LEAVE_BOTH' => '{days} 天 {hours} 小時',
+        'RANGE'           => '{start} ～ {end}',
+
+        /*
+         * 出勤乾淨那幾種情況最後那句勉勵的話（由模型當天寫）。
+         *
+         * ⚠ **不共用求助單統計那組 prompt**：那組寫的是「昨天沒有題目卡住」，
+         * 用在出勤報表會變成文不對題的肯定。
+         *
+         * ⚠ prompt 要把**不要寫什麼**講清楚，模型預設會寫成公關稿。
+         */
+        'ENCOURAGE' => [
+            'PROMPT' => implode("\n", [
+                '你要寫一句話給一位客服同仁，肯定他這一期的出勤表現。',
+                '',
+                '背景：他這段期間沒有遲到、沒有早退、沒有曠工。',
+                '',
+                '規則：',
+                '- 只寫一句，40 個字以內',
+                '- 用繁體中文，語氣像同事之間，不要像公司公告',
+                '- 可以帶上他的名字，但不要每次都放開頭',
+                '- 不要提到數字或統計，那些上面已經寫了',
+                '- 禁止這些：「感謝您的辛勤付出」「再接再厲」「保持下去」這類公關稿句型',
+                '',
+                '只輸出那一句話本身，不要加引號、不要解釋。',
+            ]),
+            'INPUT' => '同仁名字：{name}，期間：{period}',
+
+            // 模型不可用時的退路。平鋪直敘就好，不要假裝是生成的
+            'FALLBACK' => '{period}準時到、準時走，很穩定，辛苦了 🙌',
+        ],
+
+        // 勉勵話裡「這一期」的說法
+        'PERIOD_WEEKLY'  => '上週',
+        'PERIOD_MONTHLY' => '上個月',
+
+        /*
+         * 設定頁顯示的發送時間。
+         *
+         * ⚠ 這只是**給人看的字**，真正的排程時間在 `Console\Kernel`。
+         * 改排程時間記得連這裡一起改 —— 不然設定頁會寫著錯的時間。
+         */
+        'WEEKLY_SEND_AT'  => '每週一 11:00',
+        'MONTHLY_SEND_AT' => '每月 1 號 11:00',
+
+        // 測試發送的開頭，比照其他通知
+        'TEST_PREFIX' => "🧪 <b>測試發送</b>\n\n",
+    ],
+
     'TASK_NOTICE' => [
         // 個人版
         // ⚠ {date} 結尾是全形「）」，後面不加半形空格 —— 看起來會像斷開

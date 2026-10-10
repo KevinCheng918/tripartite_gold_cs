@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Notification\UpdateAttendanceReportRequest;
 use App\Http\Requests\Notification\UpdateGroupRequest;
 use App\Http\Requests\Notification\UpdateRemindRequest;
 use App\Http\Requests\Notification\UpdateReportRequest;
@@ -306,6 +307,70 @@ class NotificationController extends Controller
 
         return response()->json([
             'message' => Arr::get($messages, $reason, trans('notification.msg.task_test_failed')),
+        ], 422);
+    }
+
+    /**
+     * Ajax 更新打卡報表通知的收件人
+     *
+     * @param UpdateAttendanceReportRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxUpdateAttendance(UpdateAttendanceReportRequest $request)
+    {
+        $params = $request->validated();
+
+        try {
+            $this->settingService->updateAttendance($params, Auth::id());
+
+            return response()->json(['message' => trans('notification.msg.saved')]);
+        } catch (\Exception $e) {
+            Log::error('打卡報表通知設定更新失敗', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
+
+            return response()->json(['message' => trans('notification.msg.save_failed')], 500);
+        }
+    }
+
+    /**
+     * Ajax 打卡報表測試發送
+     *
+     * 真的發出去（不是空跑），且**只發上週的完整報表** ——
+     * 不會打擾每一位同仁，也不用等一整個月才看得到月報排版。
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxTestAttendance()
+    {
+        $result = $this->settingService->testAttendance();
+        $sent = (int) Arr::get($result, 'sent', 0);
+
+        if ($sent > 0) {
+            // 有人收到就算成功，但沒收到的人也要講 —— 理由同 ajaxTestShift()
+            $failed = (array) Arr::get($result, 'failed', []);
+
+            if (filled($failed)) {
+                return response()->json([
+                    'message' => trans('notification.msg.attendance_test_partial', [
+                        'sent'   => $sent,
+                        'failed' => implode('、', $failed),
+                    ]),
+                ]);
+            }
+
+            return response()->json([
+                'message' => trans('notification.msg.attendance_test_sent', ['sent' => $sent]),
+            ]);
+        }
+
+        $reason = (string) Arr::get($result, 'reason');
+        $messages = [
+            StaffDmService::SKIP_NO_RECIPIENT => trans('notification.msg.attendance_test_no_user'),
+            StaffDmService::SKIP_NOT_BOUND    => trans('notification.msg.attendance_test_not_bound'),
+            StaffDmService::SKIP_SEND_FAILED  => trans('notification.msg.attendance_test_failed'),
+        ];
+
+        return response()->json([
+            'message' => Arr::get($messages, $reason, trans('notification.msg.attendance_test_failed')),
         ], 422);
     }
 

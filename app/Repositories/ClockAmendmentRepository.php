@@ -108,17 +108,20 @@ class ClockAmendmentRepository
      * @return bool
      */
     /**
-     * 查詢指定月份所有已通過的補打卡（按 user_id 分組計數）
+     * 查詢某段期間所有已通過的補打卡（按 user_id 分組計數）
      *
-     * @param string $yearMonth Y-m
-     * @return \Illuminate\Support\Collection
+     * ⚠ `whereBetween` 而不是 `date like 'Y-m%'` —— 後者吃不到 `date` 的索引。
+     *
+     * @param string $startDate Y-m-d
+     * @param string $endDate   Y-m-d（含當天）
+     * @return \Illuminate\Support\Collection user_id => 次數
      */
-    public function getApprovedCountByMonth($yearMonth)
+    public function getApprovedCountByDateRange($startDate, $endDate)
     {
         return ClockAmendment::query()
             ->selectRaw('user_id, COUNT(*) as count')
             ->where('status', ClockAmendment::STATUS_APPROVED)
-            ->where('date', 'like', "{$yearMonth}%")
+            ->whereBetween('date', [$startDate, $endDate])
             ->groupBy('user_id')
             ->pluck('count', 'user_id');
     }

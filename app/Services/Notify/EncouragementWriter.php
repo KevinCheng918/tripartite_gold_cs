@@ -52,6 +52,33 @@ class EncouragementWriter
     }
 
     /**
+     * 寫給某位同仁（這一期出勤乾乾淨淨）
+     *
+     * ⚠ **不共用 `forPerson()` 的 prompt**：那支寫的是「昨天沒有求助單卡住」，
+     * 用在出勤報表會變成文不對題的肯定（他這週沒遲到，卻被誇沒有卡住題目）。
+     * 情境不同就該有自己的 prompt 與公版。
+     *
+     * @param string $name
+     * @param string $period 這一期的說法，例如「上週」「上個月」
+     * @return string
+     */
+    public function forAttendance($name, $period)
+    {
+        $config = (array) config('constants.ATTENDANCE_REPORT.ENCOURAGE');
+
+        $text = $this->generate(
+            (string) Arr::get($config, 'PROMPT'),
+            strtr((string) Arr::get($config, 'INPUT'), ['{name}' => $name, '{period}' => $period])
+        );
+
+        if (filled($text)) {
+            return $text;
+        }
+
+        return strtr((string) Arr::get($config, 'FALLBACK'), ['{name}' => $name, '{period}' => $period]);
+    }
+
+    /**
      * 寫給整個團隊（昨天完全沒有超時）
      *
      * @return string

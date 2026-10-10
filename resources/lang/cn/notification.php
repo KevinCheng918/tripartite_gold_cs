@@ -12,6 +12,7 @@ return [
     'tab_shift'  => '班表通知',
     'tab_report' => '超时提醒统计',
     'tab_task'   => '任务卡通知',
+    'tab_attendance' => '打卡报表',
 
     'select_all' => '全选',
     'unbound'    => '未绑定',
@@ -76,6 +77,17 @@ return [
     'task_personal_title' => '个人任务卡',
     'task_personal_desc'  => '每位在职同事每天 :time 会各自收到自己的那一份：已过期几项、今日到期几项、进行中几项，以及要留意的卡片清单。手上没卡的人收到的是一句轻松的话。这部分自动发送，不需要设置。',
     'task_count_note'     => '一张卡可以指派给多个人，所以各人的数字加起来会大于卡片总张数 —— 那是对的，他们每个人都该知道。',
+
+    // 打卡报表
+    'attendance_title'          => '打卡报表收件人',
+    'attendance_desc'           => '周报表 :weekly 统计上周一到上周日，月报表 :monthly 统计上个月。两份都会私讯一份全部人的统计（谁全勤、谁迟到早退旷工几次几分钟、谁加班多久）。可以勾多位，没勾任何人时不会发送。',
+    'attendance_user'           => '收件人（可多选）',
+    'attendance_user_hint'      => '周报与月报共用这一份名单。标示「未绑定」的同事收不到讯息，请他先私讯机器人一次。勾选的人不会再另外收到个人版。',
+    'attendance_test'           => '测试发送',
+    'attendance_test_hint'      => '会立刻把上周的完整报表私讯给上面勾选的人。只发完整版，不会打扰其他同事。',
+    'attendance_personal_title' => '个人打卡报表',
+    'attendance_personal_desc'  => '每位在职同事都会各自收到自己的那一份：迟到、早退、旷工的次数与时间，补打卡次数，请假几号到几号，加班总时数。没有迟到、早退、旷工的人收到的是一句勉励的话。这部分自动发送，不需要设定。',
+    'attendance_leave_note'     => '请假不算「出状况」—— 只要没有迟到、早退、旷工就算全勤，请假会另外标在后面让主管知道那几天他不在。',
 
     // ===== 班表通知 =====
     'shift_title'          => '完整班表收件人',
@@ -151,6 +163,13 @@ return [
         'task_test_no_user'   => '请先勾选收件人并保存',
         'task_test_not_bound' => '勾选的同事都还没私信过机器人，所以收不到消息',
         'task_test_failed'    => '发送失败，请确认同事没有屏蔽机器人',
+
+        'attendance_user_not_found' => '找不到这个账号',
+        'attendance_test_sent'      => '测试报表已送出 :sent 则，请确认 Telegram 有收到',
+        'attendance_test_partial'   => '已送出 :sent 则，但这几位没收到：:failed（请他们先私讯机器人一次）',
+        'attendance_test_no_user'   => '请先勾选收件人并储存',
+        'attendance_test_not_bound' => '勾选的同事都还没私讯过机器人，所以收不到讯息',
+        'attendance_test_failed'    => '发送失败，请确认同事没有屏蔽机器人',
 
         // 话题
         'topic_too_many'       => '话题数量超过上限',

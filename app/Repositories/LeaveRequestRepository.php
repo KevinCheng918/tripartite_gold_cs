@@ -144,21 +144,46 @@ class LeaveRequestRepository
     }
 
     /**
-     * 取得指定月份已通過的請假（全部員工）
+     * 取得某段期間已通過的請假（全部員工）
      *
-     * @param string $yearMonth Y-m
+     * @param string $startDate Y-m-d
+     * @param string $endDate   Y-m-d（含當天）
      * @return Collection
      */
-    public function getApprovedByMonth($yearMonth)
+    public function getApprovedByDateRange($startDate, $endDate)
     {
-        $monthStart = "{$yearMonth}-01";
-        $monthEnd = date('Y-m-t', strtotime($monthStart));
-
+        /*
+         * 「有重疊」而不是「落在區間內」：一筆 10/28～11/03 的假，
+         * 在十月的報表與十一月的報表都該被算到（各算自己那幾天）。
+         * 呼叫端負責取交集。
+         */
         return LeaveRequest::query()
             ->select(self::LIST_COLUMNS)
             ->where('status', LeaveRequest::STATUS_APPROVED)
-            ->where('start_date', '<=', $monthEnd)
-            ->where('end_date', '>=', $monthStart)
+            ->where('start_date', '<=', $endDate)
+            ->where('end_date', '>=', $startDate)
+            ->get();
+    }
+
+    /**
+     * 即將開始或進行中的請假（請假預告用）
+     *
+     * 「開始日往前推 N 天 ≤ 今天 ≤ 結束日」—— 也就是請假前 N 天開始預告，
+     * 一路報到請假結束那天。
+     *
+     * @param string $date      今天 Y-m-d
+     * @param int    $noticeDays 提前幾天開始報
+     * @return Collection
+     */
+    public function getUpcomingApproved($date, $noticeDays)
+    {
+        return LeaveRequest::query()
+            ->select(self::LIST_COLUMNS)
+            ->with('user:id,nickname')
+            ->where('status', LeaveRequest::STATUS_APPROVED)
+            ->whereDate('start_date', '<=', date('Y-m-d', strtotime("{$date} +{$noticeDays} days")))
+            ->whereDate('end_date', '>=', $date)
+            ->orderBy('start_date')
             ->get();
     }
 }

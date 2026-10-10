@@ -38,6 +38,7 @@ class NotificationSettingService
     private $shiftNotice;
     private $remindReport;
     private $taskNotice;
+    private $attendanceReport;
 
     public function __construct(
         AppSettingService $appSettingService,
@@ -48,7 +49,8 @@ class NotificationSettingService
         AutoReplySupportService $supportService,
         ShiftNoticeService $shiftNotice,
         RemindReportService $remindReport,
-        TaskNoticeService $taskNotice
+        TaskNoticeService $taskNotice,
+        AttendanceReportService $attendanceReport
     ) {
         $this->appSettingService = $appSettingService;
         $this->stationRepository = $stationRepository;
@@ -59,12 +61,13 @@ class NotificationSettingService
         $this->shiftNotice = $shiftNotice;
         $this->remindReport = $remindReport;
         $this->taskNotice = $taskNotice;
+        $this->attendanceReport = $attendanceReport;
     }
 
     /**
      * 整頁要的資料
      *
-     * 一次送出四個分頁的資料 —— 切換分頁不該再發 ajax，使用者會看到空白一拍。
+     * 一次送出所有分頁的資料 —— 切換分頁不該再發 ajax，使用者會看到空白一拍。
      *
      * @return array
      */
@@ -77,6 +80,12 @@ class NotificationSettingService
             'task'    => [
                 'user_ids' => $this->appSettingService->getIntList(AppSettingService::KEY_TASK_NOTICE_MANAGER),
                 'send_at'  => (string) config('constants.TASK_NOTICE.SEND_AT'),
+            ],
+            'attendance' => [
+                'user_ids'  => $this->appSettingService->getIntList(AppSettingService::KEY_ATTENDANCE_REPORT_MANAGER),
+                // ⚠ 這兩個只是給人看的字，真正的排程時間在 Console\Kernel
+                'weekly_at'  => (string) config('constants.ATTENDANCE_REPORT.WEEKLY_SEND_AT'),
+                'monthly_at' => (string) config('constants.ATTENDANCE_REPORT.MONTHLY_SEND_AT'),
             ],
             'options' => [
                 'systems'       => $this->systemOptions(),
@@ -357,6 +366,40 @@ class NotificationSettingService
     public function testTask()
     {
         return $this->taskNotice->test();
+    }
+
+    // ---------------------------------------------------------------
+    //  打卡報表通知
+    // ---------------------------------------------------------------
+
+    /**
+     * 存打卡報表的收件人
+     *
+     * ⚠ 週報與月報**共用同一份名單**（需求方 2026-10-10）。
+     *
+     * @param array    $params
+     * @param int|null $userId
+     * @return void
+     */
+    public function updateAttendance($params, $userId = null)
+    {
+        $this->appSettingService->put(
+            AppSettingService::KEY_ATTENDANCE_REPORT_MANAGER,
+            $this->appSettingService->idListValue(Arr::get($params, 'attendance_report_user_ids', [])),
+            $userId
+        );
+    }
+
+    /**
+     * 打卡報表的測試發送
+     *
+     * ⚠ 測試發**週報**：月報要等一整個月才有資料，測試時看不出排版對不對。
+     *
+     * @return array
+     */
+    public function testAttendance()
+    {
+        return $this->attendanceReport->test(AttendanceReportService::TYPE_WEEKLY);
     }
 
     // ---------------------------------------------------------------

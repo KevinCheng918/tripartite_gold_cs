@@ -53,6 +53,15 @@ class AppSettingService
      */
     const KEY_TASK_NOTICE_MANAGER = 'task_notice.manager_user_ids';
 
+    /*
+     * 打卡週報表／月報表要私訊給誰（逗號串接的 id，可多選）。
+     *
+     * ⚠ **週報與月報共用同一份名單**（需求方 2026-10-10 選的）——
+     * 兩份報表關心的是同一件事，分開勾只是多一個會忘記同步的地方。
+     * 真的要分開時再拆成兩個 key，儲存鍵不要動（動了既有設定會歸零）。
+     */
+    const KEY_ATTENDANCE_REPORT_MANAGER = 'attendance_report.manager_user_ids';
+
     // 內部支援群組
     const KEY_SUPPORT_CHAT_ID   = 'auto_reply.support_chat_id';
     const KEY_SUPPORT_SYSTEM_ID = 'auto_reply.support_system_id';

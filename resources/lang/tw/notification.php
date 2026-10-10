@@ -12,6 +12,7 @@ return [
     'tab_shift'  => '班表通知',
     'tab_report' => '超時提醒統計',
     'tab_task'   => '任務卡通知',
+    'tab_attendance' => '打卡報表',
 
     'select_all' => '全選',
     'unbound'    => '未綁定',
@@ -76,6 +77,17 @@ return [
     'task_personal_title' => '個人任務卡',
     'task_personal_desc'  => '每位在職同仁每天 :time 會各自收到自己的那一份：已過期幾項、今日到期幾項、進行中幾項，以及要留意的卡片清單。手上沒卡的人收到的是一句輕鬆的話。這部分自動發送，不需要設定。',
     'task_count_note'     => '一張卡可以指派給多個人，所以各人的數字加起來會大於卡片總張數 —— 那是對的，他們每個人都該知道。',
+
+    // 打卡報表
+    'attendance_title'          => '打卡報表收件人',
+    'attendance_desc'           => '週報表 :weekly 統計上週一到上週日，月報表 :monthly 統計上個月。兩份都會私訊一份全部人的統計（誰全勤、誰遲到早退曠工幾次幾分鐘、誰加班多久）。可以勾多位，沒勾任何人時不會發送。',
+    'attendance_user'           => '收件人（可多選）',
+    'attendance_user_hint'      => '週報與月報共用這一份名單。標示「未綁定」的同仁收不到訊息，請他先私訊機器人一次。勾選的人不會再另外收到個人版。',
+    'attendance_test'           => '測試發送',
+    'attendance_test_hint'      => '會立刻把上週的完整報表私訊給上面勾選的人。只發完整版，不會打擾其他同仁。',
+    'attendance_personal_title' => '個人打卡報表',
+    'attendance_personal_desc'  => '每位在職同仁都會各自收到自己的那一份：遲到、早退、曠工的次數與時間，補打卡次數，請假幾號到幾號，加班總時數。沒有遲到、早退、曠工的人收到的是一句勉勵的話。這部分自動發送，不需要設定。',
+    'attendance_leave_note'     => '請假不算「出狀況」—— 只要沒有遲到、早退、曠工就算全勤，請假會另外標在後面讓主管知道那幾天他不在。',
 
     // ===== 班表通知 =====
     'shift_title'          => '完整班表收件人',
@@ -151,6 +163,13 @@ return [
         'task_test_no_user'   => '請先勾選收件人並儲存',
         'task_test_not_bound' => '勾選的同仁都還沒私訊過機器人，所以收不到訊息',
         'task_test_failed'    => '發送失敗，請確認同仁沒有封鎖機器人',
+
+        'attendance_user_not_found' => '找不到這個帳號',
+        'attendance_test_sent'      => '測試報表已送出 :sent 則，請確認 Telegram 有收到',
+        'attendance_test_partial'   => '已送出 :sent 則，但這幾位沒收到：:failed（請他們先私訊機器人一次）',
+        'attendance_test_no_user'   => '請先勾選收件人並儲存',
+        'attendance_test_not_bound' => '勾選的同仁都還沒私訊過機器人，所以收不到訊息',
+        'attendance_test_failed'    => '發送失敗，請確認同仁沒有封鎖機器人',
 
         // 話題
         'topic_too_many'       => '話題數量超過上限',
