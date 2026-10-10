@@ -87,7 +87,7 @@ return [
     'attendance_test_hint'      => 'DMs last week\'s full report to the people selected above right away. Only the full version is sent, so no one else is disturbed.',
     'attendance_personal_title' => 'Personal attendance report',
     'attendance_personal_desc'  => 'Every active staff member receives their own copy: late / early-leave / absence counts and minutes, clock-in amendments, leave dates, and total overtime. Anyone with no lateness, early leave or absence gets a word of encouragement instead. This is sent automatically and needs no configuration.',
-    'attendance_leave_note'     => 'Approved leave does not count as a problem — perfect attendance means no lateness, early leave or absence. Leave is listed separately so managers know which days the person was away.',
+    'attendance_leave_note'     => 'Each person gets one of three lines in the full report: perfect attendance (no lateness, early leave or absence, and no leave taken), on leave (how much leave, plus "otherwise clean"), or issues (counts and minutes). Approved leave is not a problem, but it is not perfect attendance either.',
 
     // ===== Shift notice =====
     'shift_title'          => 'Full roster recipients',

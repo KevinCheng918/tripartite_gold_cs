@@ -7,6 +7,7 @@ use App\Repositories\AttendanceRepository;
 use App\Repositories\LeaveRequestRepository;
 use App\Repositories\ShiftAssignmentRepository;
 use Illuminate\Console\Command;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -55,6 +56,9 @@ class MarkAbsentCommand extends Command
         $markedCount = 0;
         $skippedOnLeave = 0;
 
+        // ⚠ 一次撈完當天請整天假的人，不要在迴圈裡逐人查 —— 那就是 N+1
+        $onLeave = (array) Arr::get($leaveRepository->fullDayLeaveMapByDateRange($date, $date), $date, []);
+
         foreach ($assignments as $assignment) {
             // 檢查是否已有打卡紀錄
             $existing = $attendanceRepository->findByUserAndDate($assignment->user_id, $date);
@@ -64,7 +68,7 @@ class MarkAbsentCommand extends Command
             }
 
             // 請整天假 → 本來就不用打卡，不是曠工
-            if ($leaveRepository->hasApprovedFullDayOnDate($assignment->user_id, $date)) {
+            if (in_array((int) $assignment->user_id, $onLeave, true)) {
                 $skippedOnLeave++;
 
                 continue;

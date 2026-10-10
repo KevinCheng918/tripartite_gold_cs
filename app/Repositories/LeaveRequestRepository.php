@@ -144,6 +144,46 @@ class LeaveRequestRepository
     }
 
     /**
+     * 某段期間內「哪一天有誰請整天假」
+     *
+     * ⚠ 給**一次撈完、在 PHP 裡比對**的呼叫端用，取代在迴圈裡逐人逐日
+     * 呼叫 `hasApprovedFullDayOnDate()` —— 那是標準的 N+1：
+     * 曠工標記每天要問一輪排班的人，一次性清理指令更是要問過每一筆曠工紀錄。
+     *
+     * 回傳的是 `['2026-10-08' => [3, 7], ...]`，用 `in_array()` 查就好。
+     *
+     * ⚠ 一筆假會跨好幾天，所以要**逐日展開**；但只展開跟查詢區間有交集的那幾天，
+     * 不然一筆橫跨半年的假會灌爆這個陣列。
+     *
+     * @param string $startDate Y-m-d
+     * @param string $endDate   Y-m-d（含當天）
+     * @return array 日期 => user_id 陣列
+     */
+    public function fullDayLeaveMapByDateRange($startDate, $endDate)
+    {
+        $leaves = LeaveRequest::query()
+            ->select(['user_id', 'start_date', 'end_date'])
+            ->where('status', LeaveRequest::STATUS_APPROVED)
+            ->where('is_full_day', 1)
+            ->where('start_date', '<=', $endDate)
+            ->where('end_date', '>=', $startDate)
+            ->get();
+
+        $map = [];
+
+        foreach ($leaves as $leave) {
+            $from = max(strtotime($startDate), strtotime($leave->start_date->format('Y-m-d')));
+            $to = min(strtotime($endDate), strtotime($leave->end_date->format('Y-m-d')));
+
+            for ($day = $from; $day <= $to; $day += 86400) {
+                $map[date('Y-m-d', $day)][] = (int) $leave->user_id;
+            }
+        }
+
+        return $map;
+    }
+
+    /**
      * 取得某段期間已通過的請假（全部員工）
      *
      * @param string $startDate Y-m-d

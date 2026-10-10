@@ -6,6 +6,7 @@ use App\Repositories\LeaveRequestRepository;
 use App\Repositories\UserRepository;
 use App\Services\Notify\EncouragementWriter;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 
 /**
  * 打卡週報表／月報表通知
@@ -135,7 +136,7 @@ class AttendanceReportService
      */
     private function resolveRange($type, $endsOn)
     {
-        $base = \Illuminate\Support\Carbon::parse($endsOn);
+        $base = Carbon::parse($endsOn);
 
         if ($type === self::TYPE_MONTHLY) {
             $start = $base->copy()->subMonthNoOverflow()->startOfMonth();
@@ -218,10 +219,11 @@ class AttendanceReportService
     }
 
     /**
-     * 這個人這段期間有沒有「出狀況」
+     * 這個人這段期間有沒有「出狀況」＝ 遲到／早退／曠工
      *
-     * ⚠ 請假**不算**狀況。需求方定義的全勤是「沒有遲到、早退、曠工」，
-     * 請假是核准過的，不該讓一個請兩天假的人看起來像出了事。
+     * ⚠ 請假**不是狀況，但也不是全勤**。核准過的假不該讓人看起來像出了事，
+     * 所以不列進這裡；但有請假就不能報「全勤」（需求方 2026-10-10 更正），
+     * 那是 `managerLine()` 的第二種狀態。
      *
      * @param array $stat
      * @return bool
@@ -262,26 +264,61 @@ class AttendanceReportService
         $text .= (string) Arr::get($report, 'MANAGER_USER_TITLE');
 
         foreach ($stats as $userId => $stat) {
-            $name = (string) Arr::get($names, (int) $userId, "#{$userId}");
-            $extra = $this->managerExtra($report, $stat);
+            $text .= $this->managerLine($report, (string) Arr::get($names, (int) $userId, "#{$userId}"), $stat);
+        }
 
-            if (!$this->hasIssue($stat)) {
-                $text .= strtr((string) Arr::get($report, 'MANAGER_PERFECT'), [
-                    '{name}'  => $name,
-                    '{extra}' => $extra,
-                ]);
+        return $text;
+    }
 
-                continue;
-            }
+    /**
+     * 完整版裡某一個人那一行
+     *
+     * 三種狀態，Early Return 依序判斷：
+     *
+     * | 狀態 | 條件 |
+     * |---|---|
+     * | ⚠️ 有狀況 | 有遲到／早退／曠工 |
+     * | 🌴 有請假 | 沒出狀況，但請過假 |
+     * | ✅ 全勤 | 沒出狀況，**而且沒請假** |
+     *
+     * ⚠ **請假不能算全勤**（需求方 2026-10-10 更正）。請了五天假的人跟整期
+     * 全到的人掛同一個標籤，主管一眼看過去分不出誰真的每天都在。
+     *
+     * @param array  $report
+     * @param string $name
+     * @param array  $stat
+     * @return string
+     */
+    private function managerLine(array $report, $name, array $stat)
+    {
+        $overtime = $this->managerOvertime($report, $stat);
+        $leave = $this->leaveAmount($report, $stat);
 
-            $text .= strtr((string) Arr::get($report, 'MANAGER_ISSUE'), [
+        if ($this->hasIssue($stat)) {
+            // 有狀況時請假仍然要標 —— 主管要知道那幾天他本來就不在
+            $extra = $overtime . (filled($leave)
+                ? strtr((string) Arr::get($report, 'MANAGER_LEAVE'), ['{leave}' => $leave])
+                : '');
+
+            return strtr((string) Arr::get($report, 'MANAGER_ISSUE'), [
                 '{name}'   => $name,
                 '{issues}' => $this->managerIssues($report, $stat),
                 '{extra}'  => $extra,
             ]);
         }
 
-        return $text;
+        if (filled($leave)) {
+            return strtr((string) Arr::get($report, 'MANAGER_LEAVE_ONLY'), [
+                '{name}'  => $name,
+                '{leave}' => $leave,
+                '{extra}' => $overtime,
+            ]);
+        }
+
+        return strtr((string) Arr::get($report, 'MANAGER_PERFECT'), [
+            '{name}'  => $name,
+            '{extra}' => $overtime,
+        ]);
     }
 
     /**
@@ -319,29 +356,24 @@ class AttendanceReportService
     }
 
     /**
-     * 完整版那一行後面的加班與請假（沒有就是空字串）
+     * 完整版那一行後面的加班（沒加班就是空字串）
+     *
+     * ⚠ 請假**不在這裡**：三種狀態要放的位置不一樣（有請假那一行本身就在
+     * 講請假，不能再附一次），所以由 `managerLine()` 各自決定。
      *
      * @param array $report
      * @param array $stat
      * @return string
      */
-    private function managerExtra(array $report, array $stat)
+    private function managerOvertime(array $report, array $stat)
     {
-        $extra = '';
-
-        if ((int) Arr::get($stat, 'overtime_total_minutes', 0) > 0) {
-            $extra .= strtr((string) Arr::get($report, 'MANAGER_OVERTIME'), [
-                '{hours}' => $this->hours($report, (int) Arr::get($stat, 'overtime_total_minutes')),
-            ]);
+        if ((int) Arr::get($stat, 'overtime_total_minutes', 0) <= 0) {
+            return '';
         }
 
-        $leave = $this->leaveAmount($report, $stat);
-
-        if (filled($leave)) {
-            $extra .= strtr((string) Arr::get($report, 'MANAGER_LEAVE'), ['{leave}' => $leave]);
-        }
-
-        return $extra;
+        return strtr((string) Arr::get($report, 'MANAGER_OVERTIME'), [
+            '{hours}' => $this->hours($report, (int) Arr::get($stat, 'overtime_total_minutes')),
+        ]);
     }
 
     /**

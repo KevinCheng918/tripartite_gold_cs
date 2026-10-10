@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\AttendanceRecord;
 use App\Repositories\LeaveRequestRepository;
 use Illuminate\Console\Command;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -55,14 +56,24 @@ class FixAbsentOnLeaveCommand extends Command
             return 0;
         }
 
-        $this->info("現有曠工紀錄共 {$absences->count()} 筆，逐筆檢查當天有沒有核准的整天假……");
+        $this->info("現有曠工紀錄共 {$absences->count()} 筆，檢查當天有沒有核准的整天假……");
+
+        /*
+         * ⚠ **一次撈完**整個曠工紀錄涵蓋的日期範圍，不要在迴圈裡逐筆
+         * `hasApprovedFullDayOnDate()` —— 那是 N+1，而且這支要掃的是
+         * 「有史以來所有曠工紀錄」，不是一天份。
+         */
+        $onLeaveMap = $leaveRepository->fullDayLeaveMapByDateRange(
+            $absences->min('date')->format('Y-m-d'),
+            $absences->max('date')->format('Y-m-d')
+        );
 
         $targets = [];
 
         foreach ($absences as $record) {
             $date = $record->date->format('Y-m-d');
 
-            if (!$leaveRepository->hasApprovedFullDayOnDate($record->user_id, $date)) {
+            if (!in_array((int) $record->user_id, (array) Arr::get($onLeaveMap, $date, []), true)) {
                 continue;
             }
 
