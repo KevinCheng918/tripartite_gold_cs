@@ -38,7 +38,7 @@ return [
 
     // ===== Daily summary =====
     'report_title'     => 'Overdue reminder summary',
-    'report_period'    => 'The same list also receives a weekly report (Mondays 11:30, covering last week) and a monthly report (the 1st at 11:30, covering last month). Weekly and monthly reports send the full version only — no personal copies.',
+    'report_period'    => 'The same list also receives a weekly report (Mondays at :time, covering last week) and a monthly report (the 1st at :time, covering last month) — same time as the daily one. Weekly and monthly reports send the full version only, no personal copies.',
     'report_desc'      => 'Yesterday\'s overdue-reminder summary is sent by direct message at :time daily. The people ticked here receive the summary for *everyone* (by ticket and by person); anyone who was reminded also receives their own personal summary automatically, with no setup.',
     'report_user'      => 'Full summary goes to (multiple)',
     'report_user_hint' => 'Managers and above is the usual choice. Staff marked "not linked" cannot receive it — ask them to message the bot once.',
