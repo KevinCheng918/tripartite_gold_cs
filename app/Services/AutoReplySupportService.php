@@ -812,6 +812,13 @@ class AutoReplySupportService
      * 把類別／問題／答案攤出來，群組裡所有人當下就看得到加了什麼，
      * 發現歸錯類別或答案要修可以直接去後台改。
      *
+     * ⚠ **一定要帶編號**（需求方 2026-10-10）。沒有編號的話，同仁要回頭改這一題
+     * 得在題庫裡用關鍵字慢慢翻 —— 而題目是客人的原話，常常不是他記得的講法。
+     *
+     * ⚠ 編號就是 `quick_reply_item.id`，後台題庫顯示成 `#23`、搜尋框輸入
+     * `#23` 可以直接定位（`public/js/quick-reply-admin.js`）。所以這裡的格式
+     * 要跟後台一致，#號不能省 —— 省了就不能直接複製貼上去找。
+     *
      * @param \App\Models\QuickReplyItem $item
      * @return string
      */
@@ -819,15 +826,16 @@ class AutoReplySupportService
     {
         $category = $this->quickReplyRepository->getActiveCategories()->firstWhere('id', $item->category_id);
         $categoryLabel = filled($category) ? $category->label : '未知類別';
+        $no = "#{$item->id}";
 
         return implode("\n", [
-            '✅ 已加入題庫',
+            "✅ 已加入題庫 {$no}",
             '',
             "類別：{$categoryLabel}",
             "問題：{$item->label}",
             "答案：{$item->answer}",
             '',
-            '如需調整內容，請至後台「快速回覆題庫」頁面編輯。',
+            "如需調整內容，請至後台「快速回覆題庫」搜尋 {$no}。",
         ]);
     }
 
