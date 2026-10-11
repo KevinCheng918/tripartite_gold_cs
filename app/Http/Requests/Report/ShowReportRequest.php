@@ -43,7 +43,13 @@ class ShowReportRequest extends FormRequest
             $start = $this->input('start');
             $end = $this->input('end');
 
-            // 格式本身不合法時先讓上面的規則報，這裡不重複報一次
+            /*
+             * 上面的規則有任何一條沒過就不再多報一句 —— 一次讓使用者看一個問題。
+             *
+             * ⚠ `blank()` 那兩個判斷在目前的規則下走不到（兩個欄位都是
+             * `required`，缺了會先被攔下）。留著是因為下面要 `Carbon::parse()`：
+             * 規則哪天改成 nullable，少了它就是一個沒人預期的 parse 例外。
+             */
             if (blank($start) || blank($end) || $validator->errors()->isNotEmpty()) {
                 return;
             }
