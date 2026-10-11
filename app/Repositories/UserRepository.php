@@ -311,14 +311,33 @@ class UserRepository
      * 帶著綁定狀態：設定頁要能直接顯示「這個人還沒私訊過機器人」，
      * 不然勾了之後只會默默發不出去。
      *
+     * ⚠ `$excludeLeaderUp` 是給**報表的個人版**用的（需求方 2026-10-11）：
+     * 打卡報表與超時統計都不把主管以上（Admin / Boss / Leader）算進統計對象，
+     * 名單濾掉了卻還發個人版，那則會是一份不存在的統計。
+     * **預設不排除** —— 班表通知與任務通知的收件人仍包含主管。
+     *
+     * ⚠ select 要帶 `level`：呼叫端判斷身份靠它，漏掉的話 `isLeaderUp()`
+     * 讀到的是 null，所有人都會被當成主管。
+     *
+     * @param bool $excludeLeaderUp 連主管以上一起排除
      * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function getDmCandidates()
+    public function getDmCandidates($excludeLeaderUp = false)
     {
+        /*
+         * **level 越小官越大**，所以兩種名單是同一個條件、只差門檻 ——
+         * 「排除到哪個身份為止」。分成兩個 where 分支只會多一個 if。
+         *
+         * ADMIN 是 0（最小值），所以預設的 `level > 0` 等於原本的 `level != 0`。
+         */
+        $exclusiveLevel = $excludeLeaderUp
+            ? config('constants.USER.LEVEL.LEADER')
+            : config('constants.USER.LEVEL.ADMIN');
+
         return User::query()
-            ->select(['id', 'nickname', 'telegram_user_id', 'telegram_dm_ready'])
+            ->select(['id', 'nickname', 'level', 'telegram_user_id', 'telegram_dm_ready'])
             ->where('status', config('constants.USER.STATUS.NORMAL'))
-            ->where('level', '!=', config('constants.USER.LEVEL.ADMIN'))
+            ->where('level', '>', $exclusiveLevel)
             ->orderBy('level')
             ->orderBy('nickname')
             ->get();

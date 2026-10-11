@@ -208,6 +208,9 @@ class AttendanceReportService
     /**
      * 把每個人的統計整理成 user_id => 數字
      *
+     * ⚠ 回傳**已經濾掉主管以上**（見 `withoutLeaderUp()`）—— 三個出口
+     * （Telegram 完整版／個人版／後台報表頁）都吃這一份，所以濾一次就夠。
+     *
      * @param array $range
      * @return array
      */
@@ -247,6 +250,43 @@ class AttendanceReportService
             $byUser[$userId]['leave_days'] = Arr::get($summary, 'days');
             $byUser[$userId]['leave_hours'] = Arr::get($summary, 'hours');
             $byUser[$userId]['leave_ranges'] = Arr::get($summary, 'ranges');
+        }
+
+        return $this->withoutLeaderUp($byUser);
+    }
+
+    /**
+     * 濾掉主管以上（Admin / Boss / Leader）
+     *
+     * ⚠ **需求方 2026-10-11 指定：打卡報表不列主管以上，含主管本人。**
+     * 一份要給主管看的出勤統計，列著主管自己遲到幾分鐘，只會干擾判讀 ——
+     * 跟超時統計的 `RemindReportService::withoutManagers()` 同一個理由。
+     *
+     * ⚠ 濾在 `collect()` 裡，所以 Telegram 完整版、個人版、後台報表頁
+     * **三個出口一次生效**，不會有哪一個出口漏掉而數字對不起來。
+     *
+     * ⚠ 查不到的 user（帳號已刪）要**留著**：不知道他是誰就沉默少掉一列，
+     * 統計會對不起來。
+     *
+     * @param array $byUser user_id => 統計
+     * @return array
+     */
+    private function withoutLeaderUp(array $byUser)
+    {
+        if (blank($byUser)) {
+            return $byUser;
+        }
+
+        /*
+         * 只剔除「查得到而且確定是主管以上」的那幾個 ——
+         * 反過來蒐集「要留下的」會把查不到的 user 一起濾掉。
+         */
+        foreach ($this->userRepository->getNamesByIds(array_keys($byUser)) as $user) {
+            if (!$user->isLeaderUp()) {
+                continue;
+            }
+
+            unset($byUser[(int) $user->id]);
         }
 
         return $byUser;
@@ -482,7 +522,14 @@ class AttendanceReportService
         $failed = [];
         $sample = null;
 
-        foreach ($this->userRepository->getDmCandidates() as $user) {
+        /*
+         * ⚠ **主管以上不收個人版**（需求方 2026-10-11）。
+         *
+         * 統計名單已經濾掉他們（`withoutLeaderUp()`），個人版照發的話
+         * `$stats` 撈不到他那一列，`emptyStat()` 會讓那則寫成「全勤」——
+         * **發出去的是一份不存在的統計**，比不發嚴重得多。
+         */
+        foreach ($this->userRepository->getDmCandidates(true) as $user) {
             $userId = (int) $user->id;
 
             if (in_array($userId, $fullRecipients, true)) {

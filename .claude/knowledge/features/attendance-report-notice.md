@@ -20,6 +20,30 @@
 3. 收件人是**新的一份**，週報月報共用
 4. 誤記的曠工**要清掉**，寫一支一次性指令
 
+## ⚠ 統計不列主管以上（2026-10-11）
+
+需求方指定：**打卡報表不能加入主管以上，含主管本人。** 同一天也確認
+超時統計的個人版比照辦理（見 [[remind-escalation]]）。
+
+「主管以上」＝ `level <= LEADER`（ADMIN 0 / BOSS 1 / LEADER 2），
+判斷用既有的 `User::isLeaderUp()`，不要再寫一次 level 比較。
+
+實作在 `AttendanceReportService::withoutLeaderUp()`，**濾在 `collect()` 裡**：
+
+⚠ **一定要濾在 `collect()`**，不是在三個出口各濾一次 —— Telegram 完整版、
+個人版、後台報表頁都吃這一份，分開濾遲早會有一個出口漏掉，而「後台的數字
+跟主管手機上那份對不起來」是最難查的那種 bug（理由同 [[report-page]]）。
+
+⚠ **主管以上也不再收個人版**（`getDmCandidates(true)`）。這一條不是順便做的：
+統計名單濾掉他之後，`$stats` 裡就沒有他那一列，而個人版找不到會退到
+`emptyStat()` —— 那則私訊會寫成「全勤」。**發出去一份不存在的統計，比不發嚴重得多。**
+
+⚠ 查不到的 user（帳號已刪）**留著**：不知道他是誰就沉默少掉一列，統計會對不起來。
+
+⚠ `UserRepository::getDmCandidates()` 多了 `$excludeLeaderUp` 參數，**預設 false** ——
+班表通知與任務通知的收件人仍包含主管，不能順手改掉共用名單。
+那支的 `select` 也補了 `level`（漏掉的話 `isLeaderUp()` 讀到 null，全部人都會被當成主管）。
+
 ## ✅ 統計邏輯是現成的
 
 `AttendanceService::getMonthlyReport()`（打卡出勤頁在用）算出來的欄位剛好就是

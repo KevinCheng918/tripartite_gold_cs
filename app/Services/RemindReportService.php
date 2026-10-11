@@ -297,8 +297,12 @@ class RemindReportService
          * ⚠ **發給所有在職同仁，不只昨天被提醒到的人**（需求方 2026-10-06）。
          *
          * 沒被提醒到的人收到的是一句肯定，不是空白統計 —— 所以收件人範圍是
-         * 「同仁」而不是「昨天出事的人」。`getDmCandidates()` 已經排除管理者
-         * 與停用帳號，跟設定頁的收件人清單同一份名單。
+         * 「同仁」而不是「昨天出事的人」。
+         *
+         * ⚠ **主管以上（含主管）不收**（需求方 2026-10-11）：完整版的「依人員」
+         * 早就濾掉他們（`withoutManagers()`），個人版照發的話等於統計說
+         * 「不列主管」、私訊卻還在逐一通知主管，兩邊對不起來。
+         * `getDmCandidates(true)` 連 Leader / Boss 一起排除（原本只排除管理者）。
          */
 
         /*
@@ -313,7 +317,7 @@ class RemindReportService
         $failed = [];
         $sample = null;
 
-        foreach ($this->userRepository->getDmCandidates() as $user) {
+        foreach ($this->userRepository->getDmCandidates(true) as $user) {
             $userId = (int) $user->id;
 
             if (in_array($userId, $fullRecipients, true)) {
