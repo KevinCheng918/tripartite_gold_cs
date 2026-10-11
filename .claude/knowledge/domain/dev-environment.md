@@ -50,3 +50,20 @@
 `php artisan optimize`（`PROMPTS.md` 規定改 route 後要跑）會把 `.env` 的值連同 `config()` 一起 cache 進 `bootstrap/cache/config.php`。這會產生兩個後果：
 1. `env()` 若在 `config/*.php` 以外的地方呼叫，cache 後一律回傳 `null`——所有需要讀 `.env` 值的地方都要包成 `config('xxx.yyy')`，`.env` 值只在對應的 `config/*.php` 裡用 `env()` 讀一次。
 2. **測試會被影響**：`phpunit.xml` 用 `<server>` 覆寫 `APP_ENV=testing`、`CACHE_DRIVER=array` 等值，但這些覆寫在 config 被 cache 後不會生效（用的是 cache 當下的值）。本機跑 `php artisan test` 前，若剛跑過 `optimize`，要先 `php artisan config:clear`。
+
+## ⚠ workspace 與 php-fpm 是兩個容器，claude CLI 的狀態不一樣
+
+查「自動回覆為什麼不動」時踩過一次（2026-10-11）：
+
+| 執行環境 | `which claude` | 結果 |
+|---|---|---|
+| `docker-compose exec workspace`（預設使用者） | 無 | `claude: not found` |
+| `docker-compose exec -u www-data workspace` | 有 | `Permission denied` |
+| `docker-compose exec php-fpm` | `/usr/local/bin/claude` | **正常** |
+
+網頁請求走的是 **php-fpm 容器**，所以 `php artisan auto-reply:test`（在 workspace 跑）
+失敗**不代表**線上的自動回覆壞了 —— 那兩個是不同的環境。
+
+⚠ 連帶效應：在 workspace 跑 `auto-reply:test` 會把失敗計進「今日用量」的
+失敗次數，讓 AI 引擎頁看起來像在大量失敗。要判斷線上狀態，用設定頁的
+**「測試連線」按鈕**（走 HTTP，等於真實路徑），不要用 CLI。

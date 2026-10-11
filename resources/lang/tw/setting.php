@@ -59,10 +59,19 @@ return [
     'usage_next'         => '下一頁',
     'usage_page'         => '第 :current / :total 頁',
 
-    'action_save'   => '儲存',
-    'action_saving' => '儲存中...',
+    'action_save'    => '儲存',
+    'action_saving'  => '儲存中...',
+    'action_test'    => '測試連線',
+    'action_testing' => '測試中...',
 
     'msg' => [
+        // 測試連線的四種結果
+        'test_ok'           => '✓ 正常，目前可以自動回覆',
+        'test_failed'       => '✗ 無法使用，客人問什麼都只會收到「轉給專員」的公版',
+        'test_failed_reason' => '✗ 無法使用：:reason',
+        'test_not_set'      => '尚未設定憑證',
+        'test_type_invalid' => '要測試的憑證種類不正確',
+
         'saved'         => '已儲存',
         'save_failed'   => '儲存失敗',
         'load_failed'   => '設定載入失敗',

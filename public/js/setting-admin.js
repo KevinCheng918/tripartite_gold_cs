@@ -296,7 +296,70 @@
             });
     }
 
+    /**
+     * 測試一把憑證，把結果寫在按鈕旁邊
+     *
+     * ⚠ 結果留在原地而不是跳 Modal：這顆會被連按好幾次（改完設定馬上再測一次），
+     * 每次都跳一個要關掉的視窗很煩，而且關掉之後就看不到上一次的結果了。
+     *
+     * ⚠ 後端一律回 200 —— token 失效不是請求失敗，而是這支要回答的答案本身。
+     * 所以「正常／不正常」都在 then 裡分，catch 只處理真的壞掉。
+     *
+     * @param {HTMLElement} button
+     * @returns {void}
+     */
+    function testCredential(button) {
+        var type = button.dataset.type;
+        var target = document.getElementById(type + '-test-result');
+
+        // 這顆按鈕裡有 icon，所以存還原要用 innerHTML —— textContent 會把 icon 吃掉
+        var original = button.innerHTML;
+
+        button.disabled = true;
+        button.textContent = i18n.action_testing;
+        target.className = 'text-muted';
+        target.textContent = i18n.action_testing;
+
+        apiFetch('/admin/setting/ajax-test-credential', {
+            method: 'POST',
+            body: JSON.stringify({ type: type })
+        }).then(function (body) {
+            if (!body.configured) {
+                target.className = 'text-muted';
+                target.textContent = i18n.msg.test_not_set;
+
+                return;
+            }
+
+            if (body.ok) {
+                target.className = 'text-success';
+                target.textContent = i18n.msg.test_ok;
+
+                return;
+            }
+
+            // 原因是 CLI 給的原文（「Not logged in」這類），比「失敗」兩個字有用得多
+            target.className = 'text-danger';
+            target.textContent = body.reason
+                ? i18n.msg.test_failed_reason.replace(':reason', body.reason)
+                : i18n.msg.test_failed;
+        }).catch(function (body) {
+            target.className = 'text-danger';
+            target.textContent = errorMessage(body, i18n.msg.test_failed);
+        }).then(function () {
+            button.disabled = false;
+            // 還原也要用 innerHTML，否則 icon 的標籤會被當成文字印在按鈕上
+            button.innerHTML = original;
+        });
+    }
+
     function bindForms() {
+        document.querySelectorAll('.js-test-credential').forEach(function (button) {
+            button.addEventListener('click', function () {
+                testCredential(button);
+            });
+        });
+
         document.getElementById('form-claude').addEventListener('submit', function (e) {
             e.preventDefault();
             submit('/admin/setting/ajax-update-claude', {

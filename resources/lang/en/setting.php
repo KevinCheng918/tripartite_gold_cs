@@ -59,10 +59,19 @@ return [
     'usage_next'         => 'Next',
     'usage_page'         => 'Page :current / :total',
 
-    'action_save'   => 'Save',
-    'action_saving' => 'Saving...',
+    'action_save'    => 'Save',
+    'action_saving'  => 'Saving...',
+    'action_test'    => 'Test connection',
+    'action_testing' => 'Testing...',
 
     'msg' => [
+        // The four outcomes of a connection test
+        'test_ok'           => '✓ Working — auto-reply is available',
+        'test_failed'       => '✗ Not usable; customers will only get the "passed to a specialist" template',
+        'test_failed_reason' => '✗ Not usable: :reason',
+        'test_not_set'      => 'No credential configured yet',
+        'test_type_invalid' => 'Invalid credential type',
+
         'saved'         => 'Saved',
         'save_failed'   => 'Save failed',
         'load_failed'   => 'Failed to load settings',

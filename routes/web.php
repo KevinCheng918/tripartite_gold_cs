@@ -180,6 +180,8 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-settings', [SettingController::class, 'ajaxSettings'])->middleware('can:setting.view')->name('ajax-settings');
         Route::put('/ajax-update-claude', [SettingController::class, 'ajaxUpdateClaude'])->middleware('can:setting.manage')->name('ajax-update-claude');
         Route::put('/ajax-update-fallback', [SettingController::class, 'ajaxUpdateFallback'])->middleware('can:setting.manage')->name('ajax-update-fallback');
+        // 測試現在存著的憑證。會真的呼叫一次 CLI，所以綁 manage 而不是 view
+        Route::post('/ajax-test-credential', [SettingController::class, 'ajaxTestCredential'])->middleware('can:setting.manage')->name('ajax-test-credential');
     });
 
     // 站台管理

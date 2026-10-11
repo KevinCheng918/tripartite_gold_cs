@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Setting\TestCredentialRequest;
 use App\Http\Requests\Setting\UpdateClaudeRequest;
 use App\Http\Requests\Setting\UpdateFallbackRequest;
 use App\Services\SettingService;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
@@ -51,6 +53,35 @@ class SettingController extends Controller
     public function ajaxSettings()
     {
         return response()->json($this->settingService->forPage());
+    }
+
+    /**
+     * Ajax 測試現在存著的憑證還能不能用
+     *
+     * ⚠ 回應一律是 200 —— 「token 失效」不是請求失敗，是這支要回答的答案本身。
+     * 丟 4xx/5xx 的話前端得把「系統壞了」跟「token 壞了」分開處理，
+     * 而使用者看到的應該是同一種東西：一句話告訴他現在正不正常。
+     *
+     * @param TestCredentialRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxTestCredential(TestCredentialRequest $request)
+    {
+        $params = $request->validated();
+
+        try {
+            $result = $this->settingService->testCredential(Arr::get($params, 'type') === 'fallback');
+
+            return response()->json($result);
+        } catch (\Exception $e) {
+            Log::error('憑證測試失敗', [
+                'type'    => Arr::get($params, 'type'),
+                'user_id' => Auth::id(),
+                'error'   => $e->getMessage(),
+            ]);
+
+            return response()->json(['message' => trans('setting.msg.test_failed')], 500);
+        }
     }
 
     /**

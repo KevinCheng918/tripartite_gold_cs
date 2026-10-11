@@ -33,7 +33,14 @@
                             <div class="mb-3 text-muted" style="font-size:0.875rem">
                                 {{ trans('setting.claude_verified_at') }}：<span id="claude-verified-at">-</span>
                             </div>
-                            <button type="submit" class="btn btn-primary js-manage-only">{{ trans('setting.action_save') }}</button>
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <button type="submit" class="btn btn-primary js-manage-only">{{ trans('setting.action_save') }}</button>
+                                {{-- 測的是已經存起來的那把，不是上面輸入框裡的字 --}}
+                                <button type="button" class="btn btn-outline-secondary js-manage-only js-test-credential" data-type="claude">
+                                    <i class="fas fa-plug me-1"></i>{{ trans('setting.action_test') }}
+                                </button>
+                                <span id="claude-test-result" style="font-size:0.875rem"></span>
+                            </div>
                         </form>
 
                         {{-- 取得流程。指令本身不進語系檔（不需要翻譯，也不該被翻壞） --}}
@@ -95,7 +102,13 @@ npm install -g @anthropic-ai/claude-code</code></pre>
                                     {{ trans('setting.fallback_used_today') }}：<span id="fallback-used-today">0</span>
                                 </small>
                             </div>
-                            <button type="submit" class="btn btn-primary js-manage-only">{{ trans('setting.action_save') }}</button>
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <button type="submit" class="btn btn-primary js-manage-only">{{ trans('setting.action_save') }}</button>
+                                <button type="button" class="btn btn-outline-secondary js-manage-only js-test-credential" data-type="fallback">
+                                    <i class="fas fa-plug me-1"></i>{{ trans('setting.action_test') }}
+                                </button>
+                                <span id="fallback-test-result" style="font-size:0.875rem"></span>
+                            </div>
                         </form>
 
                         {{-- 取得流程 --}}

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Services\AutoReply\ClaudeCodeMatcher;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -106,6 +107,41 @@ class SettingService
         ], $userId);
 
         return true;
+    }
+
+    /**
+     * 測試現在存著的那把憑證還能不能用
+     *
+     * ⚠ 測的是**已經存起來的**那把，不是表單上剛打的字 —— 要回答的問題是
+     * 「線上的自動回覆現在活著嗎」，不是「我剛貼的這串對不對」（後者在存檔時就驗了）。
+     *
+     * ⚠ 「最後驗證成功」那個時間**不會因為這裡而更新**。那欄記的是
+     * 「這把 token 是什麼時候被存進來並通過驗證的」，測試只是當下看一眼，
+     * 改寫它會讓人以為 token 被換過。
+     *
+     * @param bool $isFallback true＝測備援 API Key
+     * @return array ok／reason／configured（有沒有設定過）
+     */
+    public function testCredential($isFallback = false)
+    {
+        $key = $isFallback
+            ? AppSettingService::KEY_FALLBACK_API_KEY
+            : AppSettingService::KEY_CLAUDE_TOKEN;
+
+        $credential = (string) $this->appSettingService->get($key);
+
+        // 還沒設定過就不要去跑 CLI —— 那只會得到一個看不懂的失敗原因
+        if (blank($credential)) {
+            return ['ok' => false, 'reason' => null, 'configured' => false];
+        }
+
+        $result = $this->matcher->checkCredential($credential, $isFallback);
+
+        return [
+            'ok'         => (bool) Arr::get($result, 'ok'),
+            'reason'     => Arr::get($result, 'reason'),
+            'configured' => true,
+        ];
     }
 
     /**

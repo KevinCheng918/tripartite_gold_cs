@@ -59,10 +59,19 @@ return [
     'usage_next'         => '下一页',
     'usage_page'         => '第 :current / :total 页',
 
-    'action_save'   => '保存',
-    'action_saving' => '保存中...',
+    'action_save'    => '保存',
+    'action_saving'  => '保存中...',
+    'action_test'    => '测试连线',
+    'action_testing' => '测试中...',
 
     'msg' => [
+        // 测试连线的四种结果
+        'test_ok'           => '✓ 正常，目前可以自动回覆',
+        'test_failed'       => '✗ 无法使用，客人问什么都只会收到「转给专员」的公版',
+        'test_failed_reason' => '✗ 无法使用：:reason',
+        'test_not_set'      => '尚未设置凭证',
+        'test_type_invalid' => '要测试的凭证种类不正确',
+
         'saved'         => '已保存',
         'save_failed'   => '保存失败',
         'load_failed'   => '设置加载失败',

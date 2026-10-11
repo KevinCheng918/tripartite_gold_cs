@@ -98,8 +98,27 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
      */
     public function verifyCredential($credential, $isFallback = false)
     {
+        return (bool) Arr::get($this->checkCredential($credential, $isFallback), 'ok');
+    }
+
+    /**
+     * 驗證憑證，**並且回報為什麼不行**
+     *
+     * `verifyCredential()` 只回 bool，那對「存檔前先驗」夠用（驗不過就不存），
+     * 但設定頁的「測試」按鈕要告訴人原因 —— 「Not logged in」「額度用盡」
+     * 跟「失敗」這三個字對使用者的價值差很多，而原因本來只進得了 log。
+     *
+     * ⚠ 這支**不計入用量統計**：它送的是一個字的 prompt，拿來當健康檢查用，
+     * 混進流量裡會讓「今日呼叫次數」失真。
+     *
+     * @param string $credential
+     * @param bool   $isFallback
+     * @return array ok（bool）／reason（string|null，失敗時 CLI 給的說明）
+     */
+    public function checkCredential($credential, $isFallback = false)
+    {
         if (blank($credential)) {
-            return false;
+            return ['ok' => false, 'reason' => null];
         }
 
         $env = $this->buildEnv($isFallback
@@ -121,7 +140,7 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
         } catch (\Exception $e) {
             Log::error('Claude 憑證驗證失敗', ['fallback' => $isFallback, 'error' => $e->getMessage()]);
 
-            return false;
+            return ['ok' => false, 'reason' => $e->getMessage()];
         }
 
         $envelope = json_decode($process->getOutput(), true);
@@ -129,16 +148,27 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
         // 同 execute()：憑證不對時 CLI 仍以 exit 0 結束（result 會是 "Not logged in"），
         // 只看 exit code 會把一把錯的 token 當成驗證通過存進去
         if (!$process->isSuccessful() || (is_array($envelope) && !empty($envelope['is_error']))) {
+            /*
+             * 原因優先取 CLI envelope 裡的 result（「Not logged in」這類人看得懂的話）；
+             * CLI 根本沒跑起來時 envelope 是空的，那時 stderr 才是線索
+             * （例如 `claude: not found` —— 機器上沒裝，跟 token 無關）。
+             */
+            $reason = trim($this->envelopeMessage($envelope));
+
+            if (blank($reason)) {
+                $reason = trim($process->getErrorOutput());
+            }
+
             Log::warning('Claude 憑證驗證未通過', [
                 'fallback' => $isFallback,
-                'reason'   => mb_substr(trim($this->envelopeMessage($envelope)), 0, 200),
+                'reason'   => mb_substr($reason, 0, 200),
                 'stderr'   => mb_substr($process->getErrorOutput(), 0, 300),
             ]);
 
-            return false;
+            return ['ok' => false, 'reason' => mb_substr($reason, 0, 200)];
         }
 
-        return true;
+        return ['ok' => true, 'reason' => null];
     }
 
     /**
