@@ -1076,31 +1076,50 @@ a:hover { color: #85640a; }
     border-bottom: 0;
 }
 
-/* hover 時左側浮出一條金色指示線。用 box-shadow 內嵌而不是 border-left：
-   border 會把那一格的內容往右推 1px，整列看起來在抖。
+/* ---------------------------------------------------------------
+   列的狀態：左側指示線與底色
+   ---------------------------------------------------------------
 
-   ⚠ 兩層 shadow 要一起寫：第二層就是 Bootstrap 原本那層底色
-   （上面那條註解說的 accent-bg），只寫金線會把整列的 hover 底色擦掉。
-   先寫的畫在上面，所以金線蓋在底色之上。 */
-.table.data-table > tbody > tr:hover > td:first-child {
-    box-shadow: inset 2px 0 0 #a67c00, inset 0 0 0 9999px var(--bs-table-accent-bg);
+   左條用 box-shadow 內嵌而不是 border-left —— border 會把那一格的內容
+   往右推，整列看起來在抖。
+
+   ⚠ **顏色走 `--row-accent` 變數，box-shadow 只在這裡寫一次。**
+   一個 td 只能有一組 box-shadow，所以每種列狀態各寫一條 shadow 規則的話，
+   它們會互相整條覆蓋 —— hover 的金線會把「未處理」的紅條擦掉，
+   然後就得為每個「狀態 × hover」的組合再補一條覆寫，條數隨狀態數量平方成長。
+   改成只有這一條規則碰 box-shadow，其他地方一律只設變數。
+
+   ⚠ 第二層 shadow 是 Bootstrap 畫列底色的那層（`--bs-table-accent-bg`，
+   `.table-hover` 會在 hover 時把它換成 hover-bg）。少了它，左條會把
+   hover 底色整個擦掉。先寫的畫在上面，所以左條蓋在底色之上。
+
+   要新增一種列狀態：加一條只設 `--row-accent` / `background-color` 的規則，
+   **不要再寫 box-shadow**。 */
+.table.data-table > tbody > tr > td:first-child {
+    box-shadow: inset 3px 0 0 var(--row-accent, transparent),
+                inset 0 0 0 9999px var(--bs-table-accent-bg);
+}
+
+.table.data-table > tbody > tr:hover {
+    --row-accent: #a67c00;
 }
 
 /* 需要被看見的那幾列（目前用在報表的「仍未處理」）：淡紅底 ＋ 左側紅條。
 
-   ⚠ 底色用 background-color 而不是 Bootstrap 的 accent-bg ——
-   `.data-table` 已經把 `--bs-table-accent-bg` 設成 transparent（見上面），
-   所以那層 9999px 的 inset shadow 是透明的，background-color 看得到。
+   ⚠ 底色用 `background-color` 而不是 Bootstrap 的 accent-bg：`.data-table`
+   已經把 `--bs-table-accent-bg` 設成 transparent（見上面那段），底色這一層
+   空著正好給狀態用。hover 時 Bootstrap 會把 accent-bg 換成半透明的金，
+   疊在這個紅底之上 —— 兩種訊息都還看得到，不必互相讓位。
 
-   ⚠ hover 的金線會蓋掉紅條（同一個 td、同一個屬性），所以 hover 態要
-   再寫一次把紅色寫回去。少了這條，滑鼠經過時那一列就不再是「未處理」的樣子。 */
+   ⚠ 這條**必須寫在 `:hover` 那條之後**。兩者特異度相同（都是
+   「兩個 class + 一個 tr + 一個 class/pseudo-class」），靠順序決勝；
+   寫在前面的話，滑鼠一經過紅條就會變成金條。 */
 .table.data-table > tbody > tr.is-pending > td {
     background-color: rgba(220, 53, 69, 0.06);
 }
 
-.table.data-table > tbody > tr.is-pending > td:first-child,
-.table.data-table > tbody > tr.is-pending:hover > td:first-child {
-    box-shadow: inset 3px 0 0 #dc3545, inset 0 0 0 9999px var(--bs-table-accent-bg);
+.table.data-table > tbody > tr.is-pending {
+    --row-accent: #dc3545;
 }
 
 /* 序號欄：固定窄寬並壓成灰色，它只是定位用的 */
@@ -1441,20 +1460,24 @@ a:hover { color: #85640a; }
    這裡不重複覆寫，只補這一套新 class 自己的顏色 */
 
 /* hover 底色由既有的 `[data-theme="dark"] .table-hover > tbody > tr:hover`
-   那組規則負責（帶 !important），這裡只換金線的顏色 */
-[data-theme="dark"] .table.data-table > tbody > tr:hover > td:first-child {
-    box-shadow: inset 2px 0 0 #d4af37, inset 0 0 0 9999px var(--bs-table-accent-bg);
+   那組規則負責（帶 !important），這裡只換左條的顏色。
+
+   ⚠ 深色模式也只設 `--row-accent`，**不要再寫 box-shadow** ——
+   畫左條的那一條規則在淺色模式那段，深色只是換個顏色進去。 */
+[data-theme="dark"] .table.data-table > tbody > tr:hover {
+    --row-accent: #d4af37;
 }
 
 /* 「仍未處理」的淡紅底在深色模式要更透一點，深底上 6% 的紅幾乎看不出來；
-   紅條本身調亮，#dc3545 在深底上偏暗 */
+   紅條本身調亮，#dc3545 在深底上偏暗。
+
+   ⚠ 同樣要排在上面那條 `:hover` 之後，理由見淺色模式那段。 */
 [data-theme="dark"] .table.data-table > tbody > tr.is-pending > td {
     background-color: rgba(248, 113, 113, 0.1);
 }
 
-[data-theme="dark"] .table.data-table > tbody > tr.is-pending > td:first-child,
-[data-theme="dark"] .table.data-table > tbody > tr.is-pending:hover > td:first-child {
-    box-shadow: inset 3px 0 0 #f87171, inset 0 0 0 9999px var(--bs-table-accent-bg);
+[data-theme="dark"] .table.data-table > tbody > tr.is-pending {
+    --row-accent: #f87171;
 }
 
 /* ⚠ `.col-idx` 與 `.table-empty` 掛在 `<td>` 本身，而既有的

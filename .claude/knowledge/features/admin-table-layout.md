@@ -153,7 +153,34 @@ Architect 的 `.btn-transition` 設了 `border-color: #e9ecef`，但 base.css
   金色，淺色模式從來沒有人覆寫。一個號稱沒有藍色的介面，
   滑過任何一列都會亮一條淡藍
 
-`.data-table` 把這兩個變數都收掉了。
+`.data-table` 把這兩個變數都收掉了。**收掉之後底色那一層就空出來給列狀態用**
+（例如報表的「仍未處理」），所以在 `.data-table` 裡設 row 底色反而要用
+`background-color` —— 跟上面那句相反，差別就在 accent-bg 有沒有被收掉。
+
+### 列狀態的左條：顏色走 `--row-accent`，box-shadow 只寫一次
+
+hover 的金線與「仍未處理」的紅條都是同一個 `td:first-child` 的 box-shadow，
+而**一個元素只能有一組 box-shadow** —— 各寫一條規則的話會互相整條覆蓋，
+然後就得為每個「狀態 × hover」的組合補一條覆寫，條數隨狀態數量平方成長。
+
+```css
+/* 只有這一條碰 box-shadow */
+.table.data-table > tbody > tr > td:first-child {
+    box-shadow: inset 3px 0 0 var(--row-accent, transparent),
+                inset 0 0 0 9999px var(--bs-table-accent-bg);
+}
+
+.table.data-table > tbody > tr:hover      { --row-accent: #a67c00; }
+.table.data-table > tbody > tr.is-pending { --row-accent: #dc3545; }
+```
+
+⚠ 狀態那條**必須寫在 `:hover` 之後**：兩者特異度相同，靠順序決勝。
+寫在前面的話，滑鼠一經過紅條就會變成金條。
+
+⚠ 第二層 shadow 是 Bootstrap 畫列底色的那層，不能省 ——
+少了它，左條會把 hover 底色整個擦掉。
+
+**要新增一種列狀態：加一條只設 `--row-accent` 的規則，不要再寫 box-shadow。**
 
 ### 金色文字在深色模式看不到
 

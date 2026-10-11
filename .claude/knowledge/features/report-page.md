@@ -118,11 +118,9 @@ Laravel 沒有內建規則能比較「兩個欄位相差幾天」，所以擋在
 ⚠ **N＝0 的時候也要講一句**（「被提醒過的都已經處理完了」），
 不然分不出「都處理完了」跟「這段期間沒資料」。
 
-⚠ CSS 有兩個坑，都記在 `custom.css` 那段註解裡：
-底色要用 `background-color`（`.data-table` 把 `--bs-table-accent-bg` 設成
-transparent，所以那層 9999px 的 inset shadow 是透明的）；
-hover 的金線跟紅條是同一個 td 的同一個屬性，hover 態要再寫一次把紅色寫回去，
-不然滑鼠經過時那一列就不再是「未處理」的樣子。
+⚠ CSS：`tr.is-pending` 只設底色與 `--row-accent` 兩個值，**不碰 box-shadow**。
+左條是 `.data-table` 共用的一條規則畫的，詳見
+[[admin-table-layout]] 的「列狀態的左條」—— 各自寫 box-shadow 會互相整條覆蓋。
 
 ## 檔案
 
