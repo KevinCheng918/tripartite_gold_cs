@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Report\MarkHandledRequest;
 use App\Http\Requests\Report\ShowReportRequest;
 use App\Services\AttendanceReportService;
+use App\Services\AutoReplySupportService;
 use App\Services\RemindReportService;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
@@ -19,6 +21,7 @@ use Illuminate\Support\Facades\Log;
  * |---|---|
  * | 打卡報表 | `report.attendance` |
  * | 超時提醒統計 | `report.remind` |
+ * | 超時統計裡的「標記為已處理」 | `report.remind_handle` |
  *
  * 兩個分頁都是「自己選起訖日期 ＋ 一排快捷鈕」，比照補點紀錄。
  * 後端只收起訖，不收「日／週／月」—— 快捷鈕在前端就換算成日期了，
@@ -33,12 +36,22 @@ class ReportController extends Controller
 {
     private $attendanceReport;
     private $remindReport;
+    private $supportService;
 
-    public function __construct(AttendanceReportService $attendanceReport, RemindReportService $remindReport)
-    {
+    public function __construct(
+        AttendanceReportService $attendanceReport,
+        RemindReportService $remindReport,
+        AutoReplySupportService $supportService
+    ) {
         // 統計本體跟通知共用，不各查一次
         $this->attendanceReport = $attendanceReport;
         $this->remindReport = $remindReport;
+        /*
+         * 「標記為已處理」動的是求助單。狀態轉移一律走這支 Service ——
+         * 在報表這邊自己改一次，Telegram 那條路的規則（已處理過就不能再動、
+         * 要回報群組）就有兩份，改一邊忘另一邊是遲早的事。
+         */
+        $this->supportService = $supportService;
     }
 
     /**
@@ -101,6 +114,45 @@ class ReportController extends Controller
             Log::error('超時提醒統計載入失敗', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
 
             return response()->json(['message' => trans('report.msg.load_failed')], 500);
+        }
+    }
+
+    /**
+     * Ajax 把一張還掛著的求助單標成「客服已自行處理」
+     *
+     * 報表上看得到「仍未處理」，卻沒有任何地方可以處理它 —— 支援群組那則
+     * 求助訊息被洗掉、或同仁其實是在客戶群直接回客人的時候，那一列會永遠紅著。
+     * 這條路是那個出口。
+     *
+     * ⚠ 權限用 `report.remind_handle` 而不是 `report.remind`：看得到統計
+     * 不等於可以替別人結案 —— 比照待追蹤事項把「看」與「做」分成兩個 keyword。
+     *
+     * @param MarkHandledRequest $request
+     * @param int                $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxMarkHandled(MarkHandledRequest $request, $id)
+    {
+        $params = $request->validated();
+
+        try {
+            $this->supportService->markHandled(
+                (int) Arr::get($params, 'id'),
+                (string) Auth::user()->nickname
+            );
+
+            return response()->json(['message' => trans('report.msg.ticket_handled')]);
+        } catch (\RuntimeException $e) {
+            // 找不到、或剛剛有人在 Telegram 按過了 —— 不是系統錯誤，訊息直接給使用者看
+            return response()->json(['message' => $e->getMessage()], 422);
+        } catch (\Exception $e) {
+            Log::error('求助單標記已處理失敗', [
+                'ticket_id' => $id,
+                'user_id'   => Auth::id(),
+                'error'     => $e->getMessage(),
+            ]);
+
+            return response()->json(['message' => trans('report.msg.handle_failed')], 500);
         }
     }
 

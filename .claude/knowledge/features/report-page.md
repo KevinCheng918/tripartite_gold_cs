@@ -135,6 +135,41 @@ Laravel 沒有內建規則能比較「兩個欄位相差幾天」，所以擋在
 左條是 `.data-table` 共用的一條規則畫的，詳見
 [[admin-table-layout]] 的「列狀態的左條」—— 各自寫 box-shadow 會互相整條覆蓋。
 
+### 7. 紅標要有出口：「標記為已處理」（2026-10-11，v2.78）
+
+標出「仍未處理」之後才發現：**那一列看得到卻碰不到**。一張單要離開 `PENDING`
+只有支援群組那幾條路（引用求助訊息作答、訊息上的按鈕、後台對話視窗送訊息），
+求助訊息被洗掉、引用掛不上、或同仁其實是用個人帳號在客戶群回的時候，
+那一列就永遠紅著，提醒也會一路催到上限。
+病根與全部路徑見 [bugfix/2026-10-11-remind-report-still-pending.md](../bugfix/2026-10-11-remind-report-still-pending.md)。
+
+```
+PUT /admin/report/ajax-mark-handled/{id}        can:report.remind_handle
+  → AutoReplySupportService::markHandled()      狀態轉移一律走這支
+  → AutoReplyTicketRepository::markHandledById()
+```
+
+⚠ **狀態改成 `IGNORED`（＝客服已自行處理），不是新開一個狀態。** 那個狀態的
+定義本來就寫著「含客服已自行人工回覆」，語意完全吻合；為了「從後台按的」
+另開一個狀態，只是讓六個狀態變七個，而報表上兩者要顯示的字一模一樣。
+
+⚠ **狀態條件帶在 `update` 的 where 裡，不是先查再寫。** 同一張單很可能正好
+有人在 Telegram 按按鈕 —— 先查後寫兩邊都會成功，後寫的會把「已加入題庫」
+蓋回「客服已自行處理」。用回傳筆數判斷誰先到，0 筆回 422 而不是 500：
+那不是錯誤，是別人比較快。
+
+⚠ **一定要回報到支援群組**（`AUTO_REPLY.HANDLED_NOTICE`，引用原求助訊息）。
+後台改了狀態而群組不知道的話，同仁還是會去引用它作答，然後只拿到一句
+「這張單已經處理過了」。那則通知失敗只記 log，不能讓整個操作失敗 ——
+狀態已經改掉了，丟例外會讓人以為沒成功而再按一次。
+
+⚠ **權限是另一個 keyword**（`report.remind_handle`）：那顆會把別人的單結案、
+而且會在群組發通知，看得到統計不等於可以替別人做這個決定。比照
+[[customer-followup]] 的 index / manage。沒有這個權限的人連那一欄都不會出現。
+
+⚠ 確認文字一定要寫「**不會回覆客人、也不會加入題庫**」。按的人很容易
+以為系統會順便幫他回那位客人 —— 真的要回請走客服對話視窗。
+
 ## 檔案
 
 **新增**
@@ -179,6 +214,24 @@ config/changelog.php                        v2.72
 ```
 resources/views/layouts/app.blade.php       打卡出勤排除 admin.attendance.detail；報表收進來
 config/changelog.php                        v2.77
+```
+
+**2026-10-11 追加（標記為已處理，v2.78）**
+
+```
+app/Http/Requests/Report/MarkHandledRequest.php   新增；id 來自路由，用 validationData() 帶進驗證
+app/Http/Controllers/Admin/ReportController.php   新增 ajaxMarkHandled()；注入 AutoReplySupportService
+app/Services/AutoReplySupportService.php          新增「後台操作」一節：markHandled() / noticeHandled()
+app/Repositories/AutoReplyTicketRepository.php    新增 markHandledById()（狀態條件寫在 where 裡）
+app/Services/RemindReportService.php              forPage() 的 by_ticket 補 id
+routes/web.php                                    新增 report/ajax-mark-handled/{id}（PUT）
+config/permissionMap.php                          report group 新增 remind_handle
+config/constants.php                              AUTO_REPLY.HANDLED_NOTICE
+resources/lang/{tw,cn,en}/permission.php          remind_handle
+resources/lang/{tw,cn,en}/report.php              操作欄、按鈕、確認句、四句 msg、確定/取消
+resources/views/admin/report/index.blade.php      data-can-handle；確認與訊息兩個 Modal
+public/js/report.js                               apiFetch 收 options；操作欄、確認、送出、重載
+config/changelog.php                              v2.78
 ```
 
 ## 相關

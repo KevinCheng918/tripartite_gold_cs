@@ -19,7 +19,15 @@ $(function () {
     var canAttendance = root.dataset.canAttendance === '1';
     var canRemind = root.dataset.canRemind === '1';
     var canDetail = root.dataset.canDetail === '1';
+    var canHandle = root.dataset.canHandle === '1';
     var csrfToken = $('meta[name="csrf-token"]').attr('content');
+
+    /*
+     * 「標記為已處理」之後要把那一列換掉，所以得記住現在看的是哪一段。
+     * 期間是 bindPeriod() 裡的 closure，從外面拿不到。
+     */
+    var remindRange = null;
+    var pendingTicketId = null;
 
     /**
      * 代入語系字串的參數（:name 這類）
@@ -48,13 +56,19 @@ $(function () {
 
     /**
      * @param {string} url
+     * @param {Object} [options] fetch 選項。查詢不用帶，「標記為已處理」要帶 method: 'PUT'
      * @returns {Promise}
      */
-    function apiFetch(url) {
-        return fetch(url, {
-            headers: { 'X-CSRF-TOKEN': csrfToken, Accept: 'application/json' },
-            credentials: 'same-origin'
-        }).then(function (response) {
+    function apiFetch(url, options) {
+        options = options || {};
+        options.credentials = 'same-origin';
+        options.headers = Object.assign({
+            'X-CSRF-TOKEN': csrfToken,
+            'Content-Type': 'application/json',
+            Accept: 'application/json'
+        }, options.headers || {});
+
+        return fetch(url, options).then(function (response) {
             // session 過期交給 AuthGuard 統一處理，理由見 public/js/common.js
             var intercepted = window.AuthGuard && window.AuthGuard.intercept(response);
 
@@ -76,9 +90,10 @@ $(function () {
      * 要的是 errors 裡那一句（期間太長、結束日早於開始日）。
      *
      * @param {Object} body
+     * @param {string} [fallback] 沒有任何訊息時要顯示的字，預設是「載入失敗」
      * @returns {string}
      */
-    function errorText(body) {
+    function errorText(body, fallback) {
         var errors = body && body.errors;
 
         if (errors) {
@@ -89,7 +104,7 @@ $(function () {
             }
         }
 
-        return (body && body.message) || i18n.msg.load_failed;
+        return (body && body.message) || fallback || i18n.msg.load_failed;
     }
 
     /**
@@ -101,6 +116,21 @@ $(function () {
     function emptyRow(colspan) {
         return '<tr><td colspan="' + colspan + '" class="table-empty">' +
             '<i class="fas fa-inbox"></i>' + escapeHtml(i18n.empty) + '</td></tr>';
+    }
+
+    /**
+     * 顯示訊息（不用 alert）
+     *
+     * @param {string} message
+     * @returns {void}
+     */
+    function showMessage(message) {
+        var modalEl = document.getElementById('modal-report-msg');
+
+        if (!modalEl) { return; }
+
+        modalEl.querySelector('.modal-body').textContent = message;
+        new bootstrap.Modal(modalEl).show();
     }
 
     /**
@@ -223,6 +253,8 @@ $(function () {
      * @returns {void}
      */
     function loadRemind(from, to) {
+        remindRange = { from: from, to: to };
+
         apiFetch('/admin/report/ajax-remind?start=' + from + '&end=' + to)
             .then(renderRemind)
             .catch(function (body) {
@@ -267,11 +299,23 @@ $(function () {
                 ? '<span class="badge bg-danger">' + escapeHtml(i18n.remind_pending_badge) + '</span>'
                 : escapeHtml(t.status_label);
 
+            /*
+             * 只有還沒處理的那幾題有得按。已經結案的單再按一次，後端也只會回
+             * 「剛剛已經被處理過了」—— 那顆按鈕擺在那裡只是誤導。
+             */
+            var action = canHandle
+                ? '<td class="col-actions">' + (t.pending
+                    ? '<button type="button" class="btn btn-sm btn-outline-secondary js-rmd-handle" data-id="' + t.id + '">' +
+                        '<i class="fas fa-check me-1"></i>' + escapeHtml(i18n.remind_mark_handled) + '</button>'
+                    : '') + '</td>'
+                : '';
+
             return '<tr' + rowClass + '>' +
                 '<td><span class="cell-stack__main">' + escapeHtml(t.question) + '</span></td>' +
                 '<td>' + escapeHtml(t.group) + '</td>' +
                 '<td class="col-num">' + trans(i18n.unit_times, { n: t.times }) + '</td>' +
                 '<td>' + status + '</td>' +
+                action +
                 '</tr>';
         }).join('');
 
@@ -296,7 +340,8 @@ $(function () {
             '<th>' + escapeHtml(i18n.remind_group) + '</th>' +
             '<th class="col-num">' + escapeHtml(i18n.remind_times) + '</th>' +
             '<th>' + escapeHtml(i18n.remind_status) + '</th>' +
-            '</tr></thead><tbody>' + (ticketRows || emptyRow(4)) + '</tbody></table></div>' +
+            (canHandle ? '<th class="col-actions">' + escapeHtml(i18n.remind_action) + '</th>' : '') +
+            '</tr></thead><tbody>' + (ticketRows || emptyRow(canHandle ? 5 : 4)) + '</tbody></table></div>' +
 
             '<h6 class="mt-4">' + escapeHtml(i18n.remind_by_user) + '</h6>' +
             '<div class="table-responsive">' +
@@ -308,6 +353,74 @@ $(function () {
             '<p class="text-muted mb-0 mt-2" style="font-size:0.875rem">' +
             '<i class="fas fa-info-circle me-1"></i>' + escapeHtml(i18n.remind_manager_note) + '</p>';
     }
+
+    // ===== 標記為已處理 =====
+
+    /**
+     * 先問再做
+     *
+     * ⚠ 確認文字一定要講「不會回覆客人」：這顆只是把單結掉，
+     * 按的人很容易以為系統會順便幫他回那位客人。
+     *
+     * @param {string} id
+     * @returns {void}
+     */
+    function confirmHandle(id) {
+        var modalEl = document.getElementById('modal-report-confirm');
+
+        modalEl.querySelector('.modal-body').textContent = i18n.remind_confirm_mark;
+        pendingTicketId = id;
+        new bootstrap.Modal(modalEl).show();
+    }
+
+    /**
+     * 重查目前這一段 —— 標記完要看到那一列真的變了
+     *
+     * @returns {void}
+     */
+    function reloadRemind() {
+        if (!remindRange) { return; }
+
+        loadRemind(remindRange.from, remindRange.to);
+    }
+
+    function runHandle() {
+        if (!pendingTicketId) { return; }
+
+        var id = pendingTicketId;
+        pendingTicketId = null;
+
+        bootstrap.Modal.getInstance(document.getElementById('modal-report-confirm')).hide();
+
+        apiFetch('/admin/report/ajax-mark-handled/' + id, { method: 'PUT' })
+            .then(function (body) {
+                showMessage((body && body.message) || i18n.msg.ticket_handled);
+                reloadRemind();
+            })
+            .catch(function (body) {
+                // 422 的驗證錯誤要拿 errors 那一句，body.message 是 Laravel 的通用字串
+                showMessage(errorText(body, i18n.msg.handle_failed));
+                // 失敗也要重載：最常見的原因是別人剛在 Telegram 把它處理掉了
+                reloadRemind();
+            });
+    }
+
+    /*
+     * 列表每次查詢都整個重畫，所以委派綁在不會被換掉的容器上 ——
+     * 綁在每顆按鈕上會在重畫後失效，綁在 document 上則會累積
+     * （見 bugfix/2026-09-08-task-comment-emoji-duplicate）。
+     */
+    var remindBody = document.getElementById('rmd-body');
+
+    if (remindBody) {
+        remindBody.addEventListener('click', function (event) {
+            var btn = event.target.closest('.js-rmd-handle');
+
+            if (btn) { confirmHandle(btn.dataset.id); }
+        });
+    }
+
+    document.getElementById('report-confirm-ok').addEventListener('click', runHandle);
 
     // ===== 啟動 =====
 

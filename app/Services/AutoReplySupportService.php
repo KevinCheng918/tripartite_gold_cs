@@ -1030,6 +1030,84 @@ class AutoReplySupportService
     }
 
     // ---------------------------------------------------------------
+    //  後台操作
+    // ---------------------------------------------------------------
+
+    /**
+     * 後台把一張還掛著的單標成「客服已自行處理」
+     *
+     * ⚠ **這是報表上那個紅標唯一的出口。** 在這之前，一張單要離開「仍未處理」
+     * 只能靠支援群組那則求助訊息（引用作答或按鈕）—— 訊息被洗掉、引用掛不上、
+     * 或同仁其實是在客戶群直接回客人的時候，那一列就永遠紅著，
+     * 看得到卻碰不到。
+     *
+     * ⚠ **不回覆客人、也不寫進題庫。** 它的語意是「這件事我在別的地方處理掉了」，
+     * 不是「系統幫我處理」—— 所以狀態用 `IGNORED`（＝客服已自行處理），
+     * 跟按鈕的「忽略」同一個。真的要回客人請走客服對話視窗。
+     *
+     * @param int    $ticketId
+     * @param string $name 操作者暱稱，回報到支援群組用
+     * @return \App\Models\AutoReplyTicket
+     * @throws \RuntimeException 找不到這張單，或它已經被處理過了
+     */
+    public function markHandled($ticketId, $name)
+    {
+        $ticket = $this->ticketRepository->find($ticketId);
+
+        if (blank($ticket)) {
+            throw new \RuntimeException(trans('report.msg.ticket_missing'));
+        }
+
+        /*
+         * 0 筆不是失敗 —— 是剛剛有人在 Telegram 按了按鈕。
+         * 狀態條件寫在 update 的 where 裡，理由見 `markHandledById()`。
+         */
+        if ($this->ticketRepository->markHandledById($ticketId) < 1) {
+            throw new \RuntimeException(trans('report.msg.ticket_done'));
+        }
+
+        $this->noticeHandled($ticket, $name);
+
+        Log::info('求助單在後台標記為已處理', ['ticket_id' => $ticket->id, 'by' => $name]);
+
+        return $ticket->refresh();
+    }
+
+    /**
+     * 回報到支援群組：這張單在後台處理掉了
+     *
+     * ⚠ **一定要講一聲。** 求助訊息還掛在群裡，後台改了狀態而群組不知道的話，
+     * 同仁還是會去引用它作答 —— 然後只拿到一句「這張單已經處理過了」，
+     * 不知道發生什麼事、也不知道是誰處理的。
+     *
+     * ⚠ 失敗不能讓整件事失敗：狀態已經改掉了，這則送不出去只是少一個通知，
+     * 丟例外的話呼叫端會以為沒改成功而再按一次。比照 `sendRemind()`。
+     *
+     * @param \App\Models\AutoReplyTicket $ticket
+     * @param string                      $name
+     * @return void
+     */
+    private function noticeHandled($ticket, $name)
+    {
+        try {
+            $this->sendToSupport(
+                strtr((string) config('constants.AUTO_REPLY.HANDLED_NOTICE'), [
+                    '{name}'     => $name,
+                    '{group}'    => $this->ticketGroupTitle($ticket),
+                    '{question}' => (string) $ticket->question,
+                ]),
+                null,
+                $ticket->ask_message_id
+            );
+        } catch (\Exception $e) {
+            Log::warning('求助單已在後台處理，但回報支援群組失敗', [
+                'ticket_id' => $ticket->id,
+                'error'     => $e->getMessage(),
+            ]);
+        }
+    }
+
+    // ---------------------------------------------------------------
     //  超時提醒
     // ---------------------------------------------------------------
 

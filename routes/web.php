@@ -331,6 +331,8 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/', [ReportController::class, 'index'])->name('index');
         Route::get('/ajax-attendance', [ReportController::class, 'ajaxAttendance'])->middleware('can:report.attendance')->name('ajax-attendance');
         Route::get('/ajax-remind', [ReportController::class, 'ajaxRemind'])->middleware('can:report.remind')->name('ajax-remind');
+        // 看得到統計不等於可以替別人結案，所以是另一個 keyword
+        Route::put('/ajax-mark-handled/{id}', [ReportController::class, 'ajaxMarkHandled'])->middleware('can:report.remind_handle')->name('ajax-mark-handled');
     });
 
     /*

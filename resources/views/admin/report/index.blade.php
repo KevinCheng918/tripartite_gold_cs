@@ -33,7 +33,10 @@
          data-can-remind="{{ $canRemind ? '1' : '0' }}"
          {{-- 報表列要連到出勤明細，那一頁由 attendance.report 管；
               只勾 report.attendance 的人看得到彙總但點不進去 --}}
-         data-can-detail="{{ Auth::user()->hasPermission('attendance.report') ? '1' : '0' }}">
+         data-can-detail="{{ Auth::user()->hasPermission('attendance.report') ? '1' : '0' }}"
+         {{-- 「標記為已處理」會把別人的單結案，所以是另一個 keyword；
+              沒有的人連那一欄都不會出現 --}}
+         data-can-handle="{{ Auth::user()->hasPermission('report.remind_handle') ? '1' : '0' }}">
 
         <ul class="nav nav-tabs mb-3" role="tablist">
             @if($canAttendance)
@@ -126,6 +129,35 @@
                 </div>
             </div>
             @endif
+        </div>
+    </div>
+
+    {{-- 先問再做：這顆會把別人的單結案，而且會在支援群組發一則通知 --}}
+    <div class="modal fade" id="modal-report-confirm" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-body text-center py-4"></div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        {{ trans('report.confirm_cancel') }}
+                    </button>
+                    <button type="button" class="btn btn-primary" id="report-confirm-ok">
+                        {{ trans('report.confirm_ok') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- 訊息 Modal（不用 alert） --}}
+    <div class="modal fade" id="modal-report-msg" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-body text-center py-4"></div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                </div>
+            </div>
         </div>
     </div>
 

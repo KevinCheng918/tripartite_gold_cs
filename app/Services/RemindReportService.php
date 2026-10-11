@@ -558,6 +558,11 @@ class RemindReportService
             }
 
             $byTicket[] = [
+                /*
+                 * 前端要拿這個去呼叫「標記為已處理」。
+                 * 這是報表上那個紅標唯一的出口 —— 不帶 id 出去，那一列就只能看。
+                 */
+                'id'       => (int) $ticket->id,
                 'question' => (string) $ticket->question,
                 'group'    => filled($ticket->group) ? (string) $ticket->group->title : '-',
                 'times'    => (int) $row->times,

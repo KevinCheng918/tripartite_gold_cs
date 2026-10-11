@@ -225,6 +225,28 @@ class AutoReplyTicketRepository
     }
 
     /**
+     * 在後台把一張還掛著的單標成「客服已自行處理」
+     *
+     * ⚠ **狀態條件帶在 update 的 where 裡，不是先查再寫。** 同一張單很可能
+     * 正好有人在 Telegram 按按鈕 —— 先查後寫的話兩邊都會成功，後寫的那個
+     * 會把前一個蓋掉（例如把「已加入題庫」蓋回「客服已自行處理」）。
+     * 用回傳筆數判斷誰先到：0 就代表別人已經處理過了。
+     *
+     * @param int $id
+     * @return int 實際更新幾筆（0 = 這張單已經不在未處理狀態）
+     */
+    public function markHandledById($id)
+    {
+        return AutoReplyTicket::query()
+            ->where('id', $id)
+            ->whereIn('status', $this->openStatuses())
+            ->update([
+                'status'     => config('constants.AUTO_REPLY.TICKET_STATUS.IGNORED'),
+                'updated_at' => now(),
+            ]);
+    }
+
+    /**
      * 更新求助單
      *
      * @param AutoReplyTicket $ticket

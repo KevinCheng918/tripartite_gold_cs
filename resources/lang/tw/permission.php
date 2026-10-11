@@ -54,6 +54,8 @@ return [
     'report' => [
         'attendance' => '打卡報表',
         'remind' => '超時提醒統計',
+        // 那顆按鈕會把別人的單結案，所以跟「看得到統計」分開
+        'remind_handle' => '標記求助單為已處理',
     ],
     'followup' => [
         'index'  => '檢視待追蹤事項',

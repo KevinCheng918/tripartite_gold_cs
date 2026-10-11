@@ -54,6 +54,8 @@ return [
     'report' => [
         'attendance' => 'Attendance report',
         'remind' => 'Overdue reminder summary',
+        // Closing someone else's ticket is a separate call from reading the summary
+        'remind_handle' => 'Mark support ticket as handled',
     ],
     'followup' => [
         'index'  => 'View pending follow-ups',

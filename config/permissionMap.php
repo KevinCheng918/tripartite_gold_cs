@@ -74,6 +74,13 @@ return [
         'keywords' => [
             'report.attendance' => 'permission.report.attendance',
             'report.remind' => 'permission.report.remind',
+
+            /*
+             * ⚠ 「標記為已處理」另外一個 keyword（2026-10-11）：那顆按鈕會把
+             * 別人的單結案、而且會在支援群組發一則通知 —— 看得到統計不等於
+             * 可以替別人做這個決定。比照待追蹤事項的 index / manage。
+             */
+            'report.remind_handle' => 'permission.report.remind_handle',
         ],
     ],
 
