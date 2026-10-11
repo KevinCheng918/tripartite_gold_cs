@@ -83,6 +83,7 @@
 | [bugfix/2026-09-29-broadcast-js-syntax-error.md](bugfix/2026-09-29-broadcast-js-syntax-error.md) | broadcast.js 有兩個孤兒 `});`，語法錯誤讓群發頁的 JS 整份不執行（從 `9474c2d` 起一直壞著） |
 | [bugfix/2026-09-14-multi-bot-media-download.md](bugfix/2026-09-14-multi-bot-media-download.md) | 固定某一個 Bot 的群組讀不到圖片：媒體下載排在 `switchBotToken()` 之前，`file_id` 用錯 Bot 的 token 呼叫 `getFile` |
 | [bugfix/2026-09-30-utc-timestamp-display.md](bugfix/2026-09-30-utc-timestamp-display.md) | 上傳時間顯示少 8 小時：Model 轉 JSON 會序列化成 UTC，前端 `substring` 切字串不換算時區；新增共用的 `window.formatDateTime()`（附帶發現 `station.js` 是死檔） |
+| [bugfix/2026-10-11-modal-dialog-shadow.md](bugfix/2026-10-11-modal-dialog-shadow.md) | 置中彈窗後面多一塊「白板」：Architect 把陰影下在 `.modal-dialog`，而 `modal-dialog-centered` 的 `min-height` 讓它變成滿版的隱形矩形 —— 看到的亮長條其實是**外面被陰影壓暗**。排查時查背景色一無所獲，**背景透明不代表不會畫出東西**，要連 `boxShadow` 一起看 |
 | [bugfix/2026-10-11-attendance-detail-sidebar-active.md](bugfix/2026-10-11-attendance-detail-sidebar-active.md) | 出勤明細已搬到報表底下，側邊選單卻還亮「打卡出勤」：頁面搬了但路由名沒搬，`routeIs('admin.attendance.*')` 照樣命中 |
 | [bugfix/2026-10-11-remind-report-still-pending.md](bugfix/2026-10-11-remind-report-still-pending.md) | 「明明回了也加進題庫，超時提醒統計還是仍未處理」：報表無快取、紅的那列是另一張單；附求助單離開 `PENDING` 的全部路徑，與「同仁直接在客戶群回客人不會結單」這個缺口；已補上手動出口（報表那列可「標記為已處理」） |
 | [bugfix/2026-10-11-ignore-open-tickets-scope.md](bugfix/2026-10-11-ignore-open-tickets-scope.md) | 求助單被誤關與漏關：繳款通知／補點結果漏傳 `is_auto` 而清空整群的單，送檔案的兩支從來沒有關單規則 —— `is_auto` 問的是「算不算客服親自回覆」而不是「誰觸發的」，它幾乎總是跟 `mark_replied => false` 成對出現 |
