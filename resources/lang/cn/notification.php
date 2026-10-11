@@ -141,6 +141,8 @@ return [
         'auto_reply_ticket_hint' => '题库找不到答案时转出来的求助单、超时提醒、处理结果。客服在这里引用回复作答',
         'daily_rate'             => '每日汇率报价',
         'daily_rate_hint'        => '每天 9:00 的报价、没决定时每 30 分的提醒、决定后的结果。要引用回复决定',
+        'conversation_followup'      => '待跟进事项',
+        'conversation_followup_hint' => '有人说「稍等」之后对话就安静了，机器人来问当班人员要不要跟进。靠消息上的按钮决定，不需要引用回复',
         'ticket_handover'        => '早班待接手清单',
         'ticket_handover_hint'   => '每天 7:30 把还没人处理的问题交接给当天早班',
         'shift_notice'           => '班表没收到的人',

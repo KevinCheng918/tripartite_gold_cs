@@ -30,6 +30,10 @@ return [
     'col_action'  => '操作',
 
     'counts'      => ':waits 次／:rounds 次',
+
+    'waited_days'  => ':days 天 :hours 小时',
+    'waited_hours' => ':hours 小时 :minutes 分',
+    'waited_mins'  => ':minutes 分钟',
     'keyword'     => '命中：:keyword',
     'empty'       => '目前没有符合条件的待跟进事项',
     'never_asked' => '还没问过',

@@ -30,6 +30,10 @@ return [
     'col_action'  => 'Actions',
 
     'counts'      => ':waits / :rounds',
+
+    'waited_days'  => ':days d :hours h',
+    'waited_hours' => ':hours h :minutes m',
+    'waited_mins'  => ':minutes m',
     'keyword'     => 'Matched: :keyword',
     'empty'       => 'No follow-ups match these filters',
     'never_asked' => 'Not asked yet',

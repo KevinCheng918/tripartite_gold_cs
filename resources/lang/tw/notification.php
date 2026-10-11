@@ -141,6 +141,8 @@ return [
         'auto_reply_ticket_hint' => '題庫找不到答案時轉出來的求助單、超時提醒、處理結果。客服在這裡引用回覆作答',
         'daily_rate'             => '每日匯率報價',
         'daily_rate_hint'        => '每天 9:00 的報價、沒決定時每 30 分的提醒、決定後的結果。要引用回覆決定',
+        'conversation_followup'      => '待追蹤事項',
+        'conversation_followup_hint' => '有人說「稍等」之後對話就安靜了，機器人來問當班人員要不要追蹤。靠訊息上的按鈕決定，不需要引用回覆',
         'ticket_handover'        => '早班待接手清單',
         'ticket_handover_hint'   => '每天 7:30 把還沒人處理的問題交接給當天早班',
         'shift_notice'           => '班表沒收到的人',

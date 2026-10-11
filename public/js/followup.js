@@ -87,10 +87,16 @@
         var days = Math.floor(minutes / 1440);
         var hours = Math.floor((minutes % 1440) / 60);
 
-        if (days > 0) { return days + ' 天 ' + hours + ' 小時'; }
-        if (hours > 0) { return hours + ' 小時 ' + (minutes % 60) + ' 分'; }
+        // 樣板在語系檔，不要寫死中文 —— 簡中與英文的使用者看的是同一支 JS
+        if (days > 0) {
+            return i18n.waited_days.replace(':days', days).replace(':hours', hours);
+        }
 
-        return minutes + ' 分鐘';
+        if (hours > 0) {
+            return i18n.waited_hours.replace(':hours', hours).replace(':minutes', minutes % 60);
+        }
+
+        return i18n.waited_mins.replace(':minutes', minutes);
     }
 
     // ===== 篩選 =====

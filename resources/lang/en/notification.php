@@ -141,6 +141,8 @@ return [
         'auto_reply_ticket_hint' => 'Tickets raised when the knowledge base has no answer, overdue reminders and outcomes. Staff answer by quoting here',
         'daily_rate'             => 'Daily rate quote',
         'daily_rate_hint'        => 'The 9:00 quote, the 30-minute reminders while undecided, and the outcome. Decided by quoting the message',
+        'conversation_followup'      => 'Pending follow-ups',
+        'conversation_followup_hint' => 'Asks the on-duty staff whether to follow up after someone promised something and the chat went quiet. Decided with the buttons on the message — no reply needed',
         'ticket_handover'        => 'Morning handover list',
         'ticket_handover_hint'   => 'Unhandled questions handed to the morning shift at 7:30 daily',
         'shift_notice'           => 'Staff who missed the roster',

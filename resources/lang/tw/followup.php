@@ -30,6 +30,17 @@ return [
     'col_action'  => '操作',
 
     'counts'      => ':waits 次／:rounds 次',
+
+    /*
+     * 等多久（天／小時／分，只取最大的兩個單位）。
+     *
+     * ⚠ 這幾句**前端自己算**（`public/js/followup.js`）：頁面開著不動時
+     * 後端給的數字會停住，所以用瀏覽器的時間算。樣板放語系檔，
+     * 不要寫死在 JS 裡 —— 那會讓簡中與英文的使用者看到中文。
+     */
+    'waited_days'  => ':days 天 :hours 小時',
+    'waited_hours' => ':hours 小時 :minutes 分',
+    'waited_mins'  => ':minutes 分鐘',
     'keyword'     => '命中：:keyword',
     'empty'       => '目前沒有符合條件的待追蹤事項',
     'never_asked' => '還沒問過',
