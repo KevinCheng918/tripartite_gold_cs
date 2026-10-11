@@ -8,10 +8,12 @@ use App\Models\TelegramGroup;
 use App\Repositories\AutoReplyTicketRepository;
 use App\Repositories\SharedFileRepository;
 use App\Repositories\ShiftAssignmentRepository;
+use App\Repositories\TelegramGroupReadRepository;
 use App\Repositories\TelegramRepository;
 use App\Repositories\UserRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -34,6 +36,7 @@ class TelegramChatService
     private $progressService;
     private $userRepository;
     private $bindService;
+    private $readRepository;
 
     public function __construct(
         TelegramRepository $telegramRepository,
@@ -46,9 +49,12 @@ class TelegramChatService
         StaffIgnoreService $staffIgnoreService,
         AutoReplyProgressService $progressService,
         UserRepository $userRepository,
-        TelegramBindService $bindService
+        TelegramBindService $bindService,
+        TelegramGroupReadRepository $readRepository
     ) {
         $this->telegramRepository = $telegramRepository;
+        // 未讀是「每個客服各自」的，所以讀取位置存在另一張表，不在訊息上
+        $this->readRepository = $readRepository;
         // 私訊綁定走驗證碼，實作在那支
         $this->bindService = $bindService;
         $this->botService = $botService;
@@ -100,7 +106,11 @@ class TelegramChatService
         // 哪些對話的 AI 正在回覆 —— 一次取回整批，不要在下面的 map 裡逐一查快取
         $runningIds = $this->progressService->filterRunning($groups->pluck('id')->all());
 
-        return $groups->map(function ($group) use ($onDutyUsers, $runningIds) {
+        // 未讀數同理，一次 GROUP BY 撈回來。這支每 30 秒被前端重載一次，
+        // 逐群組 COUNT 的話群組有幾個就打幾次
+        $unreadCounts = $this->readRepository->getUnreadCountsByUser((int) Auth::id());
+
+        return $groups->map(function ($group) use ($onDutyUsers, $runningIds, $unreadCounts) {
             return [
                 'id'              => $group->id,
                 'chat_id'         => $group->chat_id,
@@ -110,7 +120,7 @@ class TelegramChatService
                 // 重新整理或切對話時，Pusher 事件早就發完了，靠這個值還原畫面
                 'auto_reply_running' => in_array($group->id, $runningIds, true),
                 'last_message_at' => $group->last_message_at ? $group->last_message_at->toDateTimeString() : null,
-                'unread_count'    => $this->telegramRepository->getUnrepliedCount($group->id),
+                'unread_count'    => (int) Arr::get($unreadCounts, $group->id, 0),
             ];
         })->all();
     }
@@ -128,14 +138,42 @@ class TelegramChatService
     }
 
     /**
-     * 標記群組訊息為已讀
+     * 標記這個人把這個對話讀到現在
+     *
+     * ⚠ **不再碰 `telegram_message.replied`**（2026-10-11）。那個欄位的原意是
+     * 「這則客人的訊息已經被回覆了」，被「點進去就算已讀」借用之後，
+     * 客服看了但沒回的訊息會被記成已回覆，「誰問了還沒回」就查不出來了。
+     *
+     * 已讀是每個客服各自的，所以寫的是 `telegram_group_read`。
      *
      * @param int $groupId
      * @return void
      */
     public function markAsRead($groupId)
     {
-        $this->telegramRepository->markMessagesReplied($groupId);
+        $userId = (int) Auth::id();
+
+        // Webhook 之類沒有登入身分的進入點不該寫出一筆屬於「0 號使用者」的已讀
+        if (blank($userId)) {
+            return;
+        }
+
+        $this->readRepository->touch($userId, (int) $groupId, now()->toDateTimeString());
+    }
+
+    /**
+     * sidebar 要的總數：這個人有幾個對話還有沒看過的訊息
+     *
+     * ⚠ 數的是**對話數**不是訊息數（需求方 2026-10-11）——
+     * 它回答的是「我還有幾個人要回」，訊息總數會被同一個客人連發十則灌爆。
+     *
+     * @return array groups => 有未讀的對話數
+     */
+    public function unreadSummary()
+    {
+        $counts = $this->readRepository->getUnreadCountsByUser((int) Auth::id());
+
+        return ['groups' => count($counts)];
     }
 
     // ---------------------------------------------------------------

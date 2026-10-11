@@ -2,6 +2,9 @@
 
 return [
     'nav_label'          => 'Telegram 客服',
+
+    // sidebar 那顆數字的語音標籤（讀螢幕軟體唸得出它是什麼）
+    'unread_aria'        => '有未讀訊息的對話數',
     'page_title'         => 'Telegram 客服聊天',
     'subtitle'           => '即時對話管理',
     'group_list'         => '對話列表',

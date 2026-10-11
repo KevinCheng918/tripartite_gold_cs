@@ -5,10 +5,18 @@
     var T = window.TgChat;
     if (!T) { return; }
 
-    // Pusher 即時訊息
-    if (T.wsKey) {
+    /*
+     * Pusher 即時訊息。
+     *
+     * ⚠ **優先用 layout 建好的 `window.AppPusher`**（sidebar 的未讀數也訂同一個
+     * channel）。各建一個的話，同一個瀏覽器分頁會開兩條 WebSocket 訂同一件事。
+     *
+     * 仍保留自己建的路徑：沒有 sidebar 權限的人看得到這一頁（路由沒綁 can:），
+     * 那種情況 layout 不會輸出 `#app-realtime`，這裡要自己來。
+     */
+    if (T.wsKey || window.AppPusher) {
         try {
-            var pusher = new Pusher(T.wsKey, {
+            var pusher = window.AppPusher || new Pusher(T.wsKey, {
                 wsHost: T.wsHost, wsPort: T.wsPort, wssPort: T.wsPort,
                 forceTLS: T.wsScheme === 'https', encrypted: T.wsScheme === 'https',
                 disableStats: true, enabledTransports: ['ws', 'wss'],

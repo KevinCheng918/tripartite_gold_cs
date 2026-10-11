@@ -2,6 +2,9 @@
 
 return [
     'nav_label'          => 'Telegram 客服',
+
+    // sidebar 那颗数字的语音标签（读屏软件念得出它是什么）
+    'unread_aria'        => '有未读讯息的对话数',
     'page_title'         => 'Telegram 客服聊天',
     'subtitle'           => '即时对话管理',
     'group_list'         => '对话列表',

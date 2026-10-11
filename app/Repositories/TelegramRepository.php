@@ -478,18 +478,4 @@ class TelegramRepository
             ->exists();
     }
 
-    /**
-     * 取得群組內未回覆 inbound 訊息數量
-     *
-     * @param int $groupId
-     * @return int
-     */
-    public function getUnrepliedCount($groupId)
-    {
-        return TelegramMessage::query()
-            ->where('telegram_group_id', $groupId)
-            ->where('direction', config('constants.TELEGRAM.DIRECTION.INBOUND'))
-            ->where('replied', false)
-            ->count();
-    }
 }

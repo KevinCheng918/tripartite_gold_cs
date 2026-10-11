@@ -25,7 +25,7 @@
 @endsection
 
 @section('scripts')
-    <script src="{{ asset('vendor/pusher.min.js') }}"></script>
+    {{-- pusher.min.js 由 layout 載（sidebar 的未讀數也要用），這裡不重複載入 --}}
     <script src="{{ asset('js/telegram-chat/state.js') }}?v={{ filemtime(public_path('js/telegram-chat/state.js')) }}"></script>
     <script src="{{ asset('js/telegram-chat/layout.js') }}?v={{ filemtime(public_path('js/telegram-chat/layout.js')) }}"></script>
     <script src="{{ asset('js/telegram-chat/messages.js') }}?v={{ filemtime(public_path('js/telegram-chat/messages.js')) }}"></script>

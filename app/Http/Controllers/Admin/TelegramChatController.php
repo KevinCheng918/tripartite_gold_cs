@@ -213,6 +213,19 @@ class TelegramChatController extends Controller
     }
 
     /**
+     * Ajax 未讀總數（sidebar 用）
+     *
+     * ⚠ 刻意跟 `ajaxGroups()` 分開：sidebar 在**每一頁**都要，而對話列表那支
+     * 會連帶撈值班人員、AI 狀態等等，為了一個數字拉整包太浪費。
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxUnreadCount()
+    {
+        return response()->json($this->chatService->unreadSummary());
+    }
+
+    /**
      * Ajax 取得群組訊息
      *
      * @param Request $request

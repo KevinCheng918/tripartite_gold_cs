@@ -31,6 +31,7 @@
 | [features/remind-escalation.md](features/remind-escalation.md) | 求助單持續提醒（1-2 次 tag 當班、3 次以後加 tag 主管老闆，到次數上限才停）＋ 08:30 每日統計（勾選的人收全部、被催到的人收自己那份）＋ 07:00 待接手清單發內部群組 tag 當天早班；同時移除對話視窗的超時紅橫幅，留下的告警缺口也記在裡面 | 已完成 |
 | [features/shift-daily-notice.md](features/shift-daily-notice.md) | 班表通知（每天 8:00 私訊今日班表：勾選的人收完整班表含時間與缺人班次、有班的人收自己那份；bot 要先被私訊過才能發） | 已完成 |
 | [features/telegram-chat.md](features/telegram-chat.md) | 客服對話窗（Telegram 整合、快速回覆、傳送圖片／檔案含進度條、表情符號選單） | 已完成 |
+| [features/unread-badge.md](features/unread-badge.md) | 未讀數（對話列表各自的則數 ＋ sidebar 的「有未讀的對話數」）：已讀**每人各自**存在新表 `telegram_group_read`，`telegram_message.replied` 回歸「真的回了」原意；Pusher 連線全站共用一條（`window.AppPusher`）；順手修掉 `getConversationList()` 逐群組 COUNT 的 N+1。**`updateOrCreate` 不是原子操作，要用 `upsert`** | **已完成，正式機待跑 migration** |
 | [features/telegram-upload-limit.md](features/telegram-upload-limit.md) | 為什麼機器人只能傳 50MB 而自己的帳號可以傳 2GB（限制在官方的 Bot API 橋接伺服器，自架可到 2000MB）；附帶發現 purge 不刪實體檔 | 調查紀錄 |
 | [features/attendance.md](features/attendance.md) | 打卡出勤 | 已完成（持續迭代） |
 | [features/changelog.md](features/changelog.md) | 版本紀錄（左下角變更日誌） | 規劃中 |
@@ -82,3 +83,5 @@
 | [bugfix/2026-09-29-broadcast-js-syntax-error.md](bugfix/2026-09-29-broadcast-js-syntax-error.md) | broadcast.js 有兩個孤兒 `});`，語法錯誤讓群發頁的 JS 整份不執行（從 `9474c2d` 起一直壞著） |
 | [bugfix/2026-09-14-multi-bot-media-download.md](bugfix/2026-09-14-multi-bot-media-download.md) | 固定某一個 Bot 的群組讀不到圖片：媒體下載排在 `switchBotToken()` 之前，`file_id` 用錯 Bot 的 token 呼叫 `getFile` |
 | [bugfix/2026-09-30-utc-timestamp-display.md](bugfix/2026-09-30-utc-timestamp-display.md) | 上傳時間顯示少 8 小時：Model 轉 JSON 會序列化成 UTC，前端 `substring` 切字串不換算時區；新增共用的 `window.formatDateTime()`（附帶發現 `station.js` 是死檔） |
+| [bugfix/2026-10-11-attendance-detail-sidebar-active.md](bugfix/2026-10-11-attendance-detail-sidebar-active.md) | 出勤明細已搬到報表底下，側邊選單卻還亮「打卡出勤」：頁面搬了但路由名沒搬，`routeIs('admin.attendance.*')` 照樣命中 |
+| [bugfix/2026-10-11-remind-report-still-pending.md](bugfix/2026-10-11-remind-report-still-pending.md) | 「明明回了也加進題庫，超時提醒統計還是仍未處理」：報表無快取、紅的那列是另一張單；附求助單離開 `PENDING` 的全部路徑，與「同仁直接在客戶群回客人不會結單」這個缺口 |

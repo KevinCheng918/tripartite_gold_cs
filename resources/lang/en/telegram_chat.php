@@ -2,6 +2,9 @@
 
 return [
     'nav_label'          => 'Telegram CS',
+
+    // Screen-reader label for the sidebar count
+    'unread_aria'        => 'Conversations with unread messages',
     'page_title'         => 'Telegram Chat',
     'subtitle'           => 'Real-time conversation management',
     'group_list'         => 'Conversations',

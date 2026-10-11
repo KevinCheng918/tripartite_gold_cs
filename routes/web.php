@@ -129,6 +129,8 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::prefix('telegram-chat')->name('telegram-chat.')->group(function () {
         Route::get('/', [TelegramChatController::class, 'index'])->name('index');
         Route::get('/ajax-groups', [TelegramChatController::class, 'ajaxGroups'])->name('ajax-groups');
+        // sidebar 的未讀數，每一頁都會打 —— 不綁權限，理由同 index（誰都看得到對話）
+        Route::get('/ajax-unread-count', [TelegramChatController::class, 'ajaxUnreadCount'])->name('ajax-unread-count');
         Route::get('/ajax-messages', [TelegramChatController::class, 'ajaxMessages'])->name('ajax-messages');
         Route::post('/ajax-reply', [TelegramChatController::class, 'ajaxReply'])->middleware('can:telegram_chat.reply')->name('ajax-reply');
         Route::post('/ajax-send-image', [TelegramChatController::class, 'ajaxSendImage'])->middleware('can:telegram_chat.reply')->name('ajax-send-image');

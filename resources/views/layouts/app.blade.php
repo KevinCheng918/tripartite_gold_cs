@@ -204,7 +204,9 @@
                                  而明細只從報表頁的列點進去，打卡頁已經沒有對應的分頁 --}}
                             @if(Auth::user()->hasPermission('attendance.view') || Auth::user()->hasPermission('attendance.clock') || Auth::user()->hasPermission('attendance.amend') || Auth::user()->hasPermission('attendance.amend_review'))
                             <li>
-                                <a href="{{ route('admin.attendance.index') }}" class="{{ request()->routeIs('admin.attendance.*') ? 'mm-active' : '' }}">
+                                {{-- 出勤明細排除在外：它只從報表頁點進去、返回鍵也回報表，
+                                     亮在這裡的話使用者會以為自己還在打卡頁 --}}
+                                <a href="{{ route('admin.attendance.index') }}" class="{{ request()->routeIs('admin.attendance.*') && ! request()->routeIs('admin.attendance.detail') ? 'mm-active' : '' }}">
                                     <i class="metismenu-icon fas fa-clock"></i>
                                     {{ trans('attendance.nav_label') }}
                                 </a>
@@ -242,6 +244,10 @@
                                 <a href="{{ route('admin.telegram-chat.index') }}" class="{{ request()->routeIs('admin.telegram-chat.*') ? 'mm-active' : '' }}">
                                     <i class="metismenu-icon fas fa-comments"></i>
                                     {{ trans('telegram_chat.nav_label') }}
+                                    {{-- 有未讀的對話數。初值留空並藏起來，由 unread-badge.js 填 ——
+                                         在這裡查 DB 等於替全站每一頁加一次查詢 --}}
+                                    <span class="badge bg-danger rounded-pill ms-2" id="sidebar-unread-badge"
+                                          style="display:none" aria-label="{{ trans('telegram_chat.unread_aria') }}"></span>
                                 </a>
                             </li>
                             @endif
@@ -285,7 +291,10 @@
                             {{-- 兩個分頁各自一個權限，有其中一個就看得到入口 --}}
                             @if(Auth::user()->hasPermission('report.attendance') || Auth::user()->hasPermission('report.remind'))
                             <li>
-                                <a href="{{ route('admin.report.index') }}" class="{{ request()->routeIs('admin.report.*') ? 'mm-active' : '' }}">
+                                {{-- 出勤明細（admin.attendance.detail）是報表列點下去的下一層，
+                                     路由名還掛在 attendance 底下（權限仍歸 attendance.report），
+                                     所以這裡要明寫進來，它才會亮在「報表」而不是「打卡出勤」 --}}
+                                <a href="{{ route('admin.report.index') }}" class="{{ request()->routeIs('admin.report.*', 'admin.attendance.detail') ? 'mm-active' : '' }}">
                                     <i class="metismenu-icon fas fa-chart-bar"></i>
                                     {{ trans('report.nav_label') }}
                                 </a>
@@ -582,6 +591,22 @@
 
     {{-- 全站共用行為（數字欄位停用滾輪改值等） --}}
     <script src="{{ asset('js/common.js') }}?v={{ filemtime(public_path('js/common.js')) }}"></script>
+
+    {{--
+        Sidebar 的未讀數＋全站共用的 Pusher 連線。
+
+        ⚠ 只在看得到 sidebar 那一項的人身上輸出 —— 沒權限的人不該載 Pusher、
+        不該開 WebSocket。條件與上面 sidebar 的顯示條件一致。
+    --}}
+    @if(Auth::check() && (Auth::user()->hasPermission('telegram_chat.reply') || Auth::user()->hasPermission('telegram_chat.assign') || Auth::user()->hasPermission('telegram_chat.broadcast')))
+    <div id="app-realtime" hidden
+         data-ws-key="{{ config('broadcasting.connections.pusher.key') }}"
+         data-ws-host="{{ config('broadcasting.connections.pusher.options.host') }}"
+         data-ws-port="{{ config('broadcasting.connections.pusher.options.port') }}"
+         data-ws-scheme="{{ config('broadcasting.connections.pusher.options.scheme') }}"></div>
+    <script src="{{ asset('vendor/pusher.min.js') }}"></script>
+    <script src="{{ asset('js/unread-badge.js') }}?v={{ filemtime(public_path('js/unread-badge.js')) }}"></script>
+    @endif
 
     {{-- Flatpickr --}}
     <script src="{{ asset('vendor/flatpickr/flatpickr.min.js') }}"></script>

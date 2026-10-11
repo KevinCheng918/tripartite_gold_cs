@@ -183,6 +183,14 @@
                 T.ignoredNames = body.ignored_names || [];
                 var messages = (body.data || []).reverse();
                 T.renderMessages(messages);
+
+                /*
+                 * 後端在這一支順便把對話標成已讀，所以列表與 sidebar 的數字
+                 * 都要跟著降。不重拉的話，那顆 badge 會一直亮到下一次 30 秒重載。
+                 */
+                T.loadGroups();
+                if (window.refreshUnreadBadge) { window.refreshUnreadBadge(); }
+
                 if (callback) { callback(); }
             });
     };
