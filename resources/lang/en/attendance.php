@@ -33,7 +33,6 @@ return [
     'field_device'       => 'Device',
     'unit_minutes'       => 'min',
 
-    'report_title'       => 'Monthly Report',
     'field_user'         => 'Staff',
     'field_total_days'   => 'Total Days',
     'field_normal_days'  => 'Normal Days',
@@ -44,7 +43,6 @@ return [
     'field_absent_count' => 'Absent Count',
     'field_overtime_total' => 'Overtime Total (min)',
     'tab_my_records'     => 'My Records',
-    'tab_report'         => 'Report',
 
     'detail_title'       => 'Attendance Detail',
     'detail_subtitle'    => 'Daily attendance records',
@@ -95,5 +93,4 @@ return [
     'amend_duplicate'       => 'A pending amendment already exists',
     'amend_already_reviewed' => 'Already reviewed',
     'amend_my_records'      => 'My Amendments',
-    'field_amend_count'     => 'Amendments',
 ];

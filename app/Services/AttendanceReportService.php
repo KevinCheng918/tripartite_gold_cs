@@ -121,6 +121,62 @@ class AttendanceReportService
     // ---------------------------------------------------------------
 
     /**
+     * 給 Controller 算區間用（`resolveRange()` 是 private）
+     *
+     * ⚠ 後台報表頁跟通知走同一支，週／月的定義才不會有兩套。
+     *
+     * @param string      $type
+     * @param string|null $endsOn
+     * @return array start / end
+     */
+    public function rangeFor($type, $endsOn = null)
+    {
+        return $this->resolveRange($type, filled($endsOn) ? $endsOn : now()->toDateString());
+    }
+
+    /**
+     * 後台報表頁要的資料
+     *
+     * ⚠ 走 `collect()` 而不是直接問 `AttendanceService::getReport()` ——
+     * 後者只回「這段期間有打卡紀錄的人」，整期都請假的人會整列消失。
+     * 主管在 Telegram 看得到那一列、在後台看不到，那種不一致最難解釋。
+     *
+     * ⚠ 只挑 id 與暱稱吐出去。`$stat['user']` 是整個 User Model，直接丟進
+     * JSON 會把 telegram_user_id 這類東西一起送到前端。
+     *
+     * @param array $range start / end
+     * @return array[] user_id / name / 各項統計
+     */
+    public function forPage(array $range)
+    {
+        $stats = $this->collect($range);
+        $names = $this->nicknamesOf(array_keys($stats));
+        $rows = [];
+
+        foreach ($stats as $userId => $stat) {
+            $userId = (int) $userId;
+
+            $rows[] = [
+                'user_id'      => $userId,
+                'name'         => (string) Arr::get($names, $userId, "#{$userId}"),
+                'total_days'   => (int) Arr::get($stat, 'total_days'),
+                'normal_days'  => (int) Arr::get($stat, 'normal_days'),
+                'late_count'   => (int) Arr::get($stat, 'late_count'),
+                'late_minutes' => (int) Arr::get($stat, 'late_total_minutes'),
+                'early_count'  => (int) Arr::get($stat, 'early_count'),
+                'early_minutes' => (int) Arr::get($stat, 'early_total_minutes'),
+                'absent_count' => (int) Arr::get($stat, 'absent_count'),
+                'amend_count'  => (int) Arr::get($stat, 'amend_count'),
+                'leave_days'   => (float) Arr::get($stat, 'leave_days'),
+                'leave_hours'  => (float) Arr::get($stat, 'leave_hours'),
+                'overtime_minutes' => (int) Arr::get($stat, 'overtime_total_minutes'),
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
      * 算出要統計哪一段
      *
      * ⚠ 都是「上一期」：週一 11:00 發的是**上週**一～日，1 號 11:00 發的是
@@ -204,6 +260,9 @@ class AttendanceReportService
     private function emptyStat()
     {
         return [
+            // 整期都請假的人就是這一種：一天都沒出勤，但不是曠工
+            'total_days'             => 0,
+            'normal_days'            => 0,
             'late_count'             => 0,
             'late_total_minutes'     => 0,
             'early_count'            => 0,

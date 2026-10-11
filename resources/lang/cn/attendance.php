@@ -33,7 +33,6 @@ return [
     'field_device'       => '设备',
     'unit_minutes'       => '分钟',
 
-    'report_title'       => '月报表',
     'field_user'         => '员工',
     'field_total_days'   => '出勤天数',
     'field_normal_days'  => '正常天数',
@@ -44,11 +43,10 @@ return [
     'field_absent_count' => '旷工次数',
     'field_overtime_total' => '加班总分钟',
     'tab_my_records'     => '我的出勤',
-    'tab_report'         => '月报表',
 
     'detail_title'       => '出勤明细',
     'detail_subtitle'    => '个人每日出勤状况',
-    'back_to_report'     => '返回月报表',
+    'back_to_report'     => '返回报表',
     'this_month'         => '本月',
     'last_month'         => '上个月',
 
@@ -95,5 +93,4 @@ return [
     'amend_duplicate'       => '已有相同的补打卡申请待审核',
     'amend_already_reviewed' => '此申请已审核过',
     'amend_my_records'      => '我的补打卡申请',
-    'field_amend_count'     => '补打卡次数',
 ];

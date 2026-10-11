@@ -200,7 +200,9 @@
                                 </a>
                             </li>
                             @endif
-                            @if(Auth::user()->hasPermission('attendance.view') || Auth::user()->hasPermission('attendance.clock') || Auth::user()->hasPermission('attendance.report') || Auth::user()->hasPermission('attendance.amend') || Auth::user()->hasPermission('attendance.amend_review'))
+                            {{-- attendance.report 不列在這裡：它現在只管「出勤明細」那一頁，
+                                 而明細只從報表頁的列點進去，打卡頁已經沒有對應的分頁 --}}
+                            @if(Auth::user()->hasPermission('attendance.view') || Auth::user()->hasPermission('attendance.clock') || Auth::user()->hasPermission('attendance.amend') || Auth::user()->hasPermission('attendance.amend_review'))
                             <li>
                                 <a href="{{ route('admin.attendance.index') }}" class="{{ request()->routeIs('admin.attendance.*') ? 'mm-active' : '' }}">
                                     <i class="metismenu-icon fas fa-clock"></i>
@@ -268,6 +270,15 @@
                                 <a href="{{ route('admin.project.index') }}" class="{{ request()->routeIs('admin.project.*') ? 'mm-active' : '' }}">
                                     <i class="metismenu-icon fas fa-folder-open"></i>
                                     專案管理
+                                </a>
+                            </li>
+                            @endif
+                            {{-- 兩個分頁各自一個權限，有其中一個就看得到入口 --}}
+                            @if(Auth::user()->hasPermission('report.attendance') || Auth::user()->hasPermission('report.remind'))
+                            <li>
+                                <a href="{{ route('admin.report.index') }}" class="{{ request()->routeIs('admin.report.*') ? 'mm-active' : '' }}">
+                                    <i class="metismenu-icon fas fa-chart-bar"></i>
+                                    {{ trans('report.nav_label') }}
                                 </a>
                             </li>
                             @endif

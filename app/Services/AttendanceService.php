@@ -249,24 +249,9 @@ class AttendanceService
     }
 
     /**
-     * 取得所有員工某月的打卡紀錄（管理者月報表）
-     *
-     * 只是把月份換算成起訖日期，統計本體在 `getReport()`。
-     *
-     * @param string $yearMonth Y-m
-     * @return array 按員工分組的統計資料
-     */
-    public function getMonthlyReport($yearMonth)
-    {
-        $monthStart = "{$yearMonth}-01";
-
-        return $this->getReport($monthStart, date('Y-m-t', strtotime($monthStart)));
-    }
-
-    /**
      * 取得所有員工某段期間的出勤統計
      *
-     * 週報（週一～週日）與月報共用這一支；打卡出勤頁的月報表也是走這裡。
+     * 週報（週一～週日）與月報共用這一支；Telegram 通知與後台報表頁都走這裡。
      *
      * ⚠ **回傳的陣列只包含「這段期間有打卡紀錄的人」。** 整段期間都請假、
      * 或根本沒排班的人不會出現 —— 呼叫端如果要「每個人都發一則」，

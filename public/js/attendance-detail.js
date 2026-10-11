@@ -52,7 +52,7 @@
         // 返回按鈕 + 月份選擇
         var header =
             '<div class="att-detail-header">' +
-            '<a href="/admin/attendance" class="btn-sm">&lsaquo; ' + i18n.back_to_report + '</a>' +
+            '<a href="/admin/report" class="btn-sm">&lsaquo; ' + i18n.back_to_report + '</a>' +
             '<input type="text" id="detail-month-picker" class="att-month-input" value="' + month + '" readonly autocomplete="off">' +
             '</div>';
 

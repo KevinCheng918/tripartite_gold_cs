@@ -171,21 +171,6 @@ class AttendanceController extends Controller
         return AttendanceResource::collection($records);
     }
 
-    /**
-     * Ajax 取得全體月報表（管理者用）
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function ajaxMonthlyReport(Request $request)
-    {
-        $yearMonth = $request->input('month', now()->format('Y-m'));
-
-        $report = $this->attendanceService->getMonthlyReport($yearMonth);
-
-        return response()->json($report);
-    }
-
     // ---------------------------------------------------------------
     //  補打卡
     // ---------------------------------------------------------------

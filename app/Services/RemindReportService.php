@@ -452,11 +452,9 @@ class RemindReportService
     private function buildText($type, array $range)
     {
         $report = (array) config('constants.AUTO_REPLY.REMIND.REPORT');
-        $start = Arr::get($range, 'start');
-        $end = Arr::get($range, 'end');
         $period = $this->periodWord($type);
-
-        $tickets = $this->remindRepository->getTicketsForRange($start, $end);
+        $data = $this->collect($type, $range);
+        $tickets = Arr::get($data, 'tickets');
 
         $text = strtr((string) Arr::get($report, 'HEADER'), [
             '{title}' => $this->title($type),
@@ -472,9 +470,127 @@ class RemindReportService
 
         $text .= $this->buildSummary($report, $tickets);
         $text .= $this->buildByTicket($report, $tickets);
-        $text .= $this->buildByUser($report, $start, $end);
+        $text .= $this->buildByUser($report, (array) Arr::get($data, 'users'), (array) Arr::get($data, 'names'));
 
         return $text;
+    }
+
+    /**
+     * 把這一期的統計撈出來（結構化，還沒排版）
+     *
+     * ⚠ **Telegram 訊息與後台報表頁走同一支。** 各查各的話，後台看到的數字
+     * 會跟主管手機上那份對不起來 —— 那種不一致最難查，因為兩邊各自都「對」。
+     *
+     * ⚠ 這裡**不套 `MAX_LINES`**。那是 Telegram 單則 4096 字的限制，
+     * 不是統計本身的性質；後台表格要的是全部。截斷由 `buildByTicket()` 與
+     * `buildByUser()` 各自處理。
+     *
+     * ⚠ `users` 已經濾掉主管以上（見 `withoutManagers()`），`tickets` 沒有濾 ——
+     * 題目不屬於任何人。
+     *
+     * @param string $type  self::TYPE_*
+     * @param array  $range start / end
+     * @return array tickets / users / names
+     */
+    public function collect($type, array $range)
+    {
+        $start = Arr::get($range, 'start');
+        $end = Arr::get($range, 'end');
+
+        $tickets = $this->remindRepository->getTicketsForRange($start, $end);
+        $rows = $this->remindRepository->countByUserForRange($start, $end);
+        $users = $this->usersOf($rows);
+
+        return [
+            'tickets' => $tickets,
+            'users'   => $this->withoutManagers($rows, $users),
+            'names'   => $this->nicknamesOf($users),
+        ];
+    }
+
+    /**
+     * 後台報表頁要的資料（含總計與期間）
+     *
+     * ⚠ 跟 Telegram 那份是**同一組數字**，差別只在這裡回陣列、那裡回字串。
+     *
+     * @param string $type
+     * @param array  $range
+     * @return array
+     */
+    public function forPage($type, array $range)
+    {
+        $report = (array) config('constants.AUTO_REPLY.REMIND.REPORT');
+        $data = $this->collect($type, $range);
+        $tickets = Arr::get($data, 'tickets');
+        $names = (array) Arr::get($data, 'names');
+        $statusLabels = (array) Arr::get($report, 'STATUS_LABEL');
+        $managerStage = (int) config('constants.AUTO_REPLY.REMIND.STAGE.MANAGER');
+
+        $times = 0;
+        $escalated = 0;
+        $byTicket = [];
+
+        foreach ($tickets as $row) {
+            $times += (int) $row->times;
+
+            if ((int) $row->max_stage >= $managerStage) {
+                $escalated++;
+            }
+
+            $ticket = $row->ticket;
+
+            // 單被刪掉時 ticket 關聯會是 null —— 略過而不是印一列空白
+            if (blank($ticket)) {
+                continue;
+            }
+
+            $byTicket[] = [
+                'question' => (string) $ticket->question,
+                'group'    => filled($ticket->group) ? (string) $ticket->group->title : '-',
+                'times'    => (int) $row->times,
+                'status'   => (int) $ticket->status,
+                'status_label' => (string) Arr::get($statusLabels, (int) $ticket->status, ''),
+            ];
+        }
+
+        $byUser = [];
+
+        foreach ((array) Arr::get($data, 'users') as $row) {
+            $byUser[] = [
+                'user_id' => filled($row->user_id) ? (int) $row->user_id : null,
+                // user_id 為 null 代表「那次提醒沒 tag 到任何人」，前端要看得出來
+                'name'    => filled($row->user_id)
+                    ? (string) Arr::get($names, (int) $row->user_id, (string) Arr::get($report, 'UNKNOWN_USER'))
+                    : null,
+                'times'   => (int) $row->times,
+                'tickets' => (int) $row->tickets,
+            ];
+        }
+
+        return [
+            'type'  => $type,
+            'range' => $range,
+            'summary' => [
+                'tickets'     => count($tickets),
+                'times'       => $times,
+                'escalated'   => $escalated,
+                'escalate_at' => (int) config('constants.AUTO_REPLY.REMIND.ESCALATE_AT'),
+            ],
+            'by_ticket' => $byTicket,
+            'by_user'   => $byUser,
+        ];
+    }
+
+    /**
+     * 給 Controller 算區間用（`resolveRange()` 是 private）
+     *
+     * @param string      $type
+     * @param string|null $endsOn
+     * @return array start / end
+     */
+    public function rangeFor($type, $endsOn = null)
+    {
+        return $this->resolveRange($type, filled($endsOn) ? $endsOn : now()->toDateString());
     }
 
     /**
@@ -568,30 +684,21 @@ class RemindReportService
      * 次數跟著累加 —— 但「誰該去回那張單」從來不是他們。
      * 一份要給主管看的統計，列著主管自己被催了幾次，只會干擾判讀。
      *
-     * @param array  $report
-     * @param string $startDate Y-m-d
-     * @param string $endDate   Y-m-d
+     * ⚠ 過濾主管、撈暱稱都在 `collect()` 做好了，這裡只負責排版與截斷 ——
+     * 後台報表頁走同一份資料，差別只在它不截斷。
+     *
+     * @param array $report
+     * @param array $rows  已經濾掉主管以上的統計列
+     * @param array $names user_id => 暱稱
      * @return string
      */
-    private function buildByUser(array $report, $startDate, $endDate)
+    private function buildByUser(array $report, array $rows, array $names)
     {
-        $rows = $this->remindRepository->countByUserForRange($startDate, $endDate);
-
+        // 整期只催到主管（例如當班的人沒設 Telegram）時這一段就整段不出現
         if (blank($rows)) {
             return '';
         }
 
-        $users = $this->usersOf($rows);
-
-        // ⚠ 要先濾掉再算，否則下面的「還有 N 人」會把主管也數進去
-        $rows = $this->withoutManagers($rows, $users);
-
-        // 整天只催到主管（例如當班的人沒設 Telegram）時這一段就整段不出現
-        if (blank($rows)) {
-            return '';
-        }
-
-        $names = $this->nicknamesOf($users);
         $max = (int) Arr::get($report, 'MAX_LINES');
         $text = (string) Arr::get($report, 'BY_USER_TITLE');
         $shown = 0;

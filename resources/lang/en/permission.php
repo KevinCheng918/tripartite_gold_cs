@@ -6,6 +6,7 @@ return [
         'account' => 'Accounts',
         'shift' => 'Shifts',
         'attendance' => 'Attendance',
+        'report' => 'Reports',
         'station' => 'Stations',
         'vm' => 'VM Management',
         'payment_config' => 'Payment Config',
@@ -44,9 +45,14 @@ return [
     'attendance' => [
         'view' => 'View attendance',
         'clock' => 'Clock in/out',
-        'report' => 'Monthly report',
+        // Summary reports moved to Back office → Reports; this now gates the per-person detail page
+        'report' => 'View attendance detail',
         'amend' => 'Request clock amendment',
         'amend_review' => 'Review clock amendment',
+    ],
+    'report' => [
+        'attendance' => 'Attendance report',
+        'remind' => 'Overdue reminder summary',
     ],
     'station' => [
         'view'   => 'View stations',

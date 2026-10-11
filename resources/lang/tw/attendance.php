@@ -36,8 +36,7 @@ return [
     'field_device'       => '裝置',
     'unit_minutes'       => '分鐘',
 
-    // 月報表
-    'report_title'       => '月報表',
+    // 出勤明細用的欄位名（彙總報表已搬到 resources/lang/*/report.php）
     'field_user'         => '員工',
     'field_total_days'   => '出勤天數',
     'field_normal_days'  => '正常天數',
@@ -48,12 +47,11 @@ return [
     'field_absent_count' => '曠工次數',
     'field_overtime_total' => '加班總分鐘',
     'tab_my_records'     => '我的出勤',
-    'tab_report'         => '月報表',
 
     // 月份切換
     'detail_title'       => '出勤明細',
     'detail_subtitle'    => '個人每日出勤狀況',
-    'back_to_report'     => '返回月報表',
+    'back_to_report'     => '返回報表',
     'this_month'         => '本月',
     'last_month'         => '上個月',
 
@@ -111,5 +109,4 @@ return [
     'amend_duplicate'       => '已有相同的補打卡申請待審核',
     'amend_already_reviewed' => '此申請已審核過',
     'amend_my_records'      => '我的補打卡申請',
-    'field_amend_count'     => '補打卡次數',
 ];

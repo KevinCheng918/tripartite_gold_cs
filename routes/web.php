@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\PaymentConfigController;
 use App\Http\Controllers\Admin\LeaveRequestController;
 use App\Http\Controllers\Admin\StaffManageController;
 use App\Http\Controllers\Admin\ProjectController;
+use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\QuickReplyController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\NotificationController;
@@ -94,7 +95,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::post('/ajax-clock-out', [AttendanceController::class, 'ajaxClockOut'])->middleware('can:attendance.clock')->name('ajax-clock-out');
         Route::get('/ajax-today-status', [AttendanceController::class, 'ajaxTodayStatus'])->name('ajax-today-status');
         Route::get('/ajax-my-monthly', [AttendanceController::class, 'ajaxMyMonthly'])->name('ajax-my-monthly');
-        Route::get('/ajax-monthly-report', [AttendanceController::class, 'ajaxMonthlyReport'])->middleware('can:attendance.report')->name('ajax-monthly-report');
+        // 彙總報表已搬到「內務管理 → 報表」（admin.report.*），這裡不再提供
         Route::get('/detail/{userId}', [AttendanceController::class, 'detail'])->middleware('can:attendance.report')->name('detail');
         Route::get('/ajax-user-monthly', [AttendanceController::class, 'ajaxUserMonthly'])->middleware('can:attendance.report')->name('ajax-user-monthly');
         Route::post('/ajax-request-amend', [AttendanceController::class, 'ajaxRequestAmend'])->middleware('can:attendance.amend')->name('ajax-request-amend');
@@ -313,6 +314,19 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-list', [ProjectController::class, 'ajaxList'])->middleware('can:project.view')->name('ajax-list');
         Route::post('/ajax-store', [ProjectController::class, 'ajaxStore'])->middleware('can:project.edit')->name('ajax-store');
         Route::put('/ajax-update/{project}', [ProjectController::class, 'ajaxUpdate'])->middleware('can:project.edit')->name('ajax-update');
+    });
+
+    /*
+     * 報表（內務管理 → 報表）
+     *
+     * ⚠ 頁面本身不綁單一權限 —— 兩個分頁各自有自己的 keyword，
+     * 只勾其中一個的人也該進得來（Blade 會只畫他有權限的那個分頁）。
+     * 兩個都沒勾的人在 sidebar 根本看不到入口。
+     */
+    Route::prefix('report')->name('report.')->group(function () {
+        Route::get('/', [ReportController::class, 'index'])->name('index');
+        Route::get('/ajax-attendance', [ReportController::class, 'ajaxAttendance'])->middleware('can:report.attendance')->name('ajax-attendance');
+        Route::get('/ajax-remind', [ReportController::class, 'ajaxRemind'])->middleware('can:report.remind')->name('ajax-remind');
     });
 
     // 共用文件區（頁面 + 列表不綁權限，Controller 內部判斷；個人文件區所有人可用）

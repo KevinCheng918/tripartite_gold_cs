@@ -6,6 +6,7 @@ return [
         'account' => '帳號管理',
         'shift' => '排班管理',
         'attendance' => '打卡出勤',
+        'report' => '報表',
         'station' => '站台管理',
         'vm' => '虛擬機管理',
         'payment_config' => '繳款設定',
@@ -44,9 +45,14 @@ return [
     'attendance' => [
         'view' => '查看出勤',
         'clock' => '打卡',
-        'report' => '月報表',
+        // 報表彙總已搬到「內務管理 → 報表」，這個權限現在管的是個人出勤明細頁
+        'report' => '查看出勤明細',
         'amend' => '申請補打卡',
         'amend_review' => '審核補打卡',
+    ],
+    'report' => [
+        'attendance' => '打卡報表',
+        'remind' => '超時提醒統計',
     ],
     'station' => [
         'view'   => '檢視站台',

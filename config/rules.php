@@ -60,4 +60,15 @@ return [
         'jsp', 'jspx', 'asp', 'aspx', 'cgi', 'pl',
         'htaccess', 'htpasswd',
     ],
+
+    /*
+     * 報表的期間類型。
+     *
+     * ⚠ 必須是白名單而不是自由字串：這個值會被拿去決定區間怎麼算，
+     * 認不得的值會靜悄悄落到「日」那條 —— 使用者看到的是錯的期間，
+     * 卻不會有任何錯誤訊息。
+     *
+     * 值對應 `RemindReportService::TYPE_*` 與 `AttendanceReportService::TYPE_*`。
+     */
+    'REPORT_PERIOD_TYPE_IN' => 'in:daily,weekly,monthly',
 ];

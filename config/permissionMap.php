@@ -58,6 +58,25 @@ return [
         ],
     ],
 
+    /*
+     * 報表頁（內務管理 → 報表）。
+     *
+     * ⚠ **兩個分頁各自一個 keyword**（需求方 2026-10-11）：打卡報表看得到
+     * 每個人的遲到早退，超時統計看得到誰被催了幾次 —— 這兩件事該不該給
+     * 同一個人看，不一定。合成一個的話就沒得選了。
+     *
+     * ⚠ 報表列點下去會連到「出勤明細」，那一頁仍然由 `attendance.report`
+     * 管。只勾 `report.attendance` 的人看得到彙總但點不進明細 —— 那是刻意的，
+     * 明細看得到的是某個人每一天幾點打卡。
+     */
+    'report' => [
+        'label' => 'permission.group.report',
+        'keywords' => [
+            'report.attendance' => 'permission.report.attendance',
+            'report.remind' => 'permission.report.remind',
+        ],
+    ],
+
     'station' => [
         'label' => 'permission.group.station',
         'keywords' => [

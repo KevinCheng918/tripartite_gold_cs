@@ -6,6 +6,7 @@ return [
         'account' => '账号管理',
         'shift' => '排班管理',
         'attendance' => '打卡出勤',
+        'report' => '报表',
         'station' => '站台管理',
         'vm' => '虚拟机管理',
         'payment_config' => '缴款设定',
@@ -44,9 +45,14 @@ return [
     'attendance' => [
         'view' => '查看出勤',
         'clock' => '打卡',
-        'report' => '月报表',
+        // 报表汇总已搬到「内务管理 → 报表」，这个权限现在管的是个人出勤明细页
+        'report' => '查看出勤明细',
         'amend' => '申请补打卡',
         'amend_review' => '审核补打卡',
+    ],
+    'report' => [
+        'attendance' => '打卡报表',
+        'remind' => '超时提醒统计',
     ],
     'station' => [
         'view'   => '查看站台',

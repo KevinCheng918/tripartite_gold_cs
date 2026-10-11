@@ -1479,3 +1479,32 @@ a:hover { color: #85640a; }
     border-color: rgba(212, 175, 55, 0.3) !important;
     color: rgba(255, 255, 255, 0.7) !important;
 }
+
+/* ---------------------------------------------------------------
+   報表頁的期間切換（日報／週報／月報）
+   --------------------------------------------------------------- */
+
+/*
+ * ⚠ 選中的那一顆必須跟 hover 長得不一樣。
+ *
+ * 全站的 `.btn-outline-secondary` 是「hover 深色填滿」，而 Bootstrap 的
+ * `.active` 也是深色填滿 —— 兩者撞在一起，滑鼠停在「週報」上時畫面有
+ * 兩顆黑的，根本看不出現在在看哪一期。選中的改用品牌金，hover 維持
+ * 全站樣式，一眼分得出「選中」與「正要按」。
+ */
+.period-switch .btn.active,
+.period-switch .btn.active:hover,
+.period-switch .btn.active:focus {
+    background-color: #a67c00 !important;
+    border-color: #a67c00 !important;
+    color: #fff !important;
+    box-shadow: none !important;
+}
+
+[data-theme="dark"] .period-switch .btn.active,
+[data-theme="dark"] .period-switch .btn.active:hover,
+[data-theme="dark"] .period-switch .btn.active:focus {
+    background-color: #d4af37 !important;
+    border-color: #d4af37 !important;
+    color: #1a1a1a !important;
+}

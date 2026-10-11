@@ -7,7 +7,8 @@
 @section('content')
 
     <div class="mb-3 d-flex align-items-center gap-2">
-        <a href="{{ route('admin.attendance.index') }}" class="btn btn-outline-secondary btn-sm">
+        {{-- 這一頁現在只從報表頁的列點進來，所以返回也回報表頁 --}}
+        <a href="{{ route('admin.report.index') }}" class="btn btn-outline-secondary btn-sm">
             <i class="fas fa-arrow-left me-1"></i>{{ trans('attendance.back_to_report') }}
         </a>
         <form method="GET" class="d-inline-flex align-items-center gap-2">

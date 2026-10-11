@@ -113,7 +113,12 @@
     //  打卡狀態 + 按鈕
     // ---------------------------------------------------------------
 
-    var defaultTab = isAdmin ? 'report' : 'clock';
+    /*
+     * ⚠ 彙總報表那個分頁已經搬到「內務管理 → 報表」（2026-10-11），
+     * 所以管理者的預設分頁也從 'report' 改成 'clock' —— 留著會讓他們
+     * 一進來就看到一個不存在的分頁，然後畫面是空的。
+     */
+    var defaultTab = 'clock';
     var savedTarget = localStorage.getItem('activeTab:' + location.pathname);
     var activeTab = (savedTarget && savedTarget.indexOf('#att-tab-') === 0)
         ? savedTarget.replace('#att-tab-', '')
@@ -127,9 +132,6 @@
         }
         if (hasPerm('attendance.view')) {
             allTabs.push({ key: 'my_records', label: '<i class="fas fa-calendar-alt me-1"></i>' + i18n.tab_my_records });
-        }
-        if (hasPerm('attendance.report')) {
-            allTabs.push({ key: 'report', label: '<i class="fas fa-chart-bar me-1"></i>' + i18n.tab_report });
         }
         if (hasPerm('attendance.amend_review')) {
             allTabs.push({ key: 'amend_review', label: '<i class="fas fa-edit me-1"></i>' + (i18n.tab_amend || '補打卡審核') });
@@ -173,8 +175,6 @@
             loadClockStatus();
         } else if (activeTab === 'my_records') {
             loadMyRecords(currentMonth);
-        } else if (activeTab === 'report') {
-            loadReport(currentMonth);
         } else if (activeTab === 'amend_review') {
             loadAmendments();
         }
@@ -577,106 +577,6 @@
     }
 
     // ---------------------------------------------------------------
-    //  月報表 Tab（管理者用）
-    // ---------------------------------------------------------------
-
-    function loadReport(month) {
-        apiFetch('/admin/attendance/ajax-monthly-report?month=' + month)
-            .then(function (body) {
-                renderReport(body, month);
-            })
-            .catch(function () {
-                getTabPane().innerHTML = '<p>Failed to load report.</p>';
-            });
-    }
-
-    function renderReport(report, month) {
-        // Admin 用 flatpickr 月份選擇器，不限制月份
-        var nav =
-            '<div class="att-month-nav">' +
-            '<input type="text" id="report-month-picker" class="att-month-input" value="' + month + '" readonly autocomplete="off">' +
-            '</div>';
-
-        var rows = report.map(function (r) {
-            var userName = r.user ? r.user.nickname : '-';
-            var userId = r.user ? r.user.id : '';
-            return (
-                '<tr class="att-report-row js-detail-link" data-user-id="' + userId + '" style="cursor:pointer">' +
-                '<td><strong>' + userName + '</strong></td>' +
-                '<td>' + r.total_days + '</td>' +
-                '<td>' + r.normal_days + '</td>' +
-                '<td>' + r.late_count + '<span class="att-sub">' + r.late_total_minutes + ' ' + i18n.unit_minutes + '</span></td>' +
-                '<td>' + r.early_count + '<span class="att-sub">' + r.early_total_minutes + ' ' + i18n.unit_minutes + '</span></td>' +
-                '<td>' + r.absent_count + '</td>' +
-                '<td>' + (r.amend_count || 0) + '</td>' +
-                '<td>' + (r.leave_count || 0) + '<span class="att-sub">' + (r.leave_days || 0) + ' 天 ' + (r.leave_hours || 0) + ' 小時</span></td>' +
-                '<td>' + r.overtime_total_minutes + ' ' + i18n.unit_minutes + '</td>' +
-                '</tr>'
-            );
-        }).join('');
-
-        var tableHtml =
-            '<h3>' + i18n.report_title + '（' + month + '）</h3>' +
-            '<table class="att-table-desktop"><thead><tr>' +
-            '<th>' + i18n.field_user + '</th>' +
-            '<th>' + i18n.field_total_days + '</th>' +
-            '<th>' + i18n.field_normal_days + '</th>' +
-            '<th>' + i18n.field_late_count + '</th>' +
-            '<th>' + i18n.field_early_count + '</th>' +
-            '<th>' + i18n.field_absent_count + '</th>' +
-            '<th>' + i18n.field_amend_count + '</th>' +
-            '<th>請假</th>' +
-            '<th>' + i18n.field_overtime_total + '</th>' +
-            '</tr></thead><tbody>' + rows + '</tbody></table>';
-
-        // 手機版卡片
-        var reportCards = report.map(function (r) {
-            var userName = r.user ? r.user.nickname : '-';
-            var userId = r.user ? r.user.id : '';
-            return (
-                '<div class="shift-card js-detail-link" data-user-id="' + userId + '" style="cursor:pointer">' +
-                '<div class="shift-card__header">' +
-                '<span class="shift-card__title">' + userName + '</span>' +
-                '<span class="badge bg-success">' + i18n.field_total_days + ' ' + r.total_days + '</span>' +
-                '</div>' +
-                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_normal_days + '</span><span>' + r.normal_days + '</span></div>' +
-                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_late_count + '</span><span>' + r.late_count + '（' + r.late_total_minutes + ' ' + i18n.unit_minutes + '）</span></div>' +
-                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_early_count + '</span><span>' + r.early_count + '（' + r.early_total_minutes + ' ' + i18n.unit_minutes + '）</span></div>' +
-                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_absent_count + '</span><span>' + r.absent_count + '</span></div>' +
-                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_amend_count + '</span><span>' + (r.amend_count || 0) + '</span></div>' +
-                '<div class="shift-card__row"><span class="shift-card__label">請假</span><span>' + (r.leave_count || 0) + '（' + (r.leave_days || 0) + ' 天 ' + (r.leave_hours || 0) + ' 小時）</span></div>' +
-                '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_overtime_total + '</span><span>' + r.overtime_total_minutes + ' ' + i18n.unit_minutes + '</span></div>' +
-                '</div>'
-            );
-        }).join('');
-
-        getTabPane().innerHTML = nav + tableHtml +
-            '<div class="shift-cards">' + reportCards + '</div>';
-
-        // 綁定 flatpickr 月份選擇器
-        flatpickr('#report-month-picker', {
-            plugins: [new monthSelectPlugin({ shorthand: true, dateFormat: 'Y-m', altFormat: 'Y-m' })],
-            disableMobile: true,
-            onChange: function (selectedDates) {
-                if (selectedDates.length === 0) { return; }
-                var d = selectedDates[0];
-                currentMonth = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-                loadReport(currentMonth);
-            }
-        });
-
-        // 點擊員工行跳轉到詳細頁面
-        root.querySelectorAll('.js-detail-link').forEach(function (row) {
-            row.addEventListener('click', function () {
-                var uid = row.dataset.userId;
-                if (uid) {
-                    window.location.href = '/admin/attendance/detail/' + uid;
-                }
-            });
-        });
-    }
-
-    // ---------------------------------------------------------------
     //  補打卡
     // ---------------------------------------------------------------
 
@@ -963,8 +863,8 @@
          * 原生 date/time 在手機上是系統的滾輪選擇器，桌機也能直接輸入，
          * 而且值的格式固定（YYYY-MM-DD / HH:mm），正是後端要的。
          *
-         * 月份選擇器（report-month-picker）仍然留著 flatpickr —— 原生沒有
-         * 「只選月份」這種控制項，拿掉會退化成完整的日期選擇器。
+         * 彙總報表搬到「內務管理 → 報表」後，這一頁已經沒有任何 flatpickr，
+         * 「我的紀錄」用的是一排月份按鈕（見 renderMyRecords）。
          */
         document.getElementById('amend-date').max = todayString();
 
