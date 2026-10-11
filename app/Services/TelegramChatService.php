@@ -1309,15 +1309,20 @@ class TelegramChatService
             ]);
 
             /*
-             * 客服自己人工回覆了，就不該再把同一個問題轉到內部支援群組 ——
-             * 跟 `sendReply()` 與 `sendFileReply()` 同一條規則。
+             * 客服親自回覆客人之後要做的兩件事，跟 `sendReply()` 與
+             * `sendFileReply()` 同一條規則：
              *
-             * ⚠ 條件是 `filled($senderId)`，不是無條件關。這一支沒有 `is_auto`
+             *   1. 該群未回覆的客戶訊息標成已回覆 —— 否則那個對話一直算「欠著」，
+             *      未回覆告警會誤報
+             *   2. 還掛著的求助單結掉 —— 否則會一路催到上限，報表上永遠紅著
+             *
+             * ⚠ 條件是 `filled($senderId)`，不是無條件做。這一支沒有 `is_auto`
              * 旗標，而 `$senderId` 就是「誰送的」：目前唯一的呼叫端帶的是
              * `Auth::id()`（客服從文件區挑檔案傳給客人），但它是 nullable ——
-             * 哪天有系統自動送檔的流程，那不算客服回覆，不該結掉客人的單。
+             * 哪天有系統自動送檔的流程，那不算客服回覆，兩件事都不該做。
              */
             if (filled($senderId)) {
+                $this->telegramRepository->markMessagesReplied($group->id);
                 $this->ticketRepository->ignoreOpenByGroup($group->id);
             }
 

@@ -30,7 +30,8 @@ if (!$isAuto) {
 兩者都已經傳了 `mark_replied => false`（系統通知不該消掉「未回覆」狀態），
 卻漏了同一個理由的 `is_auto => true`，於是走進那個 if，整群的單被清空。
 
-**二、送檔案的兩支完全沒有這條規則。** `sendFileReply()`（輸入區上傳）與
+**二、送檔案的兩支完全沒有這條規則**（文件區那支連 `markMessagesReplied()`
+都沒有）。`sendFileReply()`（輸入區上傳）與
 `sendDocumentFromSharedFile()`（從文件區挑）都是客服手動把東西送給客人，
 跟送文字、送圖片同一件事，但兩支都沒呼叫 `ignoreOpenByGroup()`。
 
@@ -44,11 +45,15 @@ if (!$isAuto) {
 | `VmController::ajaxSendNotice()` | 補 `'is_auto' => true` |
 | `CreditTopupService` 發補點結果 | 補 `'is_auto' => true` |
 | `TelegramChatService::sendFileReply()` | 補 `ignoreOpenByGroup()`（無條件：唯一呼叫端是客服上傳） |
-| `TelegramChatService::sendDocumentFromSharedFile()` | 補 `ignoreOpenByGroup()`，條件 `filled($senderId)` |
+| `TelegramChatService::sendDocumentFromSharedFile()` | 補 `markMessagesReplied()` ＋ `ignoreOpenByGroup()`，條件 `filled($senderId)` |
 
 最後一支用 `filled($senderId)` 而不是無條件：它沒有 `is_auto` 旗標，
 而 `$senderId` 就是「誰送的」。目前唯一的呼叫端帶 `Auth::id()`，
 但那個參數是 nullable —— 哪天有系統自動送檔的流程，那不算客服回覆。
+
+那一支連 `markMessagesReplied()` 都沒有，所以從文件區傳檔案給客人之後，
+那個對話在系統裡仍然算「欠著沒回」，未回覆告警會誤報。兩件事條件相同
+（都是「客服親自回覆客人之後要做的事」），所以寫在同一個 `if` 裡。
 
 ## 教訓
 
@@ -63,12 +68,6 @@ if (!$isAuto) {
 > ⚠️ 另一半是：**同一條規則散在多支送訊息的函式裡，就一定會有人漏掉。**
 > 送文字、送圖片走 `sendReply()`，送檔案另外兩支 —— 規則只寫在第一支上，
 > 另外兩支從第一天起就沒有。
-
-## 還沒處理（另一件事）
-
-`sendDocumentFromSharedFile()` **也沒有** `markMessagesReplied()`，
-所以從文件區傳檔案給客人之後，那個對話仍然算「未回覆」。
-這會讓未回覆告警誤報，但影響的是另一套機制，沒有跟著這次一起改。
 
 ## 異動檔案
 
