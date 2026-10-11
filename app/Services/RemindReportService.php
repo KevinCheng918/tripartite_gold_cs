@@ -530,9 +530,11 @@ class RemindReportService
         $names = (array) Arr::get($data, 'names');
         $statusLabels = (array) Arr::get($report, 'STATUS_LABEL');
         $managerStage = (int) config('constants.AUTO_REPLY.REMIND.STAGE.MANAGER');
+        $pendingStatus = (int) config('constants.AUTO_REPLY.TICKET_STATUS.PENDING');
 
         $times = 0;
         $escalated = 0;
+        $pending = 0;
         $byTicket = [];
 
         foreach ($tickets as $row) {
@@ -549,12 +551,25 @@ class RemindReportService
                 continue;
             }
 
+            $isPending = (int) $ticket->status === $pendingStatus;
+
+            if ($isPending) {
+                $pending++;
+            }
+
             $byTicket[] = [
                 'question' => (string) $ticket->question,
                 'group'    => filled($ticket->group) ? (string) $ticket->group->title : '-',
                 'times'    => (int) $row->times,
                 'status'   => (int) $ticket->status,
                 'status_label' => (string) Arr::get($statusLabels, (int) $ticket->status, ''),
+
+                /*
+                 * ⚠ 「還沒處理」由後端判定，前端不要自己比 `status === 1`。
+                 * 狀態的數字是 config 定義的，寫死在 JS 裡等於同一件事有兩個
+                 * 定義，改了 config 那邊畫面會安靜地標錯。
+                 */
+                'pending'  => $isPending,
             ];
         }
 
@@ -579,6 +594,9 @@ class RemindReportService
                 'times'       => $times,
                 'escalated'   => $escalated,
                 'escalate_at' => (int) config('constants.AUTO_REPLY.REMIND.ESCALATE_AT'),
+
+                // 這段期間被催過、到現在還沒人處理的題數 —— 報表真正要回答的問題
+                'pending'     => $pending,
             ],
             'by_ticket' => $byTicket,
             'by_user'   => $byUser,

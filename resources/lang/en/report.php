@@ -33,6 +33,11 @@ return [
 
     // Overdue reminder summary
     'remind_summary'   => ':tickets tickets reminded, :times reminders in total; :escalated of them were chased more than :escalate_at times',
+
+    // The ones nobody has dealt with: appended to the summary, flagged on the row too
+    'remind_pending_badge'   => 'Still open',
+    'remind_pending_summary' => ':n still unhandled',
+    'remind_pending_none'    => 'Everything that was chased has been dealt with',
     'remind_by_ticket' => 'By ticket',
     'remind_by_user'   => 'By person',
     'remind_question'  => 'Question',

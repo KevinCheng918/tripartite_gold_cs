@@ -241,19 +241,37 @@ $(function () {
             ? range.start
             : range.start + ' ～ ' + range.end;
 
-        document.getElementById('rmd-summary').textContent = trans(i18n.remind_summary, {
+        var pending = summary.pending || 0;
+
+        /*
+         * 摘要後面接一句「還有 N 題仍未處理」。
+         *
+         * 這是整份報表最該被看到的一個數字 —— 被催了幾次是過程，
+         * 還沒處理才是現在要行動的事。所以用紅字，而且 0 的時候也要講，
+         * 不然分不出「都處理完了」還是「這段沒資料」。
+         */
+        var summaryEl = document.getElementById('rmd-summary');
+        summaryEl.innerHTML = escapeHtml(trans(i18n.remind_summary, {
             tickets: summary.tickets || 0,
             times: summary.times || 0,
             escalated: summary.escalated || 0,
             escalate_at: summary.escalate_at || 0
-        });
+        })) + '　' + (pending > 0
+            ? '<strong class="text-danger">' + escapeHtml(trans(i18n.remind_pending_summary, { n: pending })) + '</strong>'
+            : '<span class="text-success">' + escapeHtml(i18n.remind_pending_none) + '</span>');
 
         var ticketRows = (body.by_ticket || []).map(function (t) {
-            return '<tr>' +
+            // 還沒處理的整列標起來：badge 看得出是哪一題，底色與左側紅條讓人用掃的
+            var rowClass = t.pending ? ' class="is-pending"' : '';
+            var status = t.pending
+                ? '<span class="badge bg-danger">' + escapeHtml(i18n.remind_pending_badge) + '</span>'
+                : escapeHtml(t.status_label);
+
+            return '<tr' + rowClass + '>' +
                 '<td><span class="cell-stack__main">' + escapeHtml(t.question) + '</span></td>' +
                 '<td>' + escapeHtml(t.group) + '</td>' +
                 '<td class="col-num">' + trans(i18n.unit_times, { n: t.times }) + '</td>' +
-                '<td>' + escapeHtml(t.status_label) + '</td>' +
+                '<td>' + status + '</td>' +
                 '</tr>';
         }).join('');
 

@@ -33,6 +33,11 @@ return [
 
     // 超时提醒统计
     'remind_summary'   => '共 :tickets 题被提醒、累计 :times 次，其中 :escalated 题催超过 :escalate_at 次',
+
+    // 还没人处理的那几题：摘要后面接一句，列上另外标红
+    'remind_pending_badge'   => '仍未处理',
+    'remind_pending_summary' => '还有 :n 题仍未处理',
+    'remind_pending_none'    => '被提醒过的都已经处理完了',
     'remind_by_ticket' => '依题目',
     'remind_by_user'   => '依人员',
     'remind_question'  => '问题',

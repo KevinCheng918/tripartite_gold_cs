@@ -1086,6 +1086,23 @@ a:hover { color: #85640a; }
     box-shadow: inset 2px 0 0 #a67c00, inset 0 0 0 9999px var(--bs-table-accent-bg);
 }
 
+/* 需要被看見的那幾列（目前用在報表的「仍未處理」）：淡紅底 ＋ 左側紅條。
+
+   ⚠ 底色用 background-color 而不是 Bootstrap 的 accent-bg ——
+   `.data-table` 已經把 `--bs-table-accent-bg` 設成 transparent（見上面），
+   所以那層 9999px 的 inset shadow 是透明的，background-color 看得到。
+
+   ⚠ hover 的金線會蓋掉紅條（同一個 td、同一個屬性），所以 hover 態要
+   再寫一次把紅色寫回去。少了這條，滑鼠經過時那一列就不再是「未處理」的樣子。 */
+.table.data-table > tbody > tr.is-pending > td {
+    background-color: rgba(220, 53, 69, 0.06);
+}
+
+.table.data-table > tbody > tr.is-pending > td:first-child,
+.table.data-table > tbody > tr.is-pending:hover > td:first-child {
+    box-shadow: inset 3px 0 0 #dc3545, inset 0 0 0 9999px var(--bs-table-accent-bg);
+}
+
 /* 序號欄：固定窄寬並壓成灰色，它只是定位用的 */
 .data-table .col-idx {
     width: 3.5rem;
@@ -1427,6 +1444,17 @@ a:hover { color: #85640a; }
    那組規則負責（帶 !important），這裡只換金線的顏色 */
 [data-theme="dark"] .table.data-table > tbody > tr:hover > td:first-child {
     box-shadow: inset 2px 0 0 #d4af37, inset 0 0 0 9999px var(--bs-table-accent-bg);
+}
+
+/* 「仍未處理」的淡紅底在深色模式要更透一點，深底上 6% 的紅幾乎看不出來；
+   紅條本身調亮，#dc3545 在深底上偏暗 */
+[data-theme="dark"] .table.data-table > tbody > tr.is-pending > td {
+    background-color: rgba(248, 113, 113, 0.1);
+}
+
+[data-theme="dark"] .table.data-table > tbody > tr.is-pending > td:first-child,
+[data-theme="dark"] .table.data-table > tbody > tr.is-pending:hover > td:first-child {
+    box-shadow: inset 3px 0 0 #f87171, inset 0 0 0 9999px var(--bs-table-accent-bg);
 }
 
 /* ⚠ `.col-idx` 與 `.table-empty` 掛在 `<td>` 本身，而既有的
