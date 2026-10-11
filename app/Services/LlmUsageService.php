@@ -108,7 +108,12 @@ class LlmUsageService
         $daily = [];
 
         foreach ($rows as $row) {
-            $date = (string) $row->used_on;
+            /*
+             * ⚠ 只取前 10 碼。`used_on` 在 Model 上 cast 成 `date`，轉成字串會
+             * 變「2026-10-11 00:00:00」—— 那個 00:00:00 對這張表沒有任何意義，
+             * 只是讓日期欄變長、看起來像有時間可以比較。
+             */
+            $date = substr((string) $row->used_on, 0, 10);
 
             if (!isset($daily[$date])) {
                 $daily[$date] = [

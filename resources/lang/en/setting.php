@@ -53,6 +53,12 @@ return [
     'usage_cost'         => 'Estimated cost',
     'usage_cost_hint'    => 'Estimated from the configured rates. The Anthropic Console is the source of truth.',
 
+    // Daily usage table: five days per page, older ones a page back
+    'usage_date'         => 'Date',
+    'usage_prev'         => 'Previous',
+    'usage_next'         => 'Next',
+    'usage_page'         => 'Page :current / :total',
+
     'action_save'   => 'Save',
     'action_saving' => 'Saving...',
 

@@ -53,6 +53,12 @@ return [
     'usage_cost'         => '預估費用',
     'usage_cost_hint'    => '依設定的單價估算，實際金額以 Anthropic Console 為準。',
 
+    // 每日用量表格：一頁五天，其餘往回翻
+    'usage_date'         => '日期',
+    'usage_prev'         => '上一頁',
+    'usage_next'         => '下一頁',
+    'usage_page'         => '第 :current / :total 頁',
+
     'action_save'   => '儲存',
     'action_saving' => '儲存中...',
 

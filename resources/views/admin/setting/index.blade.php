@@ -133,7 +133,8 @@ npm install -g @anthropic-ai/claude-code</code></pre>
                     <table class="table table-sm align-middle data-table">
                         <thead class="thead-gold">
                             <tr>
-                                <th class="col-tight">{{ trans('setting.usage_today') }}</th>
+                                {{-- 這一欄是日期，不是「今日」。原本誤用了 usage_today --}}
+                                <th class="col-tight">{{ trans('setting.usage_date') }}</th>
                                 <th class="col-num">{{ trans('setting.usage_subscription') }}</th>
                                 <th class="col-num">{{ trans('setting.usage_fallback') }}</th>
                                 <th class="col-num">{{ trans('setting.usage_rate_limited') }}</th>
@@ -141,6 +142,17 @@ npm install -g @anthropic-ai/claude-code</code></pre>
                         </thead>
                         <tbody id="usage-daily"></tbody>
                     </table>
+                </div>
+
+                {{-- 一頁五天，其餘往回翻。後端本來就只給近 30 天，所以不必再打 ajax --}}
+                <div class="d-flex align-items-center justify-content-end gap-2 mt-2" id="usage-pager">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="usage-prev">
+                        <i class="fas fa-chevron-left me-1"></i>{{ trans('setting.usage_prev') }}
+                    </button>
+                    <span class="text-muted" style="font-size:0.875rem" id="usage-page-info"></span>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="usage-next">
+                        {{ trans('setting.usage_next') }}<i class="fas fa-chevron-right ms-1"></i>
+                    </button>
                 </div>
             </div>
         </div>

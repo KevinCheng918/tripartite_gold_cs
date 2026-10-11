@@ -157,14 +157,48 @@
             : i18n.claude_not_set;
     }
 
+    /*
+     * 每日用量一頁顯示幾天。
+     *
+     * 後端一次給近 30 天（`LlmUsageService::summary()`），一口氣全攤開要捲很久，
+     * 而真正每天在看的只有最近幾天。其餘往回翻 —— 資料已經在手上，翻頁不打 ajax。
+     */
+    var USAGE_PAGE_SIZE = 5;
+    var usagePage = 0;
+
     function renderUsage() {
         var usage = settings.usage;
 
         document.getElementById('usage-summary').innerHTML =
             usageCard(i18n.usage_today, usage.today) + usageCard(i18n.usage_month, usage.month);
 
+        usagePage = 0;
+        renderUsagePage();
+    }
+
+    /**
+     * 畫出目前這一頁的每日用量
+     *
+     * ⚠ 資料是**日期新到舊**（Repository 的 `orderByDesc('used_on')`），
+     * 所以第 0 頁就是最近五天，「上一頁」往更早翻。
+     *
+     * ⚠ 只有「有呼叫過的日子」才有列，完全沒用到的日子後端不會回 ——
+     * 所以一頁五列不等於五個日曆天。那是刻意的：空白列沒有資訊。
+     *
+     * @returns {void}
+     */
+    function renderUsagePage() {
+        var daily = (settings.usage && settings.usage.daily) || [];
+        var totalPages = Math.max(1, Math.ceil(daily.length / USAGE_PAGE_SIZE));
+
+        // 資料變少（例如重新整理後）時夾回最後一頁，不然會停在空白頁
+        if (usagePage > totalPages - 1) { usagePage = totalPages - 1; }
+        if (usagePage < 0) { usagePage = 0; }
+
+        var start = usagePage * USAGE_PAGE_SIZE;
         var rows = '';
-        (usage.daily || []).forEach(function (day) {
+
+        daily.slice(start, start + USAGE_PAGE_SIZE).forEach(function (day) {
             rows += '<tr>' +
                 '<td class="col-tight">' + escapeHtml(day.date) + '</td>' +
                 '<td class="col-num">' + day.subscription_calls + '</td>' +
@@ -177,6 +211,15 @@
 
         document.getElementById('usage-daily').innerHTML = rows ||
             '<tr><td colspan="4" class="text-center text-muted">-</td></tr>';
+
+        document.getElementById('usage-page-info').textContent = (i18n.usage_page || ':current / :total')
+            .replace(':current', usagePage + 1)
+            .replace(':total', totalPages);
+
+        // 只有一頁資料時整排藏起來，免得出現兩顆永遠按不動的按鈕
+        document.getElementById('usage-pager').style.display = daily.length > USAGE_PAGE_SIZE ? '' : 'none';
+        document.getElementById('usage-prev').disabled = usagePage <= 0;
+        document.getElementById('usage-next').disabled = usagePage >= totalPages - 1;
     }
 
     /**
@@ -272,6 +315,16 @@
             }, e.target.querySelector('button[type="submit"]'));
         });
 
+        // 每日用量翻頁。資料已經在手上，只是換畫哪五列
+        document.getElementById('usage-prev').addEventListener('click', function () {
+            usagePage--;
+            renderUsagePage();
+        });
+
+        document.getElementById('usage-next').addEventListener('click', function () {
+            usagePage++;
+            renderUsagePage();
+        });
     }
 
     bindForms();
