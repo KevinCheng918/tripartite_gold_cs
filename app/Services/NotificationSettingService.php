@@ -87,6 +87,7 @@ class NotificationSettingService
                 'weekly_at'  => (string) config('constants.ATTENDANCE_REPORT.WEEKLY_SEND_AT'),
                 'monthly_at' => (string) config('constants.ATTENDANCE_REPORT.MONTHLY_SEND_AT'),
             ],
+            'followup' => $this->followupSection(),
             'options' => [
                 'systems'       => $this->systemOptions(),
                 'dm_candidates' => $this->dmCandidates(),
@@ -117,6 +118,73 @@ class NotificationSettingService
             'escalate_at'             => (int) config('constants.AUTO_REPLY.REMIND.ESCALATE_AT'),
             'report_at'               => (string) config('constants.AUTO_REPLY.REMIND.REPORT_AT'),
         ];
+    }
+
+    /**
+     * 待追蹤事項的設定
+     *
+     * ⚠ 等待詞**存的是一行一個的文字**，不是 JSON —— 設定頁是個 textarea，
+     * 使用者維護的就是那幾行字，轉成 JSON 只會多一層他看不懂的轉義。
+     * 留白時前端顯示 config 的預設值（`keyword_default`）當提示。
+     *
+     * @return array
+     */
+    private function followupSection()
+    {
+        $default = (array) config('constants.FOLLOWUP.DEFAULT');
+
+        return [
+            'enabled'          => $this->appSettingService->getBool(AppSettingService::KEY_FOLLOWUP_ENABLED),
+            'keywords'         => (string) $this->appSettingService->get(AppSettingService::KEY_FOLLOWUP_KEYWORDS),
+            'keyword_default'  => implode("\n", (array) config('constants.FOLLOWUP.KEYWORDS')),
+            'quiet_minutes'    => $this->appSettingService->getInt(
+                AppSettingService::KEY_FOLLOWUP_QUIET_MINUTES,
+                (int) Arr::get($default, 'QUIET_MINUTES')
+            ),
+            'interval_minutes' => $this->appSettingService->getInt(
+                AppSettingService::KEY_FOLLOWUP_INTERVAL_MINUTES,
+                (int) Arr::get($default, 'INTERVAL_MINUTES')
+            ),
+            'max_count'        => $this->appSettingService->getInt(
+                AppSettingService::KEY_FOLLOWUP_MAX_COUNT,
+                (int) Arr::get($default, 'MAX_COUNT')
+            ),
+            'stale_days'       => $this->appSettingService->getInt(
+                AppSettingService::KEY_FOLLOWUP_STALE_DAYS,
+                (int) config('constants.FOLLOWUP.STALE_DAYS')
+            ),
+            'report_user_ids'  => $this->appSettingService->getIntList(AppSettingService::KEY_FOLLOWUP_REPORT_MANAGER),
+            // ⚠ 這兩個只是給人看的字，真正的值在 config 與 Console\Kernel
+            'escalate_at'      => (int) config('constants.FOLLOWUP.ESCALATE_AT'),
+            'report_at'        => (string) config('constants.FOLLOWUP.REPORT_AT'),
+        ];
+    }
+
+    /**
+     * 存待追蹤事項的設定
+     *
+     * ⚠ 收件人與其他欄位一起存：這一區在畫面上是同一張卡，分兩顆儲存鈕
+     * 只會讓人以為改了一半沒生效。
+     *
+     * @param array    $params
+     * @param int|null $userId
+     * @return void
+     */
+    public function updateFollowup($params, $userId = null)
+    {
+        $this->appSettingService->putMany([
+            // 開關存 '1' / '0'，讀的時候走 getBool()
+            AppSettingService::KEY_FOLLOWUP_ENABLED          => filled(Arr::get($params, 'enabled')) ? '1' : '0',
+            AppSettingService::KEY_FOLLOWUP_KEYWORDS         => trim((string) Arr::get($params, 'keywords')),
+            AppSettingService::KEY_FOLLOWUP_QUIET_MINUTES    => (string) Arr::get($params, 'quiet_minutes'),
+            AppSettingService::KEY_FOLLOWUP_INTERVAL_MINUTES => (string) Arr::get($params, 'interval_minutes'),
+            AppSettingService::KEY_FOLLOWUP_MAX_COUNT        => (string) Arr::get($params, 'max_count'),
+            AppSettingService::KEY_FOLLOWUP_STALE_DAYS       => (string) Arr::get($params, 'stale_days'),
+            // 全部取消勾選時存 null —— 轉換與清空的規則都在 idListValue() 裡
+            AppSettingService::KEY_FOLLOWUP_REPORT_MANAGER   => $this->appSettingService->idListValue(
+                Arr::get($params, 'report_user_ids', [])
+            ),
+        ], $userId);
     }
 
     /**

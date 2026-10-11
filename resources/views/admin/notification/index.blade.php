@@ -45,6 +45,11 @@
                     <i class="fas fa-user-clock me-1"></i>{{ trans('notification.tab_attendance') }}
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#tab-followup" role="tab">
+                    <i class="fas fa-hourglass-half me-1"></i>{{ trans('notification.tab_followup') }}
+                </a>
+            </li>
         </ul>
 
         <div class="tab-content">
@@ -360,6 +365,101 @@
                                 </p>
                                 <p class="mb-0 text-muted" style="font-size:0.875rem">
                                     <i class="fas fa-info-circle me-1"></i>{{ trans('notification.attendance_leave_note') }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- ============ 分頁七：待追蹤事項 ============ --}}
+            <div class="tab-pane fade" id="tab-followup" role="tabpanel">
+                <div class="row">
+                    <div class="col-lg-7">
+                        <div class="main-card mb-3 card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ trans('notification.followup_title') }}</h5>
+                                <p class="text-muted" style="font-size:0.875rem">
+                                    {{ trans('notification.followup_desc', ['escalate' => config('constants.FOLLOWUP.ESCALATE_AT')]) }}
+                                </p>
+                                <form id="form-followup">
+                                    <div class="form-check form-switch mb-3">
+                                        <input class="form-check-input" type="checkbox" id="followup-enabled">
+                                        <label class="form-check-label" for="followup-enabled">{{ trans('notification.followup_enabled') }}</label>
+                                        <small class="form-text text-muted d-block">{{ trans('notification.followup_enabled_hint') }}</small>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-md-4 mb-3">
+                                            <label class="form-label" for="followup-quiet">{{ trans('notification.followup_quiet') }}</label>
+                                            <input type="number" class="form-control" id="followup-quiet" min="1" max="1440" step="1">
+                                            <small class="form-text text-muted">{{ trans('notification.followup_quiet_hint') }}</small>
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            <label class="form-label" for="followup-interval">{{ trans('notification.followup_interval') }}</label>
+                                            <input type="number" class="form-control" id="followup-interval" min="1" max="1440" step="1">
+                                            <small class="form-text text-muted">
+                                                {{ trans('notification.followup_interval_hint', ['escalate' => config('constants.FOLLOWUP.ESCALATE_AT')]) }}
+                                            </small>
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            <label class="form-label" for="followup-max">{{ trans('notification.followup_max') }}</label>
+                                            <input type="number" class="form-control" id="followup-max" min="1" max="200" step="1">
+                                            <small class="form-text text-muted">{{ trans('notification.followup_max_hint') }}</small>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label" for="followup-keywords">{{ trans('notification.followup_keywords') }}</label>
+                                        <textarea class="form-control" id="followup-keywords" rows="6"></textarea>
+                                        <small class="form-text text-muted">
+                                            {{ trans('notification.followup_keywords_hint') }}
+                                            <span id="followup-keyword-default" class="d-block mt-1"></span>
+                                        </small>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-md-4 mb-3">
+                                            <label class="form-label" for="followup-stale">{{ trans('notification.followup_stale') }}</label>
+                                            <input type="number" class="form-control" id="followup-stale" min="0" max="365" step="1">
+                                            <small class="form-text text-muted">{{ trans('notification.followup_stale_hint') }}</small>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <div class="d-flex align-items-center justify-content-between mb-2">
+                                            <label class="form-label mb-0">{{ trans('notification.followup_report_user') }}</label>
+                                            <div class="form-check mb-0">
+                                                <input class="form-check-input" type="checkbox" id="followup-report-all">
+                                                <label class="form-check-label" for="followup-report-all">{{ trans('notification.select_all') }}</label>
+                                            </div>
+                                        </div>
+                                        <div id="followup-report-list" class="notice-check-list p-2"></div>
+                                        <small class="form-text text-muted">
+                                            {{ trans('notification.followup_report_user_hint', ['time' => config('constants.FOLLOWUP.REPORT_AT')]) }}
+                                        </small>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-primary js-manage-only">{{ trans('notification.action_save') }}</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- 綁定說明：跟其他分頁一樣，「為什麼他沒收到」最常被問 --}}
+                    <div class="col-lg-5">
+                        <div class="main-card mb-3 card">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="fas fa-info-circle me-1"></i>{{ trans('notification.bind_title') }}
+                                </h5>
+                                <ol class="mb-2 ps-3" style="font-size:0.875rem;line-height:1.9">
+                                    <li>{{ trans('notification.bind_step1') }}</li>
+                                    <li>{{ trans('notification.bind_step2') }}</li>
+                                    <li>{{ trans('notification.bind_step3') }}</li>
+                                </ol>
+                                <p class="mb-0 text-danger" style="font-size:0.875rem">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>{{ trans('notification.bind_note') }}
                                 </p>
                             </div>
                         </div>

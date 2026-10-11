@@ -1,7 +1,8 @@
 /**
  * 通知設定（通訊管理 → 通知設定）
  *
- * 五個分頁：支援群組與話題、求助單提醒、班表通知、超時提醒統計、任務卡通知。
+ * 七個分頁：支援群組與話題、求助單提醒、班表通知、超時提醒統計、任務卡通知、
+ * 打卡報表、待追蹤事項。
  *
  * ⚠ 每個分頁各自一支 ajax —— 合成一支的話，存一個分頁會把其他分頁的值
  * 一起寫掉（那些欄位在這次送出裡是空的）。
@@ -509,6 +510,56 @@
         });
     }
 
+    // ===== 分頁七：待追蹤事項 =====
+
+    function renderFollowup() {
+        var followup = settings.followup;
+
+        document.getElementById('followup-enabled').checked = !!followup.enabled;
+        document.getElementById('followup-keywords').value = followup.keywords || '';
+        document.getElementById('followup-quiet').value = followup.quiet_minutes;
+        document.getElementById('followup-interval').value = followup.interval_minutes;
+        document.getElementById('followup-max').value = followup.max_count;
+        document.getElementById('followup-stale').value = followup.stale_days;
+
+        /*
+         * 留白時用的那一組詞直接列出來。
+         *
+         * 不塞進 textarea 當預設值 —— 那會讓「留白＝用預設」這件事消失，
+         * 使用者一存就把當下那份詞表寫死，之後系統調整預設詞也不會跟著變。
+         */
+        document.getElementById('followup-keyword-default').textContent = (followup.keyword_default || '')
+            .split('\n')
+            .join('、');
+
+        renderUserList('followup-report-list', 'js-followup-user', followup.report_user_ids);
+        syncAll('followup-report-all', 'js-followup-user');
+    }
+
+    function bindFollowup() {
+        bindSelectAll('followup-report-all', 'followup-report-list', 'js-followup-user');
+
+        document.getElementById('form-followup').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            var ids = checkedIds('js-followup-user');
+
+            submit('/admin/notification/ajax-update-followup', {
+                // 後端用 filled() 判斷，沒勾就送 null（不要送 false —— 那也是 filled）
+                enabled: document.getElementById('followup-enabled').checked ? 1 : null,
+                keywords: document.getElementById('followup-keywords').value.trim(),
+                quiet_minutes: parseInt(document.getElementById('followup-quiet').value, 10) || 30,
+                interval_minutes: parseInt(document.getElementById('followup-interval').value, 10) || 30,
+                max_count: parseInt(document.getElementById('followup-max').value, 10) || 5,
+                // 0 是合法值（不自動收），所以不能用 || 補預設
+                stale_days: parseInt(document.getElementById('followup-stale').value, 10) || 0,
+                report_user_ids: ids
+            }, event.target.querySelector('button[type="submit"]'), function () {
+                settings.followup.report_user_ids = ids;
+            });
+        });
+    }
+
     // ===== 權限 =====
 
     /**
@@ -533,6 +584,7 @@
     renderReport();
     renderTask();
     renderAttendance();
+    renderFollowup();
     applyPermission();
 
     if (canManage) {
@@ -543,5 +595,6 @@
         bindReport();
         bindTask();
         bindAttendance();
+        bindFollowup();
     }
 }());

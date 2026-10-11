@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Webhook;
 
 use App\Http\Controllers\Controller;
 use App\Services\AutoReplySupportService;
+use App\Services\CustomerFollowupService;
 use App\Services\DailyRateService;
+use App\Services\TelegramBotService;
 use App\Services\TelegramChatService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -21,15 +23,23 @@ class TelegramWebhookController extends Controller
     private $chatService;
     private $supportService;
     private $dailyRateService;
+    private $followupService;
+    private $botService;
 
     public function __construct(
         TelegramChatService $chatService,
         AutoReplySupportService $supportService,
-        DailyRateService $dailyRateService
+        DailyRateService $dailyRateService,
+        CustomerFollowupService $followupService,
+        TelegramBotService $botService
     ) {
         $this->chatService = $chatService;
         $this->supportService = $supportService;
         $this->dailyRateService = $dailyRateService;
+        // 待追蹤事項的兩顆按鈕（callback_data 前綴 fu:）
+        $this->followupService = $followupService;
+        // 回應 callback_query，不然按鈕會一直轉圈
+        $this->botService = $botService;
     }
 
     /**
@@ -73,9 +83,9 @@ class TelegramWebhookController extends Controller
                 'has_reply' => isset($payload['message']['reply_to_message']),
             ]);
 
-            // 按鈕事件（內部支援群組的處理選單）
+            // 按鈕事件（內部支援群組的處理選單、待追蹤事項的決定）
             if (isset($payload['callback_query'])) {
-                $this->supportService->handleCallback($payload);
+                $this->handleCallback($payload);
 
                 return response()->json(['ok' => true]);
             }
@@ -113,6 +123,43 @@ class TelegramWebhookController extends Controller
 
         // Telegram 要求永遠回 200
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * 按鈕事件要交給哪一支 service
+     *
+     * 兩套按鈕都在同一個內部群組裡，只能靠 `callback_data` 的前綴分辨：
+     * 待追蹤事項是 `fu:`，其餘（求助單的處理選單、候選題目、類別）
+     * 由 `AutoReplySupportService` 自己再分一層。
+     *
+     * ⚠ 這裡**只做分派**，不碰任何判斷邏輯 —— Controller 不該有商業邏輯。
+     *
+     * @param array $payload Telegram Update
+     * @return void
+     */
+    private function handleCallback($payload)
+    {
+        $data = (string) Arr::get($payload, 'callback_query.data');
+        $prefix = (string) Arr::get(explode(':', $data), 0);
+
+        if ($prefix !== (string) config('constants.FOLLOWUP.CALLBACK.DECIDE')) {
+            $this->supportService->handleCallback($payload);
+
+            return;
+        }
+
+        /*
+         * 要先回應 callback_query，否則按鈕會一直轉圈（Telegram 的規矩）。
+         * 求助單那邊是在 `handleCallback()` 裡做，這條路自己做一次。
+         */
+        $callback = (array) Arr::get($payload, 'callback_query');
+        $this->botService->answerCallbackQuery(Arr::get($callback, 'id'));
+
+        $this->followupService->handleCallback(
+            array_slice(explode(':', $data), 1),
+            Arr::get($callback, 'message.message_id'),
+            (array) Arr::get($callback, 'from', [])
+        );
     }
 
     /**

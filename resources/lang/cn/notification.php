@@ -13,6 +13,7 @@ return [
     'tab_report' => '超时提醒统计',
     'tab_task'   => '任务卡通知',
     'tab_attendance' => '打卡报表',
+    'tab_followup'   => '待跟进事项',
 
     'select_all' => '全选',
     'unbound'    => '未绑定',
@@ -46,6 +47,24 @@ return [
     'report_test_hint' => '会立刻把昨天的完整统计私信给上面勾选的人。只发完整版，不会打扰昨天被提醒到的同事。',
     'report_personal_title' => '个人统计',
     'report_personal_desc'  => '昨天被提醒到的同事，每天 :time 会各自收到「自己那份」（我被催了哪几题）。这部分自动发送，不需要设置；没被提醒到的人不会收到。',
+
+    // ===== 待跟进事项 =====
+    'followup_title'   => '待跟进事项',
+    'followup_desc'    => '对话里有人说「稍等、晚点给你」就记成一笔待跟进事项。对话安静一段时间后，系统会到支持群组 tag 当班人员问「要不要跟进」：选要跟进就发消息问客人进度（我方自己说的则改成 tag 当班人员接手），选不跟了就结案。没有人按按钮时会每隔一段时间再问一次，第 :escalate 次起同时 tag 主管与老板。',
+    'followup_enabled' => '启用待跟进事项',
+    'followup_enabled_hint' => '关闭时完全不侦测、不发消息，已经记下来的事项会留着。',
+    'followup_keywords'      => '等待词（一行一个）',
+    'followup_keywords_hint' => '命中其中一个词才会进一步请 AI 确认「是不是真的在说稍后提供」，所以宁可宽一点。留白就用系统预设的这一组：',
+    'followup_quiet'         => '安静多久后询问（分钟）',
+    'followup_quiet_hint'    => '对方说完「稍等」之后，对话安静超过这个时间才去问当班人员。客人后来又说话会重新计时 —— 他还在线上聊的时候系统不会插进来。',
+    'followup_interval'      => '没人决定时每隔（分钟）',
+    'followup_interval_hint' => '没有人按按钮时，每隔这个时间再问一次。第 :escalate 次起会同时 tag 主管与老板。',
+    'followup_max'           => '最多询问几次',
+    'followup_max_hint'      => '到这个次数仍没有人按按钮就停止询问，并发最后一则通知主管与老板（按钮仍然有效）。追问客人的轮数不受这个限制。',
+    'followup_stale'         => '几天没结果就能收掉',
+    'followup_stale_hint'    => '填 0 表示不自动收（预设）。填天数之后，要清理时执行 followup:close-stale 才会真的收，排程不会自动跑。',
+    'followup_report_user'      => '每日统计私信给（可多选）',
+    'followup_report_user_hint' => '每天 :time 把前一天的待跟进事项统计私信出去（新开几笔、结案几笔、还挂着几笔、拖最多次的是谁）。标示「未绑定」的人收不到，请他先私信机器人一次。',
 
     // ===== 话题分流 =====
     'topic_title'         => '话题分流',
@@ -150,6 +169,14 @@ return [
         'remind_invalid'       => '提醒时间须介于 1 到 1440 分钟',
         'remind_max_required'  => '请填写最多提醒几次',
         'remind_max_invalid'   => '提醒次数须介于 1 到 200 次',
+
+        'followup_keywords_invalid' => '等待词总长度不可超过 2000 字',
+        'followup_minutes_required' => '请填写询问时间',
+        'followup_minutes_invalid'  => '询问时间须介于 1 到 1440 分钟',
+        'followup_max_required'     => '请填写最多询问几次',
+        'followup_max_invalid'      => '询问次数须介于 1 到 200 次',
+        'followup_stale_required'   => '请填写几天没结果就能收掉（不自动收请填 0）',
+        'followup_stale_invalid'    => '天数须介于 0 到 365 天',
         'report_user_not_found' => '找不到这个账号',
         'report_test_sent'      => '测试统计已发出 :sent 则，请确认 Telegram 有收到',
         'report_test_partial'   => '已发出 :sent 则，但这几位没收到：:failed（请他们先私信机器人一次）',

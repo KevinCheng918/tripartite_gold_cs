@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Jobs\AutoReplyJob;
+use App\Jobs\FollowupDetectJob;
 use App\Models\TelegramGroup;
 use App\Repositories\AutoReplyTicketRepository;
 use App\Repositories\SharedFileRepository;
@@ -485,6 +486,25 @@ class TelegramChatService
                 $job->delay(now()->addSeconds($delay));
             }
         }
+
+        /*
+         * 等待詞偵測。
+         *
+         * ⚠ **刻意擺在上面那三道判斷之外**（isAutoReplyOn / isStaff / isIgnored）：
+         * 關掉自動回覆的對話（客服正在親自處理的那些）反而最需要這個功能，
+         * 而同事在客戶群講的「稍等」要記成**我方承諾**、不是漏掉。
+         *
+         * ⚠ 沒有文字的訊息（純圖片、貼圖）不必偵測 —— 省一次 Job 派送。
+         */
+        if (filled($rawText)) {
+            FollowupDetectJob::dispatch($group->id, $msg->id, $rawText, [
+                'direction'   => config('constants.TELEGRAM.DIRECTION.INBOUND'),
+                'is_auto'     => false,
+                'from'        => $from,
+                'sender_name' => $senderName,
+                'group_id'    => $group->id,
+            ]);
+        }
     }
 
     // ---------------------------------------------------------------
@@ -681,6 +701,23 @@ class TelegramChatService
         if (!$isAuto) {
             $this->ticketRepository->ignoreOpenByGroup($group->id);
         }
+
+        /*
+         * 我方自己說「稍等，我確認一下」也要記成待追蹤事項
+         * （需求方 2026-10-11）—— 那同樣代表有事情沒完成，只是方向相反：
+         * 我們欠客人。
+         *
+         * ⚠ `is_auto` 要照實傳：AI 轉人工那句必然含「稍等」，而求助單
+         * 已經在催了 —— `WaitDetector` 靠這個旗標排除它，不傳的話
+         * 每次轉人工都會多開一筆，兩套提醒追同一件事。
+         */
+        FollowupDetectJob::dispatch($group->id, $msg->id, (string) $content, [
+            'direction'      => config('constants.TELEGRAM.DIRECTION.OUTBOUND'),
+            'is_auto'        => $isAuto,
+            'sender_name'    => $nickname,
+            'sender_user_id' => $userId,
+            'group_id'       => $group->id,
+        ]);
 
         // Broadcasting
         try {

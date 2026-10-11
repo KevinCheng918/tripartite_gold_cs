@@ -13,6 +13,7 @@ return [
     'tab_report' => 'Reminder Summary',
     'tab_task'   => 'Task Cards',
     'tab_attendance' => 'Attendance Reports',
+    'tab_followup'   => 'Follow-ups',
 
     'select_all' => 'Select all',
     'unbound'    => 'not linked',
@@ -46,6 +47,24 @@ return [
     'report_test_hint' => 'Sends yesterday\'s full summary to everyone ticked above right now. Only the full version — nobody who was reminded yesterday is disturbed.',
     'report_personal_title' => 'Personal summary',
     'report_personal_desc'  => 'Anyone who was reminded yesterday receives their own summary at :time (which tickets they were chased on). This is automatic and needs no setup; people who were not reminded receive nothing.',
+
+    // ===== Pending follow-ups =====
+    'followup_title'   => 'Pending Follow-ups',
+    'followup_desc'    => 'When someone in a chat says "hold on, I\'ll send it later", it is recorded as a pending follow-up. Once the chat has been quiet for a while, the system tags the on-duty staff in the support group and asks whether to follow up: choosing to follow up messages the customer about progress (or, when one of our own staff made the promise, tags the on-duty staff to pick it up instead), and choosing to drop it closes the item. If nobody presses a button it asks again at a fixed interval, and from the :escalate reminder onwards it also tags leaders and the boss.',
+    'followup_enabled' => 'Enable pending follow-ups',
+    'followup_enabled_hint' => 'When off, nothing is detected and no messages are sent. Items already recorded are kept.',
+    'followup_keywords'      => 'Waiting phrases (one per line)',
+    'followup_keywords_hint' => 'A phrase only triggers a second check where the AI confirms whether it really is a promise to provide something later, so err on the generous side. Leave blank to use the built-in set:',
+    'followup_quiet'         => 'Ask after this much quiet (minutes)',
+    'followup_quiet_hint'    => 'The on-duty staff are only asked once the chat has been quiet for this long after the promise. Anything the customer says restarts the timer — the system will not interrupt while they are still talking.',
+    'followup_interval'      => 'Ask again every (minutes)',
+    'followup_interval_hint' => 'While nobody has pressed a button, ask again at this interval. From the :escalate reminder onwards leaders and the boss are tagged as well.',
+    'followup_max'           => 'Maximum times to ask',
+    'followup_max_hint'      => 'After this many unanswered asks the system stops and sends a final notice to leaders and the boss (the buttons still work). The number of times the customer is chased is not limited by this.',
+    'followup_stale'         => 'Days before an item can be closed out',
+    'followup_stale_hint'    => 'Use 0 for never closing automatically (the default). With a number set, items are only closed when you run followup:close-stale — no schedule does it for you.',
+    'followup_report_user'      => 'Send the daily summary to (multiple)',
+    'followup_report_user_hint' => 'At :time each day the previous day\'s follow-up summary is sent by DM (opened, closed, still open, and who stalled the most). Anyone marked "not bound" cannot receive it — ask them to DM the bot once.',
 
     // ===== Topic routing =====
     'topic_title'         => 'Topic Routing',
@@ -150,6 +169,14 @@ return [
         'remind_invalid'       => 'Reminder interval must be between 1 and 1440 minutes',
         'remind_max_required'  => 'Please enter the maximum number of reminders',
         'remind_max_invalid'   => 'Maximum reminders must be between 1 and 200',
+
+        'followup_keywords_invalid' => 'Waiting phrases must be 2000 characters or fewer in total',
+        'followup_minutes_required' => 'Please enter the timing',
+        'followup_minutes_invalid'  => 'Timing must be between 1 and 1440 minutes',
+        'followup_max_required'     => 'Please enter the maximum number of asks',
+        'followup_max_invalid'      => 'Number of asks must be between 1 and 200',
+        'followup_stale_required'   => 'Please enter the number of days (use 0 to never close automatically)',
+        'followup_stale_invalid'    => 'Days must be between 0 and 365',
         'report_user_not_found' => 'Account not found',
         'report_test_sent'      => ':sent test summary message(s) sent, please check Telegram',
         'report_test_partial'   => ':sent sent, but these people did not receive it: :failed (ask them to message the bot once)',

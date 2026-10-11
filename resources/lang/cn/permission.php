@@ -11,6 +11,7 @@ return [
         'vm' => '虚拟机管理',
         'payment_config' => '缴款设定',
         'telegram_chat' => 'Telegram 客服',
+        'followup' => '待跟进事项',
         'quick_reply' => '快速回复题库',
         'staff_manage' => '内部管理',
         'project' => '项目管理',
@@ -53,6 +54,10 @@ return [
     'report' => [
         'attendance' => '打卡报表',
         'remind' => '超时提醒统计',
+    ],
+    'followup' => [
+        'index'  => '查看待跟进事项',
+        'manage' => '决定跟进或结案',
     ],
     'station' => [
         'view'   => '查看站台',

@@ -235,13 +235,22 @@
                             </li>
                             @endif
                             {{-- 通訊管理：所有「系統主動對外發訊」的設定都收在這裡 --}}
-                            @if(Auth::user()->hasPermission('telegram_chat.reply') || Auth::user()->hasPermission('telegram_chat.assign') || Auth::user()->hasPermission('telegram_chat.broadcast') || Auth::user()->hasPermission('notification.view'))
+                            @if(Auth::user()->hasPermission('telegram_chat.reply') || Auth::user()->hasPermission('telegram_chat.assign') || Auth::user()->hasPermission('telegram_chat.broadcast') || Auth::user()->hasPermission('notification.view') || Auth::user()->hasPermission('followup.index'))
                             <li class="app-sidebar__heading">{{ trans('notification.section_label') }}</li>
                             @if(Auth::user()->hasPermission('telegram_chat.reply') || Auth::user()->hasPermission('telegram_chat.assign') || Auth::user()->hasPermission('telegram_chat.broadcast'))
                             <li>
                                 <a href="{{ route('admin.telegram-chat.index') }}" class="{{ request()->routeIs('admin.telegram-chat.*') ? 'mm-active' : '' }}">
                                     <i class="metismenu-icon fas fa-comments"></i>
                                     {{ trans('telegram_chat.nav_label') }}
+                                </a>
+                            </li>
+                            @endif
+                            {{-- 待追蹤事項：決定權在當班人員，但清單要有地方看 --}}
+                            @if(Auth::user()->hasPermission('followup.index'))
+                            <li>
+                                <a href="{{ route('admin.followup.index') }}" class="{{ request()->routeIs('admin.followup.*') ? 'mm-active' : '' }}">
+                                    <i class="metismenu-icon fas fa-hourglass-half"></i>
+                                    {{ trans('followup.nav_label') }}
                                 </a>
                             </li>
                             @endif

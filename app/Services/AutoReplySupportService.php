@@ -9,8 +9,8 @@ use App\Repositories\AutoReplyTicketRemindRepository;
 use App\Repositories\AutoReplyTicketRepository;
 use App\Repositories\QuickReplyRepository;
 use App\Repositories\TelegramRepository;
-use App\Repositories\UserRepository;
 use App\Services\AutoReply\AnswerSplitter;
+use App\Services\Notify\EscalatingReminder;
 use App\Services\Notify\NoticeText;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -57,7 +57,6 @@ class AutoReplySupportService
     private $remindRepository;
     private $telegramRepository;
     private $quickReplyRepository;
-    private $userRepository;
     private $botService;
     private $chatService;
     private $quickReplyService;
@@ -65,27 +64,27 @@ class AutoReplySupportService
     private $supportGroup;
     private $splitter;
     private $noticeText;
+    private $escalating;
 
     public function __construct(
         AutoReplyTicketRepository $ticketRepository,
         AutoReplyTicketRemindRepository $remindRepository,
         TelegramRepository $telegramRepository,
         QuickReplyRepository $quickReplyRepository,
-        UserRepository $userRepository,
         TelegramBotService $botService,
         TelegramChatService $chatService,
         QuickReplyService $quickReplyService,
         AppSettingService $appSettingService,
         SupportGroupService $supportGroup,
         AnswerSplitter $splitter,
-        NoticeText $noticeText
+        NoticeText $noticeText,
+        EscalatingReminder $escalating
     ) {
         $this->ticketRepository = $ticketRepository;
         // 每次提醒 tag 到誰要逐筆落地，才答得出「某個人被催了幾次」
         $this->remindRepository = $remindRepository;
         $this->telegramRepository = $telegramRepository;
         $this->quickReplyRepository = $quickReplyRepository;
-        $this->userRepository = $userRepository;
         $this->botService = $botService;
         $this->chatService = $chatService;
         $this->quickReplyService = $quickReplyService;
@@ -94,6 +93,11 @@ class AutoReplySupportService
         $this->splitter = $splitter;
         // 等待時間與題目截短的排版，跟三支通知 service 共用同一份
         $this->noticeText = $noticeText;
+        /*
+         * 升級規則（第幾次叫主管、上限、收尾那則）跟待追蹤事項共用這一支 ——
+         * 兩邊各寫一份的話，改一邊忘另一邊是遲早的事。
+         */
+        $this->escalating = $escalating;
     }
 
     /**
@@ -1069,7 +1073,7 @@ class AutoReplySupportService
          * 這支每分鐘跑，而且同時卡住十張單是常態 —— 逐張單去查排班與主管名單
          * 就是十倍查詢。一分鐘內當班的人與主管名單都不會變。
          */
-        $targets = $this->remindTargets($this->chatService->getOnDutyUserIds());
+        $targets = $this->escalating->targets($this->chatService->getOnDutyUserIds());
         $sent = 0;
 
         foreach ($tickets as $ticket) {
@@ -1140,24 +1144,23 @@ class AutoReplySupportService
      * 這張單每分鐘都會被重試一次，整晚下來是幾百次查詢與送信。
      *
      * @param \App\Models\AutoReplyTicket $ticket
-     * @param array                       $targets 見 `remindTargets()`：各階段要 tag 的人
+     * @param array                       $targets 見 `EscalatingReminder::targets()`：各階段要 tag 的人
      * @param int                         $max     次數上限
      * @return bool 有送出訊息才算 true
      */
     private function remindOne($ticket, array $targets, $max)
     {
-        $stageConfig = config('constants.AUTO_REPLY.REMIND.STAGE');
-        $seq = (int) $ticket->remind_count + 1;
-        $isFinal = $seq > $max;
+        // 第幾次、tag 誰、是不是收尾 —— 規則跟待追蹤事項共用
+        $plan = $this->escalating->plan($ticket->remind_count, $targets, [
+            'max'         => $max,
+            'escalate_at' => (int) config('constants.AUTO_REPLY.REMIND.ESCALATE_AT'),
+        ]);
 
-        // 收尾那則一定要 tag 到主管老闆 —— 系統要放手了，總得有人知道
-        $stage = $isFinal
-            ? (int) Arr::get($stageConfig, 'FINAL')
-            : ($seq >= (int) config('constants.AUTO_REPLY.REMIND.ESCALATE_AT')
-                ? (int) Arr::get($stageConfig, 'MANAGER')
-                : (int) Arr::get($stageConfig, 'ON_DUTY'));
+        $seq = (int) Arr::get($plan, 'seq');
+        $stage = (int) Arr::get($plan, 'stage');
+        $isFinal = (bool) Arr::get($plan, 'is_final');
+        $users = Arr::get($plan, 'users');
 
-        $users = $this->pickTargets($targets, $stage);
         $text = $isFinal
             ? $this->buildFinalText($users, $ticket, $seq - 1)
             : $this->buildRemindText($users, $ticket, $seq);
@@ -1170,15 +1173,18 @@ class AutoReplySupportService
          * 少了交易：紀錄寫進去但次數沒推進，這張單下一分鐘會再催一次，
          * 統計上就多出一筆不存在的提醒。
          */
-        DB::transaction(function () use ($ticket, $seq, $users, $stage, $isFinal, $max) {
+        $nextCount = (int) Arr::get($plan, 'next_count');
+
+        DB::transaction(function () use ($ticket, $seq, $users, $stage, $nextCount) {
             $this->remindRepository->record($ticket->id, $seq, $users->pluck('id')->all(), $stage);
 
             $this->ticketRepository->update($ticket, [
                 /*
-                 * 收尾那則把次數推到 max + 1 —— 查詢用 `remind_count <= $max`
-                 * 收單，推過去之後這張單就不會再被撈出來。
+                 * 收尾那則把次數推到 max + 1（`next_count` 算好的）——
+                 * 查詢用 `remind_count <= $max` 收單，推過去之後這張單
+                 * 就不會再被撈出來。
                  */
-                'remind_count'     => $isFinal ? $max + 1 : $seq,
+                'remind_count'     => $nextCount,
                 'last_reminded_at' => now(),
             ]);
         });
@@ -1279,44 +1285,6 @@ class AutoReplySupportService
     }
 
     /**
-     * 整輪要用到的兩組人，一次查完
-     *
-     * ⚠ 第 3 次之後是「當班人員 **＋** 主管與老闆」，不是「換成主管」——
-     * 2026-10-06 以前的版本是後者，當班的人會以為事情已經不關他了。
-     *
-     * @param array $onDutyIds 當班人員的 user.id
-     * @return array{on_duty: \Illuminate\Support\Collection, escalated: \Illuminate\Support\Collection}
-     */
-    private function remindTargets(array $onDutyIds)
-    {
-        $onDuty = collect($this->userRepository->getMentionableByIds($onDutyIds));
-
-        return [
-            'on_duty' => $onDuty,
-            // id 去重：主管自己也在值班時，不要被 tag 兩次
-            'escalated' => $onDuty
-                ->concat($this->userRepository->getManagersForMention())
-                ->unique('id')
-                ->values(),
-        ];
-    }
-
-    /**
-     * 這一階段要用哪一組
-     *
-     * @param array $targets
-     * @param int   $stage
-     * @return \Illuminate\Support\Collection
-     */
-    private function pickTargets(array $targets, $stage)
-    {
-        $onDutyStage = (int) config('constants.AUTO_REPLY.REMIND.STAGE.ON_DUTY');
-        $key = (int) $stage === $onDutyStage ? 'on_duty' : 'escalated';
-
-        return collect(Arr::get($targets, $key, []));
-    }
-
-    /**
      * 一般提醒的文案
      *
      * @param \Illuminate\Support\Collection $users
@@ -1372,25 +1340,18 @@ class AutoReplySupportService
     /**
      * 組 @ 字串
      *
-     * tag 不到任何人時給一句說明 —— 直接空字串的話訊息會以空行開頭，
-     * 看起來像系統壞了。
+     * tag 不到任何人時那句說明由 `EscalatingReminder` 統一處理 ——
+     * 直接空字串的話訊息會以空行開頭，看起來像系統壞了。
      *
      * @param \Illuminate\Support\Collection $users
      * @return string
      */
     private function buildMentions($users)
     {
-        if (blank($users)) {
-            return (string) config('constants.AUTO_REPLY.REMIND.NO_MENTION');
-        }
-
-        $mentions = [];
-
-        foreach ($users as $user) {
-            $mentions[] = '@' . ltrim($user->telegram_username, '@');
-        }
-
-        return implode(' ', $mentions);
+        return $this->escalating->mentions(
+            $users,
+            (string) config('constants.AUTO_REPLY.REMIND.NO_MENTION')
+        );
     }
 
     // ---------------------------------------------------------------

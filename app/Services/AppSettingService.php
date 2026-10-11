@@ -100,6 +100,34 @@ class AppSettingService
      */
     const KEY_REMIND_REPORT_MANAGER = 'auto_reply.remind_report_user_id';
 
+    /*
+     * 待追蹤事項（有人說「稍等」就記一筆）。
+     *
+     * ENABLED  = 總開關，預設關（新功能不該一部署就開始發群組訊息）
+     * KEYWORDS = 等待詞，一行一個；留白用 constants.FOLLOWUP.KEYWORDS
+     * QUIET    = 對話安靜幾分鐘才去問當班人員
+     * INTERVAL = 沒人按按鈕時每隔幾分鐘再問一次
+     * MAX      = 最多問幾次（只算「沒人按按鈕」，追問客人的輪數不設上限）
+     * STALE    = 幾天沒結果就能被 followup:close-stale 收掉，0 = 停用
+     *
+     * ⚠ **刻意不沿用求助單那三個欄位**（KEY_REMIND_*）：求助單是「客人在等
+     * 我們回覆」，壓力完全不同 —— 間隔綁在一起調整時一定會互相將就。
+     */
+    const KEY_FOLLOWUP_ENABLED          = 'followup.enabled';
+    const KEY_FOLLOWUP_KEYWORDS         = 'followup.keywords';
+    const KEY_FOLLOWUP_QUIET_MINUTES    = 'followup.quiet_minutes';
+    const KEY_FOLLOWUP_INTERVAL_MINUTES = 'followup.interval_minutes';
+    const KEY_FOLLOWUP_MAX_COUNT        = 'followup.max_count';
+    const KEY_FOLLOWUP_STALE_DAYS       = 'followup.stale_days';
+
+    /*
+     * 待追蹤事項的每日統計要私訊給誰（逗號串接，可多位）。
+     *
+     * 又是獨立一份：這則講的是「誰在拖、我們追了沒」，收件人跟超時統計
+     * 不一定重疊（需求方 2026-10-11 選了「獨立一則」）。
+     */
+    const KEY_FOLLOWUP_REPORT_MANAGER = 'followup.report_user_ids';
+
     // 每日匯率報價（匯率頁維護）
     const KEY_DAILY_RATE_TEMPLATE = 'daily_rate.ask_template';
 

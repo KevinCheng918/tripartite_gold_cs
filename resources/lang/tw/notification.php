@@ -13,6 +13,7 @@ return [
     'tab_report' => '超時提醒統計',
     'tab_task'   => '任務卡通知',
     'tab_attendance' => '打卡報表',
+    'tab_followup'   => '待追蹤事項',
 
     'select_all' => '全選',
     'unbound'    => '未綁定',
@@ -46,6 +47,24 @@ return [
     'report_test_hint' => '會立刻把昨天的完整統計私訊給上面勾選的人。只發完整版，不會打擾昨天被提醒到的同仁。',
     'report_personal_title' => '個人統計',
     'report_personal_desc'  => '昨天被提醒到的同仁，每天 :time 會各自收到「自己那份」（我被催了哪幾題）。這部分自動發送，不需要設定；沒被提醒到的人不會收到。',
+
+    // ===== 待追蹤事項 =====
+    'followup_title'   => '待追蹤事項',
+    'followup_desc'    => '對話裡有人說「稍等、晚點給你」就記成一筆待追蹤事項。對話安靜一段時間後，系統會到支援群組 tag 當班人員問「要不要追蹤」：選要追蹤就發訊息問客人進度（我方自己說的則改成 tag 當班人員接手），選不追了就結案。沒有人按按鈕時會每隔一段時間再問一次，第 :escalate 次起同時 tag 主管與老闆。',
+    'followup_enabled' => '啟用待追蹤事項',
+    'followup_enabled_hint' => '關閉時完全不偵測、不發訊息，已經記下來的事項會留著。',
+    'followup_keywords'      => '等待詞（一行一個）',
+    'followup_keywords_hint' => '命中其中一個詞才會進一步請 AI 確認「是不是真的在說稍後提供」，所以寧可寬一點。留白就用系統預設的這一組：',
+    'followup_quiet'         => '安靜多久後詢問（分鐘）',
+    'followup_quiet_hint'    => '對方說完「稍等」之後，對話安靜超過這個時間才去問當班人員。客人後來又說話會重新計時 —— 他還在線上聊的時候系統不會插進來。',
+    'followup_interval'      => '沒人決定時每隔（分鐘）',
+    'followup_interval_hint' => '沒有人按按鈕時，每隔這個時間再問一次。第 :escalate 次起會同時 tag 主管與老闆。',
+    'followup_max'           => '最多詢問幾次',
+    'followup_max_hint'      => '到這個次數仍沒有人按按鈕就停止詢問，並發最後一則通知主管與老闆（按鈕仍然有效）。追問客人的輪數不受這個限制。',
+    'followup_stale'         => '幾天沒結果就能收掉',
+    'followup_stale_hint'    => '填 0 表示不自動收（預設）。填天數之後，要清理時執行 followup:close-stale 才會真的收，排程不會自動跑。',
+    'followup_report_user'      => '每日統計私訊給（可多選）',
+    'followup_report_user_hint' => '每天 :time 把前一天的待追蹤事項統計私訊出去（新開幾筆、結案幾筆、還掛著幾筆、拖最多次的是誰）。標示「未綁定」的人收不到，請他先私訊機器人一次。',
 
     // ===== 話題分流 =====
     'topic_title'         => '話題分流',
@@ -150,6 +169,14 @@ return [
         'remind_invalid'       => '提醒時間須介於 1 到 1440 分鐘',
         'remind_max_required'  => '請填寫最多提醒幾次',
         'remind_max_invalid'   => '提醒次數須介於 1 到 200 次',
+
+        'followup_keywords_invalid' => '等待詞總長度不可超過 2000 字',
+        'followup_minutes_required' => '請填寫詢問時間',
+        'followup_minutes_invalid'  => '詢問時間須介於 1 到 1440 分鐘',
+        'followup_max_required'     => '請填寫最多詢問幾次',
+        'followup_max_invalid'      => '詢問次數須介於 1 到 200 次',
+        'followup_stale_required'   => '請填寫幾天沒結果就能收掉（不自動收請填 0）',
+        'followup_stale_invalid'    => '天數須介於 0 到 365 天',
         'report_user_not_found' => '找不到這個帳號',
         'report_test_sent'      => '測試統計已送出 :sent 則，請確認 Telegram 有收到',
         'report_test_partial'   => '已送出 :sent 則，但這幾位沒收到：:failed（請他們先私訊機器人一次）',

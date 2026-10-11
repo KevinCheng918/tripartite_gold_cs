@@ -11,6 +11,7 @@ return [
         'vm' => 'VM Management',
         'payment_config' => 'Payment Config',
         'telegram_chat' => 'Telegram Chat',
+        'followup' => 'Pending Follow-ups',
         'quick_reply' => 'Quick Reply Library',
         'staff_manage' => 'Staff Management',
         'project' => 'Project Management',
@@ -53,6 +54,10 @@ return [
     'report' => [
         'attendance' => 'Attendance report',
         'remind' => 'Overdue reminder summary',
+    ],
+    'followup' => [
+        'index'  => 'View pending follow-ups',
+        'manage' => 'Decide to follow up or close',
     ],
     'station' => [
         'view'   => 'View stations',

@@ -316,6 +316,66 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
      */
     public function generateText($systemPrompt, $userPrompt)
     {
+        $result = $this->generateStructured($systemPrompt, $userPrompt, [
+            'type'       => 'object',
+            'properties' => ['text' => ['type' => 'string']],
+            'required'   => ['text'],
+        ]);
+
+        $text = trim((string) Arr::get((array) $result, 'text'));
+
+        return filled($text) ? $text : null;
+    }
+
+    /**
+     * 請模型回答一個是非題
+     *
+     * 跟 `generateText()` 共用同一條路，只是 schema 換成一個布林欄位 ——
+     * 等待詞偵測這類「只要 yes / no」的判斷不該逼模型寫句子再去解析字串。
+     *
+     * ⚠ **判斷不出來時回 null，不是 false**：呼叫端對「不確定」與「確定不是」
+     * 往往要做不同的事（待追蹤事項是「判斷不到就不結案」）。
+     *
+     * @param string $systemPrompt
+     * @param string $userPrompt
+     * @param string $field        要它填的欄位名
+     * @return bool|null
+     */
+    public function generateFlag($systemPrompt, $userPrompt, $field)
+    {
+        $result = $this->generateStructured($systemPrompt, $userPrompt, [
+            'type'       => 'object',
+            'properties' => [$field => ['type' => 'boolean']],
+            'required'   => [$field],
+        ]);
+
+        if (blank($result) || !array_key_exists($field, (array) $result)) {
+            return null;
+        }
+
+        return (bool) Arr::get((array) $result, $field);
+    }
+
+    /**
+     * 叫模型回一個符合 schema 的物件
+     *
+     * `generateText()` 與 `generateFlag()` 的共用本體。跟 `resolve()` 完全
+     * 不同的任務：那支是「從題庫挑一題」（固定 schema、要回 item_id），
+     * 這支是「照指定的 schema 回一個小物件」，所以結果自己解析、不走
+     * `parseResult()`。
+     *
+     * ⚠ **只走訂閱，不切備援 API**。這類文案與輔助判斷是錦上添花 ——
+     * 訂閱額度用完時還去花 API 的錢並不合理，呼叫端本來就有退路。
+     *
+     * ⚠ **失敗一律回 null**，由呼叫端決定怎麼辦。排程不能因為模型掛掉就不發訊息。
+     *
+     * @param string $systemPrompt 要它扮演什麼、輸出要符合什麼條件
+     * @param string $userPrompt   這一次的輸入
+     * @param array  $schema       JSON Schema
+     * @return array|null
+     */
+    private function generateStructured($systemPrompt, $userPrompt, array $schema)
+    {
         $token = $this->appSettingService->get(AppSettingService::KEY_CLAUDE_TOKEN);
 
         // 短路：連 token 都沒設定就不用起 process 了
@@ -332,11 +392,7 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
                 'ANTHROPIC_API_KEY'       => false,
             ]),
             'user_prompt' => $userPrompt,
-            'schema'      => json_encode([
-                'type'       => 'object',
-                'properties' => ['text' => ['type' => 'string']],
-                'required'   => ['text'],
-            ]),
+            'schema'      => json_encode($schema),
         ];
 
         $startedAt = microtime(true);
@@ -345,7 +401,7 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
         try {
             $process->run();
         } catch (\Exception $e) {
-            Log::warning('Claude 生成文字失敗', ['error' => $e->getMessage()]);
+            Log::warning('Claude 生成失敗', ['error' => $e->getMessage()]);
             $this->recordUsage($options, [], $startedAt, true, false, []);
 
             return null;
@@ -356,7 +412,7 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
 
         // CLI 失敗時不一定是非 0 結束，理由見 execute()
         if (!$process->isSuccessful() || (is_array($envelope) && filled(Arr::get($envelope, 'is_error')))) {
-            Log::warning('Claude 生成文字回傳失敗', [
+            Log::warning('Claude 生成回傳失敗', [
                 'reason' => mb_substr(trim($this->envelopeMessage($envelope)), 0, 200),
             ]);
             $this->recordUsage($options, [], $startedAt, true, $this->looksRateLimited($process->getErrorOutput()), $usage);
@@ -370,11 +426,26 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
             $result = json_decode($result, true);
         }
 
-        $text = trim((string) Arr::get((array) $result, 'text'));
+        /*
+         * 「失敗」＝ 該有的欄位沒回來。
+         *
+         * ⚠ 只能用 `array_key_exists` 判斷，**不能用 `filled()`** ——
+         * 是非題合法地會回 `false`，而 `blank(false)` 是 true，
+         * 那會把每一個「不是」都記成模型失敗。
+         */
+        $missing = false;
 
-        $this->recordUsage($options, [], $startedAt, blank($text), false, $usage);
+        foreach ((array) Arr::get($schema, 'required', []) as $field) {
+            if (!is_array($result) || !array_key_exists($field, $result)) {
+                $missing = true;
 
-        return filled($text) ? $text : null;
+                break;
+            }
+        }
+
+        $this->recordUsage($options, [], $startedAt, $missing, false, $usage);
+
+        return $missing ? null : (array) $result;
     }
 
     /**

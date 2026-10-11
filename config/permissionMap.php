@@ -77,6 +77,20 @@ return [
         ],
     ],
 
+    /*
+     * 待追蹤事項（有人說「稍等」就記一筆）。
+     *
+     * 兩個 keyword 刻意分開：看得到清單不等於可以替客人做決定 ——
+     * 「要追蹤」那顆按下去會真的發訊息給客人。
+     */
+    'followup' => [
+        'label' => 'permission.group.followup',
+        'keywords' => [
+            'followup.index'  => 'permission.followup.index',
+            'followup.manage' => 'permission.followup.manage',
+        ],
+    ],
+
     'station' => [
         'label' => 'permission.group.station',
         'keywords' => [

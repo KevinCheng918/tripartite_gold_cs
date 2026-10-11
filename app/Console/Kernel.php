@@ -59,6 +59,16 @@ class Kernel extends ConsoleKernel
         $schedule->command('remind:report')->dailyAt('08:30')->withoutOverlapping();
 
         /*
+         * 待追蹤事項統計：每天 10:30 報前一天。
+         *
+         * ⚠ 刻意跟前面那幾則錯開（07:30 待接手、08:00 班表、08:30 超時統計、
+         * 09:00 匯率、09:30 VM 繳款、10:00 餘點同步）—— 擠在一起的通知
+         * 沒有人會細看。時間同時寫在 `constants.FOLLOWUP.REPORT_AT`，
+         * 那是設定頁顯示用的字，改這裡要一起改。
+         */
+        $schedule->command('followup:report')->dailyAt('10:30')->withoutOverlapping();
+
+        /*
          * 打卡週報表：每週一 11:00 發上週一～上週日。
          *
          * ⚠ 統計的是**上一週**，不是這一週 —— 當週還沒過完，統計沒有意義。
@@ -105,6 +115,17 @@ class Kernel extends ConsoleKernel
 
         // 每分鐘提醒超時未回答的自動回覆求助單（withoutOverlapping 避免同一張單被提醒兩次）
         $schedule->command('auto-reply:remind')->everyMinute()->withoutOverlapping();
+
+        /*
+         * 每分鐘問當班人員要不要追蹤那些說了「稍等」的事項。
+         *
+         * ⚠ `withoutOverlapping` 同上：上一輪還在送就再跑一次，同一筆會
+         * 被問兩次而計次只推進一次。
+         *
+         * 功能開關預設關著（`followup.enabled`），指令自己會短路，
+         * 所以掛排程不等於開始發訊息。
+         */
+        $schedule->command('followup:ask')->everyMinute()->withoutOverlapping();
 
         // 每月 1 號凌晨 0 點產生 VM 帳單
         $schedule->command('vm:generate-billing')->monthlyOn(1, '00:00');

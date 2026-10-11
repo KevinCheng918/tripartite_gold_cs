@@ -11,6 +11,7 @@ return [
         'vm' => '虛擬機管理',
         'payment_config' => '繳款設定',
         'telegram_chat' => 'Telegram 客服',
+        'followup' => '待追蹤事項',
         'quick_reply' => '快速回覆題庫',
         'staff_manage' => '內部管理',
         'project' => '專案管理',
@@ -53,6 +54,11 @@ return [
     'report' => [
         'attendance' => '打卡報表',
         'remind' => '超時提醒統計',
+    ],
+    'followup' => [
+        'index'  => '檢視待追蹤事項',
+        // 「要追蹤」那顆按下去會真的發訊息給客人，所以跟檢視分開
+        'manage' => '決定追蹤或結案',
     ],
     'station' => [
         'view'   => '檢視站台',

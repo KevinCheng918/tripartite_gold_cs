@@ -17,6 +17,7 @@ use App\Http\Controllers\Admin\LeaveRequestController;
 use App\Http\Controllers\Admin\StaffManageController;
 use App\Http\Controllers\Admin\ProjectController;
 use App\Http\Controllers\Admin\ReportController;
+use App\Http\Controllers\Admin\FollowupController;
 use App\Http\Controllers\Admin\QuickReplyController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\NotificationController;
@@ -162,6 +163,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::put('/ajax-update-remind', [NotificationController::class, 'ajaxUpdateRemind'])->middleware('can:notification.manage')->name('ajax-update-remind');
         Route::put('/ajax-update-report', [NotificationController::class, 'ajaxUpdateReport'])->middleware('can:notification.manage')->name('ajax-update-report');
         Route::post('/ajax-test-report', [NotificationController::class, 'ajaxTestReport'])->middleware('can:notification.manage')->name('ajax-test-report');
+        Route::put('/ajax-update-followup', [NotificationController::class, 'ajaxUpdateFollowup'])->middleware('can:notification.manage')->name('ajax-update-followup');
         Route::put('/ajax-update-task', [NotificationController::class, 'ajaxUpdateTask'])->middleware('can:notification.manage')->name('ajax-update-task');
         Route::post('/ajax-test-task', [NotificationController::class, 'ajaxTestTask'])->middleware('can:notification.manage')->name('ajax-test-task');
         Route::put('/ajax-update-attendance', [NotificationController::class, 'ajaxUpdateAttendance'])->middleware('can:notification.manage')->name('ajax-update-attendance');
@@ -327,6 +329,17 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/', [ReportController::class, 'index'])->name('index');
         Route::get('/ajax-attendance', [ReportController::class, 'ajaxAttendance'])->middleware('can:report.attendance')->name('ajax-attendance');
         Route::get('/ajax-remind', [ReportController::class, 'ajaxRemind'])->middleware('can:report.remind')->name('ajax-remind');
+    });
+
+    /*
+     * 待追蹤事項（客服管理 → 待追蹤事項）
+     *
+     * 看清單與做決定分兩個 keyword：「要追蹤」那顆按下去會真的發訊息給客人。
+     */
+    Route::prefix('followup')->name('followup.')->group(function () {
+        Route::get('/', [FollowupController::class, 'index'])->middleware('can:followup.index')->name('index');
+        Route::get('/ajax-list', [FollowupController::class, 'ajaxList'])->middleware('can:followup.index')->name('ajax-list');
+        Route::put('/ajax-decide/{id}', [FollowupController::class, 'ajaxDecide'])->middleware('can:followup.manage')->name('ajax-decide');
     });
 
     // 共用文件區（頁面 + 列表不綁權限，Controller 內部判斷；個人文件區所有人可用）

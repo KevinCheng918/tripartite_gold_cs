@@ -1,6 +1,7 @@
 # 待追蹤事項（有人說「稍等」就記一筆）
 
-> **狀態：設計定稿（2026-10-11），需求方七題全部確認，可以動工。**
+> **狀態：已實作（2026-10-11，v2.75）。待跑 migration、開啟開關、勾權限** ——
+> 清單見最後的「上線前置作業」。實作與設計的差異記在「實作結果」那一節。
 
 ## 需求（2026-10-11）
 
@@ -363,7 +364,75 @@ AI 現寫，公版退路 —— 比照 `WaitWriter`／`EncouragementWriter`：
 
 ⚠ 發到哪個話題沿用 [[support-group-topics]] 的話題設定，新增一個通知種類的 key。
 
-## 十一、預計檔案
+## 實作結果（2026-10-11）
+
+照設計做完了，四處跟設計稿不同，都記在這裡。
+
+### 1. 偵測掛在一支 Job 上，不是同步跑
+
+`FollowupDetectJob`（比照 `AutoReplyJob`）。理由跟自動回覆一樣：命中詞表之後
+要叫模型確認，那是數秒到數十秒的 CLI，webhook 同步等下去 Telegram 會逾時重送。
+
+⚠ **詞表沒命中就不會叫模型**，所以絕大多數訊息在 Job 裡是毫秒級的 ——
+丟佇列是為了那少數命中的。
+
+⚠ `tries = 1`：重試等於同一句話記兩筆（去重只擋「同對話同來源還活著」的，
+兩次同時進來時擋不住）。漏記一筆比重複記一筆好收拾。
+
+⚠ **掛在 `TelegramChatService` 的兩個地方**：`handleIncomingMessage()` 尾端
+（收到的）與 `sendReply()` 存完 outbound 訊息之後（送出的）。前者刻意**擺在
+`isAutoReplyOn` / `isStaff` / `isIgnored` 那三道判斷之外** —— 關掉自動回覆的
+對話反而最需要這個功能。
+
+### 2. callback 分派放在 Controller，不是 AutoReplySupportService
+
+兩套按鈕都在同一個群組，只能靠 `callback_data` 前綴分辨。
+`TelegramWebhookController::handleCallback()` 看前綴是不是 `fu:`，
+是就給 `CustomerFollowupService`，否則給 `AutoReplySupportService`。
+
+⚠ 這樣 `AutoReplySupportService` 不必認識待追蹤事項（職責更乾淨），
+代價是**回應 `answerCallbackQuery` 要在 Controller 自己做一次** ——
+不回的話按鈕會一直轉圈。
+
+### 3. `ClaudeCodeMatcher` 抽出 `generateStructured()`
+
+`generateText()` 原本自己起 process、自己解析。新增的 `generateFlag()`
+（是非題）要同一條路但不同 schema，所以抽出共用本體，兩支各自包一層。
+
+⚠ 「失敗」的判斷從 `blank($text)` 改成 **required 欄位在不在**：
+是非題合法地會回 `false`，而 `blank(false)` 是 true —— 用 `filled()` 判斷
+會把每一個「不是」都記成模型失敗。
+
+### 4. `EscalatingReminder` 只抽「算」的部分
+
+設計稿寫的是「吃 items 與 send callback」，實際抽出來的是
+`targets()`（名單）、`plan()`（第幾次／tag 誰／是不是收尾）、`mentions()`。
+送訊息與寫 DB 留在各自的 service。
+
+⚠ 理由：求助單要引用原求助訊息、待追蹤事項要掛按鈕，兩邊的送出差很多 ——
+硬塞進來會變成一支到處都是 if 的服務。
+
+⚠ **求助單那條路的行為必須完全沒變。** 驗過的邊界（`max=5`、`escalate_at=3`）：
+
+| 已提醒 | seq | stage | 收尾 | 寫回的次數 |
+|---|---|---|---|---|
+| 0 | 1 | 1（當班） | - | 1 |
+| 2 | 3 | 2（＋主管） | - | 3 |
+| 5 | 6 | 3（收尾） | ✅ | 6（= max+1，之後撈不到） |
+
+### 5. 收尾那則仍然附按鈕
+
+設計稿原本寫「請到後台處理」。改成附按鈕 ——
+系統放手了但事情還沒結束，只剩一句「不再詢問」的話，那筆就從所有人的視線裡
+消失了（求助單踩過同一個坑）。
+
+### 6. 還沒驗到的部分
+
+⚠ **migration 還沒跑**，所以列表頁、統計、實際開單的查詢都還沒碰過真的資料表。
+已驗的是：語法、DI 解析（無循環依賴）、兩支指令的短路、route 註冊、
+升級規則的邊界計算、設定頁的讀取。
+
+## 十一、檔案
 
 | 檔案 | 內容 |
 |---|---|
@@ -381,7 +450,11 @@ AI 現寫，公版退路 —— 比照 `WaitWriter`／`EncouragementWriter`：
 | `app/Services/TelegramChatService.php` | 入站／送出都掛偵測；`ASKED` 的結案判斷 |
 | `app/Services/AutoReplySupportService.php` | 改用共用的 `EscalatingReminder`；`handleCallback` 多一個 prefix |
 | `app/Http/Controllers/Admin/FollowupController.php` | 列表頁 ＋ 兩支 ajax |
-| `app/Http/Requests/Followup/*.php`、`config/rules.php` | 驗證 |
+| `app/Http/Requests/Followup/*.php` | 驗證（規則寫在 Request 裡，比照 `Notification/*` 的既有做法，沒進 `config/rules.php`） |
+| `app/Jobs/FollowupDetectJob.php` | 偵測丟佇列（見「實作結果」1） |
+| `app/Http/Requests/Notification/UpdateFollowupRequest.php` | 設定頁的驗證 |
+| `app/Http/Controllers/Webhook/TelegramWebhookController.php` | callback 前綴分派（見「實作結果」2） |
+| `app/Services/AutoReply/ClaudeCodeMatcher.php` | 抽出 `generateStructured()`、新增 `generateFlag()` |
 | `app/Http/Resources/FollowupResource.php` | 列表回傳 |
 | `app/Console/Commands/FollowupAskCommand.php` | `followup:ask`（每分鐘） |
 | `app/Console/Commands/FollowupReportCommand.php` | `followup:report`（10:30） |
@@ -390,23 +463,38 @@ AI 現寫，公版退路 —— 比照 `WaitWriter`／`EncouragementWriter`：
 | `config/constants.php` | `FOLLOWUP.*`（詞表、來源、狀態、文案、上限） |
 | `config/permissionMap.php` | `followup.index` / `followup.manage` ＋ route |
 | `routes/web.php` | 列表頁 ＋ `ajax-` 兩條 |
-| `app/Services/AppSettingService.php`、`SettingService.php` | 七個新設定 |
+| `app/Services/AppSettingService.php` | 七個新設定鍵 |
+| `app/Services/NotificationSettingService.php` | `followupSection()` / `updateFollowup()` |
+| `app/Http/Controllers/Admin/NotificationController.php` | `ajaxUpdateFollowup()` |
 | `resources/views/admin/followup/index.blade.php`、`public/js/followup.js` | 列表頁 |
-| `resources/views/admin/setting/index.blade.php`、`public/js/setting-admin.js` | 設定 UI |
-| `resources/views/layouts/app.blade.php` | sidebar 入口 |
-| `resources/lang/{tw,cn,en}/followup.php`、`setting.php`、`permission.php` | 語系（tw → cn → en） |
-| `config/changelog.php` | 新版號 |
+| `resources/views/admin/notification/index.blade.php`、`public/js/notification-setting.js` | 設定頁第七個分頁 |
+| `resources/views/layouts/app.blade.php` | sidebar 入口（通訊管理底下） |
+| `resources/lang/{tw,cn,en}/followup.php`、`notification.php`、`permission.php` | 語系（tw → cn → en） |
+| `config/changelog.php` | v2.75 |
+
+⚠ **設定頁在「通知設定」而不是「AI 引擎設定」**：設計稿寫的是後者，
+但等待詞與間隔跟求助單提醒是同一類東西（系統主動對外發訊的設定），
+而通知設定頁本來就按「哪一種通知」分頁。
 
 ⚠ 動了 `routes/`、`config/permissionMap.php`、`config/constants.php`，
 收尾要跑 `php artisan optimize`（PROMPTS 第 7 節）。
 
 ## 上線前置作業
 
-1. `php artisan migrate`（兩張新表）
-2. `php artisan optimize`
-3. 到「通訊管理 → 通知設定 → 內部支援群組」**打開開關**並確認間隔與收件人
-4. 到「帳號管理 → 權限」勾 `followup.index` / `followup.manage`
-5. `php artisan followup:report --dry-run` 看一眼排版
+1. **`php artisan migrate`**（`conversation_followup`、`conversation_followup_remind`
+   兩張新表）—— **沒跑的話列表頁與 `followup:report` 都會 500**
+2. `php artisan optimize`（動過 `routes/`、`config/constants.php`、
+   `config/permissionMap.php`）
+3. 到「通訊管理 → 通知設定 → **待追蹤事項**」**打開開關**，確認安靜分鐘數、
+   詢問間隔、上限次數與統計收件人
+4. 到「帳號管理 → 權限」勾 `followup.index`（看清單）／`followup.manage`（做決定）
+5. 到「通訊管理 → 通知設定 → 支援群組與話題」決定這類通知要發到哪個話題
+   （通知種類是 `conversation_followup`；不勾就發群組主區）
+6. `php artisan followup:report --dry-run` 看一眼排版
+7. 請統計收件人先私訊機器人一次，否則下拉顯示「（未綁定）」、統計發不出去
+
+⚠ **開關預設是關的**，所以部署完不會立刻開始發群組訊息 ——
+`followup:ask` 每分鐘跑但自己會短路。
 
 ## 相關
 
