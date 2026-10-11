@@ -282,7 +282,18 @@ class VmController extends Controller
                 Arr::get($notice, 'text'),
                 Auth::id(),
                 Auth::user()->nickname,
-                ['image_url' => Arr::get($notice, 'image_url'), 'mark_replied' => false]
+                /*
+                 * ⚠ `is_auto` 要傳 true，即使這是人按的按鈕。那個旗標問的是
+                 * 「這則訊息算不算客服親自回覆客人」—— 繳款通知是系統組的帳單內容，
+                 * 跟客人問的問題無關。傳 false 的話 `sendReply()` 會順手把這個群
+                 * 所有還掛著的求助單標成「客服已自行處理」，客人的問題其實沒人回。
+                 * 跟 `mark_replied => false` 同一個理由。
+                 */
+                [
+                    'image_url'    => Arr::get($notice, 'image_url'),
+                    'mark_replied' => false,
+                    'is_auto'      => true,
+                ]
             );
 
             return response()->json(['message' => trans('payment_config.msg.sent')]);

@@ -32,8 +32,11 @@ ReportController::ajaxRemind()
 | 在支援群**引用那則求助訊息**打字作答 | `ANSWERED(2)`，再按按鈕才到終態 | `AutoReplySupportService::handleSupportMessage()` |
 | 求助訊息上的按鈕（忽略／回覆／回覆並加入題庫／只加題庫／先問客人） | `IGNORED(0)` / `REPLIED(3)` / `SAVED(4)` | `handleAction()`、`handleCategoryChosen()` |
 | 直接按候選題目的按鈕回覆 | `REPLIED(3)` | `handleCandidatePicked()` → `closeTicketWithItem()` |
-| **從後台客服對話視窗**發訊息給那個客戶群 | 該群所有未結單一次標成 `IGNORED(0)` | `TelegramChatService` → `ignoreOpenByGroup()` |
+| **從後台客服對話視窗**發訊息給那個客戶群（文字、圖片、檔案、文件區檔案都算） | 該群所有未結單一次標成 `IGNORED(0)` | `TelegramChatService::sendReply()` / `sendFileReply()` / `sendDocumentFromSharedFile()` → `ignoreOpenByGroup()` |
 | `ticket:close-stale` 排程 | `EXPIRED(5)` | 預設 `STALE_DAYS = 0`＝**不自動收**
+
+> 送檔案那兩條路原本沒有關單（漏關），繳款通知與補點結果則會誤關整群 ——
+> 兩個方向都在 [[2026-10-11-ignore-open-tickets-scope]] 修掉了。
 
 ## ⚠ 缺口：直接用自己的 Telegram 帳號在客戶群回客人，單不會結
 

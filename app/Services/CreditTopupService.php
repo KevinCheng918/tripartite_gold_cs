@@ -186,7 +186,14 @@ class CreditTopupService
                 $content,
                 $reviewerId,
                 $reviewerName ?: '',
-                ['mark_replied' => false]
+                /*
+                 * ⚠ `is_auto` 要傳 true，即使觸發的是審核人員。那個旗標問的是
+                 * 「這則訊息算不算客服親自回覆客人」—— 補點結果是系統組的通知，
+                 * 跟客人問的問題無關。傳 false 的話 `sendReply()` 會順手把這個群
+                 * 所有還掛著的求助單標成「客服已自行處理」。
+                 * 跟 `mark_replied => false` 同一個理由。
+                 */
+                ['mark_replied' => false, 'is_auto' => true]
             );
 
             Log::info('補點結果已發送 Telegram', [

@@ -1308,6 +1308,19 @@ class TelegramChatService
                 'replied'             => true,
             ]);
 
+            /*
+             * 客服自己人工回覆了，就不該再把同一個問題轉到內部支援群組 ——
+             * 跟 `sendReply()` 與 `sendFileReply()` 同一條規則。
+             *
+             * ⚠ 條件是 `filled($senderId)`，不是無條件關。這一支沒有 `is_auto`
+             * 旗標，而 `$senderId` 就是「誰送的」：目前唯一的呼叫端帶的是
+             * `Auth::id()`（客服從文件區挑檔案傳給客人），但它是 nullable ——
+             * 哪天有系統自動送檔的流程，那不算客服回覆，不該結掉客人的單。
+             */
+            if (filled($senderId)) {
+                $this->ticketRepository->ignoreOpenByGroup($group->id);
+            }
+
             return true;
         }
 
@@ -1372,6 +1385,16 @@ class TelegramChatService
         ]);
 
         $this->telegramRepository->markMessagesReplied($group->id);
+
+        /*
+         * 客服自己人工回覆了，就不該再把同一個問題轉到內部支援群組 ——
+         * 跟 `sendReply()` 同一條規則。送檔案也是回覆（客人要的對帳單、教學圖
+         * 就是答案本身），漏掉的話那張單會一路催到上限，報表上永遠紅著。
+         *
+         * 這一支沒有 `is_auto`：唯一的呼叫端是客服在輸入區上傳檔案，
+         * 不會有系統自動送檔的情況。
+         */
+        $this->ticketRepository->ignoreOpenByGroup($group->id);
 
         // 廣播失敗不影響已送出的訊息，前端還有輪詢可以補上
         try {
