@@ -14,13 +14,10 @@ return [
     'tab_attendance' => '打卡报表',
     'tab_remind'     => '超时提醒统计',
 
-    // 期间切换
-    'period_daily'   => '日报',
-    'period_weekly'  => '周报',
-    'period_monthly' => '月报',
-    'prev'           => '上一期',
-    'next'           => '下一期',
-    'current'        => '最近一期',
+    // 期间：自己选起讫，底下一排快捷钮（今日／昨日／本周／上周／本月／上月）
+    'date_from' => '开始日期',
+    'date_to'   => '结束日期',
+    'search'    => '查询',
 
     // 打卡报表
     'att_user'      => '同事',
@@ -54,8 +51,10 @@ return [
     'unit_times' => ':n 次',
 
     'msg' => [
-        'load_failed'  => '加载失败，请稍后再试',
-        'type_invalid' => '期间类型不正确',
-        'date_invalid' => '日期格式不正确',
+        'load_failed'     => '加载失败，请稍后再试',
+        'date_invalid'    => '日期格式不正确',
+        'range_required'  => '请选择开始与结束日期',
+        'range_reversed'  => '结束日期不能早于开始日期',
+        'range_too_long'  => '一次最多查 :days 天，请缩短期间',
     ],
 ];

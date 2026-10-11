@@ -14,13 +14,10 @@ return [
     'tab_attendance' => 'Attendance',
     'tab_remind'     => 'Overdue reminders',
 
-    // Period switch
-    'period_daily'   => 'Daily',
-    'period_weekly'  => 'Weekly',
-    'period_monthly' => 'Monthly',
-    'prev'           => 'Previous',
-    'next'           => 'Next',
-    'current'        => 'Latest',
+    // Period: pick your own range, with shortcut buttons underneath
+    'date_from' => 'From',
+    'date_to'   => 'To',
+    'search'    => 'Search',
 
     // Attendance report
     'att_user'      => 'Staff',
@@ -54,8 +51,10 @@ return [
     'unit_times' => ':n',
 
     'msg' => [
-        'load_failed'  => 'Failed to load, please try again',
-        'type_invalid' => 'Invalid period type',
-        'date_invalid' => 'Invalid date format',
+        'load_failed'     => 'Failed to load, please try again',
+        'date_invalid'    => 'Invalid date format',
+        'range_required'  => 'Please pick a start and end date',
+        'range_reversed'  => 'End date cannot be earlier than the start date',
+        'range_too_long'  => 'At most :days days per query — please shorten the range',
     ],
 ];

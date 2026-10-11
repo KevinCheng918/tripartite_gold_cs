@@ -1,10 +1,13 @@
 /**
  * 報表頁（內務管理 → 報表）
  *
- * 兩個分頁各自一套「期間切換 + 上下一期」，資料從後端拿結構化 JSON 再畫表。
+ * 兩個分頁各自一組「起訖日期 ＋ 快捷鈕」，版面與行為比照補點紀錄。
  *
  * ⚠ **數字一律由後端算**，這裡只負責畫。打卡報表與超時統計的統計邏輯
  * 跟 Telegram 通知共用同一支 Service —— 前端再算一次就會有兩套答案。
+ *
+ * ⚠ 快捷鈕走共用的 `window.DateRange`（common.js），不要自己算週一是哪天：
+ * 補點紀錄、財務、這一頁各寫一份的話，「本週」遲早會有三種答案。
  *
  * 權限與語系由 #report-app 的 data-* 帶進來。
  */
@@ -66,59 +69,27 @@ $(function () {
     }
 
     /**
-     * 期間往前／往後推一期
+     * 把後端的驗證錯誤挑一句出來顯示
      *
-     * ⚠ 後端收的是「以哪一天往回推」，算出來的是**上一期**。所以要看更早的
-     * 一期就把基準日往前推一期的長度，看更晚的就往後推。
+     * 422 的 body 是 `{message, errors: {end: ['…']}}`。直接用 `message`
+     * 拿到的是 Laravel 那句「給定的資料無效」，對使用者沒有意義 ——
+     * 要的是 errors 裡那一句（期間太長、結束日早於開始日）。
      *
-     * ⚠ 月要用「先回到當月 1 號再加減月份」—— 直接對 31 號加一個月，
-     * JS 的 Date 會溢位到下個月（1/31 + 1 月 = 3/3）。
-     *
-     * @param {string} date Y-m-d
-     * @param {string} type daily / weekly / monthly
-     * @param {number} step -1 往前、+1 往後
-     * @returns {string} Y-m-d
+     * @param {Object} body
+     * @returns {string}
      */
-    function shiftDate(date, type, step) {
-        var parts = date.split('-');
-        var d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    function errorText(body) {
+        var errors = body && body.errors;
 
-        if (type === 'monthly') {
-            d.setDate(1);
-            d.setMonth(d.getMonth() + step);
-        } else if (type === 'weekly') {
-            d.setDate(d.getDate() + step * 7);
-        } else {
-            d.setDate(d.getDate() + step);
+        if (errors) {
+            var first = Object.keys(errors)[0];
+
+            if (first && errors[first] && errors[first].length) {
+                return errors[first][0];
+            }
         }
 
-        return d.getFullYear() + '-' +
-            String(d.getMonth() + 1).padStart(2, '0') + '-' +
-            String(d.getDate()).padStart(2, '0');
-    }
-
-    /**
-     * 今天（基準日的初始值）
-     *
-     * @returns {string} Y-m-d
-     */
-    function today() {
-        var d = new Date();
-
-        return d.getFullYear() + '-' +
-            String(d.getMonth() + 1).padStart(2, '0') + '-' +
-            String(d.getDate()).padStart(2, '0');
-    }
-
-    /**
-     * 把期間切換那一排按鈕的 active 換到被按的那顆
-     *
-     * @param {NodeList} buttons
-     * @param {HTMLElement} active
-     */
-    function setActive(buttons, active) {
-        buttons.forEach(function (btn) { btn.classList.remove('active'); });
-        active.classList.add('active');
+        return (body && body.message) || i18n.msg.load_failed;
     }
 
     /**
@@ -132,16 +103,69 @@ $(function () {
             '<i class="fas fa-inbox"></i>' + escapeHtml(i18n.empty) + '</td></tr>';
     }
 
+    /**
+     * 綁一組「起訖日期 ＋ 快捷鈕 ＋ 查詢」
+     *
+     * 兩個分頁的互動一模一樣，只有 id 前綴與要呼叫的載入函式不同。
+     *
+     * @param {string} prefix 元素 id / class 的前綴（att、rmd）
+     * @param {Function} load 查詢函式，收 (from, to)
+     * @param {{from: string, to: string}} preset 預設帶入的期間
+     * @returns {void}
+     */
+    function bindPeriod(prefix, load, preset) {
+        var from = document.getElementById(prefix + '-date-from');
+        var to = document.getElementById(prefix + '-date-to');
+
+        function search() {
+            load(from.value, to.value);
+        }
+
+        document.querySelectorAll('.js-' + prefix + '-range').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var build = window.DateRange[btn.dataset.range];
+
+                // data-range 打錯字時安靜跳過，不要讓整頁的 JS 掛掉
+                if (typeof build !== 'function') { return; }
+
+                var range = build();
+                from.value = range.from;
+                to.value = range.to;
+
+                // 快捷鈕按下去直接查，省掉再按一次「查詢」
+                search();
+            });
+        });
+
+        document.querySelector('.js-' + prefix + '-search').addEventListener('click', search);
+
+        // Enter 也要能查 —— 改完日期的下一個動作就是查，手不該被迫離開鍵盤
+        [from, to].forEach(function (input) {
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') { search(); }
+            });
+        });
+
+        from.value = preset.from;
+        to.value = preset.to;
+        search();
+    }
+
     // ===== 打卡報表 =====
 
-    var att = { type: 'weekly', date: today() };
-
-    function loadAttendance() {
-        apiFetch('/admin/report/ajax-attendance?type=' + att.type + '&date=' + att.date)
+    /**
+     * @param {string} from Y-m-d
+     * @param {string} to Y-m-d
+     * @returns {void}
+     */
+    function loadAttendance(from, to) {
+        apiFetch('/admin/report/ajax-attendance?start=' + from + '&end=' + to)
             .then(renderAttendance)
-            .catch(function () {
+            .catch(function (body) {
+                document.getElementById('att-range').textContent = '';
+                document.getElementById('att-hint').textContent = '';
                 document.getElementById('att-table').innerHTML =
-                    '<p class="text-danger mb-0">' + escapeHtml(i18n.msg.load_failed) + '</p>';
+                    '<p class="text-danger mb-0">' + escapeHtml(errorText(body)) + '</p>';
             });
     }
 
@@ -191,40 +215,21 @@ $(function () {
         });
     }
 
-    function bindAttendance() {
-        var typeButtons = document.querySelectorAll('.js-att-type');
-
-        typeButtons.forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                att.type = btn.dataset.type;
-                // 換期間類型時回到最近一期，否則基準日會停在上一種期間推出來的位置
-                att.date = today();
-                setActive(typeButtons, btn);
-                loadAttendance();
-            });
-        });
-
-        document.querySelector('.js-att-prev').addEventListener('click', function () {
-            att.date = shiftDate(att.date, att.type, -1);
-            loadAttendance();
-        });
-
-        document.querySelector('.js-att-next').addEventListener('click', function () {
-            att.date = shiftDate(att.date, att.type, 1);
-            loadAttendance();
-        });
-    }
-
     // ===== 超時提醒統計 =====
 
-    var rmd = { type: 'daily', date: today() };
-
-    function loadRemind() {
-        apiFetch('/admin/report/ajax-remind?type=' + rmd.type + '&date=' + rmd.date)
+    /**
+     * @param {string} from Y-m-d
+     * @param {string} to Y-m-d
+     * @returns {void}
+     */
+    function loadRemind(from, to) {
+        apiFetch('/admin/report/ajax-remind?start=' + from + '&end=' + to)
             .then(renderRemind)
-            .catch(function () {
+            .catch(function (body) {
+                document.getElementById('rmd-range').textContent = '';
+                document.getElementById('rmd-summary').textContent = '';
                 document.getElementById('rmd-body').innerHTML =
-                    '<p class="text-danger mb-0">' + escapeHtml(i18n.msg.load_failed) + '</p>';
+                    '<p class="text-danger mb-0">' + escapeHtml(errorText(body)) + '</p>';
             });
     }
 
@@ -286,38 +291,17 @@ $(function () {
             '<i class="fas fa-info-circle me-1"></i>' + escapeHtml(i18n.remind_manager_note) + '</p>';
     }
 
-    function bindRemind() {
-        var typeButtons = document.querySelectorAll('.js-rmd-type');
-
-        typeButtons.forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                rmd.type = btn.dataset.type;
-                rmd.date = today();
-                setActive(typeButtons, btn);
-                loadRemind();
-            });
-        });
-
-        document.querySelector('.js-rmd-prev').addEventListener('click', function () {
-            rmd.date = shiftDate(rmd.date, rmd.type, -1);
-            loadRemind();
-        });
-
-        document.querySelector('.js-rmd-next').addEventListener('click', function () {
-            rmd.date = shiftDate(rmd.date, rmd.type, 1);
-            loadRemind();
-        });
-    }
-
     // ===== 啟動 =====
 
+    /*
+     * 預設期間刻意跟 Telegram 那兩則對齊：打卡報表的通知報的是「上週」、
+     * 超時統計的日報報的是「昨天」。一進來看到的就是同仁剛收到的那一份。
+     */
     if (canAttendance) {
-        bindAttendance();
-        loadAttendance();
+        bindPeriod('att', loadAttendance, window.DateRange.lastWeek());
     }
 
     if (canRemind) {
-        bindRemind();
-        loadRemind();
+        bindPeriod('rmd', loadRemind, window.DateRange.yesterday());
     }
 });

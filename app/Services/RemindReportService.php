@@ -457,7 +457,7 @@ class RemindReportService
     {
         $report = (array) config('constants.AUTO_REPLY.REMIND.REPORT');
         $period = $this->periodWord($type);
-        $data = $this->collect($type, $range);
+        $data = $this->collect($range);
         $tickets = Arr::get($data, 'tickets');
 
         $text = strtr((string) Arr::get($report, 'HEADER'), [
@@ -492,11 +492,10 @@ class RemindReportService
      * ⚠ `users` 已經濾掉主管以上（見 `withoutManagers()`），`tickets` 沒有濾 ——
      * 題目不屬於任何人。
      *
-     * @param string $type  self::TYPE_*
-     * @param array  $range start / end
+     * @param array $range start / end
      * @return array tickets / users / names
      */
-    public function collect($type, array $range)
+    public function collect(array $range)
     {
         $start = Arr::get($range, 'start');
         $end = Arr::get($range, 'end');
@@ -517,14 +516,16 @@ class RemindReportService
      *
      * ⚠ 跟 Telegram 那份是**同一組數字**，差別只在這裡回陣列、那裡回字串。
      *
-     * @param string $type
-     * @param array  $range
-     * @return array
+     * ⚠ 不吃期間類型：後台是自己選起訖的，`daily` / `weekly` 那組標籤
+     * 只有 Telegram 那邊（標題要寫「昨天」還是「上週」）才需要。
+     *
+     * @param array $range start / end
+     * @return array summary / by_ticket / by_user
      */
-    public function forPage($type, array $range)
+    public function forPage(array $range)
     {
         $report = (array) config('constants.AUTO_REPLY.REMIND.REPORT');
-        $data = $this->collect($type, $range);
+        $data = $this->collect($range);
         $tickets = Arr::get($data, 'tickets');
         $names = (array) Arr::get($data, 'names');
         $statusLabels = (array) Arr::get($report, 'STATUS_LABEL');
@@ -572,7 +573,6 @@ class RemindReportService
         }
 
         return [
-            'type'  => $type,
             'range' => $range,
             'summary' => [
                 'tickets'     => count($tickets),
@@ -583,18 +583,6 @@ class RemindReportService
             'by_ticket' => $byTicket,
             'by_user'   => $byUser,
         ];
-    }
-
-    /**
-     * 給 Controller 算區間用（`resolveRange()` 是 private）
-     *
-     * @param string      $type
-     * @param string|null $endsOn
-     * @return array start / end
-     */
-    public function rangeFor($type, $endsOn = null)
-    {
-        return $this->resolveRange($type, filled($endsOn) ? $endsOn : now()->toDateString());
     }
 
     /**

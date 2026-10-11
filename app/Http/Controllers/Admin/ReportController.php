@@ -15,10 +15,14 @@ use Illuminate\Support\Facades\Log;
  *
  * 把原本只在 Telegram 看得到的統計搬到後台，用分頁區分：
  *
- * | 分頁 | 權限 | 期間 |
- * |---|---|---|
- * | 打卡報表 | `report.attendance` | 週／月 |
- * | 超時提醒統計 | `report.remind` | 日／週／月 |
+ * | 分頁 | 權限 |
+ * |---|---|
+ * | 打卡報表 | `report.attendance` |
+ * | 超時提醒統計 | `report.remind` |
+ *
+ * 兩個分頁都是「自己選起訖日期 ＋ 一排快捷鈕」，比照補點紀錄。
+ * 後端只收起訖，不收「日／週／月」—— 快捷鈕在前端就換算成日期了，
+ * 多一個 type 參數會讓「上週」有兩套算法。
  *
  * ⚠ **數字跟 Telegram 那份是同一組**：兩邊都走 `AttendanceReportService`
  * 與 `RemindReportService`，差別只在這裡回陣列、那裡回字串。各查一次的話，
@@ -32,7 +36,7 @@ class ReportController extends Controller
 
     public function __construct(AttendanceReportService $attendanceReport, RemindReportService $remindReport)
     {
-        // 區間算法（週＝週一～週日、月＝整個月）與統計本體都跟通知共用，不各算一次
+        // 統計本體跟通知共用，不各查一次
         $this->attendanceReport = $attendanceReport;
         $this->remindReport = $remindReport;
     }
@@ -68,10 +72,7 @@ class ReportController extends Controller
         $params = $request->validated();
 
         try {
-            $range = $this->attendanceReport->rangeFor(
-                (string) Arr::get($params, 'type'),
-                Arr::get($params, 'date')
-            );
+            $range = $this->rangeOf($params);
 
             return response()->json([
                 'range' => $range,
@@ -95,14 +96,25 @@ class ReportController extends Controller
         $params = $request->validated();
 
         try {
-            $type = (string) Arr::get($params, 'type');
-            $range = $this->remindReport->rangeFor($type, Arr::get($params, 'date'));
-
-            return response()->json($this->remindReport->forPage($type, $range));
+            return response()->json($this->remindReport->forPage($this->rangeOf($params)));
         } catch (\Exception $e) {
             Log::error('超時提醒統計載入失敗', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
 
             return response()->json(['message' => trans('report.msg.load_failed')], 500);
         }
+    }
+
+    /**
+     * 把 Request 的兩個欄位整理成 Service 要的形狀
+     *
+     * @param array $params
+     * @return array start / end（都是 Y-m-d）
+     */
+    private function rangeOf(array $params)
+    {
+        return [
+            'start' => (string) Arr::get($params, 'start'),
+            'end'   => (string) Arr::get($params, 'end'),
+        ];
     }
 }

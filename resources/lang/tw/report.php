@@ -14,13 +14,10 @@ return [
     'tab_attendance' => '打卡報表',
     'tab_remind'     => '超時提醒統計',
 
-    // 期間切換
-    'period_daily'   => '日報',
-    'period_weekly'  => '週報',
-    'period_monthly' => '月報',
-    'prev'           => '上一期',
-    'next'           => '下一期',
-    'current'        => '最近一期',
+    // 期間：自己選起訖，底下一排快捷鈕（今日／昨日／本週／上週／本月／上月）
+    'date_from' => '開始日期',
+    'date_to'   => '結束日期',
+    'search'    => '查詢',
 
     // 打卡報表
     'att_user'      => '同仁',
@@ -54,8 +51,10 @@ return [
     'unit_times' => ':n 次',
 
     'msg' => [
-        'load_failed'  => '載入失敗，請稍後再試',
-        'type_invalid' => '期間類型不正確',
-        'date_invalid' => '日期格式不正確',
+        'load_failed'     => '載入失敗，請稍後再試',
+        'date_invalid'    => '日期格式不正確',
+        'range_required'  => '請選擇開始與結束日期',
+        'range_reversed'  => '結束日期不能早於開始日期',
+        'range_too_long'  => '一次最多查 :days 天，請縮短期間',
     ],
 ];

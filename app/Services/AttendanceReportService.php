@@ -121,20 +121,6 @@ class AttendanceReportService
     // ---------------------------------------------------------------
 
     /**
-     * 給 Controller 算區間用（`resolveRange()` 是 private）
-     *
-     * ⚠ 後台報表頁跟通知走同一支，週／月的定義才不會有兩套。
-     *
-     * @param string      $type
-     * @param string|null $endsOn
-     * @return array start / end
-     */
-    public function rangeFor($type, $endsOn = null)
-    {
-        return $this->resolveRange($type, filled($endsOn) ? $endsOn : now()->toDateString());
-    }
-
-    /**
      * 後台報表頁要的資料
      *
      * ⚠ 走 `collect()` 而不是直接問 `AttendanceService::getReport()` ——

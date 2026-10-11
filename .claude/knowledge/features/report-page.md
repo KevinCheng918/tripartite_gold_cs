@@ -27,13 +27,20 @@
 └─ 財務管理
 ```
 
-| 分頁 | 權限 | 期間 |
-|---|---|---|
-| 打卡報表 | `report.attendance` | 週／月 |
-| 超時提醒統計 | `report.remind` | 日／週／月 |
+| 分頁 | 權限 |
+|---|---|
+| 打卡報表 | `report.attendance` |
+| 超時提醒統計 | `report.remind` |
 
-兩個分頁都是「期間切換 btn-group ＋ 上一期／下一期」，沒有日期選擇器 ——
-報表看的是「已經過完的那一期」，翻頁比選日期直覺。
+兩個分頁都是「開始日期 ＋ 結束日期 ＋ 六顆快捷鈕（今日／昨日／本週／上週／
+本月／上月）」，版面與操作比照補點紀錄。快捷鈕按下去直接查，不必再按「查詢」。
+
+預設期間刻意跟 Telegram 對齊：打卡報表是**上週**、超時統計是**昨天** ——
+一打開就是同仁剛收到的那一份，對得上。
+
+> 原本（v2.71）是「日／週／月切換 ＋ 上一期／下一期」，v2.73 換掉。
+> 需求方要能自己選時間段，而快捷鈕已經完全涵蓋原本那三種期間 ——
+> 兩套並存的話，「上一期」在自訂區間下沒有明確語意。
 
 ## 關鍵決定
 
@@ -59,6 +66,14 @@ Telegram 收到的那份會對不起來 —— 那種不一致最難查，因為
 `AttendanceReportService::collect()` 另外撈了一次核准的假來補這些人，
 所以 `forPage()` 走 `collect()` 而不是 `getReport()`。
 
+⚠ 2026-10-11 之後 `collect()` 還多做一件事：**濾掉主管以上**（含主管本人，
+需求方指定）。所以**兩個分頁都不列主管以上**，跟 Telegram 那兩份一致 ——
+這也是「兩邊走同一支 `collect()`」的額外好處，濾一次三個出口都生效。
+細節見 [[attendance-report-notice]] 的「統計不列主管以上」。
+
+⚠ 出勤明細頁（打卡出勤）**沒有**濾，那裡要查得到每一個人的紀錄 ——
+`AttendanceService::getReport()` 不動，只有報表這一層濾。
+
 順手補了 `emptyStat()` 缺的 `total_days` / `normal_days`（通知那邊沒用到所以一直沒發現）。
 
 ### 3. 報表頁本身不能綁 `can:` middleware
@@ -76,11 +91,19 @@ Telegram 收到的那份會對不起來 —— 那種不一致最難查，因為
 `attendance.report` 的語系標題因此改成「查看出勤明細」，並從打卡出勤頁的
 sidebar 顯示條件裡移除（只勾它的人在那一頁已經沒有任何分頁可看）。
 
-### 5. 期間切換的 active 不能跟 hover 同色
+### 5. 期間只有起訖，後端不吃「日／週／月」
 
-全站的 `.btn-outline-secondary` 是「hover 深色填滿」，Bootstrap 的 `.active`
-也是深色填滿 —— 滑鼠停在「週報」上時畫面有兩顆黑的，看不出現在在看哪一期。
-`.period-switch .btn.active` 改用品牌金（深色模式 `#d4af37`）。
+快捷鈕在前端就用 `window.DateRange`（common.js）換算成日期了，後端只收
+`start` / `end`。多一個 `type` 參數的話，「上週是哪七天」會有前後端兩套算法，
+而它們遲早會不一致（補點紀錄、財務也都用同一支 `DateRange`，就是這個理由）。
+
+⚠ 一定要有天數上限（`config('rules.REPORT_RANGE_MAX_DAYS')` ＝ 366）。
+沒有的話，被亂改的網址可以要求「2020-01-01 到今天」，那是一次把幾年的出勤
+與提醒紀錄全撈進記憶體再跑迴圈 —— 畫面卡死而且查不出原因。
+Laravel 沒有內建規則能比較「兩個欄位相差幾天」，所以擋在 `withValidator()`。
+
+⚠ 前端顯示錯誤時要挑 `errors` 裡那一句，不是 `message` ——
+後者是 Laravel 的「給定的資料無效」，對使用者沒有意義。
 
 ## 檔案
 
@@ -97,20 +120,28 @@ public/js/report.js
 **修改**
 
 ```
-app/Services/RemindReportService.php        拆出 collect() / forPage() / rangeFor()
-app/Services/AttendanceReportService.php    新增 forPage() / rangeFor()；emptyStat() 補兩個 key
+app/Services/RemindReportService.php        拆出 collect() / forPage()
+app/Services/AttendanceReportService.php    新增 forPage()；emptyStat() 補兩個 key
 app/Services/AttendanceService.php          移除 getMonthlyReport()（已無人呼叫）
 app/Http/Controllers/Admin/AttendanceController.php   移除 ajaxMonthlyReport()
 routes/web.php                              移除 attendance/ajax-monthly-report；新增 report 三條
 config/permissionMap.php                    新增 report group（兩個 keyword）
-config/rules.php                            新增 REPORT_PERIOD_TYPE_IN
+config/rules.php                            新增 REPORT_RANGE_MAX_DAYS
 resources/lang/{tw,cn,en}/permission.php    group label + 兩個 keyword；attendance.report 改標
 resources/lang/{tw,cn,en}/attendance.php    移除只給舊分頁用的 key；back_to_report 改文案
 resources/views/layouts/app.blade.php       sidebar 新增「報表」；打卡入口條件移除 attendance.report
 resources/views/admin/attendance/detail.blade.php     返回鍵改回報表頁
 public/js/attendance.js                     移除「月報表」分頁與 loadReport/renderReport
 public/js/attendance-detail.js              返回鍵改回報表頁
-public/css/custom.css                       .period-switch .btn.active
+```
+
+**2026-10-11 追加（不列主管以上）**
+
+```
+app/Repositories/UserRepository.php         getDmCandidates($excludeLeaderUp = false)；select 補 level
+app/Services/AttendanceReportService.php    collect() 尾端加 withoutLeaderUp()；個人版改 getDmCandidates(true)
+app/Services/RemindReportService.php        個人版改 getDmCandidates(true)
+config/changelog.php                        v2.72
 ```
 
 ## 相關

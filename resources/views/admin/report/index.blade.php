@@ -9,6 +9,20 @@
     @php
         $canAttendance = Auth::user()->hasPermission('report.attendance');
         $canRemind = Auth::user()->hasPermission('report.remind');
+
+        /*
+         * 日期快捷鈕。key 是 window.DateRange 的方法名（common.js），
+         * value 是 common.date_range 的語系 key —— 跟補點紀錄用同一組，
+         * 「上週」怎麼算只有一份定義。
+         */
+        $dateRanges = [
+            'today'     => 'today',
+            'yesterday' => 'yesterday',
+            'thisWeek'  => 'this_week',
+            'lastWeek'  => 'last_week',
+            'thisMonth' => 'this_month',
+            'lastMonth' => 'last_month',
+        ];
     @endphp
 
     {{-- 權限與語系由 data-* 帶給 public/js/report.js --}}
@@ -42,28 +56,33 @@
             @if($canAttendance)
             <div class="tab-pane fade show active" id="tab-report-attendance" role="tabpanel">
                 <div class="main-card mb-3 card">
-                    <div class="card-header d-flex flex-wrap align-items-center gap-2">
-                        {{-- 期間切換。打卡報表沒有「日」—— 一天的出勤看打卡出勤頁就好 --}}
-                        <div class="btn-group btn-group-sm period-switch" role="group" aria-label="{{ trans('report.page_title') }}">
-                            <button type="button" class="btn btn-outline-secondary btn-icon btn-transition active js-att-type" data-type="weekly">
-                                {{ trans('report.period_weekly') }}
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary btn-icon btn-transition js-att-type" data-type="monthly">
-                                {{ trans('report.period_monthly') }}
-                            </button>
-                        </div>
-                        <div class="row-actions ms-auto">
-                            <div class="btn-group btn-group-sm" role="group" aria-label="{{ trans('report.prev') }}">
-                                <button type="button" class="btn btn-outline-secondary btn-icon btn-transition js-att-prev">
-                                    <i class="fas fa-chevron-left btn-icon-wrapper"></i>{{ trans('report.prev') }}
-                                </button>
-                                <button type="button" class="btn btn-outline-secondary btn-icon btn-transition js-att-next">
-                                    {{ trans('report.next') }}<i class="fas fa-chevron-right ms-1"></i>
+                    <div class="card-body">
+                        {{-- 期間：起訖日期 + 快捷鈕，版面比照補點紀錄 --}}
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-3 col-6">
+                                <label class="form-label fw-bold" for="att-date-from">{{ trans('report.date_from') }}：</label>
+                                <input type="date" class="form-control" id="att-date-from">
+                            </div>
+                            <div class="col-md-3 col-6">
+                                <label class="form-label fw-bold" for="att-date-to">{{ trans('report.date_to') }}：</label>
+                                <input type="date" class="form-control" id="att-date-to">
+                            </div>
+                            <div class="col-md-3 col-6 d-flex align-items-end">
+                                <button type="button" class="btn btn-primary w-100 js-att-search">
+                                    <i class="fas fa-search me-1"></i>{{ trans('report.search') }}
                                 </button>
                             </div>
+                            {{-- gap-2 而不是 gap-1：六顆小按鈕排在一起，0.25rem 會黏成一條 --}}
+                            <div class="col-12 mt-2">
+                                <div class="d-flex flex-wrap gap-2">
+                                    @foreach($dateRanges as $range => $langKey)
+                                        <button type="button" class="btn btn-sm btn-outline-secondary js-att-range"
+                                                data-range="{{ $range }}">{{ trans("common.date_range.{$langKey}") }}</button>
+                                    @endforeach
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="card-body">
+
                         <h5 class="card-title" id="att-range"></h5>
                         <div class="table-responsive" id="att-table"></div>
                         <p class="text-muted mb-0 mt-2" style="font-size:0.875rem" id="att-hint"></p>
@@ -75,30 +94,31 @@
             @if($canRemind)
             <div class="tab-pane fade {{ $canAttendance ? '' : 'show active' }}" id="tab-report-remind" role="tabpanel">
                 <div class="main-card mb-3 card">
-                    <div class="card-header d-flex flex-wrap align-items-center gap-2">
-                        <div class="btn-group btn-group-sm period-switch" role="group" aria-label="{{ trans('report.page_title') }}">
-                            <button type="button" class="btn btn-outline-secondary btn-icon btn-transition active js-rmd-type" data-type="daily">
-                                {{ trans('report.period_daily') }}
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary btn-icon btn-transition js-rmd-type" data-type="weekly">
-                                {{ trans('report.period_weekly') }}
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary btn-icon btn-transition js-rmd-type" data-type="monthly">
-                                {{ trans('report.period_monthly') }}
-                            </button>
-                        </div>
-                        <div class="row-actions ms-auto">
-                            <div class="btn-group btn-group-sm" role="group" aria-label="{{ trans('report.prev') }}">
-                                <button type="button" class="btn btn-outline-secondary btn-icon btn-transition js-rmd-prev">
-                                    <i class="fas fa-chevron-left btn-icon-wrapper"></i>{{ trans('report.prev') }}
-                                </button>
-                                <button type="button" class="btn btn-outline-secondary btn-icon btn-transition js-rmd-next">
-                                    {{ trans('report.next') }}<i class="fas fa-chevron-right ms-1"></i>
+                    <div class="card-body">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-3 col-6">
+                                <label class="form-label fw-bold" for="rmd-date-from">{{ trans('report.date_from') }}：</label>
+                                <input type="date" class="form-control" id="rmd-date-from">
+                            </div>
+                            <div class="col-md-3 col-6">
+                                <label class="form-label fw-bold" for="rmd-date-to">{{ trans('report.date_to') }}：</label>
+                                <input type="date" class="form-control" id="rmd-date-to">
+                            </div>
+                            <div class="col-md-3 col-6 d-flex align-items-end">
+                                <button type="button" class="btn btn-primary w-100 js-rmd-search">
+                                    <i class="fas fa-search me-1"></i>{{ trans('report.search') }}
                                 </button>
                             </div>
+                            <div class="col-12 mt-2">
+                                <div class="d-flex flex-wrap gap-2">
+                                    @foreach($dateRanges as $range => $langKey)
+                                        <button type="button" class="btn btn-sm btn-outline-secondary js-rmd-range"
+                                                data-range="{{ $range }}">{{ trans("common.date_range.{$langKey}") }}</button>
+                                    @endforeach
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="card-body">
+
                         <h5 class="card-title" id="rmd-range"></h5>
                         <p class="mb-3" id="rmd-summary"></p>
                         <div id="rmd-body"></div>
