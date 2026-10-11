@@ -91,6 +91,19 @@ Telegram 收到的那份會對不起來 —— 那種不一致最難查，因為
 `attendance.report` 的語系標題因此改成「查看出勤明細」，並從打卡出勤頁的
 sidebar 顯示條件裡移除（只勾它的人在那一頁已經沒有任何分頁可看）。
 
+⚠ **路由名沒有跟著搬，所以 sidebar 的亮燈要手動指定**（2026-10-11 修）。
+那一頁的路由仍是 `admin.attendance.detail`（權限留在 `attendance.report`，
+搬到 `report.` 群組會讓 keyword 跟路由群組對不起來），而選單是用
+`routeIs()` 的前綴認人 —— 不處理的話進到明細頁會亮成「打卡出勤」：
+
+```blade
+{{-- 打卡出勤 --}} routeIs('admin.attendance.*') && ! routeIs('admin.attendance.detail')
+{{-- 報表 --}}     routeIs('admin.report.*', 'admin.attendance.detail')
+```
+
+判準是「這一頁從哪個選單點進去、返回鍵回哪裡」，不是它的 URL 長什麼樣。
+見 [bugfix/2026-10-11-attendance-detail-sidebar-active.md](../bugfix/2026-10-11-attendance-detail-sidebar-active.md)。
+
 ### 5. 期間只有起訖，後端不吃「日／週／月」
 
 快捷鈕在前端就用 `window.DateRange`（common.js）換算成日期了，後端只收
@@ -159,6 +172,13 @@ app/Repositories/UserRepository.php         getDmCandidates($excludeLeaderUp = f
 app/Services/AttendanceReportService.php    collect() 尾端加 withoutLeaderUp()；個人版改 getDmCandidates(true)
 app/Services/RemindReportService.php        個人版改 getDmCandidates(true)
 config/changelog.php                        v2.72
+```
+
+**2026-10-11 追加（出勤明細的 sidebar 亮燈）**
+
+```
+resources/views/layouts/app.blade.php       打卡出勤排除 admin.attendance.detail；報表收進來
+config/changelog.php                        v2.77
 ```
 
 ## 相關
