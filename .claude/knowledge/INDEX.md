@@ -18,7 +18,7 @@
 | 文件 | 功能 | 狀態 |
 |------|------|------|
 | [features/remind-period-report.md](features/remind-period-report.md) | 超時統計的週報表（週一）／月報表（1 號）：一支 Service 吃 `--type`，**三種都在 08:30 跟日報同一分鐘**（需求方要求時間一致），收件人沿用日報那份、只發完整版不發個人版、日報保留。文案裡寫死的「昨天」全部參數化成 `{period}` | 已完成 |
-| [features/customer-followup.md](features/customer-followup.md) | 客人說「稍等／稍晚提供」時記成待追蹤事項，安靜一段時間後到內部群組問當班人員「要不要追蹤」（按鈕），要就發訊息問客人後續、不要就結案；沒人按比照求助單計次 tag 並升級 | **設計稿，等確認** |
+| [features/customer-followup.md](features/customer-followup.md) | 待追蹤事項（有人說「稍等」就記一筆）：詞表先篩＋AI 確認、**客人承諾與我方承諾分開標示**（AI 自動回覆那句排除）、對話安靜 N 分鐘才到內部群組 tag 當班人員問「要不要追蹤」（按鈕）、不自動結案由人決定、沒人按比照求助單計次升級、後台列表頁、10:30 獨立統計 | **設計定稿，待實作** |
 | [features/attendance-report-notice.md](features/attendance-report-notice.md) | 打卡週報表（週一 11:00 報上週）／月報表（1 號 11:00 報上月）：勾選的人收全部人的、其餘同仁收自己那份；含遲到早退曠工次數與時間、補打卡、請假、加班。附帶班表通知的請假預告（前兩天到請假結束）**以及修掉「請整天假被記成曠工」的 bug**（含一次性清理指令） | **已完成，正式機要跑一次 `attendance:fix-absent-on-leave --force`** |
 | [features/report-page.md](features/report-page.md) | 報表頁（內務管理 → 報表）：打卡報表與超時提醒統計兩個分頁，**自己選起訖日期＋今日/昨日/本週/上週/本月/上月快捷鈕**（比照補點紀錄，共用 `window.DateRange`；後端只收 start/end，不吃期間類型）、**數字跟 Telegram 那份走同一支 `collect()`**；打卡出勤頁原本的「月報表」分頁搬過來後拿掉；兩個分頁各自一個權限，頁面本身因為 `can:` 是 AND 而改在 Controller 自己擋。**兩種報表都不列主管以上（含主管本人）** | 已完成 |
 | [features/task-archive-purge-pause.md](features/task-archive-purge-pause.md) | 封存卡的 30 天清理：專案停用期間不計入（重新啟用後整個專案重新給 30 天，`project.reactivated_at` 一個欄位搞定、`task` 不動）；順帶補上缺席的 `ProjectService`（狀態切換連動不能放 Controller） | **已實作，待跑 migration** |
