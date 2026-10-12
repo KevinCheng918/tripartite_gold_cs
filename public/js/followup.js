@@ -312,7 +312,12 @@
     document.getElementById('followup-reset').addEventListener('click', function () {
         document.getElementById('followup-filter-source').value = '';
         document.getElementById('followup-filter-status').value = '';
-        // 清掉期間＝不限期間，跟一進來的狀態一致
+        /*
+         * 清掉期間＝不限期間（看得到全部）。
+         *
+         * ⚠ 刻意**不是**回到預設的「今天」：那樣就沒有任何方式看歷史了。
+         * 預設帶今天是為了一進來對焦在今天，清除則是「我要看全部」。
+         */
         document.getElementById('followup-date-from').value = '';
         document.getElementById('followup-date-to').value = '';
         currentPage = 1;
@@ -373,6 +378,24 @@
 
     // ===== 啟動 =====
 
+    /**
+     * 期間預設帶今天（需求方 2026-10-12）
+     *
+     * ⚠ 只在「一進來」套用，不是寫死的下限 —— 清除條件會把日期一起清空，
+     * 那時就是不限期間（看得到全部）。預設看今天是為了一打開就對焦在
+     * 今天的事，不是為了擋住歷史資料。
+     *
+     * 期間比的是**開單日期**：今天開的那些。昨天開、今天還掛著的不會列進來，
+     * 要看那些就按「本週」或清掉期間。
+     */
+    function applyDefaultRange() {
+        var today = window.DateRange.today();
+
+        document.getElementById('followup-date-from').value = today.from;
+        document.getElementById('followup-date-to').value = today.to;
+    }
+
     renderFilters();
+    applyDefaultRange();
     loadList();
 }());
