@@ -21,8 +21,13 @@ class UserRepository
      * ⚠ `telegram_dm_ready` 是帳號管理列表要顯示「有沒有私訊過機器人」用的。
      * 少了它那一欄永遠顯示「未綁定」而且不會報錯 —— 這個專案為「select 漏欄位」
      * 的同一類問題修過好幾次（見 bugfix/2026-09-30-on-duty-reply-time）。
+     *
+     * ⚠ 出勤模式那五欄（`work_mode` 起）**一定要在這裡**：`find()` 回來的 User
+     * 就是 `AttendanceService::resolveWorkTime()` 拿來判斷固定班的那一個。
+     * 少了 `work_mode`，`isFixedWorkMode()` 會安靜地一律回 false ——
+     * 固定班的人打卡又變回「什麼都算不出來」，而且不會有任何錯誤。
      */
-    private const LIST_COLUMNS = ['id', 'account', 'nickname', 'telegram_nickname', 'telegram_username', 'telegram_user_id', 'telegram_dm_ready', 'status', 'level', 'project_ids', 'hired_at', 'equipments', 'created_at'];
+    private const LIST_COLUMNS = ['id', 'account', 'nickname', 'telegram_nickname', 'telegram_username', 'telegram_user_id', 'telegram_dm_ready', 'status', 'level', 'project_ids', 'hired_at', 'equipments', 'created_at', 'work_mode', 'work_start_time', 'work_end_time', 'work_days', 'show_in_shift'];
 
     /**
      * 依條件分頁查詢使用者
@@ -236,6 +241,31 @@ class UserRepository
             ->select(['id', 'account', 'nickname', 'status'])
             ->where('level', config('constants.USER.LEVEL.CS'))
             ->where('status', '!=', config('constants.USER.STATUS.DEACTIVATE'))
+            ->orderBy('nickname')
+            ->get();
+    }
+
+    /**
+     * 固定上下班時間、仍在職的帳號（曠工掃描與排班紀錄合成用）
+     *
+     * ⚠ **一定要排掉離職的人**：`status = 停用` 只是不能登入，真正的離職
+     * 看 `resigned_at`。兩個都不濾的話，離職同仁會從離職那天起每個上班日
+     * 被標一筆曠工，一路標到有人發現為止。
+     *
+     * ⚠ 設定不完整（勾了固定班卻沒填起訖）的也排掉 —— 算不出標準時間，
+     * 判他曠工沒有依據。
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<User>
+     */
+    public function getFixedWorkModeUsers()
+    {
+        return User::query()
+            ->select(['id', 'nickname', 'level', 'status', 'work_mode', 'work_start_time', 'work_end_time', 'work_days', 'show_in_shift'])
+            ->where('work_mode', config('constants.USER.WORK_MODE.FIXED'))
+            ->where('status', '!=', config('constants.USER.STATUS.DEACTIVATE'))
+            ->whereNull('resigned_at')
+            ->whereNotNull('work_start_time')
+            ->whereNotNull('work_end_time')
             ->orderBy('nickname')
             ->get();
     }

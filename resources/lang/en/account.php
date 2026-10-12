@@ -97,6 +97,35 @@ return [
     'level_admin' => 'Admin',
     'level_cs' => 'CS',
 
+    /*
+     * Work mode. Staff outside the shift roster (engineers) only get late /
+     * early-leave / overtime / absence once they are set to fixed hours —
+     * all four used to be derived from the shift assignment alone.
+     */
+    'field_work_mode'       => 'Work mode',
+    'work_mode_shift'       => 'Rotating shifts',
+    'work_mode_shift_hint'  => 'Hours come from the shift roster, as today',
+    'work_mode_fixed'       => 'Fixed hours',
+    'work_mode_fixed_hint'  => 'Not on the roster; same hours every working day',
+    'field_work_start_time' => 'Start time',
+    'field_work_end_time'   => 'End time',
+    'work_overnight_hint'   => 'An end time at or before the start time means an overnight shift (e.g. 22:00–06:00).',
+    'field_work_days'       => 'Working days',
+    'work_days_hint'        => 'Unchecked days need no clock-in and never count as absence. Public holidays still count as working days — file leave for those.',
+    'field_show_in_shift'   => 'Show on the roster',
+    'show_in_shift_hint'    => 'Appears on the shift timetable as a dashed, non-clickable block. Usually off for engineers.',
+
+    // Weekdays. Keys are ISO-8601 1-7, matching how work_days is stored
+    'weekdays' => [
+        1 => 'Mon',
+        2 => 'Tue',
+        3 => 'Wed',
+        4 => 'Thu',
+        5 => 'Fri',
+        6 => 'Sat',
+        7 => 'Sun',
+    ],
+
     'msg' => [
         'telegram_code_issued'    => 'Code generated, valid for :minutes minutes',
         'telegram_code_failed'    => 'Could not generate the code, please try again later',
@@ -116,6 +145,9 @@ return [
         'telegram_nickname_max' => 'Telegram signature must not exceed :value characters',
         'telegram_username_invalid' => 'Invalid Telegram username (5-32 characters, letters, digits and underscore only)',
         'invalid_status'       => 'Invalid status value',
+        'work_time_required'   => 'Fixed hours need both a start and an end time',
+        'work_time_invalid'    => 'Invalid time format (HH:mm)',
+        'work_days_required'   => 'Pick at least one working day',
         'permissions_required' => 'Please select permissions',
         'invalid_permission'   => 'Invalid permission value',
         'create_failed'        => 'Failed to create account',

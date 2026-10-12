@@ -345,6 +345,65 @@
                                 @endforeach
                             </div>
                         </div>
+
+                        {{-- 出勤模式：輪班吃排班，固定時間吃下面那幾欄。
+                             不排班的人（工程）選固定時間之後，遲到／早退／加班／曠工才算得出來 --}}
+                        <div class="mb-3">
+                            <label class="form-label">{{ trans('account.field_work_mode') }}</label>
+                            <div class="form-check">
+                                <input class="form-check-input js-edit-work-mode" type="radio" name="work_mode"
+                                       value="{{ config('constants.USER.WORK_MODE.SHIFT') }}" id="edit-work-mode-shift" checked>
+                                <label class="form-check-label" for="edit-work-mode-shift">
+                                    {{ trans('account.work_mode_shift') }}
+                                    <small class="text-muted d-block">{{ trans('account.work_mode_shift_hint') }}</small>
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input js-edit-work-mode" type="radio" name="work_mode"
+                                       value="{{ config('constants.USER.WORK_MODE.FIXED') }}" id="edit-work-mode-fixed">
+                                <label class="form-check-label" for="edit-work-mode-fixed">
+                                    {{ trans('account.work_mode_fixed') }}
+                                    <small class="text-muted d-block">{{ trans('account.work_mode_fixed_hint') }}</small>
+                                </label>
+                            </div>
+                        </div>
+
+                        {{-- 只有選「固定時間」才展開。JS 控制，見 public/js/accounts.js --}}
+                        <div id="edit-fixed-work" class="mb-3 p-3 rounded" style="display:none;background:rgba(212,175,55,0.06)">
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <label class="form-label">{{ trans('account.field_work_start_time') }}</label>
+                                    {{-- 兩個下拉而不是原生 time：12/24 小時制由瀏覽器 locale 決定，
+                                         會跟系統其他地方的 13:05 對不起來（理由見 features/scheduling） --}}
+                                    <input id="edit-work-start-time" type="text" class="js-time-select form-control" autocomplete="off">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label">{{ trans('account.field_work_end_time') }}</label>
+                                    <input id="edit-work-end-time" type="text" class="js-time-select form-control" autocomplete="off">
+                                </div>
+                            </div>
+                            <div class="form-text mb-2">{{ trans('account.work_overnight_hint') }}</div>
+
+                            <label class="form-label">{{ trans('account.field_work_days') }}</label>
+                            <div class="d-flex flex-wrap gap-3 mb-2">
+                                @foreach(trans('account.weekdays') as $iso => $label)
+                                    <div class="form-check">
+                                        <input class="form-check-input js-edit-work-day" type="checkbox"
+                                               value="{{ $iso }}" id="edit-work-day-{{ $iso }}">
+                                        <label class="form-check-label" for="edit-work-day-{{ $iso }}">{{ $label }}</label>
+                                    </div>
+                                @endforeach
+                            </div>
+                            <div class="form-text mb-3">{{ trans('account.work_days_hint') }}</div>
+
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="edit-show-in-shift">
+                                <label class="form-check-label" for="edit-show-in-shift">
+                                    {{ trans('account.field_show_in_shift') }}
+                                    <small class="text-muted d-block">{{ trans('account.show_in_shift_hint') }}</small>
+                                </label>
+                            </div>
+                        </div>
                         <div class="text-end">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('shift.modal_cancel') }}</button>
                             <button type="submit" class="btn btn-primary">{{ trans('shift.modal_confirm') }}</button>
@@ -569,8 +628,52 @@ $(function () {
         $('.js-edit-project-check').each(function () {
             $(this).prop('checked', projectIds.indexOf(parseInt($(this).val(), 10)) !== -1);
         });
+        fillWorkMode($btn);
         showBsModal('modal-edit-account');
     });
+
+    // ---------------------------------------------------------------
+    //  出勤模式（輪班 / 固定時間）
+    // ---------------------------------------------------------------
+
+    var WORK_MODE_FIXED = {{ config('constants.USER.WORK_MODE.FIXED') }};
+
+    /** 只有「固定時間」才展開下面那組欄位 */
+    function toggleFixedWork() {
+        var isFixed = parseInt($('.js-edit-work-mode:checked').val(), 10) === WORK_MODE_FIXED;
+        $('#edit-fixed-work').toggle(isFixed);
+    }
+
+    /**
+     * 把這個帳號目前的設定填進表單
+     *
+     * ⚠ 每一欄都要明確給值（包含清空與取消勾選）—— 這個 Modal 是**共用**的，
+     * 不重設的話會留著上一個被編輯的帳號的設定，而那些值會跟著送出去。
+     */
+    function fillWorkMode($btn) {
+        var mode = parseInt($btn.data('work-mode'), 10) || {{ config('constants.USER.WORK_MODE.SHIFT') }};
+        $('.js-edit-work-mode[value="' + mode + '"]').prop('checked', true);
+
+        /*
+         * ⚠ 一定要走 `TimeSelect.set()`，不能直接 `.val()` ——
+         * 那兩個欄位已經被換成「時」「分」兩個下拉，直接改 value 的話
+         * 下拉會停在上一個帳號的選擇，而送出去的是 value（看起來沒錯、
+         * 畫面卻是錯的）。它也會順手把 `09:00:00` 截成 `09:00`。
+         */
+        window.TimeSelect.set('edit-work-start-time', $btn.data('work-start-time') || '');
+        window.TimeSelect.set('edit-work-end-time', $btn.data('work-end-time') || '');
+
+        // data-work-days 是 "1,2,3,4,5"；空的時候 jQuery 會給 undefined 或空字串
+        var days = String($btn.data('work-days') || '').split(',');
+        $('.js-edit-work-day').each(function () {
+            $(this).prop('checked', days.indexOf($(this).val()) !== -1);
+        });
+
+        $('#edit-show-in-shift').prop('checked', !!$btn.data('show-in-shift'));
+        toggleFixedWork();
+    }
+
+    $('.js-edit-work-mode').on('change', toggleFixedWork);
 
     // 調整狀態按鈕
     $('.js-change-status').on('click', function () {
@@ -684,6 +787,23 @@ $(function () {
         var projectIds = [];
         $('.js-edit-project-check:checked').each(function () { projectIds.push(parseInt($(this).val(), 10)); });
         data.project_ids = projectIds;
+
+        /*
+         * 出勤模式。選「輪班」時時間與上班日**不送** —— 後端會把那幾欄清空，
+         * 免得哪天切回固定時間時默默套用上一次的設定。
+         */
+        data.work_mode = parseInt($('.js-edit-work-mode:checked').val(), 10);
+
+        if (data.work_mode === WORK_MODE_FIXED) {
+            var workDays = [];
+            $('.js-edit-work-day:checked').each(function () { workDays.push(parseInt($(this).val(), 10)); });
+
+            data.work_start_time = $('#edit-work-start-time').val() || null;
+            data.work_end_time = $('#edit-work-end-time').val() || null;
+            data.work_days = workDays;
+            data.show_in_shift = $('#edit-show-in-shift').is(':checked');
+        }
+
         $.ajax({
             url: '/admin/accounts/ajax-update/' + $('#edit-account-id').val(),
             method: 'PUT',

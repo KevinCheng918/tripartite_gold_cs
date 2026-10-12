@@ -325,10 +325,17 @@
 
         Promise.all([
             apiFetch('/admin/shifts/ajax-assignment-list?date_from=' + dateFrom + '&date_to=' + dateTo + '&per_page=200'),
-            apiFetch('/admin/covers/ajax-approved?date_from=' + dateFrom + '&date_to=' + dateTo)
+            apiFetch('/admin/covers/ajax-approved?date_from=' + dateFrom + '&date_to=' + dateTo),
+            /*
+             * 固定班的人（工程、或設了固定時間的客服）沒有排班紀錄，
+             * 他們的班是後端依帳號設定逐日算出來的。
+             * 分開一支而不是併進上面那支：那一支是分頁的，混進去會讓筆數失真。
+             */
+            apiFetch('/admin/shifts/ajax-fixed-assignments?date_from=' + dateFrom + '&date_to=' + dateTo)
         ])
             .then(function (results) {
-                assignmentsData = results[0].data;
+                // 合成的那些只有「顯示在排班紀錄」打開的人才會回來，後端已經濾好
+                assignmentsData = (results[0].data || []).concat(results[2].data || []);
                 approvedCovers = results[1].data || [];
                 renderTimetable(weekDays, assignmentsData);
             })
@@ -431,7 +438,7 @@
                 } else {
                     // 正常班
                     if (!slotMap[originalUserId]) {
-                        slotMap[originalUserId] = { cls: 'tt-shift-user', shifts: [], assignmentIds: [], userName: a.user ? a.user.nickname : '', userId: originalUserId };
+                        slotMap[originalUserId] = { cls: 'tt-shift-user', shifts: [], assignmentIds: [], userName: a.user ? a.user.nickname : '', userId: originalUserId, isFixed: !!a.is_fixed };
                     }
                     var s = slotMap[originalUserId];
                     var shiftName = a.shift.display_name || '';
@@ -464,7 +471,17 @@
                             '<div class="tt-block-user">' + s.shifts.join('、') + '</div>' +
                             '</div>';
                     }
-                    blocks.push({ cls: 'tt-shift-user', label: label, dataId: s.assignmentIds[0], color: color });
+                    /*
+                     * 固定班的色塊不可點：它沒有對應的排班紀錄，
+                     * 既沒有單可以刪、也沒有班可以找人代。
+                     * dataId 留空字串 —— 點擊那裡讀 dataset 是 falsy 就不開 Modal。
+                     */
+                    blocks.push({
+                        cls: 'tt-shift-user' + (s.isFixed ? ' tt-shift-fixed' : ''),
+                        label: label,
+                        dataId: s.isFixed ? '' : s.assignmentIds[0],
+                        color: color
+                    });
                 } else {
                     // 代班已組裝好
                     blocks.push(s);

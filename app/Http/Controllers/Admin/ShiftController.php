@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Shift\UpdateShiftRequest;
+use App\Http\Requests\ShiftAssignment\ListFixedAssignmentRequest;
 use App\Http\Requests\ShiftAssignment\StoreAssignmentRequest;
 use App\Http\Requests\ShiftAssignment\SwapRequest;
 use App\Http\Requests\ShiftAssignment\RespondSwapRequest;
@@ -15,6 +16,7 @@ use App\Models\ShiftSwap;
 use App\Repositories\UserRepository;
 use App\Services\ShiftService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
@@ -141,6 +143,31 @@ class ShiftController extends Controller
         $assignments = $this->shiftService->listAssignments($params);
 
         return ShiftAssignmentResource::collection($assignments);
+    }
+
+    /**
+     * Ajax 取得固定班人員在這段期間的虛擬排班（課表用）
+     *
+     * 固定班的人沒有 `shift_assignments` 的列，所以查詢時合成 ——
+     * 不寫實體列的理由見 `ShiftService::listFixedAssignments()`。
+     *
+     * ⚠ 跟 `ajax-assignment-list` 分開而不是合進去：那一支是分頁的，
+     * 把算出來的列混進分頁結果會讓總筆數與頁碼都失真。課表本來就是
+     * 一次取整週，前端 concat 起來就好。
+     *
+     * @param ListFixedAssignmentRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxFixedAssignments(ListFixedAssignmentRequest $request)
+    {
+        $params = $request->validated();
+
+        return response()->json([
+            'data' => $this->shiftService->listFixedAssignments(
+                Arr::get($params, 'date_from'),
+                Arr::get($params, 'date_to')
+            ),
+        ]);
     }
 
     /**

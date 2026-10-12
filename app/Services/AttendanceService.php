@@ -7,14 +7,21 @@ use App\Repositories\AttendanceRepository;
 use App\Repositories\ClockAmendmentRepository;
 use App\Repositories\LeaveRequestRepository;
 use App\Repositories\ShiftAssignmentRepository;
+use App\Repositories\UserRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 
 /**
  * 打卡 Service
  *
  * 處理上下班打卡、遲到/早退/加班計算、月報表彙整。
+ *
+ * ⚠ **「這個人今天幾點上下班」只有一個答案的來源：`resolveWorkTime()`。**
+ * 輪班的人從排班拿、固定班的人從帳號上拿 —— 遲到、早退、加班、曠工四個判定
+ * 都走那一支，不要在各自的地方再寫一次「有排班用排班、沒有就看固定班」。
+ * 那是同一條規則的四份拷貝（見 [[fixed-work-hours]]）。
  */
 class AttendanceService
 {
@@ -22,17 +29,195 @@ class AttendanceService
     private $assignmentRepository;
     private $amendmentRepository;
     private $leaveRepository;
+    private $userRepository;
 
     public function __construct(
         AttendanceRepository $attendanceRepository,
         ShiftAssignmentRepository $assignmentRepository,
         ClockAmendmentRepository $amendmentRepository,
-        LeaveRequestRepository $leaveRepository
+        LeaveRequestRepository $leaveRepository,
+        UserRepository $userRepository
     ) {
         $this->attendanceRepository = $attendanceRepository;
         $this->assignmentRepository = $assignmentRepository;
         $this->amendmentRepository = $amendmentRepository;
         $this->leaveRepository = $leaveRepository;
+        // 固定班的上下班時間存在帳號上，不在排班表裡
+        $this->userRepository = $userRepository;
+    }
+
+    /**
+     * 這個人這一天的標準上下班時間
+     *
+     * 出勤的四個判定（遲到／早退／加班／曠工）都問這一支，兩種出勤模式的
+     * 差別只在這裡分岔，分岔之後的計算完全一樣。
+     *
+     * ⚠ 回 `null` 代表**這天不用上班**：輪班沒排到、或固定班不在 `work_days` 裡。
+     * 呼叫端要分得出「不用上班」與「該上班卻沒打卡」—— 後者才是曠工。
+     *
+     * ⚠ 跨日班（`end <= start`，例如 22:00–06:00）的 `work_days`
+     * 指的是**開始上班那天**。勾了週五就是週五晚上上班、週六清晨下班。
+     *
+     * @param int|\App\Models\User $user 已經撈好的 User 傳進來，避免在迴圈裡逐人查
+     * @param string               $date Y-m-d
+     * @return array{start: string, end: string, assignment_id: int|null, is_fixed: bool, is_overnight: bool}|null
+     */
+    public function resolveWorkTime($user, $date)
+    {
+        $user = $user instanceof \App\Models\User ? $user : $this->userRepository->find((int) $user);
+
+        if (blank($user)) {
+            return null;
+        }
+
+        // 短路：絕大多數人是輪班，不必碰帳號上那幾個欄位
+        if (!$user->isFixedWorkMode()) {
+            return $this->workTimeFromAssignment((int) $user->id, $date);
+        }
+
+        return $this->workTimeFromUser($user, $date);
+    }
+
+    /**
+     * 輪班：從當天的排班指派拿
+     *
+     * @param int    $userId
+     * @param string $date
+     * @return array|null
+     */
+    private function workTimeFromAssignment($userId, $date)
+    {
+        $assignment = $this->findTodayAssignment($userId, $date);
+
+        if (blank($assignment) || blank($assignment->shift)) {
+            return null;
+        }
+
+        return $this->buildWorkTime(
+            (string) $assignment->shift->start_time,
+            (string) $assignment->shift->end_time,
+            (int) $assignment->id,
+            false
+        );
+    }
+
+    /**
+     * 固定班：從帳號上設定的起訖與上班日拿
+     *
+     * @param \App\Models\User $user
+     * @param string           $date
+     * @return array|null
+     */
+    private function workTimeFromUser($user, $date)
+    {
+        // 設定不完整（勾了固定班卻沒填時間）＝ 無從判定，當成不用上班
+        if (blank($user->work_start_time) || blank($user->work_end_time)) {
+            return null;
+        }
+
+        // Carbon 的 dayOfWeekIso：1=週一 … 7=週日，跟 work_days 的存法一致
+        if (!in_array(Carbon::parse($date)->dayOfWeekIso, $user->workDayList(), true)) {
+            return null;
+        }
+
+        return $this->buildWorkTime(
+            (string) $user->work_start_time,
+            (string) $user->work_end_time,
+            // 固定班沒有排班指派，紀錄上這一欄會是 null
+            null,
+            true
+        );
+    }
+
+    /**
+     * 一批出勤紀錄各自對應的標準上下班時間（出勤明細顯示用）
+     *
+     * 明細頁要顯示班別、提早上班幾分、延後下班幾分 —— 那些都需要「那天本來
+     * 幾點上下班」。原本 Blade 直接從 `$r->assignment->shift` 取，
+     * 於是固定班的人整欄都是 `-`。
+     *
+     * ⚠ **不逐日再查一次 DB**：輪班直接用紀錄上已經 eager load 的 assignment
+     * （`getByUserAndMonth()` 帶了 `with('assignment.shift')`），固定班根本
+     * 不必查 —— 時間在帳號上。一個月 31 筆逐日打 `resolveWorkTime()` 就是 31 次查詢。
+     *
+     * @param \App\Models\User $user
+     * @param iterable         $records
+     * @return array<string, array|null> date => work time（null = 那天不用上班）
+     */
+    public function workTimesForRecords($user, $records)
+    {
+        $map = [];
+        $isFixed = filled($user) && $user->isFixedWorkMode();
+
+        foreach ($records as $record) {
+            $date = $record->date->format('Y-m-d');
+
+            if ($isFixed) {
+                $map[$date] = $this->workTimeFromUser($user, $date);
+
+                continue;
+            }
+
+            $assignment = $record->assignment;
+
+            $map[$date] = filled($assignment) && filled($assignment->shift)
+                ? $this->buildWorkTime(
+                    (string) $assignment->shift->start_time,
+                    (string) $assignment->shift->end_time,
+                    (int) $assignment->id,
+                    false
+                )
+                : null;
+        }
+
+        return $map;
+    }
+
+    /**
+     * 把一組上下班時間整理成計算用的形狀
+     *
+     * ⚠ **`end_minutes` 一律換算成「從上班那天午夜起算」。** 既有班別用
+     * `00:00` 表示「到午夜」（＝1440），固定班則可以設到隔天任何時刻
+     * （22:00–06:00 → 1800）。在這裡一次算好，後面的早退／加班就不必各自
+     * 認得「哪一種寫法代表跨日」—— `ClockAmendmentService` 以前就是因為要
+     * 自己認 `00:00`，而在兩個方法裡各寫了一次 `if ($endMin === 0)`。
+     *
+     * @param string   $start        HH:mm:ss
+     * @param string   $end          HH:mm:ss
+     * @param int|null $assignmentId
+     * @param bool     $isFixed
+     * @return array
+     */
+    private function buildWorkTime($start, $end, $assignmentId, $isFixed)
+    {
+        $startMinutes = $this->toMinutes($start);
+        $endMinutes = $this->toMinutes($end);
+
+        // 不晚於上班時間就是跨日（`00:00` → 0 <= 任何上班時間，自然命中）
+        $isOvernight = $endMinutes <= $startMinutes;
+
+        return [
+            'start'         => $start,
+            'end'           => $end,
+            'start_minutes' => $startMinutes,
+            'end_minutes'   => $isOvernight ? $endMinutes + 1440 : $endMinutes,
+            'assignment_id' => $assignmentId,
+            'is_fixed'      => $isFixed,
+            'is_overnight'  => $isOvernight,
+        ];
+    }
+
+    /**
+     * HH:mm:ss → 從午夜起算的分鐘數
+     *
+     * @param string $time
+     * @return int
+     */
+    private function toMinutes($time)
+    {
+        $parts = explode(':', (string) $time);
+
+        return (int) Arr::get($parts, 0, 0) * 60 + (int) Arr::get($parts, 1, 0);
     }
 
     /**
@@ -73,20 +258,23 @@ class AttendanceService
             ]);
         }
 
-        // 找今日排班
-        $assignment = $this->findTodayAssignment($userId, $today);
+        /*
+         * 今天的標準上下班時間：輪班從排班拿、固定班從帳號拿。
+         *
+         * null ＝ 這天不用上班（沒排到班、或固定班的休假日）。
+         * **仍然可以打卡** —— 假日臨時進來處理事情是常有的，只是沒有遲到可算。
+         */
+        $work = $this->resolveWorkTime($userId, $today);
 
-        // 計算遲到
-        $lateMinutes = 0;
-        if ($assignment && $assignment->shift) {
-            $lateMinutes = $this->calcLateMinutes($assignment->shift->start_time);
-        }
+        $lateMinutes = filled($work)
+            ? $this->calcLateMinutes((int) Arr::get($work, 'start_minutes'))
+            : 0;
 
         $status = $lateMinutes > 0 ? AttendanceRecord::STATUS_LATE : AttendanceRecord::STATUS_INCOMPLETE;
 
         return $this->attendanceRepository->create([
             'user_id'         => $userId,
-            'assignment_id'   => $assignment ? $assignment->id : null,
+            'assignment_id'   => Arr::get($work, 'assignment_id'),
             'date'            => $today,
             'clock_in'        => now(),
             'clock_in_ip'     => $ip,
@@ -137,19 +325,24 @@ class AttendanceService
         // 計算早退和加班
         $earlyLeaveMinutes = 0;
         $overtimeMinutes = 0;
-        $assignment = $record->assignment_id
-            ? $this->assignmentRepository->find($record->assignment_id)
-            : null;
 
-        if ($assignment && $assignment->shift) {
-            $endTime = $assignment->shift->end_time;
-            $result = $this->calcEarlyLeaveAndOvertime($endTime, $isOvernight);
+        /*
+         * ⚠ 用**那筆紀錄的日期**問，不是今天 —— 跨日班的下班卡打在隔天，
+         * 標準時間要看上班那一天（固定班的 `work_days` 也是記開始那天）。
+         *
+         * ⚠ 不再從 `$record->assignment_id` 回查班別：固定班沒有 assignment，
+         * 那條路會直接跳過整段計算，遲到早退加班全部是 0。
+         */
+        $work = $this->resolveWorkTime($record->user_id, $record->date->format('Y-m-d'));
+
+        if (filled($work)) {
+            $result = $this->calcEarlyLeaveAndOvertime((int) Arr::get($work, 'end_minutes'), $isOvernight);
             $earlyLeaveMinutes = $result['early_leave'];
             $overtimeMinutes = $result['overtime'];
 
-            // 提早上班加班：上班打卡時間早於排班開始時間，差值計為加班
+            // 提早上班加班：上班打卡時間早於標準上班時間，差值計為加班
             $overtimeMinutes += $this->calcEarlyClockInOvertime(
-                $assignment->shift->start_time,
+                (int) Arr::get($work, 'start_minutes'),
                 $record->clock_in
             );
         }
@@ -392,13 +585,18 @@ class AttendanceService
     /**
      * 計算遲到分鐘數
      *
-     * @param string $workStart 上班時間 HH:mm:ss
+     * ⚠ **已知限制**：跨日班在午夜之後才打上班卡（22:00 的班拖到 00:30 才打）
+     * 算不出遲到 —— `now()` 的 00:30 比上班時間 22:00 小，相減是負數。
+     * 這不是這次改出來的，輪班的跨日班本來就是如此；而且午夜後才打卡時，
+     * 那一天已經換日，`resolveWorkTime()` 查的是新的一天（固定班的
+     * `work_days` 記的是開始那天），根本拿不到前一晚那組時間。
+     * 要修得連「往前一天找未開始的跨日班」一起做，不在這次範圍。
+     *
+     * @param int $startMinutes 標準上班時間，從午夜起算的分鐘數
      * @return int
      */
-    private function calcLateMinutes($workStart)
+    private function calcLateMinutes($startMinutes)
     {
-        $parts = explode(':', $workStart);
-        $startMinutes = (int) $parts[0] * 60 + (int) $parts[1];
         $nowMinutes = now()->hour * 60 + now()->minute;
 
         $diff = $nowMinutes - $startMinutes;
@@ -409,16 +607,13 @@ class AttendanceService
     /**
      * 計算提早上班的加班分鐘數
      *
-     * @param string                $shiftStart 排班開始時間 HH:mm:ss
-     * @param \Carbon\Carbon|string $clockIn    實際上班打卡時間
+     * @param int                   $startMinutes 標準上班時間，從午夜起算的分鐘數
+     * @param \Carbon\Carbon|string $clockIn      實際上班打卡時間
      * @return int
      */
-    private function calcEarlyClockInOvertime($shiftStart, $clockIn)
+    private function calcEarlyClockInOvertime($startMinutes, $clockIn)
     {
-        $parts = explode(':', $shiftStart);
-        $startMinutes = (int) $parts[0] * 60 + (int) $parts[1];
-
-        $clockInTime = \Carbon\Carbon::parse($clockIn);
+        $clockInTime = Carbon::parse($clockIn);
         $clockInMinutes = $clockInTime->hour * 60 + $clockInTime->minute;
 
         $diff = $startMinutes - $clockInMinutes;
@@ -429,24 +624,27 @@ class AttendanceService
     /**
      * 計算早退和加班分鐘數
      *
-     * @param string $endTime     班別結束時間 HH:mm:ss
-     * @param bool   $isOvernight 是否為跨日打卡（下班打卡日期 ≠ 上班打卡日期）
+     * ⚠ 兩個「跨日」是不同的東西，不要混在一起看：
+     *
+     * | | 意思 | 誰算的 |
+     * |---|---|---|
+     * | `$endMinutes` 已經 > 1440 | **班別設定**跨日（22:00–06:00、或 end 是 00:00） | `buildWorkTime()` |
+     * | `$isOvernight` | **這次打卡**真的打在隔天 | 呼叫端（今天沒紀錄、昨天有未完成的） |
+     *
+     * 原本這裡自己認 `endTime === '00:00'` 把它當 1440，那只蓋得住「到午夜」
+     * 這一種寫法；固定班可以設到隔天任何時刻，所以換算移到 `buildWorkTime()`。
+     *
+     * @param int  $endMinutes  標準下班時間，從**上班那天**午夜起算的分鐘數
+     * @param bool $isOvernight 這次下班打卡是否打在隔天
      * @return array{early_leave: int, overtime: int}
      */
-    private function calcEarlyLeaveAndOvertime($endTime, $isOvernight = false)
+    private function calcEarlyLeaveAndOvertime($endMinutes, $isOvernight = false)
     {
-        $parts = explode(':', $endTime);
-        $endMinutes = (int) $parts[0] * 60 + (int) $parts[1];
         $nowMinutes = now()->hour * 60 + now()->minute;
 
         // 跨日打卡：目前時間已過午夜，加上一天的分鐘數才能正確比較
         if ($isOvernight) {
             $nowMinutes += 1440; // 24 * 60
-        }
-
-        // 處理跨日班（endTime 00:00 代表到午夜）
-        if ($endMinutes === 0) {
-            $endMinutes = 1440;
         }
 
         $diff = $nowMinutes - $endMinutes;

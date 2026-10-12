@@ -25,6 +25,11 @@ use Laravel\Sanctum\HasApiTokens;
  * @property string|null $telegram_nickname Telegram 對話署名，簽在客戶訊息結尾
  * @property string|null $telegram_username Telegram 帳號（不含 @），內部群組提醒時用來 tag 本人
  * @property int|null    $telegram_user_id  Telegram 使用者 ID，首次比對命中時自動回填（見 StaffIgnoreService）
+ * @property int         $work_mode         出勤模式（見 constants.USER.WORK_MODE）
+ * @property string|null $work_start_time   固定班的上班時間 HH:mm:ss
+ * @property string|null $work_end_time     固定班的下班時間 HH:mm:ss，<= 上班時間代表跨日
+ * @property string|null $work_days         固定班的上班日，逗號分隔的 1-7（1=週一）
+ * @property bool        $show_in_shift     固定班是否顯示在排班紀錄
  * @property string|null $deleted_at        軟刪除時間
  */
 class User extends Authenticatable
@@ -42,6 +47,8 @@ class User extends Authenticatable
         'hired_at'    => 'date',
         'resigned_at' => 'date',
         'equipments'  => 'array',
+        'work_mode'     => 'integer',
+        'show_in_shift' => 'boolean',
     ];
 
     /**
@@ -82,6 +89,33 @@ class User extends Authenticatable
     public function isCs()
     {
         return $this->level == config('constants.USER.LEVEL.CS');
+    }
+
+    /**
+     * 是否為固定上下班時間（不吃排班）
+     *
+     * @return bool
+     */
+    public function isFixedWorkMode()
+    {
+        return $this->work_mode == config('constants.USER.WORK_MODE.FIXED');
+    }
+
+    /**
+     * 固定班的上班日（1=週一 … 7=週日）
+     *
+     * ⚠ 回陣列而不是讓呼叫端自己 explode：空字串 explode 出來是 `['']`，
+     * 每個呼叫端都得自己記得濾掉那一格。
+     *
+     * @return array<int>
+     */
+    public function workDayList()
+    {
+        if (blank($this->work_days)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map('intval', explode(',', $this->work_days))));
     }
 
     /**

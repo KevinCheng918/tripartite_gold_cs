@@ -7,24 +7,34 @@ use App\Models\ClockAmendment;
 use App\Repositories\AttendanceRepository;
 use App\Repositories\ClockAmendmentRepository;
 use Carbon\Carbon;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 /**
  * 補打卡申請 Service
+ *
+ * ⚠ **標準上下班時間一律問 `AttendanceService::resolveWorkTime()`。**
+ * 這裡原本自己從 `$record->assignment->shift` 取，於是固定班的人
+ * （工程，沒有排班指派）補打卡後遲到／早退／加班全部是 0 ——
+ * 跟正常打卡同一個病根，修在同一個地方（見 [[fixed-work-hours]]）。
  */
 class ClockAmendmentService
 {
     private $amendmentRepository;
     private $attendanceRepository;
+    private $attendanceService;
 
     public function __construct(
         ClockAmendmentRepository $amendmentRepository,
-        AttendanceRepository $attendanceRepository
+        AttendanceRepository $attendanceRepository,
+        AttendanceService $attendanceService
     ) {
         $this->amendmentRepository = $amendmentRepository;
         $this->attendanceRepository = $attendanceRepository;
+        // 「這個人這天幾點上下班」只有這一個答案來源
+        $this->attendanceService = $attendanceService;
     }
 
     /**
@@ -183,42 +193,39 @@ class ClockAmendmentService
      */
     private function calcLateMinutes($record, $clockTime)
     {
-        if (!$record->assignment || !$record->assignment->shift) {
-            return 0;
-        }
-
-        $startTime = $record->assignment->shift->start_time;
-        $startMin = $this->timeToMinutes($startTime);
-        $clockMin = $this->timeToMinutes($clockTime);
-
-        return max(0, $clockMin - $startMin);
+        return $this->calcLateMinutesForNew(
+            $record->user_id,
+            $record->date->format('Y-m-d'),
+            $clockTime
+        );
     }
 
     /**
-     * 新建紀錄時計算遲到（需查排班）
+     * 計算遲到（兩種情況共用）
+     *
+     * ⚠ 原本有兩份幾乎一樣的程式：一份從 `$record->assignment->shift` 取、
+     * 一份自己下 `ShiftAssignment::where(...)` 查。兩份都只看得到排班，
+     * 所以固定班的人補打卡一律算不出遲到。現在都走 `resolveWorkTime()`，
+     * 它回答「這個人這天幾點該上班」而不管那個答案是排班還是帳號設定來的。
+     *
+     * ⚠ 這裡**不是** `AttendanceService` 那支（那支比的是 `now()`）——
+     * 補打卡比的是申請單上填的時刻。
      *
      * @param int    $userId
-     * @param string $date
-     * @param string $clockTime
+     * @param string $date      Y-m-d
+     * @param string $clockTime HH:mm 或 HH:mm:ss
      * @return int
      */
     private function calcLateMinutesForNew($userId, $date, $clockTime)
     {
-        $assignment = \App\Models\ShiftAssignment::query()
-            ->select(['id', 'shift_id'])
-            ->with(['shift'])
-            ->where('user_id', $userId)
-            ->where('date', $date)
-            ->first();
+        $work = $this->attendanceService->resolveWorkTime($userId, $date);
 
-        if (!$assignment || !$assignment->shift) {
+        // 這天本來就不用上班（沒排到班、或固定班的休假日）→ 沒有遲到可算
+        if (blank($work)) {
             return 0;
         }
 
-        $startMin = $this->timeToMinutes($assignment->shift->start_time);
-        $clockMin = $this->timeToMinutes($clockTime);
-
-        return max(0, $clockMin - $startMin);
+        return max(0, $this->timeToMinutes($clockTime) - (int) Arr::get($work, 'start_minutes'));
     }
 
     /**
@@ -230,19 +237,34 @@ class ClockAmendmentService
      */
     private function calcEarlyMinutes($record, $clockTime, $isOvernight = false)
     {
-        if (!$record->assignment || !$record->assignment->shift) {
+        $endMin = $this->endMinutesOf($record);
+
+        if (blank($endMin)) {
             return 0;
         }
 
-        $endTime = $record->assignment->shift->end_time;
-        $endMin = $this->timeToMinutes($endTime);
+        return max(0, $endMin - $this->clockMinutes($clockTime, $isOvernight));
+    }
 
-        // 跨日班的 end_time 是 00:00，代表「到午夜」而不是當天零點
-        if ($endMin === 0) { $endMin = 1440; }
+    /**
+     * 這筆紀錄當天的標準下班時間（從**上班那天**午夜起算的分鐘數）
+     *
+     * ⚠ 原本兩支（早退、加班）各自從 `$record->assignment->shift` 取，
+     * 又各自寫一次「`00:00` 代表到午夜」的換算。現在問 `resolveWorkTime()`，
+     * 那支回來的 `end_minutes` 已經把跨日加好了 —— 包括固定班設到隔天
+     * 任何時刻（22:00–06:00 → 1800），不只 `00:00` 那一種。
+     *
+     * @param AttendanceRecord $record
+     * @return int|null null = 這天不用上班，沒有早退／加班可算
+     */
+    private function endMinutesOf($record)
+    {
+        $work = $this->attendanceService->resolveWorkTime(
+            $record->user_id,
+            $record->date->format('Y-m-d')
+        );
 
-        $clockMin = $this->clockMinutes($clockTime, $isOvernight);
-
-        return max(0, $endMin - $clockMin);
+        return filled($work) ? (int) Arr::get($work, 'end_minutes') : null;
     }
 
     /**
@@ -272,19 +294,13 @@ class ClockAmendmentService
      */
     private function calcOvertimeMinutes($record, $clockTime, $isOvernight = false)
     {
-        if (!$record->assignment || !$record->assignment->shift) {
+        $endMin = $this->endMinutesOf($record);
+
+        if (blank($endMin)) {
             return 0;
         }
 
-        $endTime = $record->assignment->shift->end_time;
-        $endMin = $this->timeToMinutes($endTime);
-
-        // 跨日班的 end_time 是 00:00，代表「到午夜」而不是當天零點
-        if ($endMin === 0) { $endMin = 1440; }
-
-        $clockMin = $this->clockMinutes($clockTime, $isOvernight);
-
-        return max(0, $clockMin - $endMin);
+        return max(0, $this->clockMinutes($clockTime, $isOvernight) - $endMin);
     }
 
     /**

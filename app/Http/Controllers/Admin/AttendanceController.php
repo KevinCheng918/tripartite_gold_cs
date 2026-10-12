@@ -152,6 +152,12 @@ class AttendanceController extends Controller
             'records'      => $records,
             'yearMonth'    => $yearMonth,
             'amendments'   => $amendments,
+            /*
+             * 「那天本來幾點上下班」—— 班別欄與提早上班／延後下班那兩欄要用。
+             * 在這裡算好，Blade 只負責顯示：原本 Blade 自己從
+             * `$r->assignment->shift` 取，固定班（工程）整欄都是 `-`。
+             */
+            'workTimes'    => $this->attendanceService->workTimesForRecords($targetUser, $records),
         ]);
     }
 

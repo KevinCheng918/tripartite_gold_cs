@@ -88,6 +88,8 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::post('/ajax-store-shift', [ShiftController::class, 'ajaxStoreShift'])->middleware('can:shift.update')->name('ajax-store-shift');
         Route::put('/ajax-update-shift/{shift}', [ShiftController::class, 'ajaxUpdateShift'])->middleware('can:shift.update')->name('ajax-update-shift');
         Route::get('/ajax-assignment-list', [ShiftController::class, 'ajaxAssignmentList'])->middleware('can:shift.view')->name('ajax-assignment-list');
+        // 固定班人員的虛擬排班（課表用，沒有實體 assignment 可查）
+        Route::get('/ajax-fixed-assignments', [ShiftController::class, 'ajaxFixedAssignments'])->middleware('can:shift.view')->name('ajax-fixed-assignments');
         Route::post('/ajax-assign', [ShiftController::class, 'ajaxAssign'])->middleware('can:shift.assign')->name('ajax-assign');
         Route::delete('/ajax-delete-assignment/{assignment}', [ShiftController::class, 'ajaxDeleteAssignment'])->middleware('can:shift.delete')->name('ajax-delete-assignment');
         Route::post('/ajax-request-swap', [ShiftController::class, 'ajaxRequestSwap'])->middleware('can:shift.swap')->name('ajax-request-swap');

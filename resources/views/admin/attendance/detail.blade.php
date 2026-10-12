@@ -104,9 +104,24 @@
                     </thead>
                     <tbody>
                         @forelse($records as $r)
+                            @php
+                                /*
+                                 * 那天本來幾點上下班。輪班來自排班、固定班來自帳號設定，
+                                 * 兩種都由 Controller 算好（AttendanceService::workTimesForRecords）——
+                                 * 這裡不要再從 $r->assignment->shift 取，固定班沒有那個關聯。
+                                 */
+                                $work = $workTimes[$r->date->format('Y-m-d')] ?? null;
+                                $shiftLabel = '-';
+
+                                if (filled($work)) {
+                                    $shiftLabel = Arr::get($work, 'is_fixed')
+                                        ? trans('shift.fixed_shift_name') . ' ' . substr(Arr::get($work, 'start'), 0, 5) . '–' . substr(Arr::get($work, 'end'), 0, 5)
+                                        : (filled($r->assignment) && filled($r->assignment->shift) ? $r->assignment->shift->display_name : '-');
+                                }
+                            @endphp
                             <tr>
                                 <td>{{ \App\Presenters\DatePresenter::withWeekday($r->date) }}</td>
-                                <td>{{ filled($r->assignment) && filled($r->assignment->shift) ? $r->assignment->shift->display_name : '-' }}</td>
+                                <td>{{ $shiftLabel }}</td>
                                 <td>
                                     {{ $r->clock_in ? $r->clock_in->format('H:i:s') : '-' }}
                                     @if(in_array(1, $amendLookup[$r->date->format('Y-m-d')] ?? []))
@@ -120,12 +135,11 @@
                                 </td>
                                 <td>
                                     @php
+                                        // 標準上班時間已經由 $work 給了（含固定班），不必再認 assignment
                                         $earlyClockIn = 0;
-                                        if (filled($r->clock_in) && filled($r->assignment) && filled($r->assignment->shift)) {
-                                            $shiftStartParts = explode(':', $r->assignment->shift->start_time);
-                                            $shiftStartMin = (int) $shiftStartParts[0] * 60 + (int) $shiftStartParts[1];
+                                        if (filled($r->clock_in) && filled($work)) {
                                             $clockInMin = $r->clock_in->hour * 60 + $r->clock_in->minute;
-                                            $earlyClockIn = max($shiftStartMin - $clockInMin, 0);
+                                            $earlyClockIn = max((int) Arr::get($work, 'start_minutes') - $clockInMin, 0);
                                         }
                                     @endphp
                                     @if($earlyClockIn > 0)
@@ -145,16 +159,17 @@
                                 </td>
                                 <td>
                                     @php
+                                        /*
+                                         * `end_minutes` 已經把跨日加好了（到午夜的 00:00 算 1440、
+                                         * 固定班的 06:00 算 1800），這裡不必再認哪種寫法代表跨日。
+                                         */
                                         $lateClockOut = 0;
-                                        if (filled($r->clock_out) && filled($r->assignment) && filled($r->assignment->shift)) {
-                                            $shiftEndParts = explode(':', $r->assignment->shift->end_time);
-                                            $shiftEndMin = (int) $shiftEndParts[0] * 60 + (int) $shiftEndParts[1];
-                                            if ($shiftEndMin === 0) { $shiftEndMin = 1440; }
+                                        if (filled($r->clock_out) && filled($work)) {
                                             $clockOutMin = $r->clock_out->hour * 60 + $r->clock_out->minute;
                                             if ($r->clock_out->format('Y-m-d') !== $r->date->format('Y-m-d')) {
                                                 $clockOutMin += 1440;
                                             }
-                                            $lateClockOut = max($clockOutMin - $shiftEndMin, 0);
+                                            $lateClockOut = max($clockOutMin - (int) Arr::get($work, 'end_minutes'), 0);
                                         }
                                     @endphp
                                     @if($lateClockOut > 0)

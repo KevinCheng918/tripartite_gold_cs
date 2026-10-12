@@ -8,6 +8,14 @@ return [
     'tab_assignments' => '排班紀錄',
     'tab_swaps' => '換班請求',
 
+    /*
+     * 固定班在課表上的班別名稱。
+     *
+     * 這些人沒有排班紀錄，色塊是依帳號設定算出來的 ——
+     * 名稱要讓人一眼看出「這不是排進去的班」，所以不沿用早／午／晚。
+     */
+    'fixed_shift_name' => '固定班',
+
     // 班別
     'shift_morning' => '早班',
     'shift_afternoon' => '午班',
@@ -65,6 +73,7 @@ return [
         'max_string'           => '長度不可超過 :value 字元',
         'invalid_time_format'  => '時間格式不正確（HH:mm）',
         'invalid_date_format'  => '日期格式不正確（Y-m-d）',
+        'range_reversed'       => '結束日期不能早於開始日期',
         'shift_not_found'      => '班別不存在',
         'assignment_not_found' => '排班紀錄不存在',
         'invalid_swap_status'  => '無效的換班狀態',

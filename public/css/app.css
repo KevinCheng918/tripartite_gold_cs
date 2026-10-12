@@ -838,6 +838,18 @@ table tbody tr:hover { background: rgba(0, 0, 0, 0.02); }
     filter: brightness(0.93);
 }
 
+/* 固定班的色塊是依帳號設定算出來的，沒有對應的排班紀錄 ——
+   點了不會有任何事（沒有單可刪、沒有班可代），游標與 hover 都要照實說。
+   虛線左框也讓人一眼分得出「這不是排進去的班」。 */
+.tt-block.tt-shift-fixed {
+    cursor: default;
+    border-left-style: dashed;
+}
+
+.tt-block.tt-shift-fixed:hover {
+    filter: none;
+}
+
 /* 班別色塊填充 */
 .tt-shift-morning {
     background: #fef3c7;

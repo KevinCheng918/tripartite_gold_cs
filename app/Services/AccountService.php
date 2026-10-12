@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Repositories\UserNoticeMuteRepository;
 use App\Repositories\UserRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -134,6 +135,8 @@ class AccountService
             $attributes['telegram_username'] = filled($username) ? $username : null;
         }
 
+        $attributes = array_merge($attributes, $this->workModeAttributes($params));
+
         $updated = DB::transaction(function () use ($user, $attributes) {
             return $this->userRepository->update($user, $attributes);
         });
@@ -195,6 +198,50 @@ class AccountService
      * @param array $enabledKeys 畫面上勾起來的（＝要收的）
      * @return void
      */
+    /**
+     * 整理出勤模式那幾欄
+     *
+     * ⚠ **切回輪班時要把固定班那幾欄清空。** 留著的話畫面上看不到
+     * （表單只在固定班展開），但哪天他又切回固定班，會默默套用上一次的設定 ——
+     * 設定過的人跟沒設定過的人行為不同，而且沒有任何跡象。
+     *
+     * ⚠ `show_in_shift` 一定要給值，不能靠 `array_filter`：取消勾選時送的是
+     * `false`，`filled(false)` 是 false 會被整個濾掉，那個勾就永遠取消不了。
+     *
+     * @param array $params
+     * @return array
+     */
+    private function workModeAttributes(array $params)
+    {
+        if (!array_key_exists('work_mode', $params)) {
+            return [];
+        }
+
+        $mode = (int) Arr::get($params, 'work_mode');
+
+        if ($mode !== (int) config('constants.USER.WORK_MODE.FIXED')) {
+            return [
+                'work_mode'       => (int) config('constants.USER.WORK_MODE.SHIFT'),
+                'work_start_time' => null,
+                'work_end_time'   => null,
+                'work_days'       => null,
+                'show_in_shift'   => false,
+            ];
+        }
+
+        // 勾選的星期存成 '1,2,3,4,5'；一天都沒勾就是 null（等於沒有上班日）
+        $days = array_values(array_unique(array_map('intval', (array) Arr::get($params, 'work_days', []))));
+        sort($days);
+
+        return [
+            'work_mode'       => $mode,
+            'work_start_time' => Arr::get($params, 'work_start_time') ?: null,
+            'work_end_time'   => Arr::get($params, 'work_end_time') ?: null,
+            'work_days'       => filled($days) ? implode(',', $days) : null,
+            'show_in_shift'   => (bool) Arr::get($params, 'show_in_shift', false),
+        ];
+    }
+
     public function updateNotices(User $user, array $enabledKeys)
     {
         $all = array_values((array) config('constants.NOTICE.PERSONAL'));

@@ -96,6 +96,34 @@ return [
     'level_admin' => '管理者',
     'level_cs' => '客服',
 
+    /*
+     * 出勤模式。不排班的人（工程）選「固定時間」之後，
+     * 遲到／早退／加班／曠工才算得出來 —— 那四個判定原本全部來自排班。
+     */
+    'field_work_mode'       => '出勤模式',
+    'work_mode_shift'       => '輪班',
+    'work_mode_shift_hint'  => '上下班時間依排班紀錄，跟現在一樣',
+    'work_mode_fixed'       => '固定時間',
+    'work_mode_fixed_hint'  => '不進排班，上下班時間固定（工程、行政適用）',
+    'field_work_start_time' => '上班時間',
+    'field_work_end_time'   => '下班時間',
+    'work_overnight_hint'   => '下班時間早於或等於上班時間，視為跨日班（例如 22:00 ～ 06:00）。',
+    'field_work_days'       => '上班日',
+    'work_days_hint'        => '沒勾到的日子不用打卡，也不會被算成曠工。國定假日照常算上班日，那天不用上班請走請假。',
+    'field_show_in_shift'   => '顯示在排班紀錄',
+    'show_in_shift_hint'    => '打開後會出現在排班課表上（虛線色塊，不能點）。工程通常不需要。',
+
+    // 星期。key 是 ISO-8601 的 1-7，跟 work_days 存的值一致
+    'weekdays' => [
+        1 => '週一',
+        2 => '週二',
+        3 => '週三',
+        4 => '週四',
+        5 => '週五',
+        6 => '週六',
+        7 => '週日',
+    ],
+
     // 驗證與操作訊息
     'msg' => [
         'telegram_code_issued'    => '綁定碼已產生，:minutes 分鐘內有效',
@@ -116,6 +144,9 @@ return [
         'full_width_account'   => '帳號含全形或不支援的字元，請改用半形英數與底線',
         'max_string'           => '長度不可超過 :value 字元',
         'invalid_status'       => '無效的狀態值',
+        'work_time_required'   => '選「固定時間」就要填上下班時間',
+        'work_time_invalid'    => '時間格式不正確（HH:mm）',
+        'work_days_required'   => '請至少勾選一個上班日',
         'permissions_required' => '請選擇權限',
         'invalid_permission'   => '無效的權限值',
         'create_failed'        => '帳號新增失敗',

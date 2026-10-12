@@ -9,6 +9,9 @@ return [
     'tab_swaps' => 'Swap Requests',
 
     // Shift
+    // Label for fixed-hours staff on the timetable — they have no assignment row
+    'fixed_shift_name' => 'Fixed',
+
     'shift_morning' => 'Morning',
     'shift_afternoon' => 'Afternoon',
     'shift_night' => 'Night',
@@ -64,6 +67,7 @@ return [
         'max_string'           => 'Must not exceed :value characters',
         'invalid_time_format'  => 'Invalid time format (HH:mm)',
         'invalid_date_format'  => 'Invalid date format (Y-m-d)',
+        'range_reversed'       => 'End date cannot be earlier than start date',
         'shift_not_found'      => 'Shift not found',
         'assignment_not_found' => 'Assignment not found',
         'invalid_swap_status'  => 'Invalid swap status',

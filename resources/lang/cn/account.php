@@ -96,6 +96,34 @@ return [
     'level_admin' => '管理者',
     'level_cs' => '客服',
 
+    /*
+     * 出勤模式。不排班的人（工程）选「固定时间」之后，
+     * 迟到／早退／加班／旷工才算得出来 —— 那四个判定原本全部来自排班。
+     */
+    'field_work_mode'       => '出勤模式',
+    'work_mode_shift'       => '轮班',
+    'work_mode_shift_hint'  => '上下班时间依排班纪录，跟现在一样',
+    'work_mode_fixed'       => '固定时间',
+    'work_mode_fixed_hint'  => '不进排班，上下班时间固定（工程、行政适用）',
+    'field_work_start_time' => '上班时间',
+    'field_work_end_time'   => '下班时间',
+    'work_overnight_hint'   => '下班时间早于或等于上班时间，视为跨日班（例如 22:00 ～ 06:00）。',
+    'field_work_days'       => '上班日',
+    'work_days_hint'        => '没勾到的日子不用打卡，也不会被算成旷工。国定假日照常算上班日，那天不用上班请走请假。',
+    'field_show_in_shift'   => '显示在排班纪录',
+    'show_in_shift_hint'    => '打开后会出现在排班课表上（虚线色块，不能点）。工程通常不需要。',
+
+    // 星期。key 是 ISO-8601 的 1-7，跟 work_days 存的值一致
+    'weekdays' => [
+        1 => '周一',
+        2 => '周二',
+        3 => '周三',
+        4 => '周四',
+        5 => '周五',
+        6 => '周六',
+        7 => '周日',
+    ],
+
     'msg' => [
         'telegram_code_issued'    => '绑定码已产生，:minutes 分钟内有效',
         'telegram_code_failed'    => '产生绑定码失败，请稍后再试',
@@ -115,6 +143,9 @@ return [
         'full_width_account'   => '账号含全角或不支持的字元，请改用半角英数与底线',
         'max_string'           => '长度不可超过 :value 字元',
         'invalid_status'       => '无效的状态值',
+        'work_time_required'   => '选「固定时间」就要填上下班时间',
+        'work_time_invalid'    => '时间格式不正确（HH:mm）',
+        'work_days_required'   => '请至少勾选一个上班日',
         'permissions_required' => '请选择权限',
         'invalid_permission'   => '无效的权限值',
         'create_failed'        => '账号新增失败',

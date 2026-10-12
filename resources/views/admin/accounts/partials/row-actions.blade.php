@@ -32,7 +32,14 @@
                 data-telegram-nickname="{{ $account->telegram_nickname }}"
                 data-telegram-username="{{ $account->telegram_username }}"
                 data-level="{{ $account->level }}"
-                data-project-ids="{{ json_encode(filled($account->project_ids) ? $account->project_ids : []) }}">
+                data-project-ids="{{ json_encode(filled($account->project_ids) ? $account->project_ids : []) }}"
+                {{-- 出勤模式。時間原樣輸出（09:00:00）即可 ——
+                     表單那邊走 window.TimeSelect.set()，它自己會截成 HH:mm --}}
+                data-work-mode="{{ $account->work_mode }}"
+                data-work-start-time="{{ $account->work_start_time }}"
+                data-work-end-time="{{ $account->work_end_time }}"
+                data-work-days="{{ $account->work_days }}"
+                data-show-in-shift="{{ $account->show_in_shift ? '1' : '' }}">
             <i class="fas fa-edit btn-icon-wrapper"></i>{{ trans('account.action_edit') }}
         </button>
         <button class="btn btn-outline-secondary btn-icon btn-transition js-change-status"

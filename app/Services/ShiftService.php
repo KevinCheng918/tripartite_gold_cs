@@ -14,6 +14,8 @@ use App\Repositories\ShiftRepository;
 use App\Repositories\UserRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -30,17 +32,28 @@ class ShiftService
     private $assignmentRepository;
     private $userRepository;
     private $leaveRepository;
+    private $attendanceService;
 
     public function __construct(
         ShiftRepository $shiftRepository,
         ShiftAssignmentRepository $assignmentRepository,
         UserRepository $userRepository,
-        LeaveRequestRepository $leaveRepository
+        LeaveRequestRepository $leaveRepository,
+        AttendanceService $attendanceService
     ) {
         $this->shiftRepository = $shiftRepository;
         $this->assignmentRepository = $assignmentRepository;
         $this->userRepository = $userRepository;
         $this->leaveRepository = $leaveRepository;
+        /*
+         * 課表要顯示固定班的人，而「他這天上不上班、幾點到幾點」的答案
+         * 只有一個來源（`resolveWorkTime()`）。在這裡自己比對 `work_days`
+         * 就是同一條規則的第二份 —— 改一邊忘另一邊，課表與打卡會對不起來。
+         *
+         * 反向不成立（AttendanceService 只依賴 ShiftAssignmentRepository），
+         * 所以沒有循環相依。
+         */
+        $this->attendanceService = $attendanceService;
     }
 
     // ---------------------------------------------------------------
@@ -148,6 +161,72 @@ class ShiftService
         }
 
         return $this->assignmentRepository->paginate($criteria, (int) ($params['per_page'] ?? config('constants.PAGINATION.DEFAULT', 10)));
+    }
+
+    /**
+     * 固定班人員在這段期間的「虛擬排班」（課表顯示用）
+     *
+     * 固定班的人沒有 `shift_assignments` 的列 —— 也刻意不寫，理由見
+     * [[fixed-work-hours]]：每人一個班別會塞爆 `shifts`（name 是 UNIQUE）、
+     * 會跑進換班／代班的選單、改一次設定要回頭補刪一整排未來的列。
+     * 所以課表**查詢時合成**，形狀比照 `ShiftAssignmentResource`。
+     *
+     * ⚠ `id` 是 null：前端靠它判斷這個色塊不能點（沒有單可以刪、沒有班可以代）。
+     *
+     * ⚠ 只收 `show_in_shift` 打開的人（需求方 2026-10-12 指定用獨立開關，
+     * 不綁 `level`）—— 工程預設關著，所以不會出現在課表上。
+     *
+     * @param string $dateFrom Y-m-d
+     * @param string $dateTo   Y-m-d
+     * @return array
+     */
+    public function listFixedAssignments($dateFrom, $dateTo)
+    {
+        $users = $this->userRepository->getFixedWorkModeUsers()
+            ->filter(function ($user) {
+                return (bool) $user->show_in_shift;
+            });
+
+        // 短路：沒有人要顯示就不必走日期迴圈
+        if ($users->isEmpty()) {
+            return [];
+        }
+
+        $rows = [];
+        $cursor = Carbon::parse($dateFrom);
+        $end = Carbon::parse($dateTo);
+
+        while ($cursor->lte($end)) {
+            $date = $cursor->toDateString();
+
+            foreach ($users as $user) {
+                $work = $this->attendanceService->resolveWorkTime($user, $date);
+
+                // null = 不是他的上班日
+                if (blank($work)) {
+                    continue;
+                }
+
+                $rows[] = [
+                    'id'       => null,
+                    'user_id'  => (int) $user->id,
+                    'shift_id' => null,
+                    'date'     => $date,
+                    'is_fixed' => true,
+                    'user'     => ['id' => (int) $user->id, 'nickname' => (string) $user->nickname],
+                    'shift'    => [
+                        'id'           => null,
+                        'start_time'   => Arr::get($work, 'start'),
+                        'end_time'     => Arr::get($work, 'end'),
+                        'display_name' => trans('shift.fixed_shift_name'),
+                    ],
+                ];
+            }
+
+            $cursor->addDay();
+        }
+
+        return $rows;
     }
 
     /**

@@ -9,6 +9,9 @@ return [
     'tab_swaps' => '换班请求',
 
     // 班别
+    // 固定班在课表上的班别名称。没有排班纪录，色块是依帐号设定算出来的
+    'fixed_shift_name' => '固定班',
+
     'shift_morning' => '早班',
     'shift_afternoon' => '午班',
     'shift_night' => '晚班',
@@ -64,6 +67,7 @@ return [
         'max_string'           => '长度不可超过 :value 字元',
         'invalid_time_format'  => '时间格式不正确（HH:mm）',
         'invalid_date_format'  => '日期格式不正确（Y-m-d）',
+        'range_reversed'       => '结束日期不能早于开始日期',
         'shift_not_found'      => '班别不存在',
         'assignment_not_found' => '排班记录不存在',
         'invalid_swap_status'  => '无效的换班状态',
