@@ -128,7 +128,7 @@ class TaskNoticeService
 
             foreach ($assignees as $userId) {
                 if (blank(Arr::get($byUser, $userId))) {
-                    $byUser[$userId] = ['overdue' => [], 'today' => [], 'doing' => 0];
+                    $byUser[$userId] = ['overdue' => [], 'today' => [], 'doing' => []];
                 }
 
                 if ($isOverdue) {
@@ -139,9 +139,13 @@ class TaskNoticeService
                     $byUser[$userId]['today'][] = $task;
                 }
 
-                // 進行中只要數量 —— 個人版不列它們，否則每天都是一份長清單
+                /*
+                 * ⚠ **進行中也要存卡片本身，不能只記數量**（需求方 2026-10-12）。
+                 * 原本這裡只 `$doing++`，因為當初決定「進行中不列清單」——
+                 * 現在三類都要逐條列出標題，數字改由 `count()` 得到。
+                 */
                 if ($isDoing) {
-                    $byUser[$userId]['doing']++;
+                    $byUser[$userId]['doing'][] = $task;
                 }
             }
         }
@@ -242,17 +246,32 @@ class TaskNoticeService
             '{doing}'   => $doingCount,
         ]);
 
-        return $text . $this->buildManagerUsers($notice, $byUser);
+        return $text . $this->buildManagerUsers($notice, $date, $byUser);
     }
 
     /**
      * 完整版的「依人員」那段
      *
-     * @param array $notice
-     * @param array $byUser
+     * ⚠ **每個人底下逐條列出卡片標題**（需求方 2026-10-12）。原本每人只有
+     * 一行數字 —— 看得出誰積了幾張，但看不出積的是什麼，主管還是得自己去
+     * 看板翻。
+     *
+     * ⚠ **兩層上限，缺一不可**：
+     *
+     * | 上限 | 擋什麼 |
+     * |---|---|
+     * | `MANAGER_USER_MAX_LINES` | 一個人卡了二十張時，把整則訊息吃光 |
+     * | `MANAGER_MAX_LINES` | 二十個人各卡五張 —— 每個人都沒超標，加起來照樣爆 |
+     *
+     * Telegram 單則 4096 字，超過就整則送不出去（不是截斷）——
+     * 那會變成「最需要被看見的那天，報表反而沒發出來」。
+     *
+     * @param array  $notice
+     * @param string $date
+     * @param array  $byUser
      * @return string
      */
-    private function buildManagerUsers(array $notice, array $byUser)
+    private function buildManagerUsers(array $notice, $date, array $byUser)
     {
         if (blank($byUser)) {
             return '';
@@ -260,28 +279,105 @@ class TaskNoticeService
 
         $names = $this->nicknamesOf(array_keys($byUser));
         $text = (string) Arr::get($notice, 'MANAGER_USER_TITLE');
+        $budget = (int) Arr::get($notice, 'MANAGER_MAX_LINES');
 
         foreach ($byUser as $userId => $stat) {
             $replace = [
                 '{overdue}' => count($stat['overdue']),
                 '{today}'   => count($stat['today']),
-                '{doing}'   => $stat['doing'],
+                '{doing}'   => count($stat['doing']),
             ];
 
             // 沒有指派人的那一列不掛名字，而且要看得出是警告
-            if ((int) $userId === self::NO_ASSIGNEE) {
-                $text .= strtr((string) Arr::get($notice, 'MANAGER_NO_ASSIGNEE'), $replace);
+            $text .= (int) $userId === self::NO_ASSIGNEE
+                ? strtr((string) Arr::get($notice, 'MANAGER_NO_ASSIGNEE'), $replace)
+                : strtr(
+                    (string) Arr::get($notice, 'MANAGER_USER_LINE'),
+                    array_merge($replace, ['{name}' => (string) Arr::get($names, (int) $userId, "#{$userId}")])
+                );
 
-                continue;
-            }
+            /*
+             * 順序就是急迫度：逾期 → 今日到期 → 進行中。
+             * 主管掃到第一行紅的就知道該找誰談。
+             */
+            // 同一張卡可能逾期又在進行中，去重理由見 uniqueTasks()
+            $tasks = $this->uniqueTasks($stat['overdue'], $stat['today'], $stat['doing']);
 
-            $text .= strtr(
-                (string) Arr::get($notice, 'MANAGER_USER_LINE'),
-                array_merge($replace, ['{name}' => (string) Arr::get($names, (int) $userId, "#{$userId}")])
-            );
+            // $budget 傳參考，由它自己扣掉實際列出的行數 —— 在這裡再算一次
+            // 「列了幾行」就是同一條規則的第二份
+            $text .= $this->buildManagerTaskLines($notice, $date, $tasks, $budget);
         }
 
         return $text . (string) Arr::get($notice, 'MANAGER_MULTI_NOTE');
+    }
+
+    /**
+     * 完整版裡某個人底下那幾行卡片
+     *
+     * ⚠ 一行一張（不像個人版拆三行）：完整版是給主管掃的，
+     * 每張卡佔三行的話十個人就是一面牆。
+     *
+     * @param array  $notice
+     * @param string $date
+     * @param array  $tasks
+     * @param int    $budget 整則訊息還剩幾行可以用。**傳參考**，這裡會扣掉實際用掉的
+     * @return string
+     */
+    private function buildManagerTaskLines(array $notice, $date, array $tasks, &$budget)
+    {
+        if (blank($tasks) || $budget < 1) {
+            return '';
+        }
+
+        $max = min((int) Arr::get($notice, 'MANAGER_USER_MAX_LINES'), $budget);
+        $text = '';
+        $shown = 0;
+
+        foreach ($tasks as $task) {
+            if ($shown >= $max) {
+                break;
+            }
+
+            $text .= strtr((string) Arr::get($notice, 'MANAGER_TASK_LINE'), [
+                '{icon}'    => $this->taskIcon($notice, $task, $date),
+                '{title}'   => $this->noticeText->shorten($task->title, (int) Arr::get($notice, 'TITLE_CHARS')),
+                '{project}' => filled($task->project) ? (string) $task->project->name : '-',
+                '{due}'     => $this->dueText($notice, $task, $date),
+            ]);
+            $shown++;
+        }
+
+        $budget -= $shown;
+
+        if (count($tasks) > $shown) {
+            $text .= strtr((string) Arr::get($notice, 'MANAGER_MORE_LINE'), ['{count}' => count($tasks) - $shown]);
+        }
+
+        return $text;
+    }
+
+    /**
+     * 這張卡在清單上用哪個圖示
+     *
+     * 逾期優先於今日到期，兩者都不是就是進行中 —— 一張卡可能同時逾期又在
+     * 進行中，這時要顯示比較急的那個。
+     *
+     * @param array  $notice
+     * @param object $task
+     * @param string $date
+     * @return string
+     */
+    private function taskIcon(array $notice, $task, $date)
+    {
+        if ($this->isOverdue($task, $date)) {
+            return (string) Arr::get($notice, 'ICON_OVERDUE');
+        }
+
+        if ($this->isDueToday($task, $date)) {
+            return (string) Arr::get($notice, 'ICON_TODAY');
+        }
+
+        return (string) Arr::get($notice, 'ICON_DOING');
     }
 
     /**
@@ -376,10 +472,10 @@ class TaskNoticeService
         $notice = (array) config('constants.TASK_NOTICE');
         $overdue = (array) Arr::get($stat, 'overdue', []);
         $today = (array) Arr::get($stat, 'today', []);
-        $doing = (int) Arr::get($stat, 'doing', 0);
+        $doing = (array) Arr::get($stat, 'doing', []);
 
-        // 三個數字都是 0 = 手上真的沒東西
-        if (blank($overdue) && blank($today) && $doing < 1) {
+        // 三類都是空的 = 手上真的沒東西
+        if (blank($overdue) && blank($today) && blank($doing)) {
             return strtr((string) Arr::get($notice, 'PERSONAL_CLEAR'), [
                 '{name}' => $name,
                 '{date}' => $this->noticeText->date($date),
@@ -394,27 +490,33 @@ class TaskNoticeService
         $text .= strtr((string) Arr::get($notice, 'PERSONAL_SUMMARY'), [
             '{overdue}' => count($overdue),
             '{today}'   => count($today),
-            '{doing}'   => $doing,
+            '{doing}'   => count($doing),
         ]);
 
-        return $text . $this->buildPersonalList($notice, $date, $overdue, $today);
+        return $text . $this->buildPersonalList($notice, $date, $overdue, $today, $doing);
     }
 
     /**
-     * 個人版底下「要留意的」那幾張卡
+     * 個人版底下的卡片清單
      *
-     * ⚠ 只列逾期與今日到期，**不列進行中** —— 進行中全列出來，手上十張卡的人
-     * 每天會收到一份長清單，真正要趕的那幾張反而被埋掉。
+     * ⚠ **三類都逐條列出標題**（需求方 2026-10-12）。原本只列逾期與今日到期，
+     * 進行中只給數字 —— 當時的理由是「進行中全列出來會變成每天一份長清單」。
+     * 需求方要的就是看得到標題，所以改成三類都列，長度由 `MAX_LINES` 控。
+     *
+     * ⚠ **一份清單而不是分段**：分成「要留意的／進行中」兩段的話，
+     * 一張逾期又在跑的卡會在兩段各出現一次。順序本身就是急迫度
+     * （逾期 → 今日到期 → 進行中），圖示也看得出是哪一類 —— 不需要分段。
      *
      * @param array  $notice
      * @param string $date
      * @param array  $overdue
      * @param array  $today
+     * @param array  $doing
      * @return string
      */
-    private function buildPersonalList(array $notice, $date, array $overdue, array $today)
+    private function buildPersonalList(array $notice, $date, array $overdue, array $today, array $doing)
     {
-        $tasks = array_merge($overdue, $today);
+        $tasks = $this->uniqueTasks($overdue, $today, $doing);
 
         if (blank($tasks)) {
             return '';
@@ -429,10 +531,8 @@ class TaskNoticeService
                 break;
             }
 
-            $isOverdue = $this->isOverdue($task, $date);
-
             $text .= strtr((string) Arr::get($notice, 'PERSONAL_LINE'), [
-                '{icon}'    => (string) Arr::get($notice, $isOverdue ? 'ICON_OVERDUE' : 'ICON_TODAY'),
+                '{icon}'    => $this->taskIcon($notice, $task, $date),
                 '{title}'   => $this->noticeText->shorten($task->title, (int) Arr::get($notice, 'TITLE_CHARS')),
                 '{project}' => filled($task->project) ? (string) $task->project->name : '-',
                 '{due}'     => $this->dueText($notice, $task, $date),
@@ -445,6 +545,41 @@ class TaskNoticeService
         }
 
         return $text;
+    }
+
+    /**
+     * 把三類合成一份清單，同一張卡只留一次
+     *
+     * ⚠ **一定要去重**：一張卡可以同時逾期**又**在進行中，三類是各算各的
+     * （見 [[task-daily-notice]] 的決策），所以 `array_merge` 之後同一張會
+     * 出現兩次。數字重複是刻意的（三個數字各回答一個問題），
+     * 但**同一行標題在清單裡出現兩次只會讓人以為系統壞了**。
+     *
+     * ⚠ 順序就是急迫度（逾期 → 今日到期 → 進行中），而去重保留**第一次**
+     * 出現的那一筆 —— 所以逾期又在跑的卡會排在逾期那一段，圖示也跟著是紅的。
+     *
+     * ⚠ 清單張數會**少於**三個數字相加，那是對的：相加本來就會重複計算。
+     *
+     * @param array ...$groups
+     * @return array
+     */
+    private function uniqueTasks(...$groups)
+    {
+        $seen = [];
+        $tasks = [];
+
+        foreach (array_merge(...$groups) as $task) {
+            $id = (int) $task->id;
+
+            if (array_key_exists($id, $seen)) {
+                continue;
+            }
+
+            $seen[$id] = true;
+            $tasks[] = $task;
+        }
+
+        return $tasks;
     }
 
     /**
