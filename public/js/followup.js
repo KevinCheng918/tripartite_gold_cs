@@ -19,6 +19,15 @@
     var statuses = JSON.parse(root.dataset.statuses);
     var customerSource = parseInt(root.dataset.customerSource, 10);
     var canManage = root.dataset.canManage === '1';
+
+    /*
+     * 三個動作的值由後端帶進來（constants.FOLLOWUP.DECISION），
+     * **不要在這裡寫死 'go' / 'no' / 'wait'** —— 那組值同時是 Telegram
+     * 按鈕的 callback_data，寫死在前端等於同一件事有兩個定義。
+     */
+    var ACTION_FOLLOW = root.dataset.actionFollow;
+    var ACTION_DEFER = root.dataset.actionDefer;
+    var ACTION_CLOSE = root.dataset.actionClose;
     var csrfToken = document.querySelector('meta[name="csrf-token"]').content;
 
     var currentPage = 1;
@@ -220,9 +229,15 @@
     function actionButtons(row) {
         if (!canManage || !row.can_decide) { return '<span class="text-muted">-</span>'; }
 
+        /*
+         * 三顆跟 Telegram 那則訊息上的按鈕一一對應 —— 後台與群組是同一件事
+         * 的兩個入口，少一顆就會有人為了那個動作特地跑去另一邊按。
+         */
         return '<div class="btn-group btn-group-sm row-actions">'
             + '<button type="button" class="btn btn-outline-primary btn-transition js-followup-follow" data-id="' + row.id
             + '" data-source="' + row.source + '">' + escapeHtml(i18n.action_follow) + '</button>'
+            + '<button type="button" class="btn btn-outline-secondary btn-transition js-followup-defer" data-id="' + row.id
+            + '">' + escapeHtml(i18n.action_defer) + '</button>'
             + '<button type="button" class="btn btn-outline-secondary btn-transition js-followup-close" data-id="' + row.id
             + '">' + escapeHtml(i18n.action_close) + '</button>'
             + '</div>';
@@ -263,19 +278,23 @@
      * 當班人員），所以確認的文字也不一樣 —— 按下去會發生什麼事，
      * 按之前就要看得出來。
      */
-    function confirmDecide(id, follow, source) {
+    function confirmDecide(id, action, source) {
         var message = i18n.confirm_close;
 
-        if (follow) {
+        if (action === ACTION_FOLLOW) {
             message = source === customerSource
                 ? i18n.confirm_follow_customer
                 : i18n.confirm_follow_staff;
         }
 
+        if (action === ACTION_DEFER) {
+            message = i18n.confirm_defer;
+        }
+
         var modalEl = document.getElementById('modal-followup-confirm');
         modalEl.querySelector('.modal-body').textContent = message;
 
-        pendingAction = { id: id, follow: follow };
+        pendingAction = { id: id, action: action };
         new bootstrap.Modal(modalEl).show();
     }
 
@@ -289,7 +308,7 @@
 
         apiFetch('/admin/followup/ajax-decide/' + action.id, {
             method: 'PUT',
-            body: JSON.stringify({ follow: action.follow })
+            body: JSON.stringify({ action: action.action })
         })
             .then(function (body) {
                 showMessage(body.message || i18n.msg.decided);
@@ -353,7 +372,15 @@
         var follow = event.target.closest('.js-followup-follow');
 
         if (follow) {
-            confirmDecide(follow.dataset.id, true, parseInt(follow.dataset.source, 10));
+            confirmDecide(follow.dataset.id, ACTION_FOLLOW, parseInt(follow.dataset.source, 10));
+
+            return;
+        }
+
+        var defer = event.target.closest('.js-followup-defer');
+
+        if (defer) {
+            confirmDecide(defer.dataset.id, ACTION_DEFER, null);
 
             return;
         }
@@ -361,7 +388,7 @@
         var close = event.target.closest('.js-followup-close');
 
         if (close) {
-            confirmDecide(close.dataset.id, false, null);
+            confirmDecide(close.dataset.id, ACTION_CLOSE, null);
 
             return;
         }

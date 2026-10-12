@@ -53,10 +53,14 @@ return [
 
     // 操作
     'action_follow' => '追蹤',
+    // 現在不決定，過一陣子再問一次
+    'action_defer'  => '繼續等',
     'action_close'  => '結案',
 
     'confirm_follow_customer' => '確定要追蹤嗎？系統會發訊息問客人後續進度。',
     'confirm_follow_staff'    => '確定要追蹤嗎？系統會在支援群組 tag 當班人員接手處理，不會發訊息給客人。',
+    // 要講明「還會再問」與「次數照算」——否則看起來跟結案或無限拖沒兩樣
+    'confirm_defer'           => '這筆先不決定嗎？系統會把下一次詢問往後推，安靜一段時間後再問一次。不會發訊息給客人，也不會結案；已經問過的次數照算，所以不會無限延後。',
     'confirm_close'           => '確定結案嗎？這個話題就結束了，不會再提醒。',
     'confirm_ok'              => '確定',
     'confirm_cancel'          => '取消',
@@ -64,7 +68,7 @@ return [
     'msg' => [
         'not_found'       => '這筆待追蹤事項已經處理過了',
         'decided'         => '已處理',
-        'decide_required' => '請指定要追蹤還是結案',
+        'decide_required' => '請指定要追蹤、繼續等還是結案',
         'decide_failed'   => '處理失敗，請稍後再試',
         'load_failed'     => '載入失敗，請稍後再試',
         'date_invalid'    => '日期格式不正確',

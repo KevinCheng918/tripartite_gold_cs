@@ -473,10 +473,14 @@ class CustomerFollowupService
     }
 
     /**
-     * 兩顆按鈕
+     * 三顆按鈕
      *
      * 我方承諾沒有「問客人」這個動作，所以第一顆的字不一樣 ——
      * 按下去會發生什麼事，按之前就要看得出來。
+     *
+     * ⚠ 第三顆「繼續等」是 2026-10-12 加的。原本只有追蹤與結案兩顆，
+     * 而最常見的情況其實是「再等等看」—— 沒有那一顆，當班人員只能不按，
+     * 於是系統每隔一段時間就再問一次同樣的問題，變成雜訊。
      *
      * @param ConversationFollowup $followup
      * @return array
@@ -494,6 +498,9 @@ class CustomerFollowupService
         return [
             [
                 ['text' => (string) $follow, 'callback_data' => "{$prefix}:{$decisions['FOLLOW']}:{$followup->id}"],
+            ],
+            [
+                ['text' => (string) Arr::get($ask, 'BUTTON_DEFER'), 'callback_data' => "{$prefix}:{$decisions['DEFER']}:{$followup->id}"],
             ],
             [
                 ['text' => (string) Arr::get($ask, 'BUTTON_CLOSE'), 'callback_data' => "{$prefix}:{$decisions['CLOSE']}:{$followup->id}"],
@@ -527,8 +534,17 @@ class CustomerFollowupService
         $user = $this->userRepository->findByTelegramUserId((int) Arr::get($from, 'id'));
         $who = filled($user) ? (string) $user->nickname : (string) Arr::get($decided, 'UNKNOWN_USER');
 
-        if ((string) Arr::get($parts, 0) === (string) config('constants.FOLLOWUP.DECISION.CLOSE')) {
+        $decision = (string) Arr::get($parts, 0);
+
+        if ($decision === (string) config('constants.FOLLOWUP.DECISION.CLOSE')) {
             $this->closeByDecision($followup, $user, $messageId, $who);
+
+            return;
+        }
+
+        // 繼續等：不追也不結案，只把下一次詢問往後推
+        if ($decision === (string) config('constants.FOLLOWUP.DECISION.DEFER')) {
+            $this->deferByDecision($followup, $messageId, $who);
 
             return;
         }
@@ -539,11 +555,11 @@ class CustomerFollowupService
     /**
      * 後台列表
      *
-     * ⚠ **預設只看還活著的**（等待中＋已追問）：這一頁是待辦清單，
-     * 混進已結案的就看不出「現在要處理幾件」。要看歷史時前端送
-     * `status=all`。
+     * ⚠ **預設看全部**（2026-10-12 改）。原本預設只看還活著的那兩種，
+     * 現在留白＝全部、`open` 才是「只看未結案」—— 畫面預設與「不帶參數」
+     * 是同一件事。期間則由前端預設帶今天。
      *
-     * @param array $params source / status / group_id / per_page
+     * @param array $params source / status / date_from / date_to / group_id / per_page
      * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
     public function list(array $params)
@@ -597,13 +613,13 @@ class CustomerFollowupService
      * 跟按鈕走同一條路（`decided_by` 一樣要記）—— 統計要分得出
      * 「有人決定」與「沒人理」。
      *
-     * @param int  $id
-     * @param int  $userId 操作者
-     * @param bool $follow true=追蹤, false=結案
+     * @param int    $id
+     * @param int    $userId 操作者
+     * @param string $action 見 constants.FOLLOWUP.DECISION：go=追蹤 / no=結案 / wait=繼續等
      * @return ConversationFollowup
      * @throws \RuntimeException
      */
-    public function decide($id, $userId, $follow)
+    public function decide($id, $userId, $action)
     {
         $followup = $this->repository->find($id);
 
@@ -613,8 +629,19 @@ class CustomerFollowupService
 
         $user = $this->userRepository->find($userId);
         $who = filled($user) ? (string) $user->nickname : (string) config('constants.FOLLOWUP.DECIDED.UNKNOWN_USER');
+        $decisions = (array) config('constants.FOLLOWUP.DECISION');
 
-        if ($follow) {
+        /*
+         * 三條路跟 Telegram 按鈕完全一樣（`handleCallback()`）——
+         * 後台與群組是同一件事的兩個入口，規則只能有一份。
+         */
+        if ((string) $action === (string) Arr::get($decisions, 'DEFER')) {
+            $this->deferByDecision($followup, $followup->ask_message_id, $who);
+
+            return $this->repository->find($id);
+        }
+
+        if ((string) $action === (string) Arr::get($decisions, 'FOLLOW')) {
             $this->followByDecision($followup, $user, $followup->ask_message_id, $who);
 
             return $this->repository->find($id);
@@ -645,6 +672,54 @@ class CustomerFollowupService
         $this->editAsk($messageId, $this->buildDecidedText('CLOSED', $followup, $who));
 
         Log::info('待追蹤事項結案', ['followup_id' => $followup->id, 'by' => $who]);
+    }
+
+    /**
+     * 繼續等：現在不決定，過一陣子再問一次
+     *
+     * ⚠ **這不是一個「決定」**，所以 `decided_by` / `decided_at` 都不寫 ——
+     * 列表的「誰決定的」要繼續顯示「還沒問過」。寫進去的話，一筆沒人真正
+     * 處理的事項看起來會像已經有人接手了。
+     *
+     * ⚠ **`remind_count` 刻意不歸零**（跟「對方自己又說話」那條路不一樣）：
+     * 歸零的話按這顆就能無限拖，第 3 次 tag 主管、到上限停那套升級機制
+     * 永遠走不到。延後的是「下次什麼時候問」，不是「已經問過幾次」。
+     *
+     * ⚠ 狀態維持原樣（等待中或已追問）：它只是把鬧鐘按掉，不改變這筆事情
+     * 走到哪一步了。
+     *
+     * @param ConversationFollowup $followup
+     * @param int|null             $messageId
+     * @param string               $who
+     * @return void
+     */
+    private function deferByDecision(ConversationFollowup $followup, $messageId, $who)
+    {
+        /*
+         * ⚠ **兩個時間都要設成現在，`last_reminded_at` 絕對不能設 null。**
+         *
+         * `getDueForAsk()` 有三條路，而第三條是
+         * 「`remind_count > 0` 卻沒有 `last_reminded_at`」—— 那是給壞資料的
+         * 保險（寧可多問一次也不要永遠不問）。按「繼續等」的時候
+         * `remind_count` 一定 > 0（它是被問過才按得到的），
+         * 把 `last_reminded_at` 清成 null 正好命中那條路 ——
+         * **下一分鐘就會再問一次**，跟這顆按鈕要的完全相反。
+         *
+         * 兩個都設 now()：`remind_count` 是 0 還是 >0 都走得到正確的那條路。
+         */
+        $this->repository->update($followup, [
+            'wait_at'          => now(),
+            'last_reminded_at' => now(),
+        ]);
+
+        $this->editAsk($messageId, $this->buildDecidedText('DEFERRED', $followup, $who));
+
+        Log::info('待追蹤事項：選擇繼續等', [
+            'followup_id'  => $followup->id,
+            'by'           => $who,
+            // 次數不歸零，所以記下來看得出這筆被推後過幾輪
+            'remind_count' => (int) $followup->remind_count,
+        ]);
     }
 
     /**

@@ -46,10 +46,14 @@ return [
 
     // 操作
     'action_follow' => '跟进',
+    // 现在不决定，过一阵子再问一次
+    'action_defer'  => '继续等',
     'action_close'  => '结案',
 
     'confirm_follow_customer' => '确定要跟进吗？系统会发消息问客人后续进度。',
     'confirm_follow_staff'    => '确定要跟进吗？系统会在支持群组 tag 当班人员接手处理，不会发消息给客人。',
+    // 要讲明「还会再问」与「次数照算」——否则看起来跟结案或无限拖没两样
+    'confirm_defer'           => '这笔先不决定吗？系统会把下一次询问往后推，安静一段时间后再问一次。不会发消息给客人，也不会结案；已经问过的次数照算，所以不会无限延后。',
     'confirm_close'           => '确定结案吗？这个话题就结束了，不会再提醒。',
     'confirm_ok'              => '确定',
     'confirm_cancel'          => '取消',
@@ -57,7 +61,7 @@ return [
     'msg' => [
         'not_found'       => '这笔待跟进事项已经处理过了',
         'decided'         => '已处理',
-        'decide_required' => '请指定要跟进还是结案',
+        'decide_required' => '请指定要跟进、继续等还是结案',
         'decide_failed'   => '处理失败，请稍后再试',
         'load_failed'     => '载入失败，请稍后再试',
         'date_invalid'    => '日期格式不正确',

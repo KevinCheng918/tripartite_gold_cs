@@ -65,7 +65,7 @@ class FollowupController extends Controller
             $followup = $this->followupService->decide(
                 (int) $id,
                 Auth::id(),
-                (bool) Arr::get($params, 'follow')
+                (string) Arr::get($params, 'action')
             );
 
             return response()->json([

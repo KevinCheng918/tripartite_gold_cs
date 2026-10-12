@@ -13,6 +13,11 @@
          data-sources='@json(config("constants.FOLLOWUP.SOURCE_LABEL"), JSON_HEX_APOS | JSON_HEX_QUOT)'
          data-statuses='@json(config("constants.FOLLOWUP.STATUS_LABEL"), JSON_HEX_APOS | JSON_HEX_QUOT)'
          data-customer-source="{{ config('constants.FOLLOWUP.SOURCE.CUSTOMER') }}"
+         {{-- 三個動作的值跟 Telegram 按鈕的 callback_data 共用同一組常數，
+              前端不要自己寫死 --}}
+         data-action-follow="{{ config('constants.FOLLOWUP.DECISION.FOLLOW') }}"
+         data-action-defer="{{ config('constants.FOLLOWUP.DECISION.DEFER') }}"
+         data-action-close="{{ config('constants.FOLLOWUP.DECISION.CLOSE') }}"
          data-can-manage="{{ Auth::user()->hasPermission('followup.manage') ? '1' : '0' }}">
 
         <div class="main-card mb-3 card">

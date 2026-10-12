@@ -46,10 +46,14 @@ return [
 
     // Actions
     'action_follow' => 'Follow up',
+    // Decide later — ask again after things go quiet
+    'action_defer'  => 'Keep waiting',
     'action_close'  => 'Close',
 
     'confirm_follow_customer' => 'Follow up? The system will message the customer about progress.',
     'confirm_follow_staff'    => 'Follow up? The system will tag the on-duty staff in the support group to pick this up. The customer is not messaged.',
+    // Must say both "we will ask again" and "the count still stands" — otherwise it reads as closing, or as stalling forever
+    'confirm_defer'           => 'Leave this undecided for now? The next prompt is pushed back and you will be asked again once things go quiet. The customer is not messaged and nothing is closed; rounds already asked still count, so this cannot be deferred forever.',
     'confirm_close'           => 'Close this? The topic ends here and no further reminders are sent.',
     'confirm_ok'              => 'Confirm',
     'confirm_cancel'          => 'Cancel',
@@ -57,7 +61,7 @@ return [
     'msg' => [
         'not_found'       => 'This follow-up has already been handled',
         'decided'         => 'Done',
-        'decide_required' => 'Please choose whether to follow up or close',
+        'decide_required' => 'Please choose: follow up, keep waiting, or close',
         'decide_failed'   => 'Could not complete that, please try again',
         'load_failed'     => 'Could not load the list, please try again',
         'date_invalid'    => 'Invalid date format',
