@@ -15,6 +15,9 @@ return [
     'filter_group'      => 'Conversation',
     'filter_all'        => 'All',
     'filter_open_only'  => 'Open only',
+    // The range filters on when the item was opened; blank means no limit
+    'filter_date_from'  => 'Opened from',
+    'filter_date_to'    => 'Opened to',
     'filter_search'     => 'Search',
     'filter_reset'      => 'Clear',
 
@@ -54,5 +57,8 @@ return [
         'decide_required' => 'Please choose whether to follow up or close',
         'decide_failed'   => 'Could not complete that, please try again',
         'load_failed'     => 'Could not load the list, please try again',
+        'date_invalid'    => 'Invalid date format',
+        'range_required'  => 'Pick both a start and an end date',
+        'range_reversed'  => 'End date cannot be earlier than start date',
     ],
 ];

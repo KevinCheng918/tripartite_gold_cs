@@ -21,15 +21,37 @@
 
                 {{-- 篩選 --}}
                 <div class="row g-2 align-items-end">
-                    <div class="col-md-3">
+                    <div class="col-md-3 col-6">
                         <label class="form-label" for="followup-filter-source">{{ trans('followup.filter_source') }}</label>
                         <select class="form-select" id="followup-filter-source"></select>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-3 col-6">
                         <label class="form-label" for="followup-filter-status">{{ trans('followup.filter_status') }}</label>
                         <select class="form-select" id="followup-filter-status"></select>
                     </div>
-                    <div class="col-md-3">
+                    {{-- 期間比的是開單日期（created_at）。
+                         留白＝不限期間，所以一進來看得到全部 --}}
+                    <div class="col-md-3 col-6">
+                        <label class="form-label" for="followup-date-from">{{ trans('followup.filter_date_from') }}</label>
+                        <input type="date" class="form-control" id="followup-date-from">
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label" for="followup-date-to">{{ trans('followup.filter_date_to') }}</label>
+                        <input type="date" class="form-control" id="followup-date-to">
+                    </div>
+
+                    {{-- 快捷鈕走共用的 window.DateRange（common.js），
+                         「本週」怎麼算全站只有一份定義 --}}
+                    <div class="col-12 mt-2">
+                        <div class="d-flex flex-wrap gap-2">
+                            @foreach(['today' => 'today', 'yesterday' => 'yesterday', 'thisWeek' => 'this_week', 'lastWeek' => 'last_week', 'thisMonth' => 'this_month', 'lastMonth' => 'last_month'] as $range => $langKey)
+                                <button type="button" class="btn btn-sm btn-outline-secondary js-followup-range"
+                                        data-range="{{ $range }}">{{ trans("common.date_range.{$langKey}") }}</button>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div class="col-12 mt-2">
                         <button type="button" class="btn btn-primary" id="followup-search">
                             <i class="fas fa-search me-1"></i>{{ trans('followup.filter_search') }}
                         </button>

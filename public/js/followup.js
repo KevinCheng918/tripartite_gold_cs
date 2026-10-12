@@ -114,12 +114,14 @@
         sourceSelect.innerHTML = sourceHtml;
 
         /*
-         * 狀態的預設是空字串＝「只看未結案」（後端那兩個狀態的定義在
-         * Service 裡），`all` 才是全部。這一段的順序刻意是
-         * 「只看未結案 → 全部 → 各個狀態」。
+         * ⚠ **預設看全部**（需求方 2026-10-12 改的，原本預設只看未結案）。
+         *
+         * 空字串＝全部，跟後端「不帶 status 參數」是同一件事；
+         * 「只看未結案」改成明確的 `open`。順序刻意是
+         * 「全部 → 只看未結案 → 各個狀態」，第一個就是預設值。
          */
-        var statusHtml = '<option value="">' + escapeHtml(i18n.filter_open_only) + '</option>'
-            + '<option value="all">' + escapeHtml(i18n.filter_all) + '</option>';
+        var statusHtml = '<option value="">' + escapeHtml(i18n.filter_all) + '</option>'
+            + '<option value="open">' + escapeHtml(i18n.filter_open_only) + '</option>';
 
         Object.keys(statuses).forEach(function (value) {
             statusHtml += '<option value="' + value + '">' + escapeHtml(statuses[value]) + '</option>';
@@ -132,9 +134,20 @@
         var params = ['page=' + currentPage];
         var source = document.getElementById('followup-filter-source').value;
         var status = document.getElementById('followup-filter-status').value;
+        var dateFrom = document.getElementById('followup-date-from').value;
+        var dateTo = document.getElementById('followup-date-to').value;
 
         if (source) { params.push('source=' + encodeURIComponent(source)); }
         if (status) { params.push('status=' + encodeURIComponent(status)); }
+
+        /*
+         * 期間要兩個都填才送 —— 後端的 required_with 會擋只填一邊，
+         * 在這裡先攔住比較不會讓人以為是系統壞了（只填一邊通常是還沒填完）。
+         */
+        if (dateFrom && dateTo) {
+            params.push('date_from=' + encodeURIComponent(dateFrom));
+            params.push('date_to=' + encodeURIComponent(dateTo));
+        }
 
         return params.join('&');
     }
@@ -292,8 +305,30 @@
     document.getElementById('followup-reset').addEventListener('click', function () {
         document.getElementById('followup-filter-source').value = '';
         document.getElementById('followup-filter-status').value = '';
+        // 清掉期間＝不限期間，跟一進來的狀態一致
+        document.getElementById('followup-date-from').value = '';
+        document.getElementById('followup-date-to').value = '';
         currentPage = 1;
         loadList();
+    });
+
+    /*
+     * 日期快捷鈕。按下去直接查，省掉再按一次「查詢」——
+     * 比照報表與補點紀錄的行為。
+     */
+    document.querySelectorAll('.js-followup-range').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var build = window.DateRange[btn.dataset.range];
+
+            // data-range 打錯字時安靜跳過，不要讓整頁的 JS 掛掉
+            if (typeof build !== 'function') { return; }
+
+            var range = build();
+            document.getElementById('followup-date-from').value = range.from;
+            document.getElementById('followup-date-to').value = range.to;
+            currentPage = 1;
+            loadList();
+        });
     });
 
     /*

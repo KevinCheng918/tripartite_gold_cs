@@ -15,6 +15,9 @@ return [
     'filter_group'      => '对话',
     'filter_all'        => '全部',
     'filter_open_only'  => '只看未结案',
+    // 期间比的是开单日期，留白＝不限期间
+    'filter_date_from'  => '开单日期（起）',
+    'filter_date_to'    => '开单日期（迄）',
     'filter_search'     => '查询',
     'filter_reset'      => '清除条件',
 
@@ -54,5 +57,8 @@ return [
         'decide_required' => '请指定要跟进还是结案',
         'decide_failed'   => '处理失败，请稍后再试',
         'load_failed'     => '载入失败，请稍后再试',
+        'date_invalid'    => '日期格式不正确',
+        'range_required'  => '请选择完整的开始与结束日期',
+        'range_reversed'  => '结束日期不能早于开始日期',
     ],
 ];

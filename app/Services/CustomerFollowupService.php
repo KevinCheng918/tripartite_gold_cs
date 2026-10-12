@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Criteria\Followup\FollowupDateRangeCriteria;
 use App\Criteria\Followup\FollowupGroupCriteria;
 use App\Criteria\Followup\FollowupSourceCriteria;
 use App\Criteria\Followup\FollowupStatusCriteria;
@@ -48,6 +49,14 @@ class CustomerFollowupService
 
     /** @var string 列表的「全部狀態」。數字會跟真正的 status 混淆，所以用字串 */
     const STATUS_ALL = 'all';
+
+    /**
+     * @var string 列表的「只看未結案」（等待中＋已追問）。
+     *
+     * 2026-10-12 之前這是「留白」的意思，現在留白是看全部，
+     * 要只看未結案得明講。
+     */
+    const STATUS_OPEN = 'open';
 
     private $repository;
     private $remindRepository;
@@ -191,12 +200,50 @@ class CustomerFollowupService
          * 跟著推後會讓那筆永遠等不到被問的那一刻。
          */
         if ($followup->isWaiting() && $followup->isFromCustomer()) {
-            $this->repository->update($followup, $this->resetWait($messageId, $text, $followup->matched_keyword));
+            $this->repository->update($followup, $this->pushBackWait());
         }
     }
 
     /**
+     * 只把計時往後推，**不動原句與命中的詞**
+     *
+     * ⚠ 這一支的存在就是為了修一個顯示上的 bug（2026-10-12）：原本這條路也走
+     * `resetWait()`，它會把 `wait_text` 換成客人最新說的那一句、卻刻意保留舊的
+     * `matched_keyword` —— 於是列表上出現
+     *
+     * ```
+     * 原句：能回調了嗎
+     * 命中：稍等
+     * ```
+     *
+     * 看起來像系統把「能回調了嗎」判成了等待詞。其實沒有：「稍等」是更早那句
+     * 真正命中的詞，「能回調了嗎」只是客人後來說的別的話。
+     *
+     * 「原句」要回答的是**哪一句話讓我們開始等**，推後計時並沒有改變那個答案 ——
+     * 改變的只是「從什麼時候開始算安靜」。
+     *
+     * ⚠ `telegram_message_id` 也不動：它是用來引用那則訊息的，
+     * 要跟 `wait_text` 指同一句，不然群組訊息會引用到不相干的一則。
+     *
+     * @return array
+     */
+    private function pushBackWait()
+    {
+        return [
+            'wait_at'          => now(),
+            // 對方剛說話，這一輪重新算（理由同 resetWait）
+            'remind_count'     => 0,
+            'last_reminded_at' => null,
+        ];
+    }
+
+    /**
      * 「重新開始等」要寫的那幾個欄位
+     *
+     * ⚠ **只給「這一句本身就是等待詞」用**（目前唯一的呼叫點是「又拖一次」）：
+     * 它會把原句與命中的詞一起換掉，所以兩者必須是同一句話算出來的。
+     * 客人說了別的話而只是推後計時，請走 `pushBackWait()` ——
+     * 混用會讓列表顯示「原句 A、命中 B」那種對不起來的組合。
      *
      * ⚠ **提醒次數要歸零**：對方剛說話，這一輪重新算 —— 不歸零的話
      * 一筆活著的事項會因為累積到上限而被系統放棄。
@@ -504,15 +551,30 @@ class CustomerFollowupService
         $status = (array) config('constants.FOLLOWUP.STATUS');
         $criteria = [];
 
+        /*
+         * ⚠ **留白＝看全部**（需求方 2026-10-12 改的，原本留白是「只看未結案」）。
+         *
+         * 「只看未結案」改成明確的 `open`。這樣「不帶參數」與畫面上的預設
+         * 是同一件事 —— 原本 API 直接打不帶 status 會得到跟畫面預設不同的結果，
+         * 那種不一致最難查。
+         */
         $wanted = Arr::get($params, 'status');
 
-        if (blank($wanted)) {
+        if ($wanted === self::STATUS_OPEN) {
             $criteria[] = new FollowupStatusCriteria([
                 Arr::get($status, 'WAITING'),
                 Arr::get($status, 'ASKED'),
             ]);
-        } elseif ($wanted !== self::STATUS_ALL) {
+        } elseif (filled($wanted) && $wanted !== self::STATUS_ALL) {
             $criteria[] = new FollowupStatusCriteria((int) $wanted);
+        }
+
+        // 開單日期區間。兩個都有才篩 —— 只填一邊是使用者還沒填完
+        if (filled(Arr::get($params, 'date_from')) && filled(Arr::get($params, 'date_to'))) {
+            $criteria[] = new FollowupDateRangeCriteria(
+                Arr::get($params, 'date_from'),
+                Arr::get($params, 'date_to')
+            );
         }
 
         if (filled(Arr::get($params, 'source'))) {
