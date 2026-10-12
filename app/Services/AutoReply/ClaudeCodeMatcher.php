@@ -440,8 +440,16 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
         $envelope = json_decode($process->getOutput(), true);
         $usage = is_array($envelope) ? (array) Arr::get($envelope, 'usage', []) : [];
 
-        // CLI 失敗時不一定是非 0 結束，理由見 execute()
-        if (!$process->isSuccessful() || (is_array($envelope) && filled(Arr::get($envelope, 'is_error')))) {
+        /*
+         * CLI 失敗時不一定是非 0 結束，理由見 execute()。
+         *
+         * ⚠ **`is_error` 不能用 `filled()` 判**（2026-10-12 修）：它是 JSON 裡的
+         * 布林，而 `filled(false)` 回的是 **true**（`blank()` 對布林一律回 false）。
+         * CLI 成功時輸出的 `"is_error": false` 會被當成失敗 ——
+         * 整則回應被丟掉、記一筆 `reason` 是空字串的 warning
+         * （錯誤訊息當然是空的，因為它根本沒有錯）。
+         */
+        if (!$process->isSuccessful() || (is_array($envelope) && (bool) Arr::get($envelope, 'is_error'))) {
             Log::warning('Claude 生成回傳失敗', [
                 'reason' => mb_substr(trim($this->envelopeMessage($envelope)), 0, 200),
             ]);

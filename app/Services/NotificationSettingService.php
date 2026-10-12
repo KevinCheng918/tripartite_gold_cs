@@ -173,8 +173,15 @@ class NotificationSettingService
     public function updateFollowup($params, $userId = null)
     {
         $this->appSettingService->putMany([
-            // 開關存 '1' / '0'，讀的時候走 getBool()
-            AppSettingService::KEY_FOLLOWUP_ENABLED          => filled(Arr::get($params, 'enabled')) ? '1' : '0',
+            /*
+             * 開關存 '1' / '0'，讀的時候走 getBool()。
+             *
+             * ⚠ **用 `(bool)` 不是 `filled()`**（2026-10-12 改）。目前前端送的是
+             * `1` 或 `null`，`filled()` 剛好會對 —— 但那是靠「關掉時送 null」
+             * 撐著的：哪天有人改成送 `false` 或 `0`，`filled()` 會回 true
+             * 而開關就再也關不掉，且不會報錯（`blank()` 對布林與數字一律回 false）。
+             */
+            AppSettingService::KEY_FOLLOWUP_ENABLED          => (bool) Arr::get($params, 'enabled') ? '1' : '0',
             AppSettingService::KEY_FOLLOWUP_KEYWORDS         => trim((string) Arr::get($params, 'keywords')),
             AppSettingService::KEY_FOLLOWUP_QUIET_MINUTES    => (string) Arr::get($params, 'quiet_minutes'),
             AppSettingService::KEY_FOLLOWUP_INTERVAL_MINUTES => (string) Arr::get($params, 'interval_minutes'),

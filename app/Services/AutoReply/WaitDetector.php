@@ -69,8 +69,18 @@ class WaitDetector
         $inbound = (int) config('constants.TELEGRAM.DIRECTION.INBOUND');
 
         if ((int) Arr::get($context, 'direction') !== $inbound) {
-            // 後台送出的：自動回覆不算，客服手打的算我方承諾
-            return filled(Arr::get($context, 'is_auto'))
+            /*
+             * 後台送出的：自動回覆不算，客服手打的算我方承諾。
+             *
+             * ⚠ **這裡不能用 `filled()`**（2026-10-12 修）。`is_auto` 是真布林，
+             * 而 `filled(false)` 回的是 **true** —— `blank()` 對布林一律回 false，
+             * 那個 helper 問的是「有沒有值」，不是「值是不是真」。
+             *
+             * 原本寫 `filled($isAuto) ? null : STAFF`，於是人工回覆也被當成
+             * 自動回覆 —— **「我方承諾」從上線那天起一筆都沒開出來過**，
+             * 而且完全沒有跡象（它只是安靜地不開單）。
+             */
+            return (bool) Arr::get($context, 'is_auto')
                 ? null
                 : (int) Arr::get($sources, 'STAFF');
         }
