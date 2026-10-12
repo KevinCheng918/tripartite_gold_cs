@@ -14,6 +14,15 @@ return [
     'field_reason'    => '原因',
     'field_status'    => '狀態',
 
+    /*
+     * 審核紀錄：誰審的、什麼時候審的。
+     *
+     * ⚠ 通過與拒絕都要顯示（需求方 2026-10-12）—— 被拒絕的人更需要知道
+     * 是什麼時候被回絕的，才判斷得出要不要重新申請。
+     */
+    'reviewed_by_at'  => ':name · :time 審核',
+    'reviewed_at'     => ':time 審核',
+
     'type_full_day'   => '整天',
     'type_hours'      => '時段',
 

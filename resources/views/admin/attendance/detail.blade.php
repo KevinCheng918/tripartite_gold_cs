@@ -98,7 +98,7 @@
                             <th>{{ trans('attendance.field_early_leave') }}</th>
                             <th>{{ trans('attendance.field_late_clock_out') }}</th>
                             <th>{{ trans('attendance.field_status') }}</th>
-                            <th>請假</th>
+                            <th>{{ trans('attendance.field_leave') }}</th>
                             <th>{{ trans('attendance.field_ip') }}</th>
                         </tr>
                     </thead>
@@ -174,9 +174,10 @@
                                 <td>
                                     @if(filled($r->leave_info))
                                         @if($r->leave_info['is_full_day'] === 1)
-                                            <span class="badge bg-info">整天請假</span>
+                                            <span class="badge bg-info">{{ trans('attendance.leave_full_day') }}</span>
                                         @else
-                                            <span class="badge bg-info">{{ $r->leave_info['start_time'] }} ~ {{ $r->leave_info['end_time'] }}</span>
+                                            {{-- 砍掉秒數：請假時間的秒一律是 00，印出來只是讓欄位變寬 --}}
+                                            <span class="badge bg-info">{{ substr($r->leave_info['start_time'], 0, 5) }} ~ {{ substr($r->leave_info['end_time'], 0, 5) }}</span>
                                         @endif
                                     @else
                                         -

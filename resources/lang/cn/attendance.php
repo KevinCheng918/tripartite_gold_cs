@@ -25,6 +25,15 @@ return [
     'field_late'         => '迟到',
     'field_early_leave'  => '早退',
     'field_overtime'     => '加班',
+
+    /*
+     * 请假栏。
+     *
+     * ⚠ `field_early_leave`（早退）跟这个是两回事，别混用 —— 英文都是 leave，
+     * 但早退是「该上班却提早走」，这里是「核准过的假」。
+     */
+    'field_leave'        => '请假',
+    'leave_full_day'     => '整天请假',
     'field_shift'        => '班别',
     'field_early_clock_in' => '早上班',
     'field_late_clock_out' => '晚下班',

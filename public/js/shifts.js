@@ -1834,6 +1834,33 @@
             });
     }
 
+    /**
+     * 「誰在什麼時候審的」那一行小字
+     *
+     * ⚠ **通過與拒絕都要顯示**（需求方 2026-10-12）。被拒絕的人更需要時間戳，
+     * 才判斷得出要不要重新申請。待審核（status 0）沒有東西可寫，回空字串。
+     *
+     * ⚠ 掛在狀態欄底下而不是「操作」欄：操作欄只有審核清單才有，
+     * 放那裡的話「我的請假」永遠看不到自己的假是誰、什麼時候批的。
+     *
+     * ⚠ 審核人可能已離職（`reviewed_by` 是 nullOnDelete），
+     * 那時只寫時間 —— 比寫一個空的名字好。
+     *
+     * @param {Object} item 一筆請假
+     * @returns {string}
+     */
+    function reviewText(item) {
+        if (item.status === 0 || !item.reviewed_at) { return ''; }
+
+        var template = item.reviewer
+            ? (leaveI18n.reviewed_by_at || ':name · :time 審核')
+            : (leaveI18n.reviewed_at || ':time 審核');
+
+        return template
+            .replace(':name', item.reviewer || '')
+            .replace(':time', item.reviewed_at);
+    }
+
     function renderLeaveList(containerId, list, showActions) {
         var container = document.getElementById(containerId);
         if (!container) { return; }
@@ -1849,7 +1876,11 @@
             var dateText = item.start_date === item.end_date ? item.start_date : item.start_date + ' ~ ' + item.end_date;
             var typeText = item.is_full_day === 1 ? (leaveI18n.type_full_day || '整天') : (leaveI18n.type_hours || '時段');
             var timeText = item.is_full_day === 1 ? '-' : (item.start_time + ' ~ ' + item.end_time);
-            return { item: item, idx: idx, st: st, dateText: dateText, typeText: typeText, timeText: timeText };
+            return {
+                item: item, idx: idx, st: st,
+                dateText: dateText, typeText: typeText, timeText: timeText,
+                reviewText: reviewText(item)
+            };
         });
 
         // 桌面版表格
@@ -1872,7 +1903,12 @@
             html += '<td>' + d.typeText + '</td>';
             html += '<td>' + d.timeText + '</td>';
             html += '<td>' + (item.reason || '-') + '</td>';
-            html += '<td><span class="badge ' + d.st.css + '">' + d.st.text + '</span></td>';
+            // 審核紀錄跟著狀態走 —— 兩個清單都看得到，不是只有審核那一份
+            html += '<td><span class="badge ' + d.st.css + '">' + d.st.text + '</span>';
+            if (d.reviewText) {
+                html += '<div class="text-muted" style="font-size:0.75rem;margin-top:0.25rem">' + d.reviewText + '</div>';
+            }
+            html += '</td>';
 
             if (showActions && item.status === 0) {
                 html += '<td>';
@@ -1880,9 +1916,8 @@
                 html += '<button class="btn btn-sm btn-outline-secondary js-leave-respond" data-id="' + item.id + '" data-status="2"><i class="fas fa-times text-danger me-1"></i>拒絕</button>';
                 html += '</td>';
             } else if (showActions) {
-                html += '<td>';
-                if (item.reviewer) { html += '<small class="text-muted">審核：' + item.reviewer + '</small>'; }
-                html += '</td>';
+                // 已審核的沒有可按的動作；審核者與時間已經在狀態欄底下
+                html += '<td>-</td>';
             }
 
             html += '</tr>';
@@ -1905,6 +1940,10 @@
             }
             if (item.reason) {
                 html += '<div class="d-flex justify-content-between mb-2" style="font-size:0.875rem"><span class="text-muted">原因</span><span>' + item.reason + '</span></div>';
+            }
+            // 審核紀錄：通過與拒絕都顯示，待審核時 reviewText 是空字串
+            if (d.reviewText) {
+                html += '<div class="text-muted" style="font-size:0.75rem">' + d.reviewText + '</div>';
             }
             if (showActions && item.status === 0) {
                 html += '<div class="d-flex gap-1">';

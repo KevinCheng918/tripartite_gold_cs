@@ -25,6 +25,15 @@ return [
     'field_late'         => 'Late',
     'field_early_leave'  => 'Early Leave',
     'field_overtime'     => 'Overtime',
+
+    /*
+     * The time-off column.
+     *
+     * ⚠ Not the same thing as `field_early_leave` — both read "leave" in English,
+     * but that one means "left before the shift ended", this one means approved time off.
+     */
+    'field_leave'        => 'Time off',
+    'leave_full_day'     => 'Full day',
     'field_shift'        => 'Shift',
     'field_early_clock_in' => 'Early In',
     'field_late_clock_out' => 'Late Out',

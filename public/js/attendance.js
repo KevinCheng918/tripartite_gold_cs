@@ -465,6 +465,31 @@
             });
     }
 
+    /**
+     * 那一天的請假標示
+     *
+     * ⚠ 跟「早退」是兩回事。早退是該上班卻提早走，請假是核准過的假；
+     * 同一天可能並存，所以是兩個獨立的欄位。
+     *
+     * ⚠ 時段假要把時間寫出來 —— 那天他還是有上班，只是缺一段，
+     * 只寫「請假」會讓人以為整天都不在。
+     *
+     * 出勤明細頁（attendance-detail.js）有一份一樣的，兩邊畫面不同但規則相同。
+     *
+     * @param {Object} r 一天的出勤紀錄
+     * @returns {string}
+     */
+    function leaveBadge(r) {
+        if (!r.leave_info) { return '-'; }
+
+        var text = r.leave_info.is_full_day === 1
+            ? i18n.leave_full_day
+            // 秒數一律是 00，印出來只是讓欄位變寬
+            : (r.leave_info.start_time || '').substring(0, 5) + ' ~ ' + (r.leave_info.end_time || '').substring(0, 5);
+
+        return '<span class="badge bg-info">' + text + '</span>';
+    }
+
     function renderMyRecords(records, month, amendLookup) {
         amendLookup = amendLookup || {};
         var thisMonth = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
@@ -519,7 +544,7 @@
                 '<td>' + (r.early_leave_minutes > 0 ? r.early_leave_minutes + ' ' + i18n.unit_minutes : '-') + '</td>' +
                 '<td>' + (lateOut > 0 ? '<span style="color:#059669;font-weight:600">' + lateOut + ' ' + i18n.unit_minutes + '</span>' : '-') + '</td>' +
                 '<td><span class="badge ' + st.css + '">' + st.text + '</span></td>' +
-                '<td>' + (r.leave_info ? (r.leave_info.is_full_day === 1 ? '<span class="badge bg-info">整天請假</span>' : '<span class="badge bg-info">' + r.leave_info.start_time + ' ~ ' + r.leave_info.end_time + '</span>') : '-') + '</td>' +
+                '<td>' + leaveBadge(r) + '</td>' +
                 '</tr>'
             );
         }).join('');
@@ -535,7 +560,7 @@
             '<th>' + i18n.field_early_leave + '</th>' +
             '<th>' + (i18n.field_late_clock_out || '晚下班') + '</th>' +
             '<th>' + i18n.field_status + '</th>' +
-            '<th>請假</th>' +
+            '<th>' + i18n.field_leave + '</th>' +
             '</tr></thead><tbody>' + rows + '</tbody></table>';
 
         // 手機版卡片
@@ -559,7 +584,7 @@
                 '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_clock_out + '</span><span>' + (r.clock_out || '-') + (ts.indexOf(2) !== -1 ? amendBadge : '') + '</span></div>' +
                 (r.early_leave_minutes > 0 ? '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_early_leave + '</span><span style="color:#dc2626;font-weight:600">' + r.early_leave_minutes + ' ' + i18n.unit_minutes + '</span></div>' : '') +
                 (cardLateOut > 0 ? '<div class="shift-card__row"><span class="shift-card__label">' + (i18n.field_late_clock_out || '晚下班') + '</span><span style="color:#059669;font-weight:600">' + cardLateOut + ' ' + i18n.unit_minutes + '</span></div>' : '') +
-                (r.leave_info ? '<div class="shift-card__row"><span class="shift-card__label">請假</span><span class="badge bg-info">' + (r.leave_info.is_full_day === 1 ? '整天請假' : r.leave_info.start_time + ' ~ ' + r.leave_info.end_time) + '</span></div>' : '') +
+                (r.leave_info ? '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_leave + '</span>' + leaveBadge(r) + '</div>' : '') +
                 '</div>'
             );
         }).join('');

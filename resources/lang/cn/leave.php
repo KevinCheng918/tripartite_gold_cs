@@ -14,6 +14,15 @@ return [
     'field_reason'    => '原因',
     'field_status'    => '状态',
 
+    /*
+     * 审核纪录：谁审的、什么时候审的。
+     *
+     * ⚠ 通过与拒绝都要显示（需求方 2026-10-12）—— 被拒绝的人更需要知道
+     * 是什么时候被回绝的，才判断得出要不要重新申请。
+     */
+    'reviewed_by_at'  => ':name · :time 审核',
+    'reviewed_at'     => ':time 审核',
+
     'type_full_day'   => '整天',
     'type_hours'      => '时段',
 

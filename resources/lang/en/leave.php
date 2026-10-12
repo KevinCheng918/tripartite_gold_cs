@@ -14,6 +14,15 @@ return [
     'field_reason'    => 'Reason',
     'field_status'    => 'Status',
 
+    /*
+     * Who reviewed it and when.
+     *
+     * ⚠ Shown for both approvals and rejections — someone who was turned down
+     * needs the timestamp most, to judge whether to reapply.
+     */
+    'reviewed_by_at'  => 'Reviewed by :name · :time',
+    'reviewed_at'     => 'Reviewed :time',
+
     'type_full_day'   => 'Full Day',
     'type_hours'      => 'Hours',
 
