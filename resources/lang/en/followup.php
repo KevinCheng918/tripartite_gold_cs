@@ -26,7 +26,10 @@ return [
     'col_group'   => 'Conversation',
     'col_sender'  => 'Said by',
     'col_text'    => 'What they said',
+    'col_opened_at' => 'Opened',
     'col_waited'  => 'Waiting',
+    // Measured from the last message, not from when the item was opened
+    'col_waited_hint' => 'Measured from their last message. Anything they say while we wait restarts the clock, so this can be much later than when the item was opened.',
     'col_counts'  => 'Stalls / Asks',
     'col_status'  => 'Status',
     'col_decided' => 'Decided by',

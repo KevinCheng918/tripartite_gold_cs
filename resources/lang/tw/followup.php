@@ -26,7 +26,10 @@ return [
     'col_group'   => '對話',
     'col_sender'  => '誰說的',
     'col_text'    => '原句',
+    'col_opened_at' => '開單時間',
     'col_waited'  => '等多久',
+    // 「等多久」是從最後一次重新計時起算，不是從開單 —— 對方中途說過話就會往後推
+    'col_waited_hint' => '從最後一次對方說話起算。對方在等待期間又說話會重新計時，所以可能比開單時間晚很多。',
     'col_counts'  => '已拖／已追問',
     'col_status'  => '狀態',
     'col_decided' => '誰決定的',

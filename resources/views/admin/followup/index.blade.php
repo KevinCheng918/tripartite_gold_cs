@@ -73,7 +73,11 @@
                                 <th>{{ trans('followup.col_group') }}</th>
                                 <th>{{ trans('followup.col_sender') }}</th>
                                 <th>{{ trans('followup.col_text') }}</th>
-                                <th>{{ trans('followup.col_waited') }}</th>
+                                {{-- 開單時間一定要看得到：「等多久」是從最後一次重新計時起算的，
+                                     只看那一欄會以為這筆是剛剛才開的
+                                     （見 bugfix/2026-10-12-followup-keyword-mismatch） --}}
+                                <th>{{ trans('followup.col_opened_at') }}</th>
+                                <th title="{{ trans('followup.col_waited_hint') }}">{{ trans('followup.col_waited') }}</th>
                                 <th>{{ trans('followup.col_counts') }}</th>
                                 <th>{{ trans('followup.col_status') }}</th>
                                 <th>{{ trans('followup.col_decided') }}</th>

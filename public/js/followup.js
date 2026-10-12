@@ -169,7 +169,8 @@
         var tbody = document.getElementById('followup-rows');
 
         if (!rows.length) {
-            tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">'
+            // 10 欄：來源／對話／誰說的／原句／開單時間／等多久／次數／狀態／誰決定／操作
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">'
                 + escapeHtml(i18n.empty) + '</td></tr>';
 
             return;
@@ -186,6 +187,12 @@
                 + (row.keyword ? '<br><small class="text-muted">'
                     + escapeHtml(i18n.keyword.replace(':keyword', row.keyword)) + '</small>' : '')
                 + '</td>'
+                /*
+                 * 開單時間。這一欄跟「等多久」要並排看：後者是從最後一次
+                 * 重新計時（對方又說話）起算的，兩個差很多就代表這筆已經
+                 * 拖了一陣子，只是對話中途有人講過話。
+                 */
+                + '<td><small>' + escapeHtml(window.formatDateTime ? window.formatDateTime(row.created_at) : (row.created_at || '-')) + '</small></td>'
                 + '<td>' + escapeHtml(waited(row.wait_at)) + '</td>'
                 + '<td>' + escapeHtml(i18n.counts
                     .replace(':waits', row.wait_count)
