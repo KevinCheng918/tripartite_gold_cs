@@ -24,6 +24,7 @@
 | [features/task-archive-purge-pause.md](features/task-archive-purge-pause.md) | 封存卡的 30 天清理：專案停用期間不計入（重新啟用後整個專案重新給 30 天，`project.reactivated_at` 一個欄位搞定、`task` 不動）；順帶補上缺席的 `ProjectService`（狀態切換連動不能放 Controller） | **已實作，待跑 migration** |
 | [features/admin-table-layout.md](features/admin-table-layout.md) | 後台表格與操作欄重排（操作按分類黏成幾段 `btn-group`、用 Architect 的 `btn-transition` 淡框，但**每顆都留在畫面上且都帶文字** —— 收合選單與純圖示兩版都被退回；同一件事的欄位合成一格、`.data-table` 全站統一樣式）；順手修掉 Bootstrap 列底色其實是 box-shadow（淺色模式 hover 一直是淡藍）、金色 inline style 在深色模式看不到、disabled 按鈕的 title 永遠不顯示。**列狀態的左條走 `--row-accent` 變數，box-shadow 全專案只寫一次**（各自寫會互相整條覆蓋） | 已完成 |
 | [features/rbac.md](features/rbac.md) | 分帳號、權限管理（含最小登入/登出） | 已完成 |
+| [features/user-notice-toggle.md](features/user-notice-toggle.md) | 逐個帳號開關要收哪些私訊（班表／任務卡／超時統計／打卡報表）：新表 `user_notice_mute` 走**黑名單**（有列＝關掉，上線不必補資料、新增通知自動全收）；過濾擋在共同出口 `StaffDmService::send()` 的 `noticeKey` 參數，`sendToUserIds()`（完整版）不帶 key 所以天然不受管。**靜音時回 `true` 讓 `sent` 小幅失真，換掉「被誤算進 failed 害主管去追人」** | 已完成 |
 | [features/scheduling.md](features/scheduling.md) | 排班（報班/換班/三班制） | 已完成 |
 | [features/support-group-topics.md](features/support-group-topics.md) | 內部支援群組分話題發送（話題清單 + 逐話題勾要收哪些通知、`/topicid` 查 id、話題 id 填錯會整則拒收）；附帶把設定頁重整成「通訊管理 → 通知設定」三分頁 | 已完成 |
 | [features/telegram-bind-code.md](features/telegram-bind-code.md) | 驗證碼綁定 Telegram（取代「填帳號就自動綁」的風險做法）、後台解綁、擋多重綁定、陌生人只回一次且回覆由 AI 寫 | 已完成 |

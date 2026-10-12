@@ -54,6 +54,18 @@
         </button>
     </div>
 
+    {{-- 通知開關跟 Telegram 綁定是同一件事的兩面（綁了才收得到、收哪幾種在這裡選），
+         但權限跟著 account.update 走，所以單獨一段 --}}
+    @can('account.update')
+        <div class="btn-group btn-group-sm" role="group" aria-label="{{ trans('account.notice_title') }}">
+            <button class="btn btn-outline-secondary btn-icon btn-transition js-notice"
+                    data-id="{{ $account->id }}"
+                    data-name="{{ $account->nickname }}">
+                <i class="fas fa-bell btn-icon-wrapper"></i>{{ trans('account.action_notice') }}
+            </button>
+        </div>
+    @endcan
+
     @can('account.update')
         <div class="btn-group btn-group-sm" role="group" aria-label="{{ trans('account.col_telegram') }}">
             @if($account->telegram_dm_ready)

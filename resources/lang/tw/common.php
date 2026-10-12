@@ -8,6 +8,9 @@
  */
 
 return [
+    // 資料還在路上時的佔位字
+    'loading' => '載入中…',
+
     /*
      * 日期範圍快捷鈕。搭配 public/js/common.js 的 window.DateRange，
      * 「本週」「本月」都是完整範圍（週一到週日、1 號到月底）。

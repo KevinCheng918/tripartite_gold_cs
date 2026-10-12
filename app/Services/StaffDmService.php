@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Repositories\UserNoticeMuteRepository;
 use App\Repositories\UserRepository;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
@@ -32,11 +33,27 @@ class StaffDmService
 
     private $userRepository;
     private $botService;
+    private $muteRepository;
 
-    public function __construct(UserRepository $userRepository, TelegramBotService $botService)
-    {
+    /**
+     * 每種通知的靜音名單，查過就留著
+     *
+     * 發送端是「每位同仁跑一輪」的迴圈，不快取就是 N+1。
+     * 排程每跑一輪是一個新的 Service 實例，所以不會拿到隔夜的舊資料。
+     *
+     * @var array notice_key => user_id 陣列
+     */
+    private $mutedCache = [];
+
+    public function __construct(
+        UserRepository $userRepository,
+        TelegramBotService $botService,
+        UserNoticeMuteRepository $muteRepository
+    ) {
         $this->userRepository = $userRepository;
         $this->botService = $botService;
+        // 帳號管理可以逐個帳號關掉某幾種個人版通知
+        $this->muteRepository = $muteRepository;
     }
 
     /**
@@ -140,14 +157,38 @@ class StaffDmService
      * `getDmCandidates()` 查出來的 —— 別處的查詢 select 裡沒有 `telegram_dm_ready`，
      * 讀到的永遠是 null，於是**每個人都被判定成沒綁定**而且不會報錯。
      *
-     * @param object $user
-     * @param string $text
+     * ⚠ **`$noticeKey` 只有「個人版」才傳**（需求方 2026-10-12）。帳號管理那邊
+     * 關掉的是「我自己那一份」，主管被勾進完整版名單的那份照發 ——
+     * 所以 `sendToUserIds()` 轉呼叫這裡時刻意不帶 key。
+     *
+     * ⚠ 新增一種個人版通知時**記得傳 key**。沒傳就是不受管，而且不會報錯 ——
+     * 那是為了讓完整版走同一支而留的洞，代價是新通知可能忘記納管。
+     *
+     * @param object      $user
+     * @param string      $text
+     * @param string|null $noticeKey constants.NOTICE.PERSONAL 的值；null＝不受靜音設定管
      * @return bool
      */
-    public function send($user, $text)
+    public function send($user, $text, $noticeKey = null)
     {
         if (blank($user) || !$this->canDm($user)) {
             return false;
+        }
+
+        /*
+         * 他關掉了這一種就當作沒這回事，回 true。
+         *
+         * ⚠ 這會讓呼叫端的 `sent` 多算一 —— Command 印的「發送 5 則」其實是
+         * 「處理了 5 個收件人」。**是刻意選的**：另一邊（回 false）會把他算進
+         * `failed`（「沒收到的人」），而那份名單的用途是讓人去追「誰該收卻沒收到」。
+         * 自己關掉的人出現在那裡，主管會跑去問他是不是沒綁定機器人 ——
+         * 數字小小失真，換掉一個會造成錯誤行動的誤導。
+         *
+         * 要查「為什麼他沒收到」直接看 `user_notice_mute` 表；
+         * 這裡不寫 log，不然每天每人一筆會把日誌洗掉。
+         */
+        if ($this->isMuted($user->id, $noticeKey)) {
+            return true;
         }
 
         try {
@@ -177,5 +218,27 @@ class StaffDmService
     public function canDm($user)
     {
         return filled($user->telegram_user_id) && (bool) $user->telegram_dm_ready;
+    }
+
+    /**
+     * 這個人關掉了這一種通知嗎
+     *
+     * 同一個 key 只查一次 DB，之後走實例內的快取 —— 發送端是逐人迴圈。
+     *
+     * @param int         $userId
+     * @param string|null $noticeKey null＝完整版，不受管
+     * @return bool
+     */
+    private function isMuted($userId, $noticeKey)
+    {
+        if (blank($noticeKey)) {
+            return false;
+        }
+
+        if (!Arr::has($this->mutedCache, $noticeKey)) {
+            $this->mutedCache[$noticeKey] = $this->muteRepository->getMutedUserIds($noticeKey);
+        }
+
+        return in_array((int) $userId, $this->mutedCache[$noticeKey], true);
     }
 }

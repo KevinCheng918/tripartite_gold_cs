@@ -399,6 +399,42 @@
         </div>
     </div>
 
+    {{--
+        通知開關 Modal
+
+        勾選框由 public/js/accounts.js 依 constants.NOTICE.PERSONAL 產生 ——
+        寫死在這裡的話，以後加第五種通知要改兩個地方。
+    --}}
+    <div class="modal fade" id="modal-notice" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">{{ trans('account.notice_title') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="form-notice">
+                        <input type="hidden" id="notice-user-id">
+                        <p class="text-muted mb-1" id="notice-user-name" style="font-size:0.9375rem"></p>
+                        <p class="text-muted mb-3" style="font-size:0.875rem">{{ trans('account.notice_hint') }}</p>
+
+                        <div class="mb-3" id="notice-options"></div>
+
+                        {{-- 關掉也只影響「自己那一份」，主管的全體統計照發 —— 不先講會以為全部都停了 --}}
+                        <div class="alert alert-light mb-3" style="font-size:0.8125rem">
+                            <i class="fas fa-info-circle me-1"></i>{{ trans('account.notice_full_note') }}
+                        </div>
+
+                        <div class="text-end">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('shift.modal_cancel') }}</button>
+                            <button type="submit" class="btn btn-primary">{{ trans('shift.modal_confirm') }}</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- 登入紀錄 Modal --}}
     <div class="modal fade" id="modal-login-log" tabindex="-1">
         <div class="modal-dialog modal-lg">
@@ -773,6 +809,77 @@ $(function () {
             contentType: 'application/json',
             data: JSON.stringify({ status: parseInt($('input[name="status"]:checked').val(), 10) }),
             success: function () { location.reload(); },
+            error: function (xhr) { showMessage(getErrorMsg(xhr)); }
+        });
+    });
+
+    // ---------------------------------------------------------------
+    //  通知開關：這個帳號要收哪幾種私訊
+    // ---------------------------------------------------------------
+
+    /*
+     * 種類與標籤由後端給（constants.NOTICE.PERSONAL ＋ 語系），
+     * 寫死在前端的話，以後加第五種通知要改兩個地方。
+     */
+    var noticeLabels = @json(trans('account.notice_labels'));
+
+    $(document).on('click', '.js-notice', function () {
+        var userId = $(this).data('id');
+
+        $('#notice-user-id').val(userId);
+        $('#notice-user-name').text($(this).data('name'));
+        $('#notice-options').html('<p class="text-muted mb-0">' + @json(trans('common.loading')) + '</p>');
+
+        new bootstrap.Modal(document.getElementById('modal-notice')).show();
+
+        $.ajax({
+            url: '/admin/accounts/ajax-notice/' + userId,
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            success: function (body) { renderNoticeOptions(body.all, body.enabled); },
+            error: function (xhr) {
+                $('#notice-options').html('<p class="text-danger mb-0">' + getErrorMsg(xhr) + '</p>');
+            }
+        });
+    });
+
+    /**
+     * 畫出勾選框
+     *
+     * 勾起來 ＝ 會收到。DB 存的是相反的（關掉的那幾種），反轉在後端做。
+     *
+     * @param {Array} all     全部種類
+     * @param {Array} enabled 這個人會收的
+     */
+    function renderNoticeOptions(all, enabled) {
+        var html = all.map(function (key) {
+            var checked = enabled.indexOf(key) !== -1 ? ' checked' : '';
+            var label = noticeLabels[key] || key;
+
+            return '<div class="form-check mb-2">' +
+                '<input class="form-check-input js-notice-option" type="checkbox" value="' + key + '" id="notice-' + key + '"' + checked + '>' +
+                '<label class="form-check-label" for="notice-' + key + '">' + label + '</label>' +
+                '</div>';
+        }).join('');
+
+        $('#notice-options').html(html);
+    }
+
+    $('#form-notice').on('submit', function (e) {
+        e.preventDefault();
+
+        // 全部取消是合法的 —— 他就是什麼都不想收
+        var notices = $('.js-notice-option:checked').map(function () { return this.value; }).get();
+
+        $.ajax({
+            url: '/admin/accounts/ajax-notice/' + $('#notice-user-id').val(),
+            method: 'PUT',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            contentType: 'application/json',
+            data: JSON.stringify({ notices: notices }),
+            success: function (body) {
+                bootstrap.Modal.getInstance(document.getElementById('modal-notice')).hide();
+                showMessage(body.message);
+            },
             error: function (xhr) { showMessage(getErrorMsg(xhr)); }
         });
     });

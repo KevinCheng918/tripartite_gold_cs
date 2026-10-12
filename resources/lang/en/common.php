@@ -8,6 +8,9 @@
  */
 
 return [
+    // Placeholder while data is still on its way
+    'loading' => 'Loading…',
+
     /*
      * Date range shortcuts, paired with window.DateRange in
      * public/js/common.js. "This week" and "this month" are full ranges

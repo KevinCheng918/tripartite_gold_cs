@@ -30,6 +30,23 @@ return [
     'action_cancel'           => '取消',
     'telegram_code_hint'      => '產生一組綁定碼給這位同仁',
     'telegram_unbind_hint'    => '解除後他就收不到私訊通知了',
+
+    // 通知開關：這個帳號要收哪幾種私訊
+    'action_notice'    => '通知設定',
+    'notice_title'     => '要收到的私訊通知',
+    'notice_hint'      => '打勾的才會私訊給他。沒打勾的不送，他也不會收到任何提示。',
+    'notice_full_note' => '這裡只管「他自己那一份」。如果他被勾進「通知設定」頁的完整版名單（主管看的全體統計），那一份照常會收到。',
+
+    /*
+     * 四種通知的標籤。key 要跟 constants.NOTICE.PERSONAL 的值一致 ——
+     * 對不上的話畫面會直接顯示 key（例如 `shift`）。
+     */
+    'notice_labels' => [
+        'shift'             => '每日班表（每天早上 8:00，今天你的班）',
+        'task'              => '任務卡提醒（每天早上 8:00，你的待辦與過期卡片）',
+        'remind_report'     => '超時提醒統計（每天早上 8:30，昨天你被催了幾次）',
+        'attendance_report' => '打卡報表（週一與每月 1 號 11:00，你的出勤統計）',
+    ],
     'telegram_code_title'     => 'Telegram 綁定碼',
     'telegram_code_steps'     => '請他在 Telegram 私訊客服機器人，把這組碼貼上送出即可完成綁定。',
     'telegram_code_expires'   => '這組碼 :minutes 分鐘後失效，過期可以再產生一次',
@@ -84,6 +101,9 @@ return [
         'telegram_code_issued'    => '綁定碼已產生，:minutes 分鐘內有效',
         'telegram_code_failed'    => '產生綁定碼失敗，請稍後再試',
         'telegram_code_forbidden' => '您沒有權限為其他帳號產生綁定碼',
+        'notice_saved'            => '通知設定已儲存',
+        'notice_failed'           => '通知設定儲存失敗，請稍後再試',
+        'notice_invalid'          => '通知種類不正確',
         'telegram_unbound'        => '已解除綁定',
         'telegram_unbind_failed'  => '解除綁定失敗，請稍後再試',
         'telegram_nickname_max' => 'Telegram 對話暱稱不可超過 :value 字元',

@@ -31,6 +31,23 @@ return [
     'action_cancel'           => 'Cancel',
     'telegram_code_hint'      => 'Generate a linking code for this person',
     'telegram_unbind_hint'    => 'They stop receiving direct messages once unlinked',
+
+    // Which direct messages this account receives
+    'action_notice'    => 'Notifications',
+    'notice_title'     => 'Direct messages to receive',
+    'notice_hint'      => 'Only the ticked ones are sent. Unticked ones are skipped silently.',
+    'notice_full_note' => 'This only covers their own copy. If they are on the "full report" list in Notification settings (the team-wide summary for supervisors), that one still goes out.',
+
+    /*
+     * Labels for the four notices. Keys must match constants.NOTICE.PERSONAL —
+     * a mismatch shows the raw key (e.g. `shift`) on screen.
+     */
+    'notice_labels' => [
+        'shift'             => 'Daily shift (08:00 — your shift today)',
+        'task'              => 'Task cards (08:00 — your to-dos and overdue cards)',
+        'remind_report'     => 'Overdue reminders (08:30 — how often you were chased yesterday)',
+        'attendance_report' => 'Attendance report (Mondays and the 1st, 11:00 — your own figures)',
+    ],
     'telegram_code_title'     => 'Telegram linking code',
     'telegram_code_steps'     => 'Ask them to message the support bot on Telegram and paste this code to finish linking.',
     'telegram_code_expires'   => 'This code expires in :minutes minutes; generate a new one if it lapses',
@@ -84,6 +101,9 @@ return [
         'telegram_code_issued'    => 'Code generated, valid for :minutes minutes',
         'telegram_code_failed'    => 'Could not generate the code, please try again later',
         'telegram_code_forbidden' => 'You do not have permission to generate a code for another account',
+        'notice_saved'            => 'Notification settings saved',
+        'notice_failed'           => 'Could not save notification settings, please try again later',
+        'notice_invalid'          => 'Invalid notification type',
         'telegram_unbound'        => 'Unlinked',
         'telegram_unbind_failed'  => 'Could not unlink, please try again later',
         'required'             => 'This field is required',

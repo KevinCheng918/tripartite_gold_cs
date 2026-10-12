@@ -1909,4 +1909,28 @@ return [
         'CURRENCY' => ['TWD', 'USD', 'USDT'],
     ],
 
+    /*
+     * 私訊通知的種類。
+     *
+     * 帳號管理可以逐個帳號關掉這幾種（`user_notice_mute`，有列＝關掉）。
+     *
+     * ⚠ **只涵蓋「個人版」** —— 每位同仁收自己那一份的那種（需求方 2026-10-12）。
+     * 主管在通知設定頁被勾進「完整版」名單的那份照發，那是職責不是喜好，
+     * 要調整請改那一頁的名單。
+     *
+     * ⚠ 值會直接存進 DB 的 `notice_key`，**改了舊資料就對不上**（那個人會
+     * 變回「全部都收」）。真的要改，得一併寫一支 migration 搬舊值。
+     *
+     * 新增一種：這裡加一行、語系加 `account.notice_xxx`，然後在發送端
+     * 把 key 傳給 `StaffDmService::send()`。畫面上的勾選框會自動多一個。
+     */
+    'NOTICE' => [
+        'PERSONAL' => [
+            'SHIFT'             => 'shift',             // 每天 08:00 今天的班
+            'TASK'              => 'task',              // 每天 08:00 自己的任務卡
+            'REMIND_REPORT'     => 'remind_report',     // 每天 08:30 自己被催幾次
+            'ATTENDANCE_REPORT' => 'attendance_report', // 週一／1 號 11:00 自己的出勤
+        ],
+    ],
+
 ];

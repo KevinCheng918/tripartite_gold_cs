@@ -64,6 +64,12 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/permissions/{user}', [AccountController::class, 'permissionsPage'])->middleware('can:account.assign_permission')->name('permissions');
         Route::get('/ajax-login-log/{user}', [AccountController::class, 'ajaxLoginLog'])->middleware('can:account.view')->name('ajax-login-log');
         /*
+         * 這個帳號要收哪些私訊。沿用 account.update —— 跟改暱稱、改狀態一樣
+         * 是「動別人的帳號設定」，不另開 keyword。
+         */
+        Route::get('/ajax-notice/{user}', [AccountController::class, 'ajaxNoticeSettings'])->middleware('can:account.update')->name('ajax-notice');
+        Route::put('/ajax-notice/{user}', [AccountController::class, 'ajaxUpdateNotice'])->middleware('can:account.update')->name('ajax-update-notice');
+        /*
          * Telegram 綁定。
          *
          * ⚠ 產碼那支**不掛 can:** —— 同仁要能產自己的碼（「我的帳號」那顆按鈕）。

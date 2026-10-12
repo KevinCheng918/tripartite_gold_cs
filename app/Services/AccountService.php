@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Repositories\UserNoticeMuteRepository;
 use App\Repositories\UserRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -17,12 +18,18 @@ class AccountService
 {
     private $userRepository;
     private $staffIgnoreService;
+    private $noticeMuteRepository;
 
-    public function __construct(UserRepository $userRepository, StaffIgnoreService $staffIgnoreService)
-    {
+    public function __construct(
+        UserRepository $userRepository,
+        StaffIgnoreService $staffIgnoreService,
+        UserNoticeMuteRepository $noticeMuteRepository
+    ) {
         $this->userRepository = $userRepository;
         // 帳號的 Telegram 身分與狀態一變，「後台帳號不自動回覆」的名單要跟著變
         $this->staffIgnoreService = $staffIgnoreService;
+        // 哪幾種個人版私訊被關掉（黑名單：有列＝關掉）
+        $this->noticeMuteRepository = $noticeMuteRepository;
     }
 
     /**
@@ -158,5 +165,41 @@ class AccountService
     public function assignPermissions(User $user, $keywords)
     {
         $this->userRepository->syncPermissions($user, $keywords);
+    }
+
+    /**
+     * 這個帳號目前會收到哪幾種私訊
+     *
+     * ⚠ DB 存的是**關掉的那幾種**（黑名單，有列＝關掉），畫面要的是
+     * 「勾起來＝會收」。反轉放在這裡做一次，前端與 Controller 都不必知道
+     * 資料庫存的是相反的東西。
+     *
+     * @param User $user
+     * @return array all（全部種類）／enabled（這個人會收的）
+     */
+    public function noticeSettings(User $user)
+    {
+        $all = array_values((array) config('constants.NOTICE.PERSONAL'));
+        $muted = $this->noticeMuteRepository->getMutedKeysByUser($user->id);
+
+        return [
+            'all'     => $all,
+            'enabled' => array_values(array_diff($all, $muted)),
+        ];
+    }
+
+    /**
+     * 設定這個帳號要收哪幾種私訊（全部取代）
+     *
+     * @param User  $user
+     * @param array $enabledKeys 畫面上勾起來的（＝要收的）
+     * @return void
+     */
+    public function updateNotices(User $user, array $enabledKeys)
+    {
+        $all = array_values((array) config('constants.NOTICE.PERSONAL'));
+
+        // 存進去的是「沒勾的」—— 這張表是黑名單
+        $this->noticeMuteRepository->replaceForUser($user->id, array_values(array_diff($all, $enabledKeys)));
     }
 }

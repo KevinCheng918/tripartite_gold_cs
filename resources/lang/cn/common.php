@@ -8,6 +8,9 @@
  */
 
 return [
+    // 资料还在路上时的占位字
+    'loading' => '加载中…',
+
     /*
      * 日期范围快捷钮。搭配 public/js/common.js 的 window.DateRange，
      * 「本周」「本月」都是完整范围（周一到周日、1 号到月底）。

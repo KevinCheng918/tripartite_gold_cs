@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Account\AssignPermissionRequest;
 use App\Http\Requests\Account\StoreAccountRequest;
 use App\Http\Requests\Account\UpdateAccountRequest;
+use App\Http\Requests\Account\UpdateNoticeRequest;
 use App\Http\Requests\Account\UpdateProfileRequest;
 use App\Http\Resources\AccountResource;
 use App\Http\Resources\LoginLogResource;
@@ -292,6 +293,45 @@ class AccountController extends Controller
             Log::error('權限設定失敗', ['error' => $e->getMessage(), 'user_id' => $user->id]);
 
             return response()->json(['message' => trans('account.msg.assign_failed')], 500);
+        }
+    }
+
+    /**
+     * Ajax 取得指定帳號會收到哪些私訊
+     *
+     * @param User $user
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxNoticeSettings(User $user)
+    {
+        return response()->json($this->accountService->noticeSettings($user));
+    }
+
+    /**
+     * Ajax 設定指定帳號要收哪些私訊
+     *
+     * ⚠ 只管**個人版**（需求方 2026-10-12）：關掉之後他還是會收到
+     * 通知設定頁把他勾進「完整版」名單的那一份 —— 那是職責不是喜好。
+     *
+     * ⚠ 沿用 `account.update` 權限，不另開 keyword：這跟改暱稱、改狀態
+     * 一樣是「動別人的帳號設定」，多一個 keyword 只是多一個要記得勾的東西。
+     *
+     * @param UpdateNoticeRequest $request
+     * @param User                $user
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxUpdateNotice(UpdateNoticeRequest $request, User $user)
+    {
+        $params = $request->validated();
+
+        try {
+            $this->accountService->updateNotices($user, (array) Arr::get($params, 'notices', []));
+
+            return response()->json(['message' => trans('account.msg.notice_saved')]);
+        } catch (\Exception $e) {
+            Log::error('通知設定儲存失敗', ['error' => $e->getMessage(), 'user_id' => $user->id]);
+
+            return response()->json(['message' => trans('account.msg.notice_failed')], 500);
         }
     }
 

@@ -532,7 +532,8 @@ class AttendanceReportService
                 continue;
             }
 
-            if ($this->staffDm->send($user, $text)) {
+            // 帶 key：這是個人版，收不收由帳號管理那邊的開關決定
+            if ($this->staffDm->send($user, $text, config('constants.NOTICE.PERSONAL.ATTENDANCE_REPORT'))) {
                 $sent++;
 
                 continue;
