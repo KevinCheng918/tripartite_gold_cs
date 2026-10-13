@@ -18,7 +18,8 @@ class VmRepository
     private const SERVER_COLUMNS = [
         'id', 'station_id', 'hostname', 'internal_ip', 'external_ip',
         'model_type', 'spec', 'monthly_fee', 'vpn_fee', 'google_fee', 'billing_day',
-        'power_status', 'powered_off_at', 'status', 'note', 'created_at',
+        // `status`（啟用／停用）2026-10-13 移除：收不收錢只看 power_status
+        'power_status', 'powered_off_at', 'note', 'created_at',
     ];
 
     /** @var array 帳單列表欄位 */
@@ -78,10 +79,6 @@ class VmRepository
             $query->where('external_ip', 'like', "%{$criteria['external_ip']}%");
         }
 
-        if (isset($criteria['status']) && $criteria['status'] !== '' && $criteria['status'] !== null) {
-            $query->where('status', (int) $criteria['status']);
-        }
-
         if (isset($criteria['power_status']) && $criteria['power_status'] !== '' && $criteria['power_status'] !== null) {
             $query->where('power_status', (int) $criteria['power_status']);
         }
@@ -129,16 +126,24 @@ class VmRepository
     }
 
     /**
-     * 取得所有啟用中的 VM
+     * 取得所有**開機中**的 VM（產帳單用）
+     *
+     * ⚠ 2026-10-13 之前這支叫 `getActiveServers()`，條件是 `status = 1`
+     * （啟用），開機與否由呼叫端在迴圈裡再判一次。需求方確認
+     * **「開機才收錢，不開機就不用收」** —— 「啟用」那個概念整個移除，
+     * 收不收錢只看電源。
+     *
+     * 條件寫在查詢裡而不是呼叫端的迴圈：撈回來再跳過等於把關機的機器
+     * 全部載進記憶體，而且「誰該收錢」就有兩個地方在決定。
      *
      * @return Collection
      */
-    public function getActiveServers()
+    public function getPoweredOnServers()
     {
         return VmServer::query()
             ->select(self::SERVER_COLUMNS)
             ->with(['station.system'])
-            ->where('status', 1)
+            ->where('power_status', config('constants.VM.POWER.ON'))
             ->get();
     }
 
@@ -253,9 +258,9 @@ class VmRepository
             ->with(['vmServer.station'])
             ->where('paid', config('constants.VM.BILLING.UNPAID'))
             ->whereDate('due_date', '<=', now()->addDays((int) $daysAhead)->toDateString())
+            // 關機就不收錢，所以也不催款（2026-10-13 起只看電源，不再看「啟用」）
             ->whereHas('vmServer', function ($query) {
-                $query->where('power_status', config('constants.VM.POWER.ON'))
-                    ->where('status', config('constants.VM.STATUS.ACTIVE'));
+                $query->where('power_status', config('constants.VM.POWER.ON'));
             })
             ->orderBy('due_date')
             ->get();

@@ -42,7 +42,6 @@ class VmService
             'hostname'     => $params['hostname'] ?? null,
             'internal_ip'  => $params['internal_ip'] ?? null,
             'external_ip'  => $params['external_ip'] ?? null,
-            'status'       => $params['status'] ?? null,
             'power_status' => $params['power_status'] ?? null,
         ];
 
@@ -168,8 +167,12 @@ class VmService
     }
 
     /**
-     * 產生指定月份的帳單（所有啟用中的 VM）
+     * 產生指定月份的帳單（**所有開機中的 VM**）
      * 如果帳單已存在且金額不同，會列入 mismatches 供前端確認
+     *
+     * ⚠ **開機才收錢**（需求方 2026-10-13）。原本的條件是「啟用中」再
+     * 在迴圈裡跳過關機的 —— 現在「啟用」整個概念移除了，
+     * 誰該收錢只由電源決定，而且那個判斷只寫在查詢裡一個地方。
      *
      * @param string|null $month        YYYY-MM，預設當月
      * @param bool        $forceUpdate  是否強制更新金額不同的帳單
@@ -178,7 +181,7 @@ class VmService
     public function generateMonthlyBillings($month = null, $forceUpdate = false)
     {
         $billingMonth = $month ?: now()->format('Y-m');
-        $servers = $this->vmRepository->getActiveServers();
+        $servers = $this->vmRepository->getPoweredOnServers();
 
         $generated = 0;
         $skipped = 0;
@@ -186,10 +189,7 @@ class VmService
         $mismatches = [];
 
         foreach ($servers as $server) {
-            // 關機的 VM 不產生帳單
-            if ($server->power_status === 0) {
-                continue;
-            }
+            // 關機的在查詢就濾掉了（getPoweredOnServers），這裡不再判一次
             $totalFee = (float) $server->monthly_fee + (float) $server->vpn_fee + (float) $server->google_fee;
 
             $existing = $this->vmRepository->findBillingByMonth($server->id, $billingMonth);

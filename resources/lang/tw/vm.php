@@ -15,9 +15,12 @@ return [
     'field_internal_ip'  => '內網 IP',
     'field_external_ip'  => '外網 IP',
     /*
-     * 2026-10-10 重排：虛擬機列表原本十二欄，其中四組是同一件事的兩半
-     * （系統＋站台、主機＋機型、內網＋外網 IP、開關機＋啟用狀態）。
+     * 2026-10-10 重排：虛擬機列表原本十二欄，其中幾組是同一件事的兩半
+     * （系統＋站台、主機＋機型、內網＋外網 IP）。
      * 合併之後只剩八欄，Modal 裡仍然分開顯示，所以上面那些 key 都留著。
+     *
+     * ⚠ 原本還有一組「開關機＋啟用狀態」—— **「啟用」2026-10-13 整個移除了**
+     * （需求方：開機才收錢，不開機就不用收）。狀態欄現在只有開機／關機。
      */
     'field_ip'           => 'IP',
     'field_model_type'   => '機型',
@@ -27,11 +30,8 @@ return [
     'field_google_fee'   => 'Google 帳號費用',
     'field_total_fee'    => '總金額',
     'field_billing_day'  => '帳單日',
+    // 列表那一欄的標題也用這個：那一欄只有開機／關機兩種值
     'field_power'        => '開關機',
-    // 列表那一欄的標題。內容是開機／關機，停用時才多一個灰色標籤
-    'field_status'       => '狀態',
-    // 篩選用。跟上面那個分開：同名不同義會讓人以為篩的是電源
-    'field_enabled'      => '啟用狀態',
     'field_note'         => '備註',
     'field_month'        => '月份',
     'field_amount'       => '金額',
@@ -42,8 +42,6 @@ return [
     // 狀態
     'power_on'       => '開機',
     'power_off'      => '關機',
-    'status_active'  => '啟用',
-    'status_disabled' => '停用',
     'paid_yes'       => '已收',
     'paid_no'        => '未收',
     'paid_pending'   => '待審核',

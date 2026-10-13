@@ -38,7 +38,6 @@ class VmServerResource extends JsonResource
             'billing_day'  => $this->billing_day,
             'power_status'   => $this->power_status,
             'powered_off_at' => $this->powered_off_at ? \Carbon\Carbon::parse($this->powered_off_at)->toDateString() : null,
-            'status'       => $this->status,
             'note'         => $this->note,
             'created_at'   => \Carbon\Carbon::parse($this->created_at)->toDateTimeString(),
         ];

@@ -15,8 +15,11 @@ return [
     /*
      * Reworked on 2026-10-10: the VM list had twelve columns, four pairs of
      * which were two halves of one thing (system + station, host + model,
-     * internal + external IP, power + enabled). Merging leaves eight. The
-     * modal still shows them separately, so the keys above all stay.
+     * internal + external IP). Merging leaves eight. The modal still shows
+     * them separately, so the keys above all stay.
+     *
+     * ⚠ There used to be a "power + enabled" pair too — **"enabled" was
+     * removed entirely on 2026-10-13** (billing follows the power state alone).
      */
     'field_ip'           => 'IP',
     'field_model_type'   => 'Model',
@@ -26,11 +29,8 @@ return [
     'field_google_fee'   => 'Google Account Fee',
     'field_total_fee'    => 'Total',
     'field_billing_day'  => 'Billing Day',
+    // Also used as the list column header — that column only has on/off
     'field_power'        => 'Power',
-    // Column header. Shows on/off; a grey badge is added only when disabled
-    'field_status'       => 'Status',
-    // Filter only — kept separate so it is not mistaken for the power column
-    'field_enabled'      => 'Enabled',
     'field_note'         => 'Note',
     'field_month'        => 'Month',
     'field_amount'       => 'Amount',
@@ -40,8 +40,6 @@ return [
 
     'power_on'       => 'On',
     'power_off'      => 'Off',
-    'status_active'  => 'Active',
-    'status_disabled' => 'Disabled',
     'paid_yes'       => 'Paid',
     'paid_no'        => 'Unpaid',
     'paid_pending'   => 'Pending',

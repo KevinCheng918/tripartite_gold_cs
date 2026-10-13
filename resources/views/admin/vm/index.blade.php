@@ -97,16 +97,8 @@
                                     <option value="0">{{ trans('vm.power_off') }}</option>
                                 </select>
                             </div>
-                            <div class="col-md-3 col-6">
-                                {{-- 「啟用狀態」而不是「狀態」：表格那一欄的「狀態」現在顯示的是
-                                     開關機，兩個同名不同義會讓人以為篩的是電源 --}}
-                                <label class="form-label fw-bold">{{ trans('vm.field_enabled') }}：</label>
-                                <select id="vm-search-status" class="form-select">
-                                    <option value="">{{ trans('vm.filter_all') }}</option>
-                                    <option value="1">{{ trans('vm.status_active') }}</option>
-                                    <option value="0">{{ trans('vm.status_disabled') }}</option>
-                                </select>
-                            </div>
+                            {{-- 「啟用狀態」那個篩選 2026-10-13 移除：
+                                 這台機器要不要收錢只看開關機，沒有第二個狀態 --}}
                         </div>
                         <div class="d-flex justify-content-end gap-2">
                             <button type="button" class="btn btn-outline-secondary" id="btn-vm-reset">{{ trans('vm.action_reset') }}</button>
@@ -444,14 +436,12 @@ $(function () {
         var internalIp = $('#vm-search-internal-ip').val();
         var externalIp = $('#vm-search-external-ip').val();
         var power = $('#vm-search-power').val();
-        var status = $('#vm-search-status').val();
         if (systemId) { params += '&system_id=' + systemId; }
         if (stationId) { params += '&station_id=' + stationId; }
         if (hostname) { params += '&hostname=' + encodeURIComponent(hostname); }
         if (internalIp) { params += '&internal_ip=' + encodeURIComponent(internalIp); }
         if (externalIp) { params += '&external_ip=' + encodeURIComponent(externalIp); }
         if (power !== '') { params += '&power_status=' + power; }
-        if (status !== '') { params += '&status=' + status; }
 
         $.ajax({
             url: '/admin/vm/ajax-list?' + params,
@@ -575,7 +565,9 @@ $(function () {
             '<th>' + '{{ trans("vm.field_spec") }}' + '</th>' +
             '<th>' + '{{ trans("vm.field_ip") }}' + '</th>' +
             '<th class="col-num">' + '{{ trans("vm.field_total_fee") }}' + '</th>' +
-            '<th>' + '{{ trans("vm.field_status") }}' + '</th>' +
+            {{-- 這一欄只剩開機／關機，所以標題就叫「開關機」——
+                 叫「狀態」會讓人問「狀態還有哪幾種」 --}}
+            '<th>' + '{{ trans("vm.field_power") }}' + '</th>' +
             '<th class="col-actions">' + i18n.field_action + '</th>' +
             '</tr></thead><tbody>';
 
@@ -588,21 +580,6 @@ $(function () {
             var powerBadge = vm.power_status === 1
                 ? '<span class="badge bg-success">{{ trans("vm.power_on") }}</span>'
                 : '<span class="badge bg-danger">{{ trans("vm.power_off") }}</span>';
-            /*
-             * ⚠ **「啟用」不標，只標「停用」**（需求方 2026-10-13）。
-             *
-             * 這一欄問的是「這台機器現在怎樣」，答案絕大多數時候就是開機或關機 ——
-             * 每一列都掛一個綠色「啟用」只是噪音，還會讓人以為那是另一種電源狀態。
-             *
-             * ⚠ 但**停用不能不顯示**：它會讓這台機器**不發繳款通知**
-             * （`getBillingsDueForNotice()` 同時要求開機與啟用）。
-             * 一台不收錢的機器卻看不出來，是會出事的那種安靜。
-             *
-             * 用灰色而不是紅色：停用不是故障，是「不列入管理」。
-             */
-            var statusBadge = vm.status === 1
-                ? ''
-                : '<span class="badge bg-secondary">{{ trans("vm.status_disabled") }}</span>';
             /*
              * 編輯與開關機黏成一段（Architect 的 btn-group，共用邊框、
              * 外框是 btn-transition 的淡灰，滑過去才亮）。兩顆都帶文字 ——
@@ -620,8 +597,7 @@ $(function () {
                     'data-internal-ip="' + (vm.internal_ip || '') + '" data-external-ip="' + (vm.external_ip || '') + '" ' +
                     'data-model-type="' + (vm.model_type || '') + '" data-fee="' + vm.monthly_fee + '" ' +
                     'data-vpn-fee="' + (vm.vpn_fee || 0) + '" data-google-fee="' + (vm.google_fee || 0) + '" ' +
-                    'data-billing-day="' + vm.billing_day + '" data-note="' + (vm.note || '') + '" ' +
-                    'data-status="' + vm.status + '">' +
+                    'data-billing-day="' + vm.billing_day + '" data-note="' + (vm.note || '') + '">' +
                     '<i class="fas fa-edit btn-icon-wrapper"></i>{{ trans("vm.action_edit") }}</button>' +
                     '<button class="btn btn-outline-secondary btn-icon btn-transition js-toggle-power" data-id="' + vm.id + '"' +
                     ' data-system="' + systemName + '" data-station="' + stationName + '" data-hostname="' + vm.hostname + '"' +
@@ -642,8 +618,7 @@ $(function () {
                 '<td><div>' + (vm.internal_ip || '-') + '</div>' +
                 '<div class="cell-stack__sub">' + (vm.external_ip || '-') + '</div></td>' +
                 '<td class="col-num"><strong>' + vm.total_fee + '</strong></td>' +
-                // statusBadge 平常是空字串（啟用不標），所以空白接在它前面才不會留尾巴
-                '<td class="text-nowrap">' + powerBadge + (statusBadge ? ' ' + statusBadge : '') + '</td>' +
+                '<td class="text-nowrap">' + powerBadge + '</td>' +
                 '<td class="col-actions"><div class="row-actions">' + actions + '</div></td>' +
                 '</tr>';
 
@@ -652,7 +627,7 @@ $(function () {
                 '<div class="data-card__head mb-2">' +
                 '<div><div class="cell-stack__main">' + vm.hostname + '</div>' +
                 '<div class="cell-stack__sub">' + systemName + ' / ' + stationName + '</div></div>' +
-                '<div class="d-flex gap-1">' + powerBadge + statusBadge + '</div></div>' +
+                '<div class="d-flex gap-1">' + powerBadge + '</div></div>' +
                 '<div class="data-card__row"><span>' + i18n.field_model_type + '</span><span>' + (vm.model_type || '-') + '</span></div>' +
                 '<div class="data-card__row"><span>' + i18n.field_spec + '</span><span>' + vm.spec + '</span></div>' +
                 '<div class="data-card__row"><span>' + i18n.field_internal_ip + '</span><span>' + (vm.internal_ip || '-') + '</span></div>' +
@@ -1498,7 +1473,6 @@ $(function () {
         $('#vm-search-internal-ip').val('');
         $('#vm-search-external-ip').val('');
         $('#vm-search-power').val('');
-        $('#vm-search-status').val('');
         loadServers();
     });
 

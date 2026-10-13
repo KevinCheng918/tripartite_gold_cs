@@ -68,7 +68,7 @@ class VmController extends Controller
      */
     public function ajaxList(Request $request)
     {
-        $params = $request->only(['keyword', 'station_id', 'system_id', 'hostname', 'internal_ip', 'external_ip', 'status', 'power_status', 'per_page']);
+        $params = $request->only(['keyword', 'station_id', 'system_id', 'hostname', 'internal_ip', 'external_ip', 'power_status', 'per_page']);
         $servers = $this->vmService->listServers($params);
 
         return VmServerResource::collection($servers);

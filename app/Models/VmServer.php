@@ -23,7 +23,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int         $billing_day
  * @property int         $power_status   1=開機, 0=關機
  * @property string|null $powered_off_at 關機日期
- * @property int         $status        1=啟用, 0=停用
  * @property string|null $note
  */
 class VmServer extends Model
@@ -41,7 +40,6 @@ class VmServer extends Model
         'billing_day'  => 'integer',
         'power_status'   => 'integer',
         'powered_off_at' => 'date',
-        'status'       => 'integer',
     ];
 
     public function station(): BelongsTo

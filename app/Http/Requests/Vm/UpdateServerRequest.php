@@ -42,7 +42,6 @@ class UpdateServerRequest extends FormRequest
             'vpn_fee'      => 'nullable|numeric|min:0',
             'google_fee'   => 'nullable|numeric|min:0',
             'billing_day'  => 'sometimes|integer|min:1|max:' . self::BILLING_DAY_MAX,
-            'status'       => 'sometimes|integer|in:0,1',
             'note'         => 'nullable|string',
         ];
     }

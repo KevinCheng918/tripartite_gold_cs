@@ -14,8 +14,11 @@ return [
     'field_external_ip'  => '外网 IP',
     /*
      * 2026-10-10 重排：虚拟机列表原本十二栏，其中四组是同一件事的两半
-     * （系统＋站台、主机＋机型、内网＋外网 IP、开关机＋启用状态）。
+     * （系统＋站台、主机＋机型、内网＋外网 IP）。
      * 合并之后只剩八栏，Modal 里仍然分开显示，所以上面那些 key 都留着。
+     *
+     * ⚠ 原本还有一组「开关机＋启用状态」—— **「启用」2026-10-13 整个移除了**
+     * （需求方：开机才收钱，不开机就不用收）。状态栏现在只有开机／关机。
      */
     'field_ip'           => 'IP',
     'field_model_type'   => '机型',
@@ -25,11 +28,8 @@ return [
     'field_google_fee'   => 'Google 账号费用',
     'field_total_fee'    => '总金额',
     'field_billing_day'  => '账单日',
+    // 列表那一栏的标题也用这个：那一栏只有开机／关机两种值
     'field_power'        => '开关机',
-    // 列表那一栏的标题。内容是开机／关机，停用时才多一个灰色标签
-    'field_status'       => '状态',
-    // 筛选用。跟上面那个分开：同名不同义会让人以为筛的是电源
-    'field_enabled'      => '启用状态',
     'field_note'         => '备注',
     'field_month'        => '月份',
     'field_amount'       => '金额',
@@ -39,8 +39,6 @@ return [
 
     'power_on'       => '开机',
     'power_off'      => '关机',
-    'status_active'  => '启用',
-    'status_disabled' => '停用',
     'paid_yes'       => '已收',
     'paid_no'        => '未收',
     'paid_pending'   => '待审核',
