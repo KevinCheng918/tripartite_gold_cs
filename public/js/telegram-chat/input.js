@@ -509,8 +509,28 @@
      * @returns {string}
      */
     function errorMessage(error, fallback) {
-        if (error && typeof error === 'object' && !(error instanceof Error) && error.message) {
-            return error.message;
+        if (error && typeof error === 'object' && !(error instanceof Error)) {
+            /*
+             * ⚠ **422 要先挑 `errors` 裡那一句**，不能直接用 `message`。
+             *
+             * `message` 是 Laravel 的通用字串（「輸入資料無效」），說不出
+             * 到底哪裡不對 —— 傳 .exe 被擋的時候，使用者看到的就是那句，
+             * 完全不知道是副檔名的問題。真正的原因在 errors.file[0]
+             * （「不支援此檔案類型」「檔案不可超過 50 MB」都走這條）。
+             */
+            var errors = error.errors;
+
+            if (errors) {
+                var first = Object.keys(errors)[0];
+
+                if (first && errors[first] && errors[first].length) {
+                    return errors[first][0];
+                }
+            }
+
+            if (error.message) {
+                return error.message;
+            }
         }
 
         return fallback || T.i18n.msg.image_send_failed || '圖片傳送失敗';
