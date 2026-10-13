@@ -133,30 +133,10 @@ class VmQueryCommandService
      */
     private function replyStation($raw, $threadId, array $config)
     {
-        $stations = $this->stations();
-        $station = $this->nameMatcher->match($raw, $stations);
+        $station = $this->nameMatcher->match($raw, $this->stations());
 
         if (blank($station)) {
-            /*
-             * ⚠ 模型偶爾會把兩個站台塞進同一個欄位（餘點那支實測過：
-             * prompt 寫了「一次一個」照樣回 "LV_UAT、T01"）。完全相符
-             * 找不到時，數這串字裡出現幾個已知站台名來分辨
-             * 「講了兩個」與「名字不存在」。
-             */
-            $mentioned = $this->nameMatcher->mentioned($raw, $stations);
-
-            if (count($mentioned) > 1) {
-                $this->reply(strtr((string) Arr::get($config, 'MULTIPLE_TEXT'), [
-                    '{names}' => implode('、', $mentioned),
-                ]), $threadId);
-
-                return;
-            }
-
-            $this->reply(strtr((string) Arr::get($config, 'NOT_FOUND_TEXT'), [
-                '{station}' => (string) $raw,
-                '{names}'   => $this->stationNames(),
-            ]), $threadId);
+            $this->replyNoSuchStation($raw, $threadId, $config);
 
             return;
         }
@@ -165,15 +145,44 @@ class VmQueryCommandService
         $servers = $this->vmRepository->getServersByStation($station->id, $month);
 
         if ($servers->isEmpty()) {
-            $this->reply(strtr((string) Arr::get($config, 'STATION_TITLE'), [
+            $this->reply(strtr((string) Arr::get($config, 'STATION_EMPTY'), [
                 '{station}' => (string) $station->name,
-                '{count}'   => 0,
             ]), $threadId);
 
             return;
         }
 
         $this->reply($this->renderStation($station, $servers, $month, $config), $threadId);
+    }
+
+    /**
+     * 對不到站台 —— 分辨「講了兩個」與「名字不存在」
+     *
+     * ⚠ 模型偶爾會把兩個站台塞進同一個欄位（餘點那支實測過：prompt 寫了
+     * 「一次一個」照樣回 `"LV_UAT、T01"`）。完全相符找不到時，數這串字裡
+     * 出現幾個已知站台名就分得出來，兩種要回的話不一樣。
+     *
+     * @param string   $raw
+     * @param int|null $threadId
+     * @param array    $config
+     * @return void
+     */
+    private function replyNoSuchStation($raw, $threadId, array $config)
+    {
+        $mentioned = $this->nameMatcher->mentioned($raw, $this->stations());
+
+        if (count($mentioned) > 1) {
+            $this->reply(strtr((string) Arr::get($config, 'MULTIPLE_TEXT'), [
+                '{names}' => implode('、', $mentioned),
+            ]), $threadId);
+
+            return;
+        }
+
+        $this->reply(strtr((string) Arr::get($config, 'NOT_FOUND_TEXT'), [
+            '{station}' => (string) $raw,
+            '{names}'   => $this->stationNames(),
+        ]), $threadId);
     }
 
     /**
@@ -315,7 +324,7 @@ class VmQueryCommandService
      */
     private function powerText($server, array $config)
     {
-        if ((int) $server->power_status === (int) config('constants.VM.POWER.ON')) {
+        if ($server->isPoweredOn()) {
             return (string) Arr::get($config, 'POWER_ON');
         }
 
@@ -347,9 +356,7 @@ class VmQueryCommandService
         $billing = $server->billings->first();
 
         if (blank($billing)) {
-            $poweredOn = (int) $server->power_status === (int) config('constants.VM.POWER.ON');
-
-            return (string) Arr::get($config, $poweredOn ? 'BILLING_NONE' : 'BILLING_POWERED_OFF');
+            return (string) Arr::get($config, $server->isPoweredOn() ? 'BILLING_NONE' : 'BILLING_POWERED_OFF');
         }
 
         $amount = $this->money((float) $billing->amount);
@@ -547,7 +554,7 @@ class VmQueryCommandService
             $seen[$name] = (int) Arr::get($seen, $name, 0) + 1;
             $label = $this->labelFor($name, $seen[$name], (int) Arr::get($counts, $name, 1), $config);
 
-            if ((int) $server->power_status === (int) config('constants.VM.POWER.ON')) {
+            if ($server->isPoweredOn()) {
                 $on[] = strtr((string) Arr::get($config, 'POWER_LINE'), ['{station}' => $label]);
 
                 continue;
