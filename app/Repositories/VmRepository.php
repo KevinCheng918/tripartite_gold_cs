@@ -159,22 +159,41 @@ class VmRepository
      * 錢確實還沒入帳。但呼叫端必須把兩者分開顯示：講成同一種會去催錯人，
      * 待審核那筆卡在我們自己這邊。
      *
-     * ⚠ 依 `due_date` 排序：逾期最久的最該先處理（比照
-     * `getPendingBillingsForReminder()`）。
+     * ⚠ **未收的只列開機中的**（需求方 2026-10-13）。關機不收錢，
+     * `getBillingsForNotice()` 本來就不會去催關機機器的款 —— 清單列出來
+     * 卻沒人會催，只是讓真正要處理的那幾筆被淹掉。
+     *
+     * ⚠ **但待審核的不分電源。** 那是客戶已經付錢也上傳證明、等我們審的款：
+     * 機器後來關機不代表我們可以不審。濾掉的話，那筆錢會從清單上消失、
+     * 永遠沒人處理 —— 客戶付了卻什麼都沒拿到。
+     * （`getPendingBillingsForReminder()` 也是刻意不篩電源，同一個理由。）
+     *
+     * ⚠ 依 `due_date` 排序：逾期最久的最該先處理。
      *
      * @param string $billingMonth YYYY-MM
      * @return Collection
      */
     public function getUnpaidBillingsByMonth($billingMonth)
     {
+        $unpaid = config('constants.VM.BILLING.UNPAID');
+        $pending = config('constants.VM.BILLING.PENDING');
+        $powerOn = config('constants.VM.POWER.ON');
+
         return VmBilling::query()
             ->select(self::BILLING_COLUMNS)
             ->with(['vmServer.station'])
             ->where('billing_month', $billingMonth)
-            ->whereIn('paid', [
-                config('constants.VM.BILLING.UNPAID'),
-                config('constants.VM.BILLING.PENDING'),
-            ])
+            ->where(function ($query) use ($unpaid, $pending, $powerOn) {
+                // 未收：關機的不列
+                $query->where(function ($one) use ($unpaid, $powerOn) {
+                    $one->where('paid', $unpaid)
+                        ->whereHas('vmServer', function ($server) use ($powerOn) {
+                            $server->where('power_status', $powerOn);
+                        });
+                })
+                // 待審核：不論電源都要列
+                ->orWhere('paid', $pending);
+            })
             ->orderBy('due_date')
             ->get();
     }

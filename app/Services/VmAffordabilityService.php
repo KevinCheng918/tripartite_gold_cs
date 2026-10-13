@@ -153,6 +153,13 @@ class VmAffordabilityService
      * ⚠ 這裡**要加總**（跟卡片一台一段不一樣）：問的是「總共要扣多少」，
      * 不是「哪一台多少」。
      *
+     * ⚠ **關機機器的「未收」不算**（需求方 2026-10-13）。關機不收錢，
+     * 繳款通知（`getBillingsForNotice()`）與未收清單都不會去催那一筆 ——
+     * 算進「要扣多少」的話，試算會說不夠扣、害人多補了用不到的點。
+     *
+     * ⚠ **待審核的照算，不分電源。** 那是客戶已經付錢等我們審的款，
+     * 機器後來關機不代表那筆錢不存在。
+     *
      * @param \Illuminate\Database\Eloquent\Collection $servers
      * @return array{items: array, unpaid: float, pending: float, paid: float}
      */
@@ -165,21 +172,28 @@ class VmAffordabilityService
 
         foreach ($servers as $server) {
             foreach ($server->billings as $billing) {
-                $items[] = $billing;
                 $amount = (float) $billing->amount;
 
                 if ((int) $billing->paid === (int) config('constants.VM.BILLING.PAID')) {
+                    $items[] = $billing;
                     $paid += $amount;
 
                     continue;
                 }
 
                 if ((int) $billing->paid === (int) config('constants.VM.BILLING.PENDING')) {
+                    $items[] = $billing;
                     $pending += $amount;
 
                     continue;
                 }
 
+                // 未收 ＋ 關機 ＝ 不會去收，所以也不算進「要扣多少」
+                if (!$server->isPoweredOn()) {
+                    continue;
+                }
+
+                $items[] = $billing;
                 $unpaid += $amount;
             }
         }
