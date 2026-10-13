@@ -1120,6 +1120,22 @@ $(function () {
 
     var $dropzone = $('#tpl-dropzone');
 
+    /*
+     * ⚠ **`<input>` 的 click 一定要擋住冒泡**，否則是無限遞迴：
+     *
+     *   點 dropzone → trigger input.click() → 那個 click 冒泡回 dropzone
+     *   → 又 trigger → … → Maximum call stack size exceeded
+     *
+     * 因為 `#tpl-files` 就藏在 `#tpl-dropzone` 裡面（刻意的，鍵盤使用者要
+     * tab 得到）。點上方的 `<label for="tpl-files">` 也會走同一條路。
+     *
+     * 擋在 input 這一側而不是在 dropzone 裡判斷 `e.target` ——
+     * 這樣不論 click 是誰觸發的（使用者、label、程式）都只會往下開檔案視窗。
+     */
+    $('#tpl-files').on('click', function (e) {
+        e.stopPropagation();
+    });
+
     $dropzone.on('click', function () {
         $('#tpl-files').trigger('click');
     });
