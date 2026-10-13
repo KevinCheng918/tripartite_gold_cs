@@ -97,6 +97,7 @@ return [
         'ignore_manage'   => 'Manage auto-reply exclusions',
         'broadcast_template' => 'Manage announcement templates',
         'station_credit' => 'Query station credits by command',
+        'vm_query' => 'Query virtual machines by command',
         'reply'     => 'Reply messages',
         'assign'    => 'Assign duty staff',
         'broadcast' => 'Broadcast announcement',

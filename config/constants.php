@@ -852,24 +852,16 @@ return [
      */
     'STATION_CREDIT_COMMAND' => [
         /*
-         * 粗篩用，含這些字才跑模型。真正的判斷在解析器裡。
+         * ⚠ 這裡原本有一份 `KEYWORDS` 粗篩清單（餘點／點數／…），
+         * 2026-10-13 整個拿掉。
          *
-         * ⚠ **這份清單一定會漏。** 2026-10-13 上線當天就漏掉
-         * 「確認 Rich 還剩多少點」—— 沒有「餘點」也沒有「點數」，於是整支
-         * 餘點指令沒被問到，訊息掉到最後的預約提醒，被排成了明天的提醒。
+         * 上線當天就漏掉「確認 Rich 還剩多少點」—— 一個關鍵字都不中，
+         * 這支指令根本沒被問到，訊息掉到最後的預約提醒被排成了明天的提醒。
+         * 補上「多少點」之後那句會中，但「Rich 剩多少」連「點」都沒有，
+         * 照樣會漏：**關鍵字清單永遠追不完講法**。
          *
-         * 加上「多少點」「剩點」之後那一句會中，但「Rich 剩多少」這種
-         * 連「點」都沒有的講法照樣會漏。粗篩是成本取捨（不要每則 tag 都跑
-         * 三支模型），不是正確性機制 —— 真正的解法見
-         * `features/station-credit-command.md` 的「粗篩的極限」。
+         * 現在四支指令一律由解析器判斷（`TelegramCommandRouter::handlers()`）。
          */
-        'KEYWORDS' => [
-            '餘點', '余点',
-            '點數', '点数',
-            '多少點', '多少点',
-            '剩點', '剩点',
-            '剩餘點', '剩余点',
-        ],
 
         // 樸素寫法，理由同 BROADCAST_COMMAND.PROMPT
         'PROMPT' => implode("\n", [
@@ -982,15 +974,145 @@ return [
         'WORKING_TEXT' => '正在同步 {station} 的餘點，請稍候…',
     ],
 
+    /*
+     * 用 Telegram 指令查站台的虛擬機。
+     *
+     * 「幫我查一下 LV_UAT 虛擬機」「誰還沒繳錢」「誰是開機還是關機」
+     *
+     * ⚠ **不做二次確認**（跟餘點指令不一樣）。餘點要確認是因為它會打
+     * 主系統 API 並把結果寫回資料庫 —— 按鈕是在問「要不要執行這個動作」。
+     * 這一支純讀本地資料、沒有副作用、不用等，多一次點擊只是礙事。
+     */
+    'VM_QUERY_COMMAND' => [
+        /*
+         * ⚠ 樸素寫法，不要用 `**` 與 ⚠ ——
+         * 帶排版符號的 prompt 會讓模型把整包 JSON 塞進欄位裡
+         * （見 bugfix/2026-10-12-double-wrapped-json-prompt）。
+         */
+        'PROMPT' => implode("\n", [
+            '你是群組機器人的指令解析器，只負責判斷「這句話是不是在問虛擬機的狀況」。',
+            '',
+            'intent 怎麼填：',
+            '- station：他要查某一個站台的虛擬機（「幫我查一下 LV_UAT 虛擬機」',
+            '  「幫我確認 lv-uat 虛擬機規格」「lv-uat 他是開機還是關機」',
+            '  「lv-uat 虛擬機繳費了嗎」都算）',
+            '- unpaid：沒有指名站台，問的是誰還沒繳錢、哪些還沒收到款',
+            '- power：沒有指名站台，問的是誰開機誰關機',
+            '- not_vm：這句話不是在問虛擬機（例如要排提醒、要發公告、要查餘點）',
+            '- unknown：是在問虛擬機，但聽不出要查什麼',
+            '',
+            'station 填站台名稱原文，不要帶「的」「虛擬機」「站台」這些字。',
+            '沒有指名哪一個站台就填 null。',
+            '只要他講了站台名稱，intent 一律填 station，就算他問的是電源或繳費也一樣。',
+        ]),
+
+        'INPUT' => '對方說：{text}',
+
+        // 一次只查一個站台
+        'MULTIPLE_TEXT' => "一次只能查一個站台 🙏\n"
+            . '您提到了：{names}，要先查哪一個呢？',
+
+        'NOT_FOUND_TEXT' => "找不到叫 <b>{station}</b> 的站台 🙏\n"
+            . '目前有的是：{names}',
+
+        'UNKNOWN_TEXT' => implode("\n", [
+            '要查虛擬機的什麼呢 🙏 可以這樣問：',
+            '・幫我查一下 LV_UAT 虛擬機',
+            '・幫我查一下誰還沒繳錢',
+            '・誰是開機還是關機',
+        ]),
+
+        'UNAVAILABLE_TEXT' => '抱歉，現在沒辦法解析這則指令，請稍後再試一次 🙏',
+
+        /*
+         * 權限。
+         *
+         * ⚠ 名稱要跟**介面上看到的字**一樣（帳號管理 → 權限設定 →
+         * Telegram 客服 → 用指令查虛擬機）。寫近似說法的話，
+         * 人照著去權限頁會找不到那一項。
+         */
+        'NOT_BOUND_TEXT' => "這則指令要先把 Telegram 綁到系統帳號才能用 🙏\n"
+            . '（後台「帳號管理」→ 編輯自己的帳號 → 填 Telegram 使用者 ID）',
+
+        'NO_PERMISSION_TEXT' => '這個操作需要「Telegram 客服 → 用指令查虛擬機」權限 🙏',
+
+        // --- 單一站台 ---
+
+        'STATION_TITLE' => "🖥 <b>{station}</b> 的虛擬機（{count} 台）\n",
+
+        /*
+         * ⚠ **不列主機名稱**（需求方 2026-10-13：「虛擬機不用列主機名稱，
+         * 只需要列站台名稱就好」）。所以一個站台有多台時是**加總**呈現，
+         * 不是一台一行 —— 列了明細卻沒有名字，根本分不出哪行是哪台。
+         */
+        'STATION_SPEC'  => "規格：{spec}\n",
+        'STATION_FEE'   => "費用：<b>{fee}</b> USDT／月\n",
+        'STATION_FEE_BREAKDOWN' => "　（主機 {monthly}　VPN {vpn}　Google {google}）\n",
+        'STATION_POWER' => "電源：{power}\n",
+
+        'POWER_ON'    => '🟢 開機',
+        'POWER_OFF'   => '🔴 關機',
+        'POWER_OFF_SINCE' => '🔴 關機（{date} 起）',
+        'POWER_MIXED' => '🟢 開機 {on} 台 ／ 🔴 關機 {off} 台',
+
+        // --- 帳單（只看當月，需求方 2026-10-13）---
+
+        'BILLING_TITLE' => '{month}帳單：',
+
+        /*
+         * ⚠ **三態要分開講。** `paid = 2` 是「客戶已上傳繳款證明，
+         * 等我們後台審核」—— 把它說成「未繳費」是把我們的延誤講成客戶欠款，
+         * 會去催錯人。
+         */
+        'BILLING_UNPAID'  => "❌ 未收 <b>{amount}</b> USDT，應收日 {due}（{when}）\n",
+        'BILLING_PENDING' => "⏳ 客戶已上傳繳款證明，等後台審核（{amount} USDT）\n",
+        'BILLING_PAID'    => "✅ 已收 {amount} USDT（{paid_at}）\n",
+
+        // 關機的機器不出帳（「開機才收錢」）
+        'BILLING_POWERED_OFF' => "關機不出帳\n",
+
+        // 開機卻沒有當月帳單 —— 通常是帳單還沒產
+        'BILLING_NONE' => "這個月還沒有帳單\n",
+
+        'DUE_OVERDUE' => '已逾期 {days} 天',
+        'DUE_TODAY'   => '就是今天',
+        'DUE_FUTURE'  => '還有 {days} 天',
+
+        // --- 跨站台：誰還沒繳錢 ---
+
+        'UNPAID_TITLE' => "💸 <b>{month}</b> 還沒收到的虛擬機費用（{count} 筆，共 {total} USDT）\n\n",
+        'UNPAID_EMPTY' => '{month} 的虛擬機費用都收齊了 👍',
+        'UNPAID_LINE'  => "• <b>{station}</b> ｜ {amount} USDT ｜ 應收日 {due}（{when}）\n",
+        'UNPAID_LINE_PENDING' => "• <b>{station}</b> ｜ {amount} USDT ｜ ⏳ 已上傳證明，等後台審核\n",
+
+        // --- 跨站台：誰開機誰關機 ---
+
+        'POWER_TITLE'     => "🖥 虛擬機電源狀況（共 {count} 台）\n",
+        'POWER_ON_TITLE'  => "\n🟢 開機（{count} 台）\n",
+        'POWER_OFF_TITLE' => "\n🔴 關機（{count} 台）\n",
+        'POWER_LINE'      => "• {station}\n",
+        'POWER_LINE_OFF'  => "• {station}（{date} 起）\n",
+        'POWER_EMPTY'     => '目前沒有任何虛擬機資料 🙏',
+
+        // 沒綁站台的機器也要看得到，不然它會從清單上消失
+        'NO_STATION_NAME' => '（未綁站台）',
+
+        /*
+         * 清單上限。
+         *
+         * ⚠ 多撈一筆才分得出「剛好 N 筆」與「還有更多」
+         * （做法同 REMINDER.LIST_MAX）。
+         */
+        'LIST_MAX'  => 20,
+        'LIST_MORE' => "\n…另外還有 {count} 筆",
+    ],
+
     'BROADCAST_COMMAND' => [
         /*
-         * 粗篩用的關鍵字 —— 含這些字才跑這一支模型。
-         *
-         * ⚠ **只是粗篩，不是判斷。** 「明天提醒我發公告」含「公告」但其實是
-         * 提醒，所以解析器還能回 `not_broadcast` 讓呼叫端退回提醒那條路。
-         * 這裡的用途單純是「不要每則訊息都跑兩支模型」。
+         * ⚠ 這裡原本有 `'KEYWORDS' => ['公告']` 粗篩，2026-10-13 拿掉 ——
+         * 餘點那邊因為關鍵字漏接出事之後，四支指令一律由解析器判斷。
+         * 理由見 `TelegramCommandRouter::handlers()`。
          */
-        'KEYWORDS' => ['公告'],
 
         /*
          * ⚠ 樸素寫法，不要用 `**` 與 ⚠ ——

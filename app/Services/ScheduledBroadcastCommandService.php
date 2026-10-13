@@ -57,20 +57,12 @@ class ScheduledBroadcastCommandService
         $this->supportGroup = $supportGroup;
     }
 
-    /**
-     * 這句話像不像在講發公告
-     *
-     * ⚠ **先用關鍵字分流，不要每則訊息都跑兩支模型。** 這一支只是粗篩，
-     * 真正的判斷在 `BroadcastCommandParser`（它會回 `not_broadcast`
-     * 讓呼叫端退回提醒那條路）—— 「明天提醒我發公告」含「公告」卻是提醒。
-     *
-     * @param string $text
-     * @return bool
+    /*
+     * ⚠ 這裡原本有一支 `looksLikeCommand()`（關鍵字粗篩「公告」），
+     * 2026-10-13 拿掉 —— 餘點指令那邊漏掉「還剩多少點」出事之後，
+     * 需求方決定四支指令一律由解析器判斷，不再用關鍵字抄捷徑。
+     * 理由見 `TelegramCommandRouter::handlers()`。
      */
-    public function looksLikeCommand($text)
-    {
-        return Str::contains((string) $text, (array) config('constants.BROADCAST_COMMAND.KEYWORDS', ['公告']));
-    }
 
     /**
      * 處理一句指令

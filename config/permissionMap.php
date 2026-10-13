@@ -162,6 +162,18 @@ return [
              * 跟著其他 tag 指令（群發公告）一起指派比較好找。
              */
             'telegram_chat.station_credit' => 'permission.telegram_chat.station_credit',
+
+            /*
+             * 在內部群組 tag 機器人查站台的虛擬機（費用／電源／繳費）。
+             *
+             * ⚠ 不沿用後台的 `vm.view`，理由同上一項：後台檢視虛擬機
+             * 與用指令查一下是兩件事。
+             *
+             * ⚠ 也不跟 `station_credit` 共用：餘點是**客戶在主系統的錢**，
+             * 虛擬機費用是**我們向客戶收的錢** —— 敏感度不一樣，
+             * 誰能看該分開指派。
+             */
+            'telegram_chat.vm_query' => 'permission.telegram_chat.vm_query',
         ],
     ],
 

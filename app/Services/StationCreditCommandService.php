@@ -7,7 +7,6 @@ use App\Repositories\UserRepository;
 use App\Services\AutoReply\StationCreditCommandParser;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 /**
  * 用 Telegram 指令查站台餘點
@@ -45,6 +44,7 @@ class StationCreditCommandService
     private $stationRepository;
     private $userRepository;
     private $stationService;
+    private $nameMatcher;
     private $supportGroup;
 
     /**
@@ -59,6 +59,7 @@ class StationCreditCommandService
         StationRepository $stationRepository,
         UserRepository $userRepository,
         StationService $stationService,
+        StationNameMatcher $nameMatcher,
         SupportGroupService $supportGroup
     ) {
         $this->parser = $parser;
@@ -67,19 +68,18 @@ class StationCreditCommandService
         $this->userRepository = $userRepository;
         // 同步走站台管理頁「同步」按鈕的同一支，不另外寫一份
         $this->stationService = $stationService;
+        // 「他說的名字是哪個站台」四支指令共用同一份規則
+        $this->nameMatcher = $nameMatcher;
         $this->supportGroup = $supportGroup;
     }
 
-    /**
-     * 這句話像不像在查餘點（粗篩，不是判斷）
+    /*
+     * ⚠ 這裡原本有一支 `looksLikeCommand()`（關鍵字粗篩），2026-10-13 拿掉。
      *
-     * @param string $text
-     * @return bool
+     * 上線當天就漏掉「確認 Rich 還剩多少點」——「餘點」「點數」一個都不中，
+     * 這支指令根本沒被問到，訊息掉到分派器最後一棒被排成了明天的提醒。
+     * 關鍵字清單永遠追不完講法，詳見 `TelegramCommandRouter::handlers()`。
      */
-    public function looksLikeCommand($text)
-    {
-        return Str::contains((string) $text, (array) config('constants.STATION_CREDIT_COMMAND.KEYWORDS', ['餘點']));
-    }
 
     /**
      * 處理一句指令
@@ -143,7 +143,7 @@ class StationCreditCommandService
          * 「、」「跟」「和」這些分隔符：站台名稱本身可能含奇怪的字元，
          * 猜分隔符會把合法名稱切壞。
          */
-        $matched = $this->matchedNames($raw);
+        $matched = $this->nameMatcher->mentioned($raw, $this->syncableStations());
 
         if (count($matched) > 1) {
             $this->reply(strtr((string) Arr::get($config, 'MULTIPLE_TEXT'), [
@@ -336,103 +336,16 @@ class StationCreditCommandService
      * 那支已經篩掉「停用」與「沒設 API」的站台。自己寫一條的話，
      * 會出現「指令找得到這個站台、按下去卻同步不了」那種不一致。
      *
-     * ⚠ 完全相符（不計大小寫），不模糊比對 —— 猜錯會讓人拿著別的站台的
-     * 點數做判斷。
+     * ⚠ 比對本身交給 `StationNameMatcher`（四支指令共用）——
+     * 原本這裡自己寫一份「不計大小寫的完全相符」，`lv-uat` 會找不到
+     * `LV_UAT`。比對規則只能有一份。
      *
      * @param string|null $name
      * @return \App\Models\Station|null
      */
     private function findStation($name)
     {
-        $name = mb_strtolower(trim((string) $name));
-
-        if (blank($name)) {
-            return null;
-        }
-
-        foreach ($this->syncableStations() as $station) {
-            if (mb_strtolower((string) $station->name) === $name) {
-                return $station;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * 這串字裡出現了哪些已知的站台名稱
-     *
-     * 專門用來分辨「他講了兩個站台」與「他講的名字不存在」——
-     * 兩種都是完全相符找不到，但回話要不一樣。
-     *
-     * ⚠ **只用來數個數，不用來代替完全相符。** 假設站台有 `T01` 沒有 `T011`，
-     * 使用者問 `T011` 時這裡會「包含 T01」—— 直接拿去查就會回 T01 的點數，
-     * 而他問的是另一個站台。所以命中一個的時候仍然走「找不到」，
-     * 只有命中兩個以上才改口說「一次只能查一個」。
-     *
-     * @param string $text
-     * @return array<string> 站台名稱原文（長的排前面，理由見內文）
-     */
-    private function matchedNames($text)
-    {
-        $text = mb_strtolower((string) $text);
-
-        if (blank($text)) {
-            return [];
-        }
-
-        $names = [];
-
-        foreach ($this->syncableStations() as $station) {
-            $name = (string) $station->name;
-
-            if (blank($name)) {
-                continue;
-            }
-
-            if (mb_strpos($text, mb_strtolower($name)) !== false) {
-                $names[] = $name;
-            }
-        }
-
-        /*
-         * ⚠ 長的先比：有 `T01` 與 `T011` 兩個站台時，字串 "T011" 同時包含
-         * 兩者 —— 不排掉的話會被數成「講了兩個站台」。長的命中之後，
-         * 被它整個包住的短名稱就不算。
-         */
-        return $this->dropContained($names);
-    }
-
-    /**
-     * 排掉「被別的命中名稱整個包住」的那些
-     *
-     * @param array<string> $names
-     * @return array<string>
-     */
-    private function dropContained(array $names)
-    {
-        usort($names, function ($a, $b) {
-            return mb_strlen($b) - mb_strlen($a);
-        });
-
-        $kept = [];
-
-        foreach ($names as $name) {
-            $contained = false;
-
-            foreach ($kept as $longer) {
-                if (mb_strpos(mb_strtolower($longer), mb_strtolower($name)) !== false) {
-                    $contained = true;
-                    break;
-                }
-            }
-
-            if (!$contained) {
-                $kept[] = $name;
-            }
-        }
-
-        return $kept;
+        return $this->nameMatcher->match($name, $this->syncableStations());
     }
 
     /**

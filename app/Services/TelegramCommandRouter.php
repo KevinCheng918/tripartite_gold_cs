@@ -8,10 +8,11 @@ use Illuminate\Support\Arr;
  * 內部群組裡 tag 機器人的指令分派
  *
  * ```
- * tag 機器人
- *   ├─ 含「公告」  → 預約發送公告（要權限、要先確認）
- *   ├─ 含「餘點」  → 同步站台餘點（要先確認）
- *   └─ 其餘        → 預約提醒（也是看不懂時的歸宿）
+ * tag 機器人 → 依序問每一支，誰認領就誰處理
+ *   ├─ 預約發送公告（要權限、要先確認）
+ *   ├─ 同步站台餘點（要權限、要先確認）
+ *   ├─ 查站台虛擬機（要權限，純讀不必確認）
+ *   └─ 預約提醒（擺最後，也是看不懂時的歸宿）
  * ```
  *
  * ⚠ **這一支抽出來的理由**（2026-10-13）：原本「有沒有 tag 到我」「話題准不准」
@@ -20,12 +21,11 @@ use Illuminate\Support\Arr;
  * 下一個人要找分流邏輯會先翻 webhook，再翻到提醒的 service 裡才看到。
  *
  * ⚠ **每一支 handler 的簽章都一樣**（`handle($body, $from, $threadId): bool`），
- * 回 `false` 代表「這不是我的事，換下一個」。加第四種指令時只要寫一支 handler
+ * 回 `false` 代表「這不是我的事，換下一個」。再加一種指令時只要寫一支 handler
  * 再掛進 `handlers()`，不必動任何既有的 service。
  *
- * ⚠ **關鍵字只是粗篩，不是判斷。** 真正的判斷在各自的解析器裡 ——
- * 「明天提醒我發公告」含「公告」卻是提醒，所以公告那支會回 false 讓它往下走。
- * 粗篩的用途單純是「不要每則訊息都跑三支模型」。
+ * ⚠ **判斷一律由解析器做，沒有關鍵字捷徑。** 「明天提醒我發公告」含「公告」
+ * 卻是提醒 —— 這種只有讀懂整句才分得出來。理由見 `handlers()`。
  */
 class TelegramCommandRouter
 {
@@ -36,6 +36,7 @@ class TelegramCommandRouter
     private $botService;
     private $broadcastCommand;
     private $creditCommand;
+    private $vmCommand;
     private $reminder;
 
     public function __construct(
@@ -43,6 +44,7 @@ class TelegramCommandRouter
         TelegramBotService $botService,
         ScheduledBroadcastCommandService $broadcastCommand,
         StationCreditCommandService $creditCommand,
+        VmQueryCommandService $vmCommand,
         ScheduledReminderService $reminder
     ) {
         $this->supportGroup = $supportGroup;
@@ -50,6 +52,7 @@ class TelegramCommandRouter
         $this->botService = $botService;
         $this->broadcastCommand = $broadcastCommand;
         $this->creditCommand = $creditCommand;
+        $this->vmCommand = $vmCommand;
         // 擺最後：它同時是「看不懂」時的歸宿
         $this->reminder = $reminder;
     }
@@ -108,7 +111,19 @@ class TelegramCommandRouter
      * 依序問過去，誰認領就誰處理
      *
      * ⚠ 順序有意義：**提醒擺最後**，因為它同時是「看不懂」時的歸宿
-     * （會回一句範例）。把它放前面的話，後面兩種永遠輪不到。
+     * （會回一句範例）。把它放前面的話，後面幾種永遠輪不到。
+     *
+     * ⚠ **沒有關鍵字粗篩**（2026-10-13 拿掉，需求方決定）。原本每支指令
+     * 前面都先用關鍵字擋一道，省模型呼叫 —— 但上線當天就漏掉
+     * 「確認 Rich 還剩多少點」（沒有「餘點」也沒有「點數」），餘點指令
+     * 根本沒被問到，訊息掉到提醒那一棒被排成了明天的提醒。
+     *
+     * 關鍵字清單永遠追不完講法，而每漏一次都是默默出錯、要等人回報。
+     * 粗篩本來就只是成本機制，拿它當正確性機制就會變成「功能做好了
+     * 但叫不出來」。現在一律問過去，各解析器自己回 `false` 退場。
+     *
+     * 代價是最差跑四次模型。被 tag 的訊息本來就少（是人特地 tag 機器人），
+     * 用這個換「講法換一種就失靈」是划算的。
      *
      * @return array<callable>
      */
@@ -116,16 +131,18 @@ class TelegramCommandRouter
     {
         $broadcast = $this->broadcastCommand;
         $credit = $this->creditCommand;
+        $vm = $this->vmCommand;
         $reminder = $this->reminder;
 
         return [
             function ($body, $from, $threadId) use ($broadcast) {
-                return $broadcast->looksLikeCommand($body)
-                    && $broadcast->handle($body, $from, $threadId);
+                return $broadcast->handle($body, $from, $threadId);
             },
             function ($body, $from, $threadId) use ($credit) {
-                return $credit->looksLikeCommand($body)
-                    && $credit->handle($body, $from, $threadId);
+                return $credit->handle($body, $from, $threadId);
+            },
+            function ($body, $from, $threadId) use ($vm) {
+                return $vm->handle($body, $from, $threadId);
             },
             function ($body, $from, $threadId, $message) use ($reminder) {
                 return $reminder->handle($body, $threadId, $message);

@@ -126,6 +126,79 @@ class VmRepository
     }
 
     /**
+     * 某個站台的虛擬機（Telegram 指令查詢用）
+     *
+     * ⚠ 一併 eager load **指定月份**的帳單，不要在迴圈裡一台一台撈 ——
+     * 一個站台可能有好幾台機器，那就是 N+1。
+     *
+     * ⚠ 不篩電源：關機的機器照樣要回報（使用者問的就是「開機還是關機」）。
+     *
+     * @param int    $stationId
+     * @param string $billingMonth YYYY-MM
+     * @return Collection
+     */
+    public function getServersByStation($stationId, $billingMonth)
+    {
+        return VmServer::query()
+            ->select(self::SERVER_COLUMNS)
+            ->with([
+                'billings' => function ($query) use ($billingMonth) {
+                    $query->select(self::BILLING_COLUMNS)
+                        ->where('billing_month', $billingMonth);
+                },
+            ])
+            ->where('station_id', (int) $stationId)
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * 指定月份還沒收到錢的帳單（跨站台，Telegram 指令「誰還沒繳錢」用）
+     *
+     * ⚠ 「還沒收到」**包含待審核**（`paid = 2`，客戶已上傳證明等我們審）——
+     * 錢確實還沒入帳。但呼叫端必須把兩者分開顯示：講成同一種會去催錯人，
+     * 待審核那筆卡在我們自己這邊。
+     *
+     * ⚠ 依 `due_date` 排序：逾期最久的最該先處理（比照
+     * `getPendingBillingsForReminder()`）。
+     *
+     * @param string $billingMonth YYYY-MM
+     * @return Collection
+     */
+    public function getUnpaidBillingsByMonth($billingMonth)
+    {
+        return VmBilling::query()
+            ->select(self::BILLING_COLUMNS)
+            ->with(['vmServer.station'])
+            ->where('billing_month', $billingMonth)
+            ->whereIn('paid', [
+                config('constants.VM.BILLING.UNPAID'),
+                config('constants.VM.BILLING.PENDING'),
+            ])
+            ->orderBy('due_date')
+            ->get();
+    }
+
+    /**
+     * 全部虛擬機的電源狀況（跨站台，Telegram 指令「誰是開機還是關機」用）
+     *
+     * ⚠ 開機的排前面，再依站台 —— 關機的通常是已經不用了的，
+     * 要先看到的是正在跑（正在收錢）的那些。
+     *
+     * @return Collection
+     */
+    public function getAllServersWithStation()
+    {
+        return VmServer::query()
+            ->select(self::SERVER_COLUMNS)
+            ->with(['station'])
+            ->orderByDesc('power_status')
+            ->orderBy('station_id')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
      * 取得所有**開機中**的 VM（產帳單用）
      *
      * ⚠ 2026-10-13 之前這支叫 `getActiveServers()`，條件是 `status = 1`
