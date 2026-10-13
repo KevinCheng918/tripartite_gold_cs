@@ -179,8 +179,12 @@ class VmQueryCommandService
     /**
      * 組單一站台的那張卡
      *
-     * ⚠ **費用與帳單都是加總**，因為不列主機名稱 —— 一台一行卻沒有名字
-     * 的話，看的人分不出哪行是哪台。
+     * ⚠ **一台一段，不加總**（需求方 2026-10-13：「如果一個站有兩台，
+     * 要分別列出，不能混在一起」）。兩台的規格與電源可能完全不同，
+     * 加總等於把資訊弄丟。
+     *
+     * ⚠ 但**不列主機名稱**（同日的另一條補充），所以用**序號**區分。
+     * 只有一台時不編號也不縮排。
      *
      * @param \App\Models\Station                      $station
      * @param \Illuminate\Database\Eloquent\Collection $servers
@@ -195,66 +199,98 @@ class VmQueryCommandService
             '{count}'   => $servers->count(),
         ]);
 
-        $text .= strtr((string) Arr::get($config, 'STATION_SPEC'), [
-            '{spec}' => $this->specText($servers),
-        ]);
-
-        $text .= $this->feeText($servers, $config);
-        $text .= strtr((string) Arr::get($config, 'STATION_POWER'), [
-            '{power}' => $this->powerText($servers, $config),
-        ]);
-
-        $text .= "\n" . strtr((string) Arr::get($config, 'BILLING_TITLE'), [
-            '{month}' => $this->monthText($month),
-        ]) . "\n";
-
-        return $text . $this->billingText($servers, $config);
-    }
-
-    /**
-     * 規格（多台就一台一個，用 ／ 隔開）
-     *
-     * @param \Illuminate\Database\Eloquent\Collection $servers
-     * @return string
-     */
-    private function specText($servers)
-    {
-        $specs = [];
+        $multiple = $servers->count() > 1;
+        $index = 0;
 
         foreach ($servers as $server) {
-            if (filled($server->spec)) {
-                $specs[] = (string) $server->spec;
-            }
+            $index++;
+
+            // 多台時每段之間空一行，不然兩台會黏成一坨
+            $text .= $multiple ? "\n" : '';
+            $text .= $this->renderMachine($server, $month, $config, $multiple ? $index : 0);
         }
 
-        return filled($specs) ? implode(' ／ ', $specs) : '-';
+        return $text;
     }
 
     /**
-     * 費用（全部機器加總，並拆出三個項目）
+     * 一台機器的那一段
+     *
+     * @param \App\Models\VmServer $server
+     * @param string               $month
+     * @param array                $config
+     * @param int                  $index 0 = 只有一台，不編號
+     * @return string
+     */
+    private function renderMachine($server, $month, array $config, $index)
+    {
+        // 第一行掛序號，後面幾行用等寬的空白對齊
+        $number = $index > 0 ? $this->machineNumber($index, $config) : '';
+        $head = filled($number) ? "{$number} " : '';
+        $indent = $index > 0 ? (string) Arr::get($config, 'MACHINE_INDENT') : '';
+
+        $text = strtr((string) Arr::get($config, 'MACHINE_SPEC'), [
+            '{indent}' => $head,
+            '{spec}'   => filled($server->spec) ? (string) $server->spec : '-',
+        ]);
+
+        $text .= $this->feeText($server, $config, $indent);
+
+        $text .= strtr((string) Arr::get($config, 'MACHINE_POWER'), [
+            '{indent}' => $indent,
+            '{power}'  => $this->powerText($server, $config),
+        ]);
+
+        return $text . strtr((string) Arr::get($config, 'MACHINE_BILLING'), [
+            '{indent}'  => $indent,
+            '{month}'   => $this->monthText($month),
+            '{billing}' => $this->billingText($server, $config),
+        ]);
+    }
+
+    /**
+     * 第幾台
+     *
+     * ⚠ 超過十台就沒有圈號可用，退回 `(11)` —— 直接取陣列會拿到 null，
+     * 那一行的序號就不見了。
+     *
+     * @param int   $index 1 起算
+     * @param array $config
+     * @return string
+     */
+    private function machineNumber($index, array $config)
+    {
+        $numbers = (array) Arr::get($config, 'MACHINE_NUMBERS', []);
+        $symbol = Arr::get($numbers, $index - 1);
+
+        if (filled($symbol)) {
+            return (string) $symbol;
+        }
+
+        return strtr((string) Arr::get($config, 'MACHINE_NUMBER_FALLBACK'), ['{index}' => $index]);
+    }
+
+    /**
+     * 一台的費用（並拆出三個項目）
      *
      * ⚠ 三項的加總方式跟產帳單那邊一樣
      * （`VmService::generateMonthlyBillings()`：主機 ＋ VPN ＋ Google）——
      * 這裡報的數字必須跟實際出帳的金額對得起來。
      *
-     * @param \Illuminate\Database\Eloquent\Collection $servers
-     * @param array                                    $config
+     * @param \App\Models\VmServer $server
+     * @param array                $config
+     * @param string               $indent
      * @return string
      */
-    private function feeText($servers, array $config)
+    private function feeText($server, array $config, $indent)
     {
-        $monthly = 0.0;
-        $vpn = 0.0;
-        $google = 0.0;
+        $monthly = (float) $server->monthly_fee;
+        $vpn = (float) $server->vpn_fee;
+        $google = (float) $server->google_fee;
 
-        foreach ($servers as $server) {
-            $monthly += (float) $server->monthly_fee;
-            $vpn += (float) $server->vpn_fee;
-            $google += (float) $server->google_fee;
-        }
-
-        $text = strtr((string) Arr::get($config, 'STATION_FEE'), [
-            '{fee}' => $this->money($monthly + $vpn + $google),
+        $text = strtr((string) Arr::get($config, 'MACHINE_FEE'), [
+            '{indent}' => $indent,
+            '{fee}'    => $this->money($monthly + $vpn + $google),
         ]);
 
         // 只有主機費時不必拆 —— 「（主機 30.00　VPN 0.00　Google 0.00）」是雜訊
@@ -262,7 +298,8 @@ class VmQueryCommandService
             return $text;
         }
 
-        return $text . strtr((string) Arr::get($config, 'STATION_FEE_BREAKDOWN'), [
+        return $text . strtr((string) Arr::get($config, 'MACHINE_FEE_BREAKDOWN'), [
+            '{indent}'  => $indent,
             '{monthly}' => $this->money($monthly),
             '{vpn}'     => $this->money($vpn),
             '{google}'  => $this->money($google),
@@ -270,134 +307,69 @@ class VmQueryCommandService
     }
 
     /**
-     * 電源（全開／全關／混合）
+     * 一台的電源
      *
-     * @param \Illuminate\Database\Eloquent\Collection $servers
-     * @param array                                    $config
+     * @param \App\Models\VmServer $server
+     * @param array                $config
      * @return string
      */
-    private function powerText($servers, array $config)
+    private function powerText($server, array $config)
     {
-        $on = 0;
-        $off = 0;
-        $offSince = null;
-
-        foreach ($servers as $server) {
-            if ((int) $server->power_status === (int) config('constants.VM.POWER.ON')) {
-                $on++;
-                continue;
-            }
-
-            $off++;
-
-            if (blank($offSince) && filled($server->powered_off_at)) {
-                $offSince = $server->powered_off_at;
-            }
-        }
-
-        if ($on > 0 && $off > 0) {
-            return strtr((string) Arr::get($config, 'POWER_MIXED'), ['{on}' => $on, '{off}' => $off]);
-        }
-
-        if ($off < 1) {
+        if ((int) $server->power_status === (int) config('constants.VM.POWER.ON')) {
             return (string) Arr::get($config, 'POWER_ON');
         }
 
-        // 全部關機：只有一台時順便講從哪天開始關的
-        if ($servers->count() === 1 && filled($offSince)) {
-            return strtr((string) Arr::get($config, 'POWER_OFF_SINCE'), [
-                '{date}' => $offSince->format('n/j'),
-            ]);
+        if (blank($server->powered_off_at)) {
+            return (string) Arr::get($config, 'POWER_OFF');
         }
 
-        return (string) Arr::get($config, 'POWER_OFF');
+        return strtr((string) Arr::get($config, 'POWER_OFF_SINCE'), [
+            '{date}' => $server->powered_off_at->format('n/j'),
+        ]);
     }
 
     /**
-     * 當月帳單（加總）
+     * 一台的當月帳單（一台一個月只會有一筆）
      *
      * ⚠ **三態要分開講。** `paid = 2` 是「客戶已上傳繳款證明，等我們審核」——
      * 講成「未繳費」是把我們的延誤說成客戶欠款。
      *
-     * ⚠ 關機的機器**不出帳**（`generateMonthlyBillings()` 只對開機的產），
-     * 所以沒帳單時要先看電源，才不會把「不該有帳單」說成「帳單還沒產」。
+     * ⚠ 關機的機器**不出帳**（`generateMonthlyBillings()` 只對開機的產）。
+     * 沒帳單時**先看有沒有帳單、再看電源**：反過來的話，關機前就產好的那筆
+     * 會被「關機不出帳」蓋掉，而那筆錢還是要收的。
      *
-     * @param \Illuminate\Database\Eloquent\Collection $servers
-     * @param array                                    $config
+     * @param \App\Models\VmServer $server
+     * @param array                $config
      * @return string
      */
-    private function billingText($servers, array $config)
+    private function billingText($server, array $config)
     {
-        $unpaid = 0.0;
-        $pending = 0.0;
-        $paid = 0.0;
-        $due = null;
-        $paidAt = null;
-        $anyBilling = false;
-        $anyOn = false;
+        $billing = $server->billings->first();
 
-        foreach ($servers as $server) {
-            if ((int) $server->power_status === (int) config('constants.VM.POWER.ON')) {
-                $anyOn = true;
-            }
+        if (blank($billing)) {
+            $poweredOn = (int) $server->power_status === (int) config('constants.VM.POWER.ON');
 
-            foreach ($server->billings as $billing) {
-                $anyBilling = true;
-                $amount = (float) $billing->amount;
-
-                if ((int) $billing->paid === (int) config('constants.VM.BILLING.PAID')) {
-                    $paid += $amount;
-
-                    if (blank($paidAt) && filled($billing->paid_at)) {
-                        $paidAt = $billing->paid_at;
-                    }
-
-                    continue;
-                }
-
-                if ((int) $billing->paid === (int) config('constants.VM.BILLING.PENDING')) {
-                    $pending += $amount;
-
-                    continue;
-                }
-
-                $unpaid += $amount;
-
-                // 多台時取最早的應收日 —— 要先處理的是最急的那一筆
-                if (blank($due) || $billing->due_date->lessThan($due)) {
-                    $due = $billing->due_date;
-                }
-            }
+            return (string) Arr::get($config, $poweredOn ? 'BILLING_NONE' : 'BILLING_POWERED_OFF');
         }
 
-        if (!$anyBilling) {
-            return (string) Arr::get($config, $anyOn ? 'BILLING_NONE' : 'BILLING_POWERED_OFF');
-        }
+        $amount = $this->money((float) $billing->amount);
 
-        $text = '';
-
-        if ($unpaid > 0) {
-            $text .= strtr((string) Arr::get($config, 'BILLING_UNPAID'), [
-                '{amount}' => $this->money($unpaid),
-                '{due}'    => filled($due) ? $due->format('n/j') : '-',
-                '{when}'   => $this->dueText($due, $config),
+        if ((int) $billing->paid === (int) config('constants.VM.BILLING.PAID')) {
+            return strtr((string) Arr::get($config, 'BILLING_PAID'), [
+                '{amount}'  => $amount,
+                '{paid_at}' => filled($billing->paid_at) ? $billing->paid_at->format('n/j') : '-',
             ]);
         }
 
-        if ($pending > 0) {
-            $text .= strtr((string) Arr::get($config, 'BILLING_PENDING'), [
-                '{amount}' => $this->money($pending),
-            ]);
+        if ((int) $billing->paid === (int) config('constants.VM.BILLING.PENDING')) {
+            return strtr((string) Arr::get($config, 'BILLING_PENDING'), ['{amount}' => $amount]);
         }
 
-        if ($paid > 0) {
-            $text .= strtr((string) Arr::get($config, 'BILLING_PAID'), [
-                '{amount}'  => $this->money($paid),
-                '{paid_at}' => filled($paidAt) ? $paidAt->format('n/j') : '-',
-            ]);
-        }
-
-        return $text;
+        return strtr((string) Arr::get($config, 'BILLING_UNPAID'), [
+            '{amount}' => $amount,
+            '{due}'    => filled($billing->due_date) ? $billing->due_date->format('n/j') : '-',
+            '{when}'   => $this->dueText($billing->due_date, $config),
+        ]);
     }
 
     /**
@@ -432,6 +404,19 @@ class VmQueryCommandService
             '{total}' => $this->money($total),
         ]);
 
+        /*
+         * ⚠ 同一個站台有兩台都沒繳時，兩行會長得一模一樣（我們不列主機名稱）
+         * —— 看的人會以為系統列重複了。先數一遍，重複的才加序號。
+         */
+        $names = [];
+
+        foreach ($billings as $billing) {
+            $names[] = $this->stationNameOf($billing->vmServer, $config);
+        }
+
+        $counts = $this->countNames($names);
+        $seen = [];
+
         $max = (int) Arr::get($config, 'LIST_MAX', 20);
         $shown = 0;
 
@@ -440,7 +425,14 @@ class VmQueryCommandService
                 break;
             }
 
-            $text .= $this->unpaidLine($billing, $config);
+            $name = Arr::get($names, $shown);
+            $seen[$name] = (int) Arr::get($seen, $name, 0) + 1;
+
+            $text .= $this->unpaidLine(
+                $billing,
+                $this->labelFor($name, $seen[$name], (int) Arr::get($counts, $name, 1), $config),
+                $config
+            );
             $shown++;
         }
 
@@ -457,27 +449,67 @@ class VmQueryCommandService
      * 未收清單的一行
      *
      * @param \App\Models\VmBilling $billing
+     * @param string                $label   站台名（同站多台時已帶序號）
      * @param array                 $config
      * @return string
      */
-    private function unpaidLine($billing, array $config)
+    private function unpaidLine($billing, $label, array $config)
     {
-        $station = $this->stationNameOf($billing->vmServer, $config);
         $pending = (int) $billing->paid === (int) config('constants.VM.BILLING.PENDING');
 
         if ($pending) {
             return strtr((string) Arr::get($config, 'UNPAID_LINE_PENDING'), [
-                '{station}' => $station,
+                '{station}' => $label,
                 '{amount}'  => $this->money((float) $billing->amount),
             ]);
         }
 
         return strtr((string) Arr::get($config, 'UNPAID_LINE'), [
-            '{station}' => $station,
+            '{station}' => $label,
             '{amount}'  => $this->money((float) $billing->amount),
             '{due}'     => filled($billing->due_date) ? $billing->due_date->format('n/j') : '-',
             '{when}'    => $this->dueText($billing->due_date, $config),
         ]);
+    }
+
+    /**
+     * 每個站台名各出現幾次
+     *
+     * @param array<string> $names
+     * @return array<string, int>
+     */
+    private function countNames(array $names)
+    {
+        $counts = [];
+
+        foreach ($names as $name) {
+            $counts[$name] = (int) Arr::get($counts, $name, 0) + 1;
+        }
+
+        return $counts;
+    }
+
+    /**
+     * 站台名 —— 同一站有多台時才加序號
+     *
+     * ⚠ 只有一台時不加：「LV_UAT ①」後面沒有②，那個序號只會讓人以為
+     * 還有別台沒列出來。
+     *
+     * @param string $name
+     * @param int    $index 這是該站台的第幾台
+     * @param int    $total 該站台在這份清單裡共幾台
+     * @param array  $config
+     * @return string
+     */
+    private function labelFor($name, $index, $total, array $config)
+    {
+        if ($total < 2) {
+            return $name;
+        }
+
+        $number = $this->machineNumber($index, $config);
+
+        return "{$name} {$number}";
     }
 
     /**
@@ -497,20 +529,32 @@ class VmQueryCommandService
             return;
         }
 
+        // 同一站有多台時要編號，不然兩行一模一樣（我們不列主機名稱）
+        $names = [];
+
+        foreach ($servers as $server) {
+            $names[] = $this->stationNameOf($server, $config);
+        }
+
+        $counts = $this->countNames($names);
+        $seen = [];
+
         $on = [];
         $off = [];
 
-        foreach ($servers as $server) {
+        foreach ($servers as $i => $server) {
+            $name = Arr::get($names, $i);
+            $seen[$name] = (int) Arr::get($seen, $name, 0) + 1;
+            $label = $this->labelFor($name, $seen[$name], (int) Arr::get($counts, $name, 1), $config);
+
             if ((int) $server->power_status === (int) config('constants.VM.POWER.ON')) {
-                $on[] = strtr((string) Arr::get($config, 'POWER_LINE'), [
-                    '{station}' => $this->stationNameOf($server, $config),
-                ]);
+                $on[] = strtr((string) Arr::get($config, 'POWER_LINE'), ['{station}' => $label]);
 
                 continue;
             }
 
             $off[] = strtr((string) Arr::get($config, filled($server->powered_off_at) ? 'POWER_LINE_OFF' : 'POWER_LINE'), [
-                '{station}' => $this->stationNameOf($server, $config),
+                '{station}' => $label,
                 '{date}'    => filled($server->powered_off_at) ? $server->powered_off_at->format('n/j') : '-',
             ]);
         }

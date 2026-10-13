@@ -1041,38 +1041,54 @@ return [
         'STATION_TITLE' => "🖥 <b>{station}</b> 的虛擬機（{count} 台）\n",
 
         /*
-         * ⚠ **不列主機名稱**（需求方 2026-10-13：「虛擬機不用列主機名稱，
-         * 只需要列站台名稱就好」）。所以一個站台有多台時是**加總**呈現，
-         * 不是一台一行 —— 列了明細卻沒有名字，根本分不出哪行是哪台。
+         * ⚠ **不列主機名稱，但一台一段**（需求方 2026-10-13 兩次補充：
+         * 「虛擬機不用列主機名稱，只需要列站台名稱就好」＋
+         * 「如果一個站有兩台，要分別列出，不能混在一起」）。
+         *
+         * 兩條合起來 ＝ 用**序號**區分，不用主機名。加總呈現不行：
+         * 兩台的規格與電源可能完全不同，混成一行等於把資訊弄丟。
+         *
+         * 只有一台時不編號也不縮排 —— 「①」後面只有一段，是多餘的裝飾。
          */
-        'STATION_SPEC'  => "規格：{spec}\n",
-        'STATION_FEE'   => "費用：<b>{fee}</b> USDT／月\n",
-        'STATION_FEE_BREAKDOWN' => "　（主機 {monthly}　VPN {vpn}　Google {google}）\n",
-        'STATION_POWER' => "電源：{power}\n",
+        'MACHINE_NUMBERS' => ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'],
+
+        // 超過十台之後沒有圈號可用，退回數字
+        'MACHINE_NUMBER_FALLBACK' => '({index})',
+
+        // 序號之後幾行的對齊用：全形空白（寬度同圈號）＋ 一個半形空白
+        'MACHINE_INDENT' => '　 ',
+
+        'MACHINE_SPEC'  => "{indent}規格：{spec}\n",
+        'MACHINE_FEE'   => "{indent}費用：<b>{fee}</b> USDT／月\n",
+        'MACHINE_FEE_BREAKDOWN' => "{indent}　（主機 {monthly}　VPN {vpn}　Google {google}）\n",
+        'MACHINE_POWER' => "{indent}電源：{power}\n",
+        'MACHINE_BILLING' => "{indent}{month}帳單：{billing}\n",
 
         'POWER_ON'    => '🟢 開機',
         'POWER_OFF'   => '🔴 關機',
         'POWER_OFF_SINCE' => '🔴 關機（{date} 起）',
-        'POWER_MIXED' => '🟢 開機 {on} 台 ／ 🔴 關機 {off} 台',
 
-        // --- 帳單（只看當月，需求方 2026-10-13）---
-
-        'BILLING_TITLE' => '{month}帳單：',
-
+        /*
+         * --- 帳單（只看當月，需求方 2026-10-13）---
+         *
+         * 一台機器一個月只會有一筆（`vm_billing` 的 unique 是
+         * `vm_server_id` ＋ `billing_month`），所以這幾句都是單行、不帶換行 ——
+         * 由 `MACHINE_BILLING` 包起來。
+         */
         /*
          * ⚠ **三態要分開講。** `paid = 2` 是「客戶已上傳繳款證明，
          * 等我們後台審核」—— 把它說成「未繳費」是把我們的延誤講成客戶欠款，
          * 會去催錯人。
          */
-        'BILLING_UNPAID'  => "❌ 未收 <b>{amount}</b> USDT，應收日 {due}（{when}）\n",
-        'BILLING_PENDING' => "⏳ 客戶已上傳繳款證明，等後台審核（{amount} USDT）\n",
-        'BILLING_PAID'    => "✅ 已收 {amount} USDT（{paid_at}）\n",
+        'BILLING_UNPAID'  => '❌ 未收 <b>{amount}</b> USDT，應收日 {due}（{when}）',
+        'BILLING_PENDING' => '⏳ 客戶已上傳繳款證明，等後台審核（{amount} USDT）',
+        'BILLING_PAID'    => '✅ 已收 {amount} USDT（{paid_at}）',
 
         // 關機的機器不出帳（「開機才收錢」）
-        'BILLING_POWERED_OFF' => "關機不出帳\n",
+        'BILLING_POWERED_OFF' => '關機不出帳',
 
         // 開機卻沒有當月帳單 —— 通常是帳單還沒產
-        'BILLING_NONE' => "這個月還沒有帳單\n",
+        'BILLING_NONE' => '這個月還沒有帳單',
 
         'DUE_OVERDUE' => '已逾期 {days} 天',
         'DUE_TODAY'   => '就是今天',
@@ -1082,6 +1098,11 @@ return [
 
         'UNPAID_TITLE' => "💸 <b>{month}</b> 還沒收到的虛擬機費用（{count} 筆，共 {total} USDT）\n\n",
         'UNPAID_EMPTY' => '{month} 的虛擬機費用都收齊了 👍',
+        /*
+         * ⚠ `{station}` 在同一個站台有多台時會帶序號（「LV_UAT ②」）——
+         * 不然兩行會長得一模一樣，看的人以為系統列重複了。
+         * 序號只在那個站台真的有多台時才加。
+         */
         'UNPAID_LINE'  => "• <b>{station}</b> ｜ {amount} USDT ｜ 應收日 {due}（{when}）\n",
         'UNPAID_LINE_PENDING' => "• <b>{station}</b> ｜ {amount} USDT ｜ ⏳ 已上傳證明，等後台審核\n",
 
