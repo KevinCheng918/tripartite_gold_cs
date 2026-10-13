@@ -306,6 +306,9 @@ class TaskNoticeService
             // $budget 傳參考，由它自己扣掉實際列出的行數 —— 在這裡再算一次
             // 「列了幾行」就是同一條規則的第二份
             $text .= $this->buildManagerTaskLines($notice, $date, $tasks, $budget);
+
+            // 每個人之間空一行，不然七八個人的區塊會連成一整片
+            $text .= (string) Arr::get($notice, 'MANAGER_USER_GAP');
         }
 
         return $text . (string) Arr::get($notice, 'MANAGER_MULTI_NOTE');
@@ -602,9 +605,29 @@ class TaskNoticeService
             return strtr((string) Arr::get($notice, 'DUE_TODAY'), ['{date}' => $due]);
         }
 
+        /*
+         * ⚠ **三種，不是兩種**（2026-10-12 的 regression，隔天修）。
+         *
+         * 這支原本只處理「今天」與「逾期」—— 因為當時清單只列逾期與今日到期，
+         * 不可能出現未來的日期。加入「進行中」之後，期限還沒到的卡掉進最後
+         * 那個 return，於是 10/13 收到的通知上寫著
+         * 「網銀爬蟲自動化 已逾期 10 天（2026-10-23）」。
+         *
+         * ⚠ `diffInDays()` 回的是**絕對值**，所以未來與過去都是正數 ——
+         * 光看那個數字分不出方向，一定要自己比日期。
+         */
+        $days = \Illuminate\Support\Carbon::parse($date)->diffInDays($task->due_date);
+
+        if ($due > $date) {
+            return strtr((string) Arr::get($notice, 'DUE_FUTURE'), [
+                '{days}' => $days,
+                '{date}' => $due,
+            ]);
+        }
+
         return strtr((string) Arr::get($notice, 'DUE_OVERDUE'), [
             // 用日期相減而不是 diffInDays(now())：後者會把今天過了幾小時算進去
-            '{days}' => \Illuminate\Support\Carbon::parse($date)->diffInDays($task->due_date),
+            '{days}' => $days,
             '{date}' => $due,
         ]);
     }
