@@ -149,6 +149,19 @@ return [
              * 之後每一個人發出去的內容，而發送只影響這一次。
              */
             'telegram_chat.broadcast_template' => 'permission.telegram_chat.broadcast_template',
+
+            /*
+             * 在內部群組 tag 機器人查站台餘點。
+             *
+             * ⚠ **刻意不用 `station.update`**（需求方 2026-10-13）。那是後台
+             * 站台頁「同步」按鈕的權限，意思是「能改站台設定」—— 範圍比
+             * 「在群組問一下還剩多少點」大得多。能查餘點的人不該因此
+             * 連站台設定都能改。
+             *
+             * 放在 Telegram 客服底下，因為這是 Telegram 指令的能力，
+             * 跟著其他 tag 指令（群發公告）一起指派比較好找。
+             */
+            'telegram_chat.station_credit' => 'permission.telegram_chat.station_credit',
         ],
     ],
 

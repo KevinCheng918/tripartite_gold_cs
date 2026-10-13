@@ -93,6 +93,7 @@ return [
         'delete'          => '刪除對話紀錄',
         'ignore_manage'   => '設定不自動回覆的成員',
         'broadcast_template' => '建檔／修改公告範本',
+        'station_credit'  => '用指令查站台餘點',
     ],
     'setting' => [
         'view'   => '檢視 AI 引擎設定與用量',

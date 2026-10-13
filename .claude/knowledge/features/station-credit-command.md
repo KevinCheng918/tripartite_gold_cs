@@ -10,7 +10,7 @@
 @機器人 幫我查一下 LV_UAT 餘點
   ↓ 粗篩（含「餘點／點數」才跑模型）
   ↓ AI 解析 → intent=credit, station=LV_UAT
-  ↓ 權限（station.update）
+  ↓ 權限（telegram_chat.station_credit）
   ↓ 站台名稱完全相符
   ↓
 🔍 要查 LV_UAT 的餘點嗎？            【查詢】【取消】
@@ -43,22 +43,38 @@
 
 所以它跟後台站台頁的「同步」按鈕是同一件事，不是「看一下數字」。
 
-## 權限：`station.update`
+## 權限：`telegram_chat.station_credit`（獨立的一項）
 
-介面上叫什麼：**帳號管理 → 編輯帳號 → 權限設定 → 站台管理 → 編輯站台**。
+介面上叫什麼：**帳號管理 → 編輯帳號 → 權限設定 → Telegram 客服 → 用指令查站台餘點**。
 
 | | |
 |---|---|
-| keyword | `station.update` |
-| 群組 label | `permission.group.station` → 站台管理 |
-| 項目 label | `permission.station.update` → **編輯站台** |
+| keyword | `telegram_chat.station_credit` |
+| 群組 label | `permission.group.telegram_chat` → Telegram 客服 |
+| 項目 label | `permission.telegram_chat.station_credit` → **用指令查站台餘點** |
 
-⚠ 對外文案要寫**介面上看到的那幾個字**。第一版寫成「站台編輯」（2026-10-13
-當天就被問「station.update 是什麼？我怎麼沒看到」）—— keyword 不會出現在介面上，
-而近似說法會讓人在權限頁上找不到。
+### 為什麼不沿用 `station.update`
 
-後台的同步按鈕是 `can:station.update`（`routes/web.php` 的 `ajax-sync-credits`）。
-同一件事換個入口做卻不檢查，這支指令就是 RBAC 的後門 —— 所以指令也要同一個 keyword。
+第一版用的是後台站台頁「同步」按鈕的那個權限（`routes/web.php` 的
+`ajax-sync-credits` → `can:station.update`），理由是「同一件事換個入口做卻不檢查，
+指令就成了 RBAC 的後門」。
+
+需求方否決（2026-10-13）：
+
+> 編輯站台是後台編輯，這個指令查詢是指令查詢，兩個不一樣
+
+說得對，而且我那個理由只看了一半。`station.update` 的語意是**能改站台設定** ——
+為了讓人能在群組問一句「還剩多少點」就給出站台編輯權，是把洞開在另一邊，
+而且那個洞比原本要防的大。
+
+⚠ 一般化的教訓：「底層動作相同」**不等於**「該共用同一個權限」。
+這裡底層確實是同一支 `syncInfo()`，但使用者在做的事不一樣 ——
+一邊是維護站台設定，一邊是查一個數字。權限該照**使用者在做什麼**切，
+不是照程式走到哪一支切。
+
+⚠ 對外文案要寫**介面上看到的那幾個字**。第一版寫成「站台編輯」而介面是
+「編輯站台」，當天就被問「`station.update` 是什麼？我怎麼沒看到」——
+keyword 不會出現在介面上，近似說法會讓人在權限頁上找不到。
 
 ⚠ **按鈕要再驗一次。** 按按鈕的人不一定是下指令的人：有權限的 A 下了指令，
 確認訊息留在群組裡，沒權限的 B 按下【查詢】。只擋指令的話 B 就看到點數了。

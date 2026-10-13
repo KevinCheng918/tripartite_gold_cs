@@ -22,14 +22,24 @@ use Illuminate\Support\Str;
  * 拿它當「現在的餘點」會讓人以為點數還夠。餘點告警排程也是同一條規則
  * （`SKIP_SYNC_FAILED`：絕不拿舊點數判斷）。
  *
- * ⚠ **要 `station.update` 權限** —— 後台站台頁的「同步」按鈕就是
- * `can:station.update`（`routes/web.php` 的 `ajax-sync-credits`）。
- * 同一件事換個入口做就不檢查的話，這支指令等於是 RBAC 的後門。
+ * ⚠ **要 `telegram_chat.station_credit` 權限**（獨立的一項）。
+ *
+ * 一開始用的是後台同步按鈕那個 `station.update`，理由是「同一件事換個入口
+ * 做就不檢查等於 RBAC 後門」。需求方否決（2026-10-13）：`station.update`
+ * 的意思是**能改站台設定**，範圍比「在群組問一下還剩多少點」大得多 ——
+ * 為了讓人能查餘點而給出站台編輯權，是把洞開在另一邊。
  */
 class StationCreditCommandService
 {
-    /** @var string 做這件事需要的權限（＝後台「同步」按鈕的那一個） */
-    const PERMISSION = 'station.update';
+    /**
+     * 做這件事需要的權限
+     *
+     * ⚠ 不是後台同步按鈕的 `station.update`：**後台編輯站台**與
+     * **用指令查一下餘點**是兩件不同的事（需求方 2026-10-13）。
+     *
+     * @var string
+     */
+    const PERMISSION = 'telegram_chat.station_credit';
 
     private $parser;
     private $stationRepository;
@@ -75,7 +85,7 @@ class StationCreditCommandService
      * 處理一句指令
      *
      * @param string   $text     已經去掉 @機器人
-     * @param array    $from     Telegram 的 from（目前只用來記 log）
+     * @param array    $from     Telegram 的 from（對到系統帳號驗權限用）
      * @param int|null $threadId
      * @return bool 有處理就回 true；false 代表「這不是查餘點」，換下一個 handler
      */
@@ -240,6 +250,16 @@ class StationCreditCommandService
          * 當成「現在的餘點」會讓人以為點數還夠。
          */
         if (blank($info)) {
+            /*
+             * ⚠ 要記一筆。`syncInfo()` 回 null 是「API 沒回資料」——
+             * 不丟例外，所以上面那個 catch 接不到。不記的話「有人查了但
+             * 查不到」完全無跡可循，事後查不出是主系統掛了還是設定錯。
+             */
+            Log::warning('指令查餘點：主系統沒回資料', [
+                'station_id' => $station->id,
+                'station'    => (string) $station->name,
+            ]);
+
             $this->supportGroup->editMessage($messageId, strtr(
                 (string) Arr::get($config, 'SYNC_FAILED_TEXT'),
                 ['{station}' => (string) $station->name]
