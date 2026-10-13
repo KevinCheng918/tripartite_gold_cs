@@ -18,7 +18,7 @@
 | 文件 | 功能 | 狀態 |
 |------|------|------|
 | [features/remind-period-report.md](features/remind-period-report.md) | 超時統計的週報表（週一）／月報表（1 號）：一支 Service 吃 `--type`，**三種都在 08:30 跟日報同一分鐘**（需求方要求時間一致），收件人沿用日報那份、只發完整版不發個人版、日報保留。文案裡寫死的「昨天」全部參數化成 `{period}` | 已完成 |
-| [features/scheduled-reminder.md](features/scheduled-reminder.md) | 預約提醒：在內部群組 tag 機器人說「明天下午三點提醒 @abc123aa 對帳」，時間到原文發回**同一個話題**。AI 解析自然語言（一定複述＋取消按鈕，因為解析錯要到那個時間才會被發現）、內容原文送出讓 Telegram 自己 mention、送失敗不標記下一分鐘再試。**實測踩到模型把整包 JSON 塞進 content 欄位**，schema 描述＋prompt 去掉排版符號＋程式端 `looksLikeJson()` 三層防 | **已完成，正式機待跑 migration** |
+| [features/scheduled-reminder.md](features/scheduled-reminder.md) | 預約提醒：在內部群組 tag 機器人說「明天下午三點提醒 @abc123aa 對帳」，時間到原文發回**同一個話題**。AI 解析自然語言（一定複述＋取消按鈕，因為解析錯要到那個時間才會被發現）、內容原文送出讓 Telegram 自己 mention、送失敗不標記下一分鐘再試。**實測踩到模型把整包 JSON 塞進 content 欄位**，schema 描述＋prompt 去掉排版符號＋程式端 `looksLikeJson()` 三層防。話題分流多一項 `scheduled_reminder`，**語意跟其他類型相反**（勾的是「哪些話題可以排」而不是「發到哪」），一個都沒勾＝不限制 | **已完成，正式機待跑 migration ＋ 勾話題** |
 | [features/customer-followup.md](features/customer-followup.md) | 待追蹤事項（有人說「稍等」就記一筆）：詞表先篩＋AI 確認、**客人承諾與我方承諾分開標示**（AI 自動回覆那句排除）、對話安靜 N 分鐘才到內部群組 tag 當班人員問「要不要追蹤」（按鈕）、**客人又說一次「稍等」不算結案**、不自動結案由人決定、沒人按比照求助單計次升級（升級規則抽成共用的 `EscalatingReminder`）、後台列表頁（狀態**預設看全部**、期間**預設今天開的**，清除條件會連期間一起清掉＝看全部）、10:30 獨立統計 | **已實作，待跑 migration、開開關、勾權限** |
 | [features/attendance-report-notice.md](features/attendance-report-notice.md) | 打卡週報表（週一 11:00 報上週）／月報表（1 號 11:00 報上月）：勾選的人收全部人的、其餘同仁收自己那份；含遲到早退曠工次數與時間、補打卡、請假、加班。附帶班表通知的請假預告（前兩天到請假結束）**以及修掉「請整天假被記成曠工」的 bug**（含一次性清理指令） | **已完成，正式機要跑一次 `attendance:fix-absent-on-leave --force`** |
 | [features/report-page.md](features/report-page.md) | 報表頁（內務管理 → 報表）：打卡報表與超時提醒統計兩個分頁，**自己選起訖日期＋今日/昨日/本週/上週/本月/上月快捷鈕**（比照補點紀錄，共用 `window.DateRange`；後端只收 start/end，不吃期間類型）、**數字跟 Telegram 那份走同一支 `collect()`**；打卡出勤頁原本的「月報表」分頁搬過來後拿掉；兩個分頁各自一個權限，頁面本身因為 `can:` 是 AND 而改在 Controller 自己擋。**兩種報表都不列主管以上（含主管本人）**；超時統計的「仍未處理」整列標紅＋摘要帶題數（pending 由後端判定，前端不寫死 status 數字），紅標那一列可按「標記為已處理」結案（另一個 keyword `report.remind_handle`，狀態條件寫在 update 的 where 裡避開與 Telegram 按鈕互相覆蓋，並回報支援群組） | 已完成 |
@@ -27,7 +27,7 @@
 | [features/rbac.md](features/rbac.md) | 分帳號、權限管理（含最小登入/登出） | 已完成 |
 | [features/user-notice-toggle.md](features/user-notice-toggle.md) | 逐個帳號開關要收哪些私訊（班表／任務卡／超時統計／打卡報表）：新表 `user_notice_mute` 走**黑名單**（有列＝關掉，上線不必補資料、新增通知自動全收）；過濾擋在共同出口 `StaffDmService::send()` 的 `noticeKey` 參數，`sendToUserIds()`（完整版）不帶 key 所以天然不受管。**靜音時回 `true` 讓 `sent` 小幅失真，換掉「被誤算進 failed 害主管去追人」** | 已完成 |
 | [features/scheduling.md](features/scheduling.md) | 排班（報班/換班/三班制） | 已完成 |
-| [features/support-group-topics.md](features/support-group-topics.md) | 內部支援群組分話題發送（話題清單 + 逐話題勾要收哪些通知、`/topicid` 查 id、話題 id 填錯會整則拒收）；附帶把設定頁重整成「通訊管理 → 通知設定」三分頁 | 已完成 |
+| [features/support-group-topics.md](features/support-group-topics.md) | 內部支援群組分話題發送（話題清單 + 逐話題勾要收哪些通知、`/topicid` 查 id、話題 id 填錯會整則拒收）；附帶把設定頁重整成「通訊管理 → 通知設定」三分頁。⚠ 2026-10-13 起清單裡混了一個**語意相反**的類型（`scheduled_reminder` 勾的是「哪些話題可以排提醒」），見 [[scheduled-reminder]] | 已完成 |
 | [features/telegram-bind-code.md](features/telegram-bind-code.md) | 驗證碼綁定 Telegram（取代「填帳號就自動綁」的風險做法）、後台解綁、擋多重綁定、陌生人只回一次且回覆由 AI 寫 | 已完成 |
 | [features/task-daily-notice.md](features/task-daily-notice.md) | 每日任務卡通知（每人收自己的已過期／今日到期／進行中，勾選的人收全部人的總覽；三個數字各算各的會重複、一張卡可多人指派） | 已完成 |
 | [features/remind-escalation.md](features/remind-escalation.md) | 求助單持續提醒（1-2 次 tag 當班、3 次以後加 tag 主管老闆，到次數上限才停）＋ 08:30 每日統計（勾選的人收全部、被催到的人收自己那份）＋ 07:00 待接手清單發內部群組 tag 當天早班；同時移除對話視窗的超時紅橫幅，留下的告警缺口也記在裡面 | 已完成 |
