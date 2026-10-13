@@ -30,89 +30,45 @@ use Illuminate\Support\Facades\Log;
  */
 class ScheduledReminderService
 {
-    /** @var string 這類通知不走話題分流 —— 一定要回在使用者說話的那個話題 */
-    const NOTICE_TYPE = 'scheduled_reminder';
+    /*
+     * ⚠ 這裡原本有一個 `NOTICE_TYPE`（話題分流用），2026-10-13 搬到
+     * `TelegramCommandRouter` —— 話題准不准用機器人指令是**全部指令**共用的
+     * 判斷，不是提醒專屬的。留一份在這裡遲早會跟那邊分岔。
+     */
 
     private $repository;
     private $parser;
     private $supportGroup;
-    private $botService;
-    private $broadcastCommand;
 
     public function __construct(
         ScheduledReminderRepository $repository,
         ReminderParser $parser,
-        SupportGroupService $supportGroup,
-        TelegramBotService $botService,
-        ScheduledBroadcastCommandService $broadcastCommand
+        SupportGroupService $supportGroup
     ) {
         $this->repository = $repository;
         // 自然語言 → 時間 ＋ 內容
         $this->parser = $parser;
         $this->supportGroup = $supportGroup;
-        // 判斷「這則有沒有 tag 我」要知道 Bot 自己的 username
-        $this->botService = $botService;
-        /*
-         * 「發公告」走另一條路：發給客戶、要權限、要先按確認。
-         * 兩者共用同一個入口（tag 機器人），所以在這裡分流而不是在 webhook
-         * ——「有沒有 tag 到我」的判斷只該有一份。
-         */
-        $this->broadcastCommand = $broadcastCommand;
     }
 
     /**
-     * 支援群組收到訊息：是不是在跟機器人預約提醒
+     * 排一筆提醒（或列出已排的）
      *
-     * ⚠ **回 bool 讓呼叫端決定要不要繼續往下走**，比照
-     * `DailyRateService::handleSupportReply()` —— 同一則訊息不該被兩套
-     * 邏輯各處理一次。
+     * ⚠ **這一支是分派器的最後一棒**（`TelegramCommandRouter`）：
+     * 前面的指令都不認領時才輪到它，所以它同時是「看不懂」的歸宿 ——
+     * 回一句範例讓人重講，而不是靜默。
      *
-     * @param array $payload Telegram Update
-     * @return bool 有處理就回 true
+     * ⚠ 「有沒有 tag 到機器人」「話題准不准」都在分派器做過了，
+     * 這裡拿到的 `$body` 已經是去掉 `@機器人` 的那句話。
+     *
+     * @param string   $body     去掉 @機器人 之後的內容
+     * @param int|null $threadId
+     * @param array    $message  Telegram 的 message（要 from 與 chat.id）
+     * @return bool 永遠 true —— 走到這裡就是要回話的
      */
-    public function handleMessage(array $payload)
+    public function handle($body, $threadId, array $message)
     {
-        $message = (array) Arr::get($payload, 'message');
-        $text = trim((string) Arr::get($message, 'text', ''));
-
-        // 短路：沒有文字的訊息（貼圖、圖片）連 username 都不必查
-        if (blank($text)) {
-            return false;
-        }
-
-        $body = $this->stripMention($text);
-
-        // 沒 tag 到機器人 —— 群組裡的一般討論，不是我們的事
-        if (blank($body)) {
-            return false;
-        }
-
         $chatId = (int) Arr::get($message, 'chat.id');
-        $threadId = Arr::get($message, 'message_thread_id');
-
-        /*
-         * ⚠ **擋在解析之前**：不准排的話題不該燒模型額度。
-         *
-         * 也不能靜默 —— 使用者 tag 了沒反應只會以為壞了，然後再試幾次。
-         */
-        if (!$this->isAllowedThread($threadId)) {
-            $this->reply((string) config('constants.REMINDER.WRONG_TOPIC_TEXT'), $threadId);
-
-            return true;
-        }
-
-        /*
-         * 「20 分鐘後發送 T01 公告給 LV_UAT」走另一條路（發給客戶、要權限、
-         * 要先確認）。先用關鍵字粗篩，含「公告」才跑那一支模型。
-         *
-         * ⚠ 它回 false 代表「這其實不是在講發公告」（例如「明天提醒我發公告」）
-         * —— 那就繼續往下當成提醒處理，不要兩邊都不理。
-         */
-        if ($this->broadcastCommand->looksLikeCommand($body)
-            && $this->broadcastCommand->handle($body, (array) Arr::get($message, 'from', []), $threadId)) {
-            return true;
-        }
-
         $parsed = $this->parser->parse($body);
 
         // 模型不可用（沒設 token、額度用完、CLI 逾時）
@@ -139,59 +95,6 @@ class ScheduledReminderService
         return true;
     }
 
-    /**
-     * 這個話題准不准排提醒
-     *
-     * 「通知設定 → 話題分流」裡勾了「預約提醒」的話題才可以。
-     *
-     * ⚠ **一個都沒勾 ＝ 不限制**，不是「全部停用」。設定還沒填的那段時間
-     * 不該整個停擺 —— 這是話題分流一貫的規則（沒勾的通知發到主區，
-     * 而不是不發）。上線時忘了勾不會讓功能靜悄悄失效。
-     *
-     * ⚠ 勾了之後**群組主區就不能排了**（主區沒有 thread id，比不上任何一個
-     * 勾選的話題）。那是對的：既然限定了話題，主區就不在限定範圍內。
-     *
-     * @param int|null $threadId
-     * @return bool
-     */
-    private function isAllowedThread($threadId)
-    {
-        $allowed = $this->supportGroup->topicIdsFor(self::NOTICE_TYPE);
-
-        if (blank($allowed)) {
-            return true;
-        }
-
-        return filled($threadId) && in_array((int) $threadId, $allowed, true);
-    }
-
-    /**
-     * 去掉開頭的 `@機器人`，回剩下的那句話
-     *
-     * ⚠ **查不到自己的 username 時一律回空字串**（＝當成沒 tag 到）。
-     * 寧可整個功能暫時不動，也不要把群組裡每一則訊息都丟給模型解析 ——
-     * 那會燒額度，而且會對閒聊亂回話。
-     *
-     * @param string $text
-     * @return string 沒 tag 到機器人時回空字串
-     */
-    private function stripMention($text)
-    {
-        $username = $this->botService->getMyUsername();
-
-        if (blank($username)) {
-            return '';
-        }
-
-        $mention = '@' . $username;
-
-        if (mb_stripos($text, $mention) === false) {
-            return '';
-        }
-
-        // tag 可能在句首也可能在句中（「幫我 @bot 排一個提醒」），一律拿掉
-        return trim(str_ireplace($mention, ' ', $text));
-    }
 
     /**
      * 建立一筆並複述

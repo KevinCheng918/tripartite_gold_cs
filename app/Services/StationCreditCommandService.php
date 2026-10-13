@@ -1,0 +1,511 @@
+<?php
+
+namespace App\Services;
+
+use App\Repositories\StationRepository;
+use App\Repositories\UserRepository;
+use App\Services\AutoReply\StationCreditCommandParser;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+
+/**
+ * 用 Telegram 指令查站台餘點
+ *
+ * 「幫我查一下 LV_UAT 餘點」→ 確認 → 同步 → 回報點數與同步時間。
+ *
+ * ⚠ **要先確認才同步**（需求方 2026-10-13）。看起來是唯讀，實際上
+ * `StationService::syncInfo()` 會打主系統 API **並把 credits / settings /
+ * synced_at 寫回資料庫** —— 不是純查詢，而且外部 API 要花時間。
+ *
+ * ⚠ **同步失敗不回舊點數。** 資料庫裡那個數字可能是好幾天前的，
+ * 拿它當「現在的餘點」會讓人以為點數還夠。餘點告警排程也是同一條規則
+ * （`SKIP_SYNC_FAILED`：絕不拿舊點數判斷）。
+ *
+ * ⚠ **要 `station.update` 權限** —— 後台站台頁的「同步」按鈕就是
+ * `can:station.update`（`routes/web.php` 的 `ajax-sync-credits`）。
+ * 同一件事換個入口做就不檢查的話，這支指令等於是 RBAC 的後門。
+ */
+class StationCreditCommandService
+{
+    /** @var string 做這件事需要的權限（＝後台「同步」按鈕的那一個） */
+    const PERMISSION = 'station.update';
+
+    private $parser;
+    private $stationRepository;
+    private $userRepository;
+    private $stationService;
+    private $supportGroup;
+
+    /**
+     * 可同步餘點的站台（一次指令內的暫存）
+     *
+     * @var \Illuminate\Database\Eloquent\Collection|null
+     */
+    private $syncable;
+
+    public function __construct(
+        StationCreditCommandParser $parser,
+        StationRepository $stationRepository,
+        UserRepository $userRepository,
+        StationService $stationService,
+        SupportGroupService $supportGroup
+    ) {
+        $this->parser = $parser;
+        $this->stationRepository = $stationRepository;
+        // Telegram 使用者 → 系統帳號，才有權限可查
+        $this->userRepository = $userRepository;
+        // 同步走站台管理頁「同步」按鈕的同一支，不另外寫一份
+        $this->stationService = $stationService;
+        $this->supportGroup = $supportGroup;
+    }
+
+    /**
+     * 這句話像不像在查餘點（粗篩，不是判斷）
+     *
+     * @param string $text
+     * @return bool
+     */
+    public function looksLikeCommand($text)
+    {
+        return Str::contains((string) $text, (array) config('constants.STATION_CREDIT_COMMAND.KEYWORDS', ['餘點']));
+    }
+
+    /**
+     * 處理一句指令
+     *
+     * @param string   $text     已經去掉 @機器人
+     * @param array    $from     Telegram 的 from（目前只用來記 log）
+     * @param int|null $threadId
+     * @return bool 有處理就回 true；false 代表「這不是查餘點」，換下一個 handler
+     */
+    public function handle($text, array $from, $threadId)
+    {
+        $config = (array) config('constants.STATION_CREDIT_COMMAND');
+        $parsed = $this->parser->parse($text);
+
+        if (blank($parsed)) {
+            $this->reply((string) Arr::get($config, 'UNAVAILABLE_TEXT'), $threadId);
+
+            return true;
+        }
+
+        $intent = (string) Arr::get($parsed, 'intent');
+
+        // 不是在查餘點 —— 讓分派器換下一個
+        if ($intent === StationCreditCommandParser::INTENT_NOT_CREDIT) {
+            return false;
+        }
+
+        if ($intent !== StationCreditCommandParser::INTENT_CREDIT) {
+            $this->reply((string) Arr::get($config, 'UNKNOWN_TEXT'), $threadId);
+
+            return true;
+        }
+
+        /*
+         * ⚠ **權限擋在查站台之前**：沒權限的人不該拿到確認按鈕 ——
+         * 給了按鈕再在按下去的時候拒絕，看起來像系統出錯。
+         */
+        $denied = $this->permissionError($from, $config);
+
+        if (filled($denied)) {
+            $this->reply($denied, $threadId);
+
+            return true;
+        }
+
+        $raw = (string) Arr::get($parsed, 'station');
+        $station = $this->findStation($raw);
+
+        if (filled($station)) {
+            $this->replyConfirm($station, $threadId, $config);
+
+            return true;
+        }
+
+        /*
+         * ⚠ **模型不一定聽話。** prompt 寫了「講了兩個以上就填 unknown」，
+         * 實測「幫我查 LV_UAT 跟 T01 的餘點」照樣回
+         * `credit` ＋ `station: "LV_UAT、T01"`（2026-10-13 實測）。
+         *
+         * 所以多站台是在這裡用**實際的站台清單**兜住的 —— 不是去猜
+         * 「、」「跟」「和」這些分隔符：站台名稱本身可能含奇怪的字元，
+         * 猜分隔符會把合法名稱切壞。
+         */
+        $matched = $this->matchedNames($raw);
+
+        if (count($matched) > 1) {
+            $this->reply(strtr((string) Arr::get($config, 'MULTIPLE_TEXT'), [
+                '{names}' => implode('、', $matched),
+            ]), $threadId);
+
+            return true;
+        }
+
+        $this->replyNotFound($raw, $threadId, $config);
+
+        return true;
+    }
+
+    /**
+     * 按鈕按下去
+     *
+     * ⚠ callback_data 直接帶 station id 就夠，不必像預約公告那樣存草稿 ——
+     * 這裡要記的只有一個數字。
+     *
+     * ⚠ **按下去的時候要重新查一次站台**，不能信確認訊息上的那顆按鈕：
+     * 確認訊息會一直留在群組裡，三天後有人翻上去再按一次，站台可能
+     * 已經停用或 api_key 被清掉了。查詢同樣走 `getForCreditSync()`，
+     * 所以那時候會回「找不到」而不是去打一支不存在的 API。
+     *
+     * ⚠ **按鈕也要檢查權限**，不能只擋在指令那一步：按按鈕的人不一定是
+     * 下指令的人。有權限的 A 下了指令，確認訊息留在群組裡，沒權限的 B
+     * 按下【查詢】—— 只擋指令的話 B 就看到點數了。
+     *
+     * @param array    $parts     [action, station_id]
+     * @param int|null $messageId
+     * @param array    $from      按按鈕的人
+     * @param int|null $threadId  按鈕所在的話題
+     * @return void
+     */
+    public function handleCallback(array $parts, $messageId, array $from = [], $threadId = null)
+    {
+        $config = (array) config('constants.STATION_CREDIT_COMMAND');
+        $action = (string) Arr::get($parts, 0);
+
+        // 取消不需要權限 —— 把自己群組裡的一則確認訊息收掉，誰都可以
+        if ($action === (string) Arr::get($config, 'ACTION_CANCEL')) {
+            $this->supportGroup->editMessage($messageId, (string) Arr::get($config, 'CANCELLED_TEXT'));
+
+            return;
+        }
+
+        $denied = $this->permissionError($from, $config);
+
+        /*
+         * ⚠ **另發一則，不要 `editMessage()`。** 編輯的話，沒權限的 B 按一下
+         * 就把 A 的確認按鈕蓋掉了 —— A 要重打一次指令。
+         *
+         * （比較理想是用 `answerCallbackQuery` 的文字跳一個只有 B 看到的提示，
+         * 但那一次已經在 controller 答掉了，同一個 query 不能答第二次。）
+         */
+        if (filled($denied)) {
+            $this->reply($denied, $threadId);
+
+            return;
+        }
+
+        $station = $this->stationRepository->getForCreditSync((int) Arr::get($parts, 1, 0))->first();
+
+        if (blank($station)) {
+            $this->supportGroup->editMessage($messageId, strtr(
+                (string) Arr::get($config, 'GONE_TEXT'),
+                ['{names}' => $this->stationNames()]
+            ));
+
+            return;
+        }
+
+        $this->sync($station, $messageId, $config);
+    }
+
+    /**
+     * 真的去同步並回報
+     *
+     * ⚠ **先把訊息改成「正在同步…」**：主系統 API 要幾秒，不講的話
+     * 使用者會以為按鈕沒反應，然後再按一次。
+     *
+     * @param \App\Models\Station $station
+     * @param int|null            $messageId
+     * @param array               $config
+     * @return void
+     */
+    private function sync($station, $messageId, array $config)
+    {
+        $this->supportGroup->editMessage($messageId, strtr(
+            (string) Arr::get($config, 'WORKING_TEXT'),
+            ['{station}' => (string) $station->name]
+        ));
+
+        try {
+            $info = $this->stationService->syncInfo($station);
+        } catch (\Exception $e) {
+            Log::error('指令查餘點同步失敗', ['station_id' => $station->id, 'error' => $e->getMessage()]);
+            $info = null;
+        }
+
+        /*
+         * ⚠ 同步失敗時**不回舊點數** —— 那個數字可能是好幾天前的，
+         * 當成「現在的餘點」會讓人以為點數還夠。
+         */
+        if (blank($info)) {
+            $this->supportGroup->editMessage($messageId, strtr(
+                (string) Arr::get($config, 'SYNC_FAILED_TEXT'),
+                ['{station}' => (string) $station->name]
+            ));
+
+            return;
+        }
+
+        /*
+         * ⚠ **一定要 refresh()**：`getForCreditSync()` 的 select 裡**沒有
+         * `synced_at`**（那支是餘點告警用的，不需要這一欄），不重撈的話
+         * 同步時間會是 null。`refresh()` 撈的是全部欄位。
+         */
+        $station->refresh();
+
+        /*
+         * `credits` 的 cast 是 `decimal:2`，轉出來就是「16390.94」這個樣子
+         * （兩位小數、不加千分位），跟餘點告警的 `formatCredits()` 同一個
+         * 輸出 —— 所以這裡不再格式化一次，格式才不會兩邊分岔。
+         */
+        $this->supportGroup->editMessage($messageId, strtr((string) Arr::get($config, 'RESULT_TEXT'), [
+            '{station}'   => (string) $station->name,
+            '{credits}'   => (string) $station->credits,
+            '{synced_at}' => filled($station->synced_at)
+                ? $station->synced_at->format('Y-m-d H:i:s')
+                : '-',
+        ]));
+
+        Log::info('指令查餘點完成', [
+            'station_id' => $station->id,
+            'credits'    => $station->credits,
+        ]);
+    }
+
+    /**
+     * 這個人能不能查 —— 不能的話回要講的那句話
+     *
+     * 回空字串 ＝ 可以。回字串 ＝ 要把這句話講出去。
+     * 分成「回文字」而不是「回 bool 自己發訊息」，是因為指令要回在話題裡、
+     * 按鈕要回在按鈕那邊，發送的管道不一樣。
+     *
+     * @param array $from   Telegram 的 from
+     * @param array $config
+     * @return string
+     */
+    private function permissionError(array $from, array $config)
+    {
+        $telegramId = Arr::get($from, 'id');
+
+        // 短路：連 Telegram id 都沒有就不必查資料庫
+        if (blank($telegramId)) {
+            return (string) Arr::get($config, 'NOT_BOUND_TEXT');
+        }
+
+        $user = $this->userRepository->findByTelegramUserId((int) $telegramId);
+
+        if (blank($user)) {
+            return (string) Arr::get($config, 'NOT_BOUND_TEXT');
+        }
+
+        if (!$user->hasPermission(self::PERMISSION)) {
+            Log::info('指令查餘點被權限擋下', ['user_id' => $user->id]);
+
+            return (string) Arr::get($config, 'NO_PERMISSION_TEXT');
+        }
+
+        return '';
+    }
+
+    /**
+     * 依名稱找站台
+     *
+     * ⚠ **走 `getForCreditSync()`**（餘點同步排程的來源）而不是自己下一條查詢：
+     * 那支已經篩掉「停用」與「沒設 API」的站台。自己寫一條的話，
+     * 會出現「指令找得到這個站台、按下去卻同步不了」那種不一致。
+     *
+     * ⚠ 完全相符（不計大小寫），不模糊比對 —— 猜錯會讓人拿著別的站台的
+     * 點數做判斷。
+     *
+     * @param string|null $name
+     * @return \App\Models\Station|null
+     */
+    private function findStation($name)
+    {
+        $name = mb_strtolower(trim((string) $name));
+
+        if (blank($name)) {
+            return null;
+        }
+
+        foreach ($this->syncableStations() as $station) {
+            if (mb_strtolower((string) $station->name) === $name) {
+                return $station;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * 這串字裡出現了哪些已知的站台名稱
+     *
+     * 專門用來分辨「他講了兩個站台」與「他講的名字不存在」——
+     * 兩種都是完全相符找不到，但回話要不一樣。
+     *
+     * ⚠ **只用來數個數，不用來代替完全相符。** 假設站台有 `T01` 沒有 `T011`，
+     * 使用者問 `T011` 時這裡會「包含 T01」—— 直接拿去查就會回 T01 的點數，
+     * 而他問的是另一個站台。所以命中一個的時候仍然走「找不到」，
+     * 只有命中兩個以上才改口說「一次只能查一個」。
+     *
+     * @param string $text
+     * @return array<string> 站台名稱原文（長的排前面，理由見內文）
+     */
+    private function matchedNames($text)
+    {
+        $text = mb_strtolower((string) $text);
+
+        if (blank($text)) {
+            return [];
+        }
+
+        $names = [];
+
+        foreach ($this->syncableStations() as $station) {
+            $name = (string) $station->name;
+
+            if (blank($name)) {
+                continue;
+            }
+
+            if (mb_strpos($text, mb_strtolower($name)) !== false) {
+                $names[] = $name;
+            }
+        }
+
+        /*
+         * ⚠ 長的先比：有 `T01` 與 `T011` 兩個站台時，字串 "T011" 同時包含
+         * 兩者 —— 不排掉的話會被數成「講了兩個站台」。長的命中之後，
+         * 被它整個包住的短名稱就不算。
+         */
+        return $this->dropContained($names);
+    }
+
+    /**
+     * 排掉「被別的命中名稱整個包住」的那些
+     *
+     * @param array<string> $names
+     * @return array<string>
+     */
+    private function dropContained(array $names)
+    {
+        usort($names, function ($a, $b) {
+            return mb_strlen($b) - mb_strlen($a);
+        });
+
+        $kept = [];
+
+        foreach ($names as $name) {
+            $contained = false;
+
+            foreach ($kept as $longer) {
+                if (mb_strpos(mb_strtolower($longer), mb_strtolower($name)) !== false) {
+                    $contained = true;
+                    break;
+                }
+            }
+
+            if (!$contained) {
+                $kept[] = $name;
+            }
+        }
+
+        return $kept;
+    }
+
+    /**
+     * 可以同步餘點的站台（一次指令內只撈一次）
+     *
+     * ⚠ 一次指令會問三個問題（找站台、數有幾個、列出可查的），
+     * 每個都撈一次的話同一條查詢會跑三遍。
+     *
+     * ⚠ 一筆站台都沒有時這裡會每次都重撈（空集合的 `blank()` 是 true）——
+     * 刻意不為它多留一個旗標：那種狀態下指令只會回「目前沒有可查的站台」，
+     * 多跑兩次空查詢換掉一個多餘的欄位不值得。
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    private function syncableStations()
+    {
+        if (blank($this->syncable)) {
+            $this->syncable = $this->stationRepository->getForCreditSync();
+        }
+
+        return $this->syncable;
+    }
+
+    /**
+     * 回確認訊息
+     *
+     * @param \App\Models\Station $station
+     * @param int|null            $threadId
+     * @param array               $config
+     * @return void
+     */
+    private function replyConfirm($station, $threadId, array $config)
+    {
+        $prefix = (string) Arr::get($config, 'CALLBACK');
+        $confirm = (string) Arr::get($config, 'ACTION_CONFIRM');
+        $cancel = (string) Arr::get($config, 'ACTION_CANCEL');
+
+        $keyboard = [[
+            [
+                'text'          => (string) Arr::get($config, 'BUTTON_CONFIRM'),
+                'callback_data' => "{$prefix}:{$confirm}:{$station->id}",
+            ],
+            [
+                'text'          => (string) Arr::get($config, 'BUTTON_CANCEL'),
+                'callback_data' => "{$prefix}:{$cancel}:{$station->id}",
+            ],
+        ]];
+
+        $this->supportGroup->sendToThread(strtr(
+            (string) Arr::get($config, 'CONFIRM_TEXT'),
+            ['{station}' => (string) $station->name]
+        ), $threadId, $keyboard);
+    }
+
+    /**
+     * 找不到站台時，列出可查的
+     *
+     * @param string|null $name
+     * @param int|null    $threadId
+     * @param array       $config
+     * @return void
+     */
+    private function replyNotFound($name, $threadId, array $config)
+    {
+        $this->reply(strtr((string) Arr::get($config, 'NOT_FOUND_TEXT'), [
+            '{station}' => (string) $name,
+            '{names}'   => $this->stationNames(),
+        ]), $threadId);
+    }
+
+    /**
+     * 可以查的站台名稱
+     *
+     * @return string
+     */
+    private function stationNames()
+    {
+        $names = [];
+
+        foreach ($this->syncableStations() as $station) {
+            $names[] = (string) $station->name;
+        }
+
+        return filled($names) ? implode('、', $names) : '（目前沒有可查的站台）';
+    }
+
+    /**
+     * @param string   $text
+     * @param int|null $threadId
+     * @return void
+     */
+    private function reply($text, $threadId)
+    {
+        $this->supportGroup->sendToThread($text, $threadId);
+    }
+}

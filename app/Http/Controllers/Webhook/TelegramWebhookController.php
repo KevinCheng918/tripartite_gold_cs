@@ -8,8 +8,10 @@ use App\Services\CustomerFollowupService;
 use App\Services\DailyRateService;
 use App\Services\ScheduledBroadcastCommandService;
 use App\Services\ScheduledReminderService;
+use App\Services\StationCreditCommandService;
 use App\Services\TelegramBotService;
 use App\Services\TelegramChatService;
+use App\Services\TelegramCommandRouter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
@@ -26,8 +28,10 @@ class TelegramWebhookController extends Controller
     private $supportService;
     private $dailyRateService;
     private $followupService;
+    private $commandRouter;
     private $reminderService;
     private $broadcastCommandService;
+    private $creditCommandService;
     private $botService;
 
     public function __construct(
@@ -35,8 +39,10 @@ class TelegramWebhookController extends Controller
         AutoReplySupportService $supportService,
         DailyRateService $dailyRateService,
         CustomerFollowupService $followupService,
+        TelegramCommandRouter $commandRouter,
         ScheduledReminderService $reminderService,
         ScheduledBroadcastCommandService $broadcastCommandService,
+        StationCreditCommandService $creditCommandService,
         TelegramBotService $botService
     ) {
         $this->chatService = $chatService;
@@ -44,15 +50,18 @@ class TelegramWebhookController extends Controller
         $this->dailyRateService = $dailyRateService;
         // 待追蹤事項的三顆按鈕（callback_data 前綴 fu:）
         $this->followupService = $followupService;
-        // 預約提醒：tag 機器人建立、取消按鈕（前綴 rm:）
-        $this->reminderService = $reminderService;
+        // tag 機器人的那些指令（預約提醒／預約公告／查餘點）走同一個入口分流
+        $this->commandRouter = $commandRouter;
         /*
-         * 指令預約公告的【確認預約】【取消】（前綴 bc:）。
+         * ⚠ 下面三支**只用來接按鈕**（前綴 rm: / bc: / sc:）。
          *
-         * ⚠ 訊息的分流在 `ScheduledReminderService` 裡做（兩者共用「tag 機器人」
-         * 這個入口），這裡只接按鈕 —— callback 沒有共用的入口可分。
+         * 訊息有共用入口（tag 機器人）可以交給分派器，callback 沒有 ——
+         * 每顆按鈕的 `callback_data` 本來就各帶各的前綴，在這裡攤平分派
+         * 比再包一層薄薄的 router 清楚。
          */
+        $this->reminderService = $reminderService;
         $this->broadcastCommandService = $broadcastCommandService;
+        $this->creditCommandService = $creditCommandService;
         // 回應 callback_query，不然按鈕會一直轉圈
         $this->botService = $botService;
     }
@@ -119,13 +128,13 @@ class TelegramWebhookController extends Controller
                 }
 
                 /*
-                 * tag 機器人 ＝ 要排預約提醒（或查清單）。
+                 * tag 機器人 ＝ 下指令（預約提醒／預約公告／查站台餘點）。
                  *
-                 * ⚠ 擺在求助單**之前**：求助單靠「引用回覆」運作，而預約是
+                 * ⚠ 擺在求助單**之前**：求助單靠「引用回覆」運作，而指令是
                  * 直接 tag 機器人 —— 兩者的觸發條件不重疊，但先問這一支
                  * 才不會讓「@bot 明天提醒我…」掉進求助單的作答判斷。
                  */
-                if ($this->reminderService->handleMessage($payload)) {
+                if ($this->commandRouter->handleMessage($payload)) {
                     return response()->json(['ok' => true]);
                 }
 
@@ -154,9 +163,10 @@ class TelegramWebhookController extends Controller
     /**
      * 按鈕事件要交給哪一支 service
      *
-     * 兩套按鈕都在同一個內部群組裡，只能靠 `callback_data` 的前綴分辨：
-     * 待追蹤事項是 `fu:`，其餘（求助單的處理選單、候選題目、類別）
-     * 由 `AutoReplySupportService` 自己再分一層。
+     * 所有按鈕都在同一個內部群組裡，只能靠 `callback_data` 的前綴分辨：
+     * 待追蹤事項 `fu:`、預約公告 `bc:`、預約提醒 `rm:`、查餘點 `sc:`，
+     * 其餘（求助單的處理選單、候選題目、類別）由 `AutoReplySupportService`
+     * 自己再分一層。
      *
      * ⚠ 這裡**只做分派**，不碰任何判斷邏輯 —— Controller 不該有商業邏輯。
      *
@@ -204,6 +214,27 @@ class TelegramWebhookController extends Controller
             $this->reminderService->handleCallback(
                 array_slice(explode(':', $data), 1),
                 Arr::get($callback, 'message.message_id')
+            );
+
+            return;
+        }
+
+        /*
+         * 查站台餘點的【查詢】【取消】。
+         *
+         * ⚠ 這一支的 `handleCallback()` 會去打主系統 API（要幾秒），所以
+         * `answerCallbackQuery()` 一定要在它**之前**：先把按鈕的轉圈停掉，
+         * 再慢慢同步。順序顛倒的話使用者會看著轉圈以為沒反應又按一次。
+         */
+        if ($prefix === (string) config('constants.STATION_CREDIT_COMMAND.CALLBACK')) {
+            $this->botService->answerCallbackQuery(Arr::get($callback, 'id'));
+
+            $this->creditCommandService->handleCallback(
+                array_slice(explode(':', $data), 1),
+                Arr::get($callback, 'message.message_id'),
+                // 按按鈕的人要再驗一次權限 —— 他不一定是下指令的那個人
+                (array) Arr::get($callback, 'from', []),
+                Arr::get($callback, 'message.message_thread_id')
             );
 
             return;
