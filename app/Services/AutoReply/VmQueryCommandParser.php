@@ -31,6 +31,9 @@ class VmQueryCommandParser
     /** @var string 跨站台：誰開機誰關機 */
     const INTENT_POWER = 'power';
 
+    /** @var string 這個站台的點數夠不夠扣這期虛擬機費用 */
+    const INTENT_AFFORD = 'afford';
+
     /** @var string 不是在問虛擬機（呼叫端要換下一個 handler） */
     const INTENT_NOT_VM = 'not_vm';
 
@@ -82,10 +85,13 @@ class VmQueryCommandParser
     /**
      * 把模型回的東西收斂成可用的形狀
      *
-     * ⚠ **`station` 填了就一定是 `station` 意圖。** 模型偶爾會回
+     * ⚠ **`station` 填了就一定是「單一站台」那條路。** 模型偶爾會回
      * 「intent=power ＋ station=LV_UAT」（他問「lv-uat 他是開機還是關機」）
-     * —— 講了站台就該回那個站台的完整狀況，不是跨站台的清單。
+     * —— 講了站台就該回那個站台的狀況，不是跨站台的清單。
      * 在這裡收斂，呼叫端就不必再判一次。
+     *
+     * ⚠ 但 `afford`（夠不夠扣）是例外：它本來就要指名站台，而且回的是
+     * 試算不是卡片。所以它不被收斂成 `station`。
      *
      * @param array $result
      * @return array
@@ -99,6 +105,13 @@ class VmQueryCommandParser
         }
 
         $station = trim((string) Arr::get($result, 'station'));
+
+        // 夠不夠扣：沒指名站台就不知道要算誰的，退回「聽不出要查什麼」
+        if ($intent === self::INTENT_AFFORD) {
+            return filled($station)
+                ? ['intent' => self::INTENT_AFFORD, 'station' => $station]
+                : ['intent' => self::INTENT_UNKNOWN, 'station' => null];
+        }
 
         if (filled($station)) {
             return ['intent' => self::INTENT_STATION, 'station' => $station];
@@ -126,10 +139,11 @@ class VmQueryCommandParser
                         self::INTENT_STATION,
                         self::INTENT_UNPAID,
                         self::INTENT_POWER,
+                        self::INTENT_AFFORD,
                         self::INTENT_NOT_VM,
                         self::INTENT_UNKNOWN,
                     ],
-                    'description' => '查某個站台的虛擬機（station）、誰還沒繳錢（unpaid）、誰開機誰關機（power）、不是在問虛擬機（not_vm）、問虛擬機但聽不出要查什麼（unknown）',
+                    'description' => '查某個站台的虛擬機（station）、誰還沒繳錢（unpaid）、誰開機誰關機（power）、某站台的點數夠不夠扣這期虛擬機費用（afford）、不是在問虛擬機（not_vm）、問虛擬機但聽不出要查什麼（unknown）',
                 ],
                 'station' => [
                     'type'        => ['string', 'null'],

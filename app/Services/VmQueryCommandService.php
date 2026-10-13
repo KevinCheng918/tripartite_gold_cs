@@ -39,6 +39,7 @@ class VmQueryCommandService
     private $stationRepository;
     private $userRepository;
     private $nameMatcher;
+    private $affordability;
     private $supportGroup;
 
     /**
@@ -54,6 +55,7 @@ class VmQueryCommandService
         StationRepository $stationRepository,
         UserRepository $userRepository,
         StationNameMatcher $nameMatcher,
+        VmAffordabilityService $affordability,
         SupportGroupService $supportGroup
     ) {
         $this->parser = $parser;
@@ -63,6 +65,8 @@ class VmQueryCommandService
         $this->userRepository = $userRepository;
         // 「他說的名字是哪個站台」四支指令共用同一份規則
         $this->nameMatcher = $nameMatcher;
+        // 「點數夠不夠扣」的試算（含單位換算），錢的算術不放在這支裡
+        $this->affordability = $affordability;
         $this->supportGroup = $supportGroup;
     }
 
@@ -92,7 +96,13 @@ class VmQueryCommandService
             return false;
         }
 
-        $denied = $this->permissionError($from, $config);
+        /*
+         * ⚠ 「夠不夠扣」的答案裡**有站台餘點**，所以它要多一個
+         * `telegram_chat.station_credit`。只驗虛擬機那個權限的話，
+         * 這支指令就成了繞過餘點權限的側門 —— 問「夠不夠扣」就看到點數了。
+         */
+        $needCredit = $intent === VmQueryCommandParser::INTENT_AFFORD;
+        $denied = $this->permissionError($from, $config, $needCredit);
 
         if (filled($denied)) {
             $this->reply($denied, $threadId);
@@ -112,6 +122,12 @@ class VmQueryCommandService
             return true;
         }
 
+        if ($intent === VmQueryCommandParser::INTENT_AFFORD) {
+            $this->replyAfford((string) Arr::get($parsed, 'station'), $threadId, $config);
+
+            return true;
+        }
+
         if ($intent !== VmQueryCommandParser::INTENT_STATION) {
             $this->reply((string) Arr::get($config, 'UNKNOWN_TEXT'), $threadId);
 
@@ -121,6 +137,154 @@ class VmQueryCommandService
         $this->replyStation((string) Arr::get($parsed, 'station'), $threadId, $config);
 
         return true;
+    }
+
+    /**
+     * 點數夠不夠扣這期虛擬機費用
+     *
+     * ⚠ **會同步一次點數**（打主系統 API ＋ 寫 DB），所以先回一句
+     * 「正在試算」—— 不講的話使用者會以為沒反應。
+     *
+     * ⚠ 這一支**沒有二次確認**，跟餘點指令不一樣。那一支的按鈕是在問
+     * 「要不要執行同步」；這裡使用者要的是一個試算結果，同步只是取得
+     * 結果的必要步驟（需求方描述的流程就是一氣呵成的）。
+     * 要改成先確認的話，加一顆按鈕即可。
+     *
+     * @param string   $raw
+     * @param int|null $threadId
+     * @param array    $config
+     * @return void
+     */
+    private function replyAfford($raw, $threadId, array $config)
+    {
+        $station = $this->nameMatcher->match($raw, $this->stations());
+
+        if (blank($station)) {
+            $this->replyNoSuchStation($raw, $threadId, $config);
+
+            return;
+        }
+
+        $this->reply(strtr((string) Arr::get($config, 'AFFORD_WORKING'), [
+            '{station}' => (string) $station->name,
+        ]), $threadId);
+
+        $result = $this->affordability->evaluate($station, now()->format('Y-m'));
+
+        $this->reply($this->renderAfford($station, $result, $config), $threadId);
+    }
+
+    /**
+     * 組試算的回覆
+     *
+     * ⚠ **每一種結果都要有自己的話。** 算不出來時湊一個數字，比不回答糟 ——
+     * 這個數字是拿來決定要不要補點的。
+     *
+     * @param \App\Models\Station $station
+     * @param array               $result
+     * @param array               $config
+     * @return string
+     */
+    private function renderAfford($station, array $result, array $config)
+    {
+        $name = (string) $station->name;
+        $state = (string) Arr::get($result, 'result');
+
+        if ($state === VmAffordabilityService::RESULT_NO_BILLING) {
+            return strtr((string) Arr::get($config, 'AFFORD_NO_BILLING'), ['{station}' => $name]);
+        }
+
+        if ($state === VmAffordabilityService::RESULT_PAID) {
+            return strtr((string) Arr::get($config, 'AFFORD_PAID'), [
+                '{station}' => $name,
+                '{fee}'     => $this->money(Arr::get($result, 'fee')),
+            ]);
+        }
+
+        if ($state === VmAffordabilityService::RESULT_SYNC_FAILED) {
+            return strtr((string) Arr::get($config, 'AFFORD_SYNC_FAILED'), ['{station}' => $name]);
+        }
+
+        if ($state === VmAffordabilityService::RESULT_NO_RATE) {
+            return strtr((string) Arr::get($config, 'AFFORD_NO_RATE'), [
+                '{fee}'     => $this->money(Arr::get($result, 'fee')),
+                '{credits}' => $this->money(Arr::get($result, 'credits')),
+            ]);
+        }
+
+        return $this->renderAffordNumbers($name, $result, $config);
+    }
+
+    /**
+     * 試算成功的那一則
+     *
+     * @param string $name
+     * @param array  $result
+     * @param array  $config
+     * @return string
+     */
+    private function renderAffordNumbers($name, array $result, array $config)
+    {
+        $syncedAt = Arr::get($result, 'synced_at');
+
+        $text = strtr((string) Arr::get($config, 'AFFORD_TITLE'), ['{station}' => $name]);
+
+        $text .= strtr((string) Arr::get($config, 'AFFORD_FEE'), [
+            '{fee}'   => $this->money(Arr::get($result, 'fee')),
+            '{count}' => (int) Arr::get($result, 'count'),
+        ]);
+
+        $text .= strtr((string) Arr::get($config, 'AFFORD_RATE'), [
+            '{rate}'   => (string) Arr::get($result, 'rate'),
+            '{source}' => $this->rateSourceText(Arr::get($result, 'rate_source'), $config),
+            '{needed}' => $this->money(Arr::get($result, 'needed')),
+        ]);
+
+        $text .= strtr((string) Arr::get($config, 'AFFORD_CREDITS'), [
+            '{credits}'   => $this->money(Arr::get($result, 'credits')),
+            '{synced_at}' => filled($syncedAt) ? $syncedAt->format('n/j H:i') : '-',
+        ]);
+
+        $remaining = (float) Arr::get($result, 'remaining');
+
+        /*
+         * ⚠ `enough` 是布林，用 `(bool)` 取不要用 `filled()` ——
+         * `filled(false)` 回的是 true（見 bugfix/2026-10-12-filled-on-boolean）。
+         */
+        if ((bool) Arr::get($result, 'enough')) {
+            $text .= strtr((string) Arr::get($config, 'AFFORD_ENOUGH'), [
+                '{remaining}' => $this->money($remaining),
+            ]);
+        } else {
+            $text .= strtr((string) Arr::get($config, 'AFFORD_NOT_ENOUGH'), [
+                '{short}' => $this->money(abs($remaining)),
+            ]);
+        }
+
+        if ((string) Arr::get($result, 'result') === VmAffordabilityService::RESULT_PENDING) {
+            $text .= (string) Arr::get($config, 'AFFORD_PENDING_NOTE');
+        }
+
+        return $text;
+    }
+
+    /**
+     * 匯率是哪來的
+     *
+     * ⚠ 一定要講。今日報價與 4H 均價是兩個不同的數字，而試算結果直接
+     * 影響「要不要補點」—— 看的人得知道這是定案的還是浮動的。
+     *
+     * @param string $source
+     * @param array  $config
+     * @return string
+     */
+    private function rateSourceText($source, array $config)
+    {
+        if ((string) $source === VmAffordabilityService::RATE_DECIDED) {
+            return (string) Arr::get($config, 'AFFORD_RATE_DECIDED');
+        }
+
+        return (string) Arr::get($config, 'AFFORD_RATE_AVG_4H');
     }
 
     /**
@@ -638,9 +802,10 @@ class VmQueryCommandService
      *
      * @param array $from
      * @param array $config
+     * @param bool  $needCredit 答案裡會出現站台餘點，要多驗餘點權限
      * @return string 空字串 ＝ 可以
      */
-    private function permissionError(array $from, array $config)
+    private function permissionError(array $from, array $config, $needCredit = false)
     {
         $telegramId = Arr::get($from, 'id');
 
@@ -659,6 +824,13 @@ class VmQueryCommandService
             Log::info('指令查虛擬機被權限擋下', ['user_id' => $user->id]);
 
             return (string) Arr::get($config, 'NO_PERMISSION_TEXT');
+        }
+
+        // 這一行是布林不是「有沒有填」，所以用 (bool) 不用 filled()
+        if ((bool) $needCredit && !$user->hasPermission(StationCreditCommandService::PERMISSION)) {
+            Log::info('指令試算餘點被權限擋下（缺餘點權限）', ['user_id' => $user->id]);
+
+            return (string) Arr::get($config, 'NO_CREDIT_PERMISSION_TEXT');
         }
 
         return '';
