@@ -98,6 +98,7 @@ return [
         'broadcast_template' => 'Manage announcement templates',
         'station_credit' => 'Query station credits by command',
         'vm_query' => 'Query virtual machines by command',
+        'credit_alert' => 'Send credit alert to customers by command',
         'reply'     => 'Reply messages',
         'assign'    => 'Assign duty staff',
         'broadcast' => 'Broadcast announcement',

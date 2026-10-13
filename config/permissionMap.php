@@ -174,6 +174,16 @@ return [
              * 誰能看該分開指派。
              */
             'telegram_chat.vm_query' => 'permission.telegram_chat.vm_query',
+
+            /*
+             * 在內部群組 tag 機器人，把餘點告警＋補點通知發給某個站台的客戶。
+             *
+             * ⚠ **這一項跟其他 tg 指令不同層級**：其餘都只回在內部群組，
+             * 這一個會把訊息**發出去給客戶、而且收不回來**。
+             * 所以不跟 `station_credit`（查餘點）共用 —— 看得到點數
+             * 不等於可以替公司發通知給客戶。
+             */
+            'telegram_chat.credit_alert' => 'permission.telegram_chat.credit_alert',
         ],
     ],
 

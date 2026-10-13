@@ -9,7 +9,8 @@ use Illuminate\Support\Arr;
  *
  * ```
  * tag 機器人 → 依序問每一支，誰認領就誰處理
- *   ├─ 預約發送公告（要權限、要先確認）
+ *   ├─ 預約發送公告（要權限、要先確認、**會發給客戶**）
+ *   ├─ 發餘點告警（要權限、要先確認、**會發給客戶**）
  *   ├─ 同步站台餘點（要權限、要先確認）
  *   ├─ 查站台虛擬機（要權限，純讀不必確認）
  *   └─ 預約提醒（擺最後，也是看不懂時的歸宿）
@@ -35,6 +36,7 @@ class TelegramCommandRouter
     private $supportGroup;
     private $botService;
     private $broadcastCommand;
+    private $alertCommand;
     private $creditCommand;
     private $vmCommand;
     private $reminder;
@@ -43,6 +45,7 @@ class TelegramCommandRouter
         SupportGroupService $supportGroup,
         TelegramBotService $botService,
         ScheduledBroadcastCommandService $broadcastCommand,
+        CreditAlertCommandService $alertCommand,
         StationCreditCommandService $creditCommand,
         VmQueryCommandService $vmCommand,
         ScheduledReminderService $reminder
@@ -51,6 +54,8 @@ class TelegramCommandRouter
         // 判斷「這則有沒有 tag 我」要知道 Bot 自己的 username
         $this->botService = $botService;
         $this->broadcastCommand = $broadcastCommand;
+        // 擺在查餘點之前：「發告警」與「查餘點」都提到點數，先問會發的那支
+        $this->alertCommand = $alertCommand;
         $this->creditCommand = $creditCommand;
         $this->vmCommand = $vmCommand;
         // 擺最後：它同時是「看不懂」時的歸宿
@@ -130,6 +135,7 @@ class TelegramCommandRouter
     private function handlers()
     {
         $broadcast = $this->broadcastCommand;
+        $alert = $this->alertCommand;
         $credit = $this->creditCommand;
         $vm = $this->vmCommand;
         $reminder = $this->reminder;
@@ -137,6 +143,15 @@ class TelegramCommandRouter
         return [
             function ($body, $from, $threadId) use ($broadcast) {
                 return $broadcast->handle($body, $from, $threadId);
+            },
+            /*
+             * ⚠ 發告警擺在查餘點**之前**：兩者都提到「點數」，而這一支會
+             * 把訊息發給客戶。萬一兩邊都想認領，先問會發的那支比較安全 ——
+             * 查詢被誤判成發送，至少還有二次確認擋著；反過來則是使用者
+             * 想發卻只拿到一個查詢結果，會重打好幾次。
+             */
+            function ($body, $from, $threadId) use ($alert) {
+                return $alert->handle($body, $from, $threadId);
             },
             function ($body, $from, $threadId) use ($credit) {
                 return $credit->handle($body, $from, $threadId);

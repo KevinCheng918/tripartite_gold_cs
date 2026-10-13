@@ -102,6 +102,7 @@ return [
         'broadcast_template' => '建档／修改公告范本',
         'station_credit'  => '用指令查站台余点',
         'vm_query'        => '用指令查虚拟机',
+        'credit_alert'    => '用指令发余点告警给客户',
     ],
     'staff_manage' => [
         'view' => '查看内部管理',

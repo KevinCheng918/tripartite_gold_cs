@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\AutoReplySupportService;
 use App\Services\CustomerFollowupService;
 use App\Services\DailyRateService;
+use App\Services\CreditAlertCommandService;
 use App\Services\ScheduledBroadcastCommandService;
 use App\Services\ScheduledReminderService;
 use App\Services\StationCreditCommandService;
@@ -32,6 +33,7 @@ class TelegramWebhookController extends Controller
     private $reminderService;
     private $broadcastCommandService;
     private $creditCommandService;
+    private $alertCommandService;
     private $botService;
 
     public function __construct(
@@ -43,6 +45,7 @@ class TelegramWebhookController extends Controller
         ScheduledReminderService $reminderService,
         ScheduledBroadcastCommandService $broadcastCommandService,
         StationCreditCommandService $creditCommandService,
+        CreditAlertCommandService $alertCommandService,
         TelegramBotService $botService
     ) {
         $this->chatService = $chatService;
@@ -62,6 +65,7 @@ class TelegramWebhookController extends Controller
         $this->reminderService = $reminderService;
         $this->broadcastCommandService = $broadcastCommandService;
         $this->creditCommandService = $creditCommandService;
+        $this->alertCommandService = $alertCommandService;
         // 回應 callback_query，不然按鈕會一直轉圈
         $this->botService = $botService;
     }
@@ -235,6 +239,24 @@ class TelegramWebhookController extends Controller
                 // 按按鈕的人要再驗一次權限 —— 他不一定是下指令的那個人
                 (array) Arr::get($callback, 'from', []),
                 Arr::get($callback, 'message.message_thread_id')
+            );
+
+            return;
+        }
+
+        /*
+         * 發餘點告警給客戶的【確認發送】【取消】。
+         *
+         * ⚠ 這一支按下去會**把訊息發給客戶**，所以 service 裡會再驗一次
+         * 權限（按的人不一定是下指令的人），草稿也會過期。
+         */
+        if ($prefix === (string) config('constants.CREDIT_ALERT_COMMAND.CALLBACK')) {
+            $this->botService->answerCallbackQuery(Arr::get($callback, 'id'));
+
+            $this->alertCommandService->handleCallback(
+                array_slice(explode(':', $data), 1),
+                Arr::get($callback, 'message.message_id'),
+                (array) Arr::get($callback, 'from', [])
             );
 
             return;
