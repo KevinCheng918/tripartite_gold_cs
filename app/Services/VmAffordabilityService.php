@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Station;
+use App\Repositories\StationRepository;
 use App\Repositories\VmRepository;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
@@ -44,6 +45,17 @@ class VmAffordabilityService
     /** @var string 主系統沒回點數 */
     const RESULT_SYNC_FAILED = 'sync_failed';
 
+    /**
+     * 這個站台沒設定 API，同步不了
+     *
+     * ⚠ 跟 `RESULT_SYNC_FAILED` 分開：一個是**設定缺了**（去後台填就好），
+     * 一個是**主系統沒回應**（要去看主系統）。講成同一句的話，
+     * 看的人會去查一個好好的主系統。
+     *
+     * @var string
+     */
+    const RESULT_NO_API = 'no_api';
+
     /** @var string 今日匯率沒決定，4H 均價也拿不到 */
     const RESULT_NO_RATE = 'no_rate';
 
@@ -57,17 +69,21 @@ class VmAffordabilityService
     const RATE_AVG_4H = 'avg_4h';
 
     private $vmRepository;
+    private $stationRepository;
     private $stationService;
     private $dailyRateService;
     private $usdtRateService;
 
     public function __construct(
         VmRepository $vmRepository,
+        StationRepository $stationRepository,
         StationService $stationService,
         DailyRateService $dailyRateService,
         UsdtRateService $usdtRateService
     ) {
         $this->vmRepository = $vmRepository;
+        // 同步要 api_url / api_key，不能信呼叫端撈了哪些欄位（見 freshCredits）
+        $this->stationRepository = $stationRepository;
         // 同步點數走站台頁「同步」按鈕的同一支
         $this->stationService = $stationService;
         // 今天對客的報價（還沒決定時回 null）
@@ -123,19 +139,25 @@ class VmAffordabilityService
         $state = $bills['unpaid'] > 0 ? self::RESULT_OK : self::RESULT_PENDING;
         $count = $bills['owed'];
 
-        $credits = $this->freshCredits($station);
+        $synced = $this->freshCredits($station->id);
 
-        if (blank($credits)) {
+        if (blank($synced)) {
             return $this->result(self::RESULT_SYNC_FAILED, ['fee' => $fee, 'count' => $count]);
         }
 
+        // 沒設 API：同步根本沒發生，要跟「主系統沒回應」分開講
+        if (Arr::get($synced, 'result') === self::RESULT_NO_API) {
+            return $this->result(self::RESULT_NO_API, ['fee' => $fee, 'count' => $count]);
+        }
+
+        $credits = (float) $synced['credits'];
         $rate = $this->rate();
 
         if (blank($rate)) {
             return $this->result(self::RESULT_NO_RATE, [
                 'fee'       => $fee,
                 'credits'   => $credits,
-                'synced_at' => $station->synced_at,
+                'synced_at' => $synced['synced_at'],
                 'count'     => $count,
             ]);
         }
@@ -150,7 +172,7 @@ class VmAffordabilityService
             'enough'      => $credits >= $needed,
             'rate'        => (float) $rate['value'],
             'rate_source' => (string) $rate['source'],
-            'synced_at'   => $station->synced_at,
+            'synced_at'   => $synced['synced_at'],
             'count'       => $count,
         ]);
     }
@@ -225,29 +247,57 @@ class VmAffordabilityService
      * 決定「要不要補點」的 —— 用舊的判斷正是餘點告警
      * （`SKIP_SYNC_FAILED`）一直在防的事。
      *
-     * @param Station $station
-     * @return float|null null = 主系統沒回
+     * ⚠ **一定要自己重撈一次完整的站台**（2026-10-13 線上踩到）。
+     * 呼叫端是用 `allForDropdown()` 找站台的，那支只 select
+     * `id / system_id / name` —— `api_url` 與 `api_key` 讀出來是 **null
+     * 而且不會報錯**，`getStationInfo()` 第一行就 `blank()` 擋掉並
+     * 立刻回 null。結果是「正在同步…」下一秒就變成「主系統沒有回應」，
+     * 但其實**根本沒有去打主系統**。
+     *
+     * 重撈放在這裡而不是要求呼叫端傳完整的 model：欄位夠不夠是這支的需求，
+     * 讓它自己負責，下一個呼叫端就不必記得這件事。
+     *
+     * @param int $stationId
+     * @return array{credits: float, synced_at: \Illuminate\Support\Carbon|null}|null null = 同步不到
      */
-    private function freshCredits(Station $station)
+    private function freshCredits($stationId)
     {
+        // `find()` 的 LIST_COLUMNS 含 api_url / api_key / credits / synced_at
+        $station = $this->stationRepository->find($stationId);
+
+        if (blank($station)) {
+            Log::warning('試算餘點：站台不見了', ['station_id' => $stationId]);
+
+            return null;
+        }
+
+        /*
+         * ⚠ 沒設 API 跟「主系統沒回應」是兩回事，要分開記 ——
+         * 不然查 log 的人會去查主系統，但主系統好好的。
+         */
+        if (blank($station->api_url) || blank($station->api_key)) {
+            Log::warning('試算餘點：站台沒設定 API，無法同步', ['station_id' => $stationId]);
+
+            return ['result' => self::RESULT_NO_API];
+        }
+
         try {
             $info = $this->stationService->syncInfo($station);
         } catch (\Exception $e) {
-            Log::error('試算餘點：同步失敗', ['station_id' => $station->id, 'error' => $e->getMessage()]);
+            Log::error('試算餘點：同步失敗', ['station_id' => $stationId, 'error' => $e->getMessage()]);
 
             return null;
         }
 
         if (blank($info)) {
-            Log::warning('試算餘點：主系統沒回資料', ['station_id' => $station->id]);
+            Log::warning('試算餘點：主系統沒回資料', ['station_id' => $stationId]);
 
             return null;
         }
 
-        // syncInfo() 的 select 不含 synced_at，重撈才拿得到同步時間
         $station->refresh();
 
-        return (float) $station->credits;
+        return ['credits' => (float) $station->credits, 'synced_at' => $station->synced_at];
     }
 
     /**

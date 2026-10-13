@@ -205,6 +205,11 @@ class VmQueryCommandService
             return strtr((string) Arr::get($config, 'AFFORD_SYNC_FAILED'), ['{station}' => $name]);
         }
 
+        // 沒設 API 跟主系統沒回應要分開講，不然會去查一個好好的主系統
+        if ($state === VmAffordabilityService::RESULT_NO_API) {
+            return strtr((string) Arr::get($config, 'AFFORD_NO_API'), ['{station}' => $name]);
+        }
+
         if ($state === VmAffordabilityService::RESULT_NO_RATE) {
             return strtr((string) Arr::get($config, 'AFFORD_NO_RATE'), [
                 '{fee}'     => $this->money(Arr::get($result, 'fee')),
