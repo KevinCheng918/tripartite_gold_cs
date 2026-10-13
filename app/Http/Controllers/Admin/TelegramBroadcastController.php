@@ -116,6 +116,14 @@ class TelegramBroadcastController extends Controller
         $params['image_urls'] = filled($images) ? $images : null;
         $params['file_urls'] = filled($files) ? $files : null;
 
+        /*
+         * 編號**快照**進發送紀錄，歷史紀錄才看得出這次用的是哪一則公告。
+         *
+         * ⚠ 存字串不是 FK：公告之後被刪或改了編號，歷史紀錄該留的仍是
+         * 「當時用的那一個」—— 那正是歷史紀錄要回答的問題。
+         */
+        $params['template_code'] = filled($template) ? $template->code : null;
+
         try {
             if (filled(Arr::get($params, 'scheduled_at'))) {
                 $broadcast = $this->broadcastService->schedule($params, Auth::id());

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * @property int         $id
  * @property string      $content          公告內容
+ * @property string|null $template_code    發送當下用的公告編號快照（自己打的為 null）
  * @property int         $target_type      1=全部群組, 2=指定群組
  * @property array|null  $target_group_ids 指定的群組 ID 陣列
  * @property int         $total_count      應發送群組數

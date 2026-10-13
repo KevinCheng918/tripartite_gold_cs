@@ -292,6 +292,8 @@ class TelegramBroadcastService
 
         return $this->broadcastRepository->create([
             'content'          => $params['content'],
+            // 編號快照。公告之後被刪或改編號，這裡留的仍是發送當下那一個
+            'template_code'    => Arr::get($params, 'template_code'),
             'target_type'      => $targetType,
             'target_group_ids' => $stationIds,
             'image_urls'       => $params['image_urls'] ?? null,
@@ -373,6 +375,8 @@ class TelegramBroadcastService
 
         $broadcast = $this->broadcastRepository->create([
             'content'          => $params['content'],
+            // 編號快照。公告之後被刪或改編號，這裡留的仍是發送當下那一個
+            'template_code'    => Arr::get($params, 'template_code'),
             'target_type'      => $targetType,
             'target_group_ids' => $targetType === TelegramBroadcast::TARGET_SELECTED ? ($params['group_ids'] ?? []) : null,
             'image_urls'       => $params['image_urls'] ?? null,

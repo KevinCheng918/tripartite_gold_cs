@@ -209,6 +209,7 @@
                                     <th>{{ trans('broadcast.field_time') }}</th>
                                     <th>{{ trans('broadcast.field_sender') }}</th>
                                     <th>{{ trans('broadcast.field_target') }}</th>
+                                    <th class="col-tight">{{ trans('broadcast.template_code') }}</th>
                                     <th>{{ trans('broadcast.field_content') }}</th>
                                     <th>{{ trans('broadcast.field_result') }}</th>
                                     <th class="col-actions">{{ trans('broadcast.field_action') }}</th>
@@ -228,6 +229,8 @@
                                         </td>
                                         <td>{{ $record->sender ? $record->sender->nickname : '-' }}</td>
                                         <td>@include('admin.telegram-broadcast.partials.target-badge', ['record' => $record, 'groups' => $groups])</td>
+                                        {{-- 自己打的公告沒有編號 --}}
+                                        <td class="col-tight">{{ filled($record->template_code) ? $record->template_code : '-' }}</td>
                                         <td>{{ Str::limit($record->content, 50) }}</td>
                                         {{-- 成功／失敗／總數合成一格，跟手機版卡片同一種寫法 --}}
                                         <td class="text-nowrap">
@@ -259,7 +262,8 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="7" class="table-empty">
+                                        {{-- 8 欄：狀態／時間／發送者／對象／編號／內容／送達／操作 --}}
+                                        <td colspan="8" class="table-empty">
                                             <i class="fas fa-bullhorn"></i>{{ trans('broadcast.no_history') }}
                                         </td>
                                     </tr>
@@ -287,6 +291,10 @@
                                             <i class="far fa-clock me-1"></i>{{ $record->scheduled_at->format('m/d H:i') }}
                                         @else
                                             {{ $record->sent_at ? $record->sent_at->format('m/d H:i') : '-' }}
+                                        @endif
+                                        {{-- 用了哪則建檔公告。自己打的沒有編號就整段不出現 --}}
+                                        @if(filled($record->template_code))
+                                            <span class="ms-1">· {{ $record->template_code }}</span>
                                         @endif
                                     </div>
                                 </div>

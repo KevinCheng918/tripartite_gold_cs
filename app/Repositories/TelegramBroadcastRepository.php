@@ -19,7 +19,7 @@ class TelegramBroadcastRepository
     public function paginate($perPage = 20)
     {
         return TelegramBroadcast::query()
-            ->select(['id', 'content', 'target_type', 'target_group_ids', 'send_results', 'status', 'scheduled_at', 'image_urls', 'file_urls', 'total_count', 'success_count', 'fail_count', 'sender_id', 'sent_at', 'created_at'])
+            ->select(['id', 'content', 'template_code', 'target_type', 'target_group_ids', 'send_results', 'status', 'scheduled_at', 'image_urls', 'file_urls', 'total_count', 'success_count', 'fail_count', 'sender_id', 'sent_at', 'created_at'])
             ->with('sender')
             ->orderByDesc('id')
             ->paginate($perPage);
@@ -37,7 +37,13 @@ class TelegramBroadcastRepository
     public function getDueScheduled($now)
     {
         return TelegramBroadcast::query()
-            ->select(['id', 'content', 'target_type', 'target_group_ids', 'status', 'scheduled_at', 'image_urls', 'file_urls', 'sender_id'])
+            /*
+             * ⚠ `template_code` 這支其實用不到，但照樣 select ——
+             * 漏掉的欄位讀出來是 null 而**不會報錯**，日後有人在送出流程裡
+             * 用到它，查起來會是「資料庫明明有值，程式卻看不到」。
+             * 這個坑在 `reply_start_time` 上踩過一次。
+             */
+            ->select(['id', 'content', 'template_code', 'target_type', 'target_group_ids', 'status', 'scheduled_at', 'image_urls', 'file_urls', 'sender_id'])
             ->where('status', TelegramBroadcast::STATUS_PENDING)
             ->where('scheduled_at', '<=', $now)
             ->orderBy('scheduled_at')
