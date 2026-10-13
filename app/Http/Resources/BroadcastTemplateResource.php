@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Arr;
 
 /**
  * 公告範本
@@ -48,7 +49,8 @@ class BroadcastTemplateResource extends JsonResource
         $urls = [];
 
         foreach ((array) $this->image_urls as $image) {
-            $path = is_array($image) ? ($image['path'] ?? null) : $image;
+            // 舊資料可能是純字串路徑，新的是 {path, name}
+            $path = is_array($image) ? Arr::get($image, 'path') : $image;
 
             if (filled($path)) {
                 $urls[] = asset('storage/' . $path);

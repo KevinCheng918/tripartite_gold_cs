@@ -110,7 +110,7 @@ class TelegramBroadcastController extends Controller
         $params['file_urls'] = filled($files) ? $files : null;
 
         try {
-            if (filled($params['scheduled_at'] ?? null)) {
+            if (filled(Arr::get($params, 'scheduled_at'))) {
                 $broadcast = $this->broadcastService->schedule($params, Auth::id());
 
                 return response()->json([
