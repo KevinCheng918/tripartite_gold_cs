@@ -55,6 +55,20 @@ class CreditAlertCommandService
      */
     private $stations;
 
+    /**
+     * 已經查過的那個 Telegram id（0 ＝ 還沒查過）
+     *
+     * @var int
+     */
+    private $resolvedFor = 0;
+
+    /**
+     * 上面那個 id 對到的帳號（查不到就是 null）
+     *
+     * @var \App\Models\User|null
+     */
+    private $resolvedUser;
+
     public function __construct(
         CreditAlertCommandParser $parser,
         StationRepository $stationRepository,
@@ -227,11 +241,15 @@ class CreditAlertCommandService
         }
 
         /*
-         * ⚠ `pull()` 會把草稿取出並刪掉 —— 連點兩下不會發兩次。
+         * ⚠ 先 `get()` 看一眼，**還不要 `pull()`**。
+         *
+         * 顛倒過來的話，沒權限的 B 按一下就把草稿消耗掉了 —— A 的待確認
+         * 跟著失效，得重打一次指令。B 沒有權限做任何事，更不該有能力
+         * 把別人的待確認弄掉。
          *
          * ⚠ 草稿不在（過期或已用掉）**不能當成成功**，要照實說過期。
          */
-        $draft = Cache::pull(self::DRAFT_PREFIX . $key);
+        $draft = (array) Cache::get(self::DRAFT_PREFIX . $key);
 
         if (blank($draft)) {
             $this->supportGroup->editMessage($messageId, (string) Arr::get($config, 'EXPIRED_TEXT'));
@@ -243,13 +261,24 @@ class CreditAlertCommandService
 
         if (filled($denied)) {
             /*
-             * ⚠ 沒權限時用**另發一則**而不是 editMessage：編輯的話，
-             * 沒權限的 B 按一下就把 A 的確認按鈕蓋掉了。
-             *
-             * 但草稿已經被 `pull()` 掉了，所以還是要把那則改成過期 ——
-             * 否則按鈕還在、按下去卻永遠說過期，更難懂。
+             * ⚠ **另發一則，不要 editMessage** —— 編輯的話 B 按一下就把 A 的
+             * 確認按鈕蓋掉了。草稿沒被消耗，所以那顆按鈕仍然有效，
+             * 有權限的人可以照常按下去。
              */
             $this->reply($denied, Arr::get($draft, 'thread_id'));
+
+            return;
+        }
+
+        /*
+         * ⚠ **確定要發了才 `pull()`**：取出並刪掉，連點兩下不會發兩次。
+         *
+         * 這裡再檢查一次是因為 `get()` 到 `pull()` 之間還有一小段 ——
+         * 另一個人同時按下去的話，只有先 pull 到的那次會真的發。
+         */
+        $draft = (array) Cache::pull(self::DRAFT_PREFIX . $key);
+
+        if (blank($draft)) {
             $this->supportGroup->editMessage($messageId, (string) Arr::get($config, 'EXPIRED_TEXT'));
 
             return;
@@ -504,6 +533,9 @@ class CreditAlertCommandService
     /**
      * Telegram 使用者 → 系統帳號
      *
+     * ⚠ 一次按鈕會問兩次（驗權限、記是誰送出的），所以記起來 ——
+     * 同一個人查兩遍資料庫沒有意義。
+     *
      * @param array $from
      * @return \App\Models\User|null
      */
@@ -516,7 +548,18 @@ class CreditAlertCommandService
             return null;
         }
 
-        return $this->userRepository->findByTelegramUserId((int) $telegramId);
+        $telegramId = (int) $telegramId;
+
+        /*
+         * ⚠ 用「查過了沒」而不是 `blank($this->resolvedUser)` 當判斷 ——
+         * 查不到的人回的是 null，用 blank() 的話每次都會重查一遍。
+         */
+        if ($this->resolvedFor !== $telegramId) {
+            $this->resolvedFor = $telegramId;
+            $this->resolvedUser = $this->userRepository->findByTelegramUserId($telegramId);
+        }
+
+        return $this->resolvedUser;
     }
 
     /**
