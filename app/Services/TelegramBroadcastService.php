@@ -131,26 +131,23 @@ class TelegramBroadcastService
      * `sendDocument($chatId, $diskPath, $name)`，那支吃的是本地絕對路徑 ——
      * 直接收前端送來的路徑等於開放「指定伺服器上任何檔案發給所有客人」。
      *
-     * ⚠ 沒給索引＝**全部帶走**（使用者剛選範本、還沒動過任何附件）。
-     * 給了空陣列才是「全部移除」—— 兩者意思不同，不能一起當成空。
+     * ⚠ **沒給索引＝一個都不帶**，不是「全部帶走」。FormData 沒辦法表達
+     * 空陣列（`append(name, '')` 會變成空字串，過不了 `array` 驗證），
+     * 所以語意定成這樣，由前端負責在選範本時就送出全部索引 ——
+     * 使用者按叉掉某個附件，那個索引才會從清單裡消失。
      *
      * @param \App\Models\BroadcastTemplate|null $template
      * @param string     $field   image_urls 或 file_urls
-     * @param array|null $indexes 要留下的索引；null＝全留
+     * @param array|null $indexes 要留下的索引
      * @return array [{path, name}]
      */
     public function pickTemplateAttachments($template, $field, $indexes)
     {
-        if (blank($template)) {
+        if (blank($template) || !is_array($indexes)) {
             return [];
         }
 
         $all = (array) $template->{$field};
-
-        if (!is_array($indexes)) {
-            return array_values($all);
-        }
-
         $picked = [];
 
         foreach ($indexes as $index) {

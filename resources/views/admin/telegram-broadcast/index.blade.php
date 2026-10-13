@@ -679,18 +679,15 @@ $(function () {
          * ⚠ 送的是 **id 與索引**，不是路徑 —— 路徑由後端拿 id 去資料庫查。
          * 讓前端送路徑等於開放「指定伺服器上任何檔案發給所有客人」。
          *
-         * ⚠ 索引陣列一定要送（哪怕是空的）：後端分得出「沒給＝全留」
-         * 與「給了空陣列＝全部移除」，少送那個欄位會變成全部都帶走。
+         * ⚠ **沒送索引＝一個都不帶**。FormData 沒辦法表達「空陣列」
+         * （`append(name, '')` 會變成空字串，過不了 array 驗證），
+         * 所以語意定成這樣，由這裡負責在選範本時就把全部索引放進
+         * `keptTemplateImages` —— 使用者按叉掉才會變少。
          */
         if (selectedTemplate) {
             formData.append('template_id', selectedTemplate.id);
-
             keptTemplateImages.forEach(function (idx) { formData.append('keep_image_indexes[]', idx); });
             keptTemplateFiles.forEach(function (idx) { formData.append('keep_file_indexes[]', idx); });
-
-            // 全部移除時 forEach 不會跑，補一個空值讓後端收得到「空陣列」
-            if (keptTemplateImages.length === 0) { formData.append('keep_image_indexes', ''); }
-            if (keptTemplateFiles.length === 0) { formData.append('keep_file_indexes', ''); }
         }
 
         $('#btn-send').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>' + BC_I18N.sending);
