@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string      $spec
  * @property float       $monthly_fee
  * @property float       $vpn_fee
+ * @property string|null $vpn_renew_date VPN 下一次續約日期（vpn_fee > 0 才有意義）
  * @property float       $google_fee
  * @property int         $billing_day
  * @property int         $power_status   1=開機, 0=關機
@@ -40,7 +41,21 @@ class VmServer extends Model
         'billing_day'  => 'integer',
         'power_status'   => 'integer',
         'powered_off_at' => 'date',
+        'vpn_renew_date' => 'date',
     ];
+
+    /**
+     * 這台有沒有買 VPN
+     *
+     * ⚠ 判準是**費用 > 0**，不另外開一個「啟用 VPN」的開關 ——
+     * 兩個可以互相矛盾的欄位是 `status`（啟用／停用）踩過的坑。
+     *
+     * @return bool
+     */
+    public function hasVpn()
+    {
+        return (float) $this->vpn_fee > 0;
+    }
 
     public function station(): BelongsTo
     {

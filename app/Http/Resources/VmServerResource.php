@@ -33,6 +33,8 @@ class VmServerResource extends JsonResource
             'spec'         => $this->spec,
             'monthly_fee'  => $this->monthly_fee,
             'vpn_fee'      => $this->vpn_fee,
+            // 前端用它決定要不要顯示續約欄位與「已續約」按鈕
+            'vpn_renew_date' => filled($this->vpn_renew_date) ? $this->vpn_renew_date->toDateString() : null,
             'google_fee'   => $this->google_fee,
             'total_fee'    => number_format((float) $this->monthly_fee + (float) $this->vpn_fee + (float) $this->google_fee, 2, '.', ''),
             'billing_day'  => $this->billing_day,

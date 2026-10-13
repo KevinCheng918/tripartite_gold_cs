@@ -140,6 +140,33 @@ class VmController extends Controller
     }
 
     /**
+     * Ajax 標記 VPN 已續約（日期往後推一個月）
+     *
+     * ⚠ 從**原本的日期**推而不是從今天 —— 理由見 `VmService::markVpnRenewed()`。
+     *
+     * @param VmServer $vm
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxRenewVpn(VmServer $vm)
+    {
+        try {
+            $server = $this->vmService->markVpnRenewed($vm);
+
+            return response()->json([
+                'message'        => trans('vm.msg.vpn_renewed'),
+                'vpn_renew_date' => $server->vpn_renew_date->toDateString(),
+            ]);
+        } catch (\RuntimeException $e) {
+            // 這台沒有 VPN 或沒設過日期 —— 不是系統錯誤
+            return response()->json(['message' => $e->getMessage()], 422);
+        } catch (\Exception $e) {
+            Log::error('VPN 續約標記失敗', ['error' => $e->getMessage(), 'vm_id' => $vm->id]);
+
+            return response()->json(['message' => trans('vm.msg.action_failed')], 500);
+        }
+    }
+
+    /**
      * Ajax 帳單列表
      *
      * @param Request $request

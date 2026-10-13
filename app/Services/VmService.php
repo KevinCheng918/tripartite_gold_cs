@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Repositories\VmRepository;
 use Carbon\Carbon;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -56,7 +57,33 @@ class VmService
      */
     public function createServer($params)
     {
-        return $this->vmRepository->createServer($params);
+        return $this->vmRepository->createServer($this->normalizeVpn($params));
+    }
+
+    /**
+     * VPN 費用歸零時，把續約日期一起清掉
+     *
+     * ⚠ 留著的話畫面上看不到（那一欄只在有 VPN 時展開），但它仍然躺在資料庫裡 ——
+     * 哪天費用又填回去，會默默套用上一次的日期，而那個日期早就過期了。
+     * 出勤模式切回輪班時踩過同一件事（見 [[fixed-work-hours]]）。
+     *
+     * @param array $params
+     * @return array
+     */
+    private function normalizeVpn(array $params)
+    {
+        // 沒送 vpn_fee 就不要動（部分更新），送了才判斷
+        if (!array_key_exists('vpn_fee', $params)) {
+            return $params;
+        }
+
+        if ((float) Arr::get($params, 'vpn_fee') > 0) {
+            return $params;
+        }
+
+        $params['vpn_renew_date'] = null;
+
+        return $params;
     }
 
     /**
@@ -68,7 +95,32 @@ class VmService
      */
     public function updateServer($server, $params)
     {
-        return $this->vmRepository->updateServer($server, $params);
+        return $this->vmRepository->updateServer($server, $this->normalizeVpn($params));
+    }
+
+    /**
+     * 標記 VPN 已續約：日期往後推一個月
+     *
+     * ⚠ **從原本的日期推，不是從今天推**（需求方 2026-10-13 選的是自動 +1 個月）。
+     * 從今天推的話，拖了三天才按的人會把續約日永遠往後偏移 ——
+     * 合約週期是固定的，不會因為我們晚幾天處理就跟著變。
+     *
+     * ⚠ 用 `addMonthNoOverflow()`：1/31 加一個月要是 2/28，
+     * `addMonth()` 會變成 3/3。
+     *
+     * @param \App\Models\VmServer $server
+     * @return \App\Models\VmServer
+     * @throws \RuntimeException 這台沒有 VPN、或根本沒設過續約日期
+     */
+    public function markVpnRenewed($server)
+    {
+        if (!$server->hasVpn() || blank($server->vpn_renew_date)) {
+            throw new \RuntimeException(trans('vm.msg.vpn_renew_not_applicable'));
+        }
+
+        return $this->vmRepository->updateServer($server, [
+            'vpn_renew_date' => $server->vpn_renew_date->copy()->addMonthNoOverflow()->toDateString(),
+        ]);
     }
 
     /**

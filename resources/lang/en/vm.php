@@ -26,6 +26,8 @@ return [
     'field_spec'         => 'Spec',
     'field_monthly_fee'  => 'Server Fee',
     'field_vpn_fee'      => 'VPN Fee',
+    // Only required when a VPN is bought (fee > 0); drives the renewal reminder
+    'field_vpn_renew_date' => 'VPN Renewal Date',
     'field_google_fee'   => 'Google Account Fee',
     'field_total_fee'    => 'Total',
     'field_billing_day'  => 'Billing Day',
@@ -59,6 +61,7 @@ return [
     'action_create'        => 'Add VM',
     'action_edit'          => 'Edit',
     'action_toggle_power'  => 'Toggle Power',
+    'action_renew_vpn'     => 'Renewed',
     'action_upload_proof'  => 'Upload Proof',
     'action_approve'       => 'Approve',
     'action_mark_paid'     => 'Mark Paid',
@@ -101,6 +104,9 @@ return [
     'confirm_title'      => 'Confirm action',
     'confirm_toggle'     => 'Confirm :action?',
     'confirm_mark_paid'  => 'Mark this billing as paid?',
+    // Must spell out "pushed forward one month" — this directly rewrites the date
+    'confirm_renew_vpn'  => 'Confirm the VPN renewal is done? The renewal date moves forward one month.',
+    'vpn_renew_hint'     => 'From 2 days before the date, the internal group is reminded daily to renew; overdue ones keep being reminded. After renewing, press "Renewed" in the list to push the date forward one month.',
     'confirm_approve'    => 'Approve this payment?',
     'mismatch_title'     => 'Amount mismatch',
     'mismatch_hint'      => 'The following billings differ from current fees. Update them?',
@@ -127,6 +133,11 @@ return [
         'action_failed'    => 'Operation failed',
         'done'             => 'Done',
         'station_not_found' => 'Station not found',
+        'date_invalid'      => 'Invalid date format',
+        // Leaving it blank means the reminder silently never fires, so it is blocked here
+        'vpn_renew_date_required' => 'A VPN fee needs a renewal date, otherwise nobody is reminded when it expires',
+        'vpn_renewed'             => 'Renewal date moved forward one month',
+        'vpn_renew_not_applicable' => 'This machine has no VPN, or no renewal date is set',
         'max_string'       => ':field must not exceed :value characters',
         'numeric_required' => ':field must be a number',
         'billing_day_range' => 'Billing day must be between 1 and :max',

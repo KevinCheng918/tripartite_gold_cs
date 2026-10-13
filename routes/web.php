@@ -227,6 +227,8 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::post('/ajax-store', [VmController::class, 'ajaxStore'])->middleware('can:vm.create')->name('ajax-store');
         Route::put('/ajax-update/{vm}', [VmController::class, 'ajaxUpdate'])->middleware('can:vm.update')->name('ajax-update');
         Route::post('/ajax-toggle-power/{vm}', [VmController::class, 'ajaxTogglePower'])->middleware('can:vm.update')->name('ajax-toggle-power');
+        // 標記 VPN 已續約：日期往後推一個月。跟編輯同一個權限（它就是在改那一欄）
+        Route::post('/ajax-renew-vpn/{vm}', [VmController::class, 'ajaxRenewVpn'])->middleware('can:vm.update')->name('ajax-renew-vpn');
         Route::get('/ajax-billing', [VmController::class, 'ajaxBillingList'])->middleware('can:vm.billing_view')->name('ajax-billing');
         Route::post('/ajax-upload-proof/{billing}', [VmController::class, 'ajaxUploadProof'])->middleware('can:vm.billing_upload')->name('ajax-upload-proof');
         Route::put('/ajax-approve-paid/{billing}', [VmController::class, 'ajaxApprovePaid'])->middleware('can:vm.billing_approve')->name('ajax-approve-paid');

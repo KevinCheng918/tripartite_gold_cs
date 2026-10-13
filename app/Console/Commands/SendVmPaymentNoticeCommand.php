@@ -29,7 +29,7 @@ class SendVmPaymentNoticeCommand extends Command
         {--dry-run : 只判斷並印出結果，不送出任何訊息}
         {--billing= : 只處理指定的帳單 ID}';
 
-    protected $description = '發送虛擬機繳款通知（未收的給客戶、待審核的催內部審核）';
+    protected $description = '發送虛擬機繳款通知（未收的給客戶、待審核的催內部審核）＋ VPN 續約提醒';
 
     /** @var array 跳過原因對應的說明文字 */
     private const REASON_LABELS = [
@@ -61,6 +61,16 @@ class SendVmPaymentNoticeCommand extends Command
             $this->warn('── 空跑模式：不會送出任何訊息 ──');
         }
 
+        /*
+         * VPN 續約提醒跟繳款通知走同一支排程（需求方 2026-10-13）：
+         * 同一批人、同一個時間點處理虛擬機的事，多一支 Command 只是多一個
+         * 會忘記開的排程。
+         *
+         * ⚠ 擺在繳款通知**之前**跑，而且不受 `--billing=` 影響 ——
+         * 那個參數是用來重送某一筆帳單的，跟 VPN 無關。
+         */
+        $this->sendVpnRenewals($dryRun);
+
         $results = $this->noticeService->sendPaymentNotices([
             'dry_run'    => $dryRun,
             'billing_id' => $this->option('billing'),
@@ -91,6 +101,51 @@ class SendVmPaymentNoticeCommand extends Command
             : "共 {$total} 筆，送出 {$sent} 筆");
 
         return 0;
+    }
+
+    /**
+     * VPN 續約提醒
+     *
+     * ⚠ **失敗不能讓繳款通知跟著不發**：兩件事互相獨立，
+     * 這裡掛掉只是少一則提醒，而帳單沒發出去是會少收錢的。
+     *
+     * @param bool $dryRun
+     * @return void
+     */
+    private function sendVpnRenewals($dryRun)
+    {
+        try {
+            $results = $this->noticeService->sendVpnRenewalNotices(['dry_run' => $dryRun]);
+        } catch (\Exception $e) {
+            $this->error("VPN 續約提醒發送失敗：{$e->getMessage()}");
+            Log::error('VPN 續約提醒整輪失敗', ['error' => $e->getMessage()]);
+
+            return;
+        }
+
+        if (blank($results)) {
+            $this->info('沒有需要提醒的 VPN 續約（到期日在 '
+                . config('constants.VM.VPN_RENEWAL.DAYS_AHEAD') . ' 天內或已逾期的）');
+
+            return;
+        }
+
+        $rows = [];
+
+        foreach ($results as $row) {
+            $rows[] = [
+                Arr::get($row, 'vm_id'),
+                Arr::get($row, 'station'),
+                Arr::get($row, 'sent') ? '已送出' : '失敗',
+            ];
+        }
+
+        $this->line('── VPN 續約提醒 ──');
+        $this->table(['VM', '站台', '結果'], $rows);
+
+        if ($dryRun && filled($results)) {
+            $this->line((string) Arr::get($results, '0.text'));
+        }
     }
 
     /**

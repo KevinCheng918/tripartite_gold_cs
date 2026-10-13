@@ -17,7 +17,7 @@ class VmRepository
     /** @var array VM 列表欄位 */
     private const SERVER_COLUMNS = [
         'id', 'station_id', 'hostname', 'internal_ip', 'external_ip',
-        'model_type', 'spec', 'monthly_fee', 'vpn_fee', 'google_fee', 'billing_day',
+        'model_type', 'spec', 'monthly_fee', 'vpn_fee', 'vpn_renew_date', 'google_fee', 'billing_day',
         // `status`（啟用／停用）2026-10-13 移除：收不收錢只看 power_status
         'power_status', 'powered_off_at', 'note', 'created_at',
     ];
@@ -144,6 +144,34 @@ class VmRepository
             ->select(self::SERVER_COLUMNS)
             ->with(['station.system'])
             ->where('power_status', config('constants.VM.POWER.ON'))
+            ->get();
+    }
+
+    /**
+     * 該提醒續約 VPN 的機器
+     *
+     * ⚠ **沒有下界** —— 逾期的會一直撈出來，比照繳款通知
+     * （`getBillingsDueForNotice()`）。VPN 斷掉的後果比群組多幾則訊息嚴重，
+     * 所以「到期了還沒人處理」要一直講到有人把日期往後改。
+     *
+     * ⚠ 條件是 `vpn_fee > 0`：有買 VPN 才需要續約。
+     * 不另外開一個「啟用 VPN」的開關 —— 理由見 `VmServer::hasVpn()`。
+     *
+     * ⚠ **不看開關機**（跟帳單不一樣）：關機只是這個月不收錢，
+     * VPN 的合約還是會到期。到期沒續約，機器開回來時就連不上了。
+     *
+     * @param int $daysAhead 到期前幾天開始提醒
+     * @return Collection
+     */
+    public function getVpnRenewalsDue($daysAhead)
+    {
+        return VmServer::query()
+            ->select(self::SERVER_COLUMNS)
+            ->with(['station.system'])
+            ->where('vpn_fee', '>', 0)
+            ->whereNotNull('vpn_renew_date')
+            ->whereDate('vpn_renew_date', '<=', now()->addDays((int) $daysAhead)->toDateString())
+            ->orderBy('vpn_renew_date')
             ->get();
     }
 

@@ -234,6 +234,15 @@
                             <label class="form-label">{{ trans('vm.field_vpn_fee') }}</label>
                             <input id="vm-vpn-fee" type="number" class="form-control js-fee-input" name="vpn_fee" step="0.01" min="0" value="0">
                         </div>
+
+                        {{-- 續約日期只在「有買 VPN」（費用 > 0）時展開。
+                             不另外做一個「啟用 VPN」的開關 —— 兩個可以互相矛盾的
+                             欄位是剛拿掉的 status 踩過的坑 --}}
+                        <div class="mb-3" id="vm-vpn-renew-wrap" style="display:none">
+                            <label class="form-label">{{ trans('vm.field_vpn_renew_date') }}</label>
+                            <input id="vm-vpn-renew-date" type="date" class="form-control" name="vpn_renew_date">
+                            <div class="form-text">{{ trans('vm.vpn_renew_hint') }}</div>
+                        </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('vm.field_google_fee') }}</label>
                             <input id="vm-google-fee" type="number" class="form-control js-fee-input" name="google_fee" step="0.01" min="0" value="0">
@@ -596,7 +605,8 @@ $(function () {
                     'data-hostname="' + vm.hostname + '" data-spec="' + vm.spec + '" ' +
                     'data-internal-ip="' + (vm.internal_ip || '') + '" data-external-ip="' + (vm.external_ip || '') + '" ' +
                     'data-model-type="' + (vm.model_type || '') + '" data-fee="' + vm.monthly_fee + '" ' +
-                    'data-vpn-fee="' + (vm.vpn_fee || 0) + '" data-google-fee="' + (vm.google_fee || 0) + '" ' +
+                    'data-vpn-fee="' + (vm.vpn_fee || 0) + '" data-vpn-renew-date="' + (vm.vpn_renew_date || '') + '" ' +
+                    'data-google-fee="' + (vm.google_fee || 0) + '" ' +
                     'data-billing-day="' + vm.billing_day + '" data-note="' + (vm.note || '') + '">' +
                     '<i class="fas fa-edit btn-icon-wrapper"></i>{{ trans("vm.action_edit") }}</button>' +
                     '<button class="btn btn-outline-secondary btn-icon btn-transition js-toggle-power" data-id="' + vm.id + '"' +
@@ -604,6 +614,15 @@ $(function () {
                     ' data-power="' + vm.power_status + '">' +
                     '<i class="fas fa-power-off btn-icon-wrapper"></i>' +
                     (vm.power_status === 1 ? i18n.power_off : i18n.power_on) + '</button>' +
+                    /*
+                     * 「已續約」只在這台真的有 VPN 且設過日期時出現 ——
+                     * 每一台都掛一顆用不到的按鈕，等於把真正要按的那幾台藏起來。
+                     */
+                    (vm.vpn_renew_date
+                        ? '<button class="btn btn-outline-secondary btn-icon btn-transition js-renew-vpn" data-id="' + vm.id + '"' +
+                          ' data-hostname="' + vm.hostname + '" data-date="' + vm.vpn_renew_date + '">' +
+                          '<i class="fas fa-rotate btn-icon-wrapper"></i>' + i18n.action_renew_vpn + '</button>'
+                        : '') +
                     '</div>';
             }
 
@@ -617,7 +636,11 @@ $(function () {
                 '<td>' + vm.spec + '</td>' +
                 '<td><div>' + (vm.internal_ip || '-') + '</div>' +
                 '<div class="cell-stack__sub">' + (vm.external_ip || '-') + '</div></td>' +
-                '<td class="col-num"><strong>' + vm.total_fee + '</strong></td>' +
+                // 有 VPN 的才多一行續約日期 —— 沒有的機器不該憑空多出一個日期欄
+                '<td class="col-num"><strong>' + vm.total_fee + '</strong>' +
+                (vm.vpn_renew_date
+                    ? '<div class="cell-stack__sub">' + i18n.field_vpn_renew_date + '：' + vm.vpn_renew_date + '</div>'
+                    : '') + '</td>' +
                 '<td class="text-nowrap">' + powerBadge + '</td>' +
                 '<td class="col-actions"><div class="row-actions">' + actions + '</div></td>' +
                 '</tr>';
@@ -659,6 +682,9 @@ $(function () {
                 $('#vm-spec').val($btn.data('spec'));
                 $('#vm-fee').val($btn.data('fee'));
                 $('#vm-vpn-fee').val($btn.data('vpn-fee') || 0);
+                // Modal 是共用的，每個欄位都要明確給值 —— 不然會留著上一台的設定
+                $('#vm-vpn-renew-date').val($btn.data('vpn-renew-date') || '');
+                toggleVpnRenew();
                 $('#vm-google-fee').val($btn.data('google-fee') || 0);
                 updateTotalFee();
                 $('#vm-billing-day').val($btn.data('billing-day'));
@@ -695,6 +721,45 @@ $(function () {
                     headers: { 'X-CSRF-TOKEN': csrfToken },
                     contentType: 'application/json',
                     success: function () { loadServers(); },
+                    error: function (xhr) {
+                        showMessage((xhr.responseJSON && xhr.responseJSON.message) || i18n.msg.action_failed);
+                    }
+                });
+            };
+            showBsModal('modal-vm-confirm');
+        });
+
+        /*
+         * 標記 VPN 已續約：日期往後推一個月。
+         *
+         * ⚠ 先問再做 —— 它會直接改掉日期，而那個日期決定了什麼時候再提醒。
+         * 按錯的話下一個月都不會有人被提醒。
+         */
+        $('.js-renew-vpn').off('click').on('click', function () {
+            var $btn = $(this);
+            var id = $btn.data('id');
+            var hostname = $btn.data('hostname');
+            var date = $btn.data('date');
+
+            var confirmHtml = '<div class="text-center">' +
+                '<p><strong>' + i18n.confirm_renew_vpn + '</strong></p>' +
+                '<table class="table table-sm mt-2 text-center"><tbody>' +
+                '<tr><th style="width:110px">' + i18n.field_hostname + '</th><td>' + hostname + '</td></tr>' +
+                '<tr><th>' + i18n.field_vpn_renew_date + '</th><td>' + date + '</td></tr>' +
+                '</tbody></table></div>';
+
+            $('#modal-vm-confirm-title').text(i18n.confirm_title);
+            $('#modal-vm-confirm-body').html(confirmHtml);
+            pendingVmAction = function () {
+                $.ajax({
+                    url: '/admin/vm/ajax-renew-vpn/' + id,
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': csrfToken },
+                    contentType: 'application/json',
+                    success: function (res) {
+                        showMessage(res.message || i18n.msg.done);
+                        loadServers();
+                    },
                     error: function (xhr) {
                         showMessage((xhr.responseJSON && xhr.responseJSON.message) || i18n.msg.action_failed);
                     }
@@ -845,6 +910,10 @@ $(function () {
             spec: $('#vm-spec').val(),
             monthly_fee: parseFloat($('#vm-fee').val()),
             vpn_fee: parseFloat($('#vm-vpn-fee').val()) || 0,
+            // 沒有 VPN 時送 null，後端會把日期清掉（留著舊日期之後會誤發提醒）
+            vpn_renew_date: (parseFloat($('#vm-vpn-fee').val()) || 0) > 0
+                ? ($('#vm-vpn-renew-date').val() || null)
+                : null,
             google_fee: parseFloat($('#vm-google-fee').val()) || 0,
             billing_day: parseInt($('#vm-billing-day').val(), 10),
             note: $('#vm-note').val(),
@@ -1490,6 +1559,18 @@ $(function () {
         $('#vm-total-fee').text((fee + vpn + google).toFixed(2));
     }
     $(document).on('input', '.js-fee-input', updateTotalFee);
+
+    /**
+     * 有買 VPN（費用 > 0）才顯示續約日期
+     *
+     * 判準跟後端同一個（VmServer::hasVpn()）—— 不另外做一個「啟用 VPN」
+     * 的開關，兩個可以互相矛盾的欄位是剛拿掉的 status 踩過的坑。
+     */
+    function toggleVpnRenew() {
+        var hasVpn = (parseFloat($('#vm-vpn-fee').val()) || 0) > 0;
+        $('#vm-vpn-renew-wrap').toggle(hasVpn);
+    }
+    $(document).on('input', '#vm-vpn-fee', toggleVpnRenew);
 
     // 初始載入
     @if(Auth::user()->hasPermission('vm.view'))

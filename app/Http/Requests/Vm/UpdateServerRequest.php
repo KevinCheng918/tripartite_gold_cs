@@ -40,16 +40,47 @@ class UpdateServerRequest extends FormRequest
             'spec'         => 'sometimes|string|max:255',
             'monthly_fee'  => 'sometimes|numeric|min:0',
             'vpn_fee'      => 'nullable|numeric|min:0',
+            // 有買 VPN 才需要續約日期，規則在 withValidator()（required_if 比不了「> 0」）
+            'vpn_renew_date' => 'nullable|date_format:Y-m-d',
             'google_fee'   => 'nullable|numeric|min:0',
             'billing_day'  => 'sometimes|integer|min:1|max:' . self::BILLING_DAY_MAX,
             'note'         => 'nullable|string',
         ];
     }
 
+    /**
+     * 有買 VPN 就一定要填續約日期
+     *
+     * ⚠ 用 `withValidator()` 而不是 `required_if:vpn_fee,...`：
+     * 那條規則只能比對**固定值**，比不了「大於 0」。
+     *
+     * ⚠ 沒填的後果不是報錯而是**安靜地不提醒** —— 一台有 VPN 卻沒有續約日期
+     * 的機器永遠不會被撈出來（`getVpnRenewalsDue()` 要求 `whereNotNull`），
+     * 到期斷線時才會有人發現。所以擋在這裡。
+     *
+     * @param \Illuminate\Validation\Validator $validator
+     * @return void
+     */
+    public function withValidator($validator)
+    {
+        $validator->after(function ($validator) {
+            if ((float) $this->input('vpn_fee') <= 0) {
+                return;
+            }
+
+            if (filled($this->input('vpn_renew_date'))) {
+                return;
+            }
+
+            $validator->errors()->add('vpn_renew_date', trans('vm.msg.vpn_renew_date_required'));
+        });
+    }
+
     public function messages()
     {
         return [
             'station_id.exists'  => trans('vm.msg.station_not_found'),
+            'vpn_renew_date.date_format' => trans('vm.msg.date_invalid'),
             'hostname.max'       => trans('vm.msg.max_string', ['field' => trans('vm.field_hostname'), 'value' => '100']),
             'internal_ip.max'    => trans('vm.msg.max_string', ['field' => trans('vm.field_internal_ip'), 'value' => '45']),
             'external_ip.max'    => trans('vm.msg.max_string', ['field' => trans('vm.field_external_ip'), 'value' => '45']),

@@ -204,6 +204,109 @@ class VmPaymentNoticeService
     }
 
     /**
+     * VPN 續約提醒（2026-10-13）
+     *
+     * 有買 VPN 的機器（`vpn_fee > 0`）到了續約日期前幾天，每天提醒一次
+     * 內部支援群組 —— 內容要講明「幫這個站台做 VPN 續約」，
+     * 只說「快到期了」的話，看到的人不知道該做什麼。
+     *
+     * ⚠ **只發內部群組，不發給客戶**：續約是我們要做的事，
+     * 跟客戶沒有關係（繳款通知才是對客的）。
+     *
+     * ⚠ **一台失敗不能讓整輪停掉** —— 逐台送、逐台記結果，
+     * 比照 `guardBilling()`。
+     *
+     * @param array $options dry_run
+     * @return array 每一台一筆結果，給 Command 顯示
+     */
+    public function sendVpnRenewalNotices($options = [])
+    {
+        $dryRun = (bool) Arr::get($options, 'dry_run', false);
+        $config = (array) config('constants.VM.VPN_RENEWAL');
+
+        $servers = $this->vmRepository->getVpnRenewalsDue((int) Arr::get($config, 'DAYS_AHEAD'));
+
+        if ($servers->isEmpty()) {
+            return [];
+        }
+
+        // ⚠ 整輪只查一次 tag 名單：逐台查就是 N 倍查詢，而一分鐘內名單不會變
+        $mentions = $this->managerMentions();
+        $results = [];
+
+        foreach ($servers as $server) {
+            $results[] = $this->guardVpnRenewal($server, $config, $mentions, $dryRun);
+        }
+
+        return $results;
+    }
+
+    /**
+     * 包一層 try/catch 再送一台
+     *
+     * @param \App\Models\VmServer $server
+     * @param array                $config
+     * @param string               $mentions
+     * @param bool                 $dryRun
+     * @return array
+     */
+    private function guardVpnRenewal($server, array $config, $mentions, $dryRun)
+    {
+        $station = filled($server->station) ? (string) $server->station->name : '-';
+
+        try {
+            $text = strtr((string) Arr::get($config, 'TEXT'), [
+                // 模板裡 {mentions} 就在開頭，沒人可 tag 時整行連換行一起消失
+                '{mentions}' => $mentions,
+                '{station}'  => $station,
+                '{hostname}' => (string) $server->hostname,
+                '{fee}'      => NumberPresenter::trimZeros($server->vpn_fee, 2),
+                '{date}'     => $server->vpn_renew_date->toDateString(),
+                '{when}'     => $this->renewalWhen($config, $server->vpn_renew_date),
+            ]);
+
+            if (!$dryRun) {
+                $this->supportGroup->send($text, null, null, self::NOTICE_TYPE);
+            }
+
+            return ['vm_id' => $server->id, 'station' => $station, 'sent' => true, 'text' => $text];
+        } catch (\Exception $e) {
+            Log::error('VPN 續約提醒發送失敗', [
+                'vm_id' => $server->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return ['vm_id' => $server->id, 'station' => $station, 'sent' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * 續約日期還有多久（或逾期多久）
+     *
+     * ⚠ 三種都要有。只寫「還有 N 天」的話，逾期的會變成「還有 3 天」——
+     * 任務卡通知上個月才踩過一模一樣的坑
+     * （`diffInDays()` 回絕對值，方向要自己比日期）。
+     *
+     * @param array           $config
+     * @param \Carbon\Carbon  $date
+     * @return string
+     */
+    private function renewalWhen(array $config, $date)
+    {
+        $today = now()->startOfDay();
+        $due = $date->copy()->startOfDay();
+        $days = $today->diffInDays($due);
+
+        if ($due->equalTo($today)) {
+            return (string) Arr::get($config, 'WHEN_TODAY');
+        }
+
+        $key = $due->greaterThan($today) ? 'WHEN_FUTURE' : 'WHEN_OVERDUE';
+
+        return strtr((string) Arr::get($config, $key), ['{days}' => $days]);
+    }
+
+    /**
      * 包一層 try/catch 再處理單筆
      *
      * @param VmBilling $billing

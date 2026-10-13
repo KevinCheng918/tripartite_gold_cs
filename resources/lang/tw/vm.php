@@ -27,6 +27,8 @@ return [
     'field_spec'         => '規格',
     'field_monthly_fee'  => '主機月費',
     'field_vpn_fee'      => 'VPN 費用',
+    // 有買 VPN（費用 > 0）才要填，到期前會提醒內部群組去續約
+    'field_vpn_renew_date' => 'VPN 續約日期',
     'field_google_fee'   => 'Google 帳號費用',
     'field_total_fee'    => '總金額',
     'field_billing_day'  => '帳單日',
@@ -62,6 +64,7 @@ return [
     'action_create'        => '新增虛擬機',
     'action_edit'          => '編輯',
     'action_toggle_power'  => '切換開關機',
+    'action_renew_vpn'     => '已續約',
     'action_upload_proof'  => '上傳繳款證明',
     'action_approve'       => '審核通過',
     'action_mark_paid'     => '標記已收',
@@ -105,6 +108,9 @@ return [
     'confirm_title'      => '操作確認',
     'confirm_toggle'     => '確定要:action？',
     'confirm_mark_paid'  => '確定要標記此帳單為已收款？',
+    // 要講明「往後推一個月」—— 按下去會直接改日期，而那個日期決定何時再提醒
+    'confirm_renew_vpn'  => '確定已經完成 VPN 續約嗎？續約日期會往後推一個月。',
+    'vpn_renew_hint'     => '到期前 2 天開始，每天提醒內部群組來續約；逾期也會繼續提醒。續約完按列表上的「已續約」就會往後推一個月。',
     'confirm_approve'    => '確定要審核通過此繳款？',
     'mismatch_title'     => '金額差異確認',
     'mismatch_hint'      => '以下帳單金額與目前費用不同，是否更新？',
@@ -132,6 +138,11 @@ return [
         'action_failed'    => '操作失敗',
         'done'             => '完成',
         'station_not_found' => '站台不存在',
+        'date_invalid'      => '日期格式不正確',
+        // 沒填的後果是「安靜地永遠不提醒」，所以擋在驗證而不是放行
+        'vpn_renew_date_required' => '有填 VPN 費用就要填續約日期，否則到期時不會有人被提醒',
+        'vpn_renewed'             => 'VPN 續約日期已往後推一個月',
+        'vpn_renew_not_applicable' => '這台沒有 VPN 或還沒設定續約日期',
         'max_string'       => ':field 不可超過 :value 字元',
         'numeric_required' => ':field 必須為數字',
         'billing_day_range' => '帳單日必須是 1 到 :max 之間的數字',
