@@ -28,7 +28,10 @@ return [
     'field_total_fee'    => '總金額',
     'field_billing_day'  => '帳單日',
     'field_power'        => '開關機',
+    // 列表那一欄的標題。內容是開機／關機，停用時才多一個灰色標籤
     'field_status'       => '狀態',
+    // 篩選用。跟上面那個分開：同名不同義會讓人以為篩的是電源
+    'field_enabled'      => '啟用狀態',
     'field_note'         => '備註',
     'field_month'        => '月份',
     'field_amount'       => '金額',

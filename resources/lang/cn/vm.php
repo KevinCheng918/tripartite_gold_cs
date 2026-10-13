@@ -26,7 +26,10 @@ return [
     'field_total_fee'    => '总金额',
     'field_billing_day'  => '账单日',
     'field_power'        => '开关机',
+    // 列表那一栏的标题。内容是开机／关机，停用时才多一个灰色标签
     'field_status'       => '状态',
+    // 筛选用。跟上面那个分开：同名不同义会让人以为筛的是电源
+    'field_enabled'      => '启用状态',
     'field_note'         => '备注',
     'field_month'        => '月份',
     'field_amount'       => '金额',

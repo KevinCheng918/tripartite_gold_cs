@@ -27,7 +27,10 @@ return [
     'field_total_fee'    => 'Total',
     'field_billing_day'  => 'Billing Day',
     'field_power'        => 'Power',
+    // Column header. Shows on/off; a grey badge is added only when disabled
     'field_status'       => 'Status',
+    // Filter only — kept separate so it is not mistaken for the power column
+    'field_enabled'      => 'Enabled',
     'field_note'         => 'Note',
     'field_month'        => 'Month',
     'field_amount'       => 'Amount',

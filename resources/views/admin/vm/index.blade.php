@@ -98,7 +98,9 @@
                                 </select>
                             </div>
                             <div class="col-md-3 col-6">
-                                <label class="form-label fw-bold">{{ trans('vm.field_status') }}：</label>
+                                {{-- 「啟用狀態」而不是「狀態」：表格那一欄的「狀態」現在顯示的是
+                                     開關機，兩個同名不同義會讓人以為篩的是電源 --}}
+                                <label class="form-label fw-bold">{{ trans('vm.field_enabled') }}：</label>
                                 <select id="vm-search-status" class="form-select">
                                     <option value="">{{ trans('vm.filter_all') }}</option>
                                     <option value="1">{{ trans('vm.status_active') }}</option>
@@ -586,9 +588,21 @@ $(function () {
             var powerBadge = vm.power_status === 1
                 ? '<span class="badge bg-success">{{ trans("vm.power_on") }}</span>'
                 : '<span class="badge bg-danger">{{ trans("vm.power_off") }}</span>';
+            /*
+             * ⚠ **「啟用」不標，只標「停用」**（需求方 2026-10-13）。
+             *
+             * 這一欄問的是「這台機器現在怎樣」，答案絕大多數時候就是開機或關機 ——
+             * 每一列都掛一個綠色「啟用」只是噪音，還會讓人以為那是另一種電源狀態。
+             *
+             * ⚠ 但**停用不能不顯示**：它會讓這台機器**不發繳款通知**
+             * （`getBillingsDueForNotice()` 同時要求開機與啟用）。
+             * 一台不收錢的機器卻看不出來，是會出事的那種安靜。
+             *
+             * 用灰色而不是紅色：停用不是故障，是「不列入管理」。
+             */
             var statusBadge = vm.status === 1
-                ? '<span class="badge bg-success">{{ trans("vm.status_active") }}</span>'
-                : '<span class="badge bg-danger">{{ trans("vm.status_disabled") }}</span>';
+                ? ''
+                : '<span class="badge bg-secondary">{{ trans("vm.status_disabled") }}</span>';
             /*
              * 編輯與開關機黏成一段（Architect 的 btn-group，共用邊框、
              * 外框是 btn-transition 的淡灰，滑過去才亮）。兩顆都帶文字 ——
@@ -628,7 +642,8 @@ $(function () {
                 '<td><div>' + (vm.internal_ip || '-') + '</div>' +
                 '<div class="cell-stack__sub">' + (vm.external_ip || '-') + '</div></td>' +
                 '<td class="col-num"><strong>' + vm.total_fee + '</strong></td>' +
-                '<td class="text-nowrap">' + powerBadge + ' ' + statusBadge + '</td>' +
+                // statusBadge 平常是空字串（啟用不標），所以空白接在它前面才不會留尾巴
+                '<td class="text-nowrap">' + powerBadge + (statusBadge ? ' ' + statusBadge : '') + '</td>' +
                 '<td class="col-actions"><div class="row-actions">' + actions + '</div></td>' +
                 '</tr>';
 
