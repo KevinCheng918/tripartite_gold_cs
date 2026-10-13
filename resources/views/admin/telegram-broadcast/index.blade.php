@@ -841,6 +841,371 @@ $(function () {
             setTimeout(function () { $btn.html('<i class="fas fa-copy me-1"></i>' + BC_I18N.btn_copy); }, 1500);
         }
     });
+
+    // ===============================================================
+    //  公告管理（建檔的範本）
+    // ===============================================================
+
+    var templates = [];
+    var canManageTemplate = @json(Auth::user()->hasPermission('telegram_chat.broadcast_template'));
+
+    /**
+     * 載入範本清單
+     *
+     * 發送分頁的下拉與公告管理分頁的表格共用同一份資料 ——
+     * 範本數量是人工建檔的量級，整包拿回來比開兩支 API 省事。
+     *
+     * @param {Function} [after] 載完要做的事（例如存完重畫）
+     */
+    function loadTemplates(after) {
+        $.ajax({
+            url: '/admin/telegram-broadcast/ajax-templates',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            success: function (body) {
+                templates = body.data || [];
+                renderTemplateList();
+                renderTemplateOptions();
+                if (after) { after(); }
+            }
+        });
+    }
+
+    /** 公告管理分頁的表格 */
+    function renderTemplateList() {
+        var $tbody = $('#template-list');
+        var cols = canManageTemplate ? 6 : 5;
+
+        if (!templates.length) {
+            $tbody.html('<tr><td colspan="' + cols + '" class="table-empty"><i class="fas fa-inbox"></i>' + BC_I18N.template_empty + '</td></tr>');
+            return;
+        }
+
+        var html = '';
+
+        templates.forEach(function (t) {
+            var attachCount = (t.image_urls || []).length + (t.file_urls || []).length;
+
+            html += '<tr>';
+            html += '<td><span class="cell-stack__main">' + escapeHtml(t.title) + '</span></td>';
+            // 內容只給摘要 —— 整段貼進表格會把其他欄位擠掉
+            html += '<td><span class="text-muted">' + escapeHtml(summarize(t.content)) + '</span></td>';
+            html += '<td class="col-num">' + (attachCount > 0 ? attachCount : '-') + '</td>';
+            html += '<td>' + escapeHtml(t.creator || '-') + '</td>';
+            html += '<td>' + escapeHtml(t.updated_at || '-') + '</td>';
+
+            if (canManageTemplate) {
+                html += '<td><div class="row-actions"><div class="btn-group btn-group-sm" role="group">';
+                html += '<button type="button" class="btn btn-outline-secondary btn-icon btn-transition js-template-edit" data-id="' + t.id + '">';
+                html += '<i class="fas fa-edit btn-icon-wrapper"></i>' + BC_I18N.template_edit + '</button>';
+                html += '<button type="button" class="btn btn-outline-secondary btn-icon btn-transition js-template-delete" data-id="' + t.id + '">';
+                html += '<i class="fas fa-trash-alt btn-icon-wrapper text-danger"></i>' + BC_I18N.template_delete + '</button>';
+                html += '</div></div></td>';
+            }
+
+            html += '</tr>';
+        });
+
+        $tbody.html(html);
+    }
+
+    /**
+     * 把長內容切成一行摘要
+     *
+     * @param {string} text
+     * @returns {string}
+     */
+    function summarize(text) {
+        var oneLine = (text || '').replace(/\s+/g, ' ').trim();
+
+        return oneLine.length > 40 ? oneLine.substring(0, 40) + '…' : oneLine;
+    }
+
+    function escapeHtml(value) {
+        return $('<span>').text(value === null || value === undefined ? '' : value).html();
+    }
+
+    /** 發送分頁的下拉 */
+    function renderTemplateOptions() {
+        var html = '<option value="">' + BC_I18N.source_pick + '</option>';
+
+        templates.forEach(function (t) {
+            html += '<option value="' + t.id + '">' + escapeHtml(t.title) + '</option>';
+        });
+
+        $('#bc-template-id').html(html);
+    }
+
+    // ---------------------------------------------------------------
+    //  發送分頁：選用建檔的公告
+    // ---------------------------------------------------------------
+
+    var selectedTemplate = null;
+    var keptTemplateImages = [];
+    var keptTemplateFiles = [];
+
+    $('input[name="bc_source"]').on('change', function () {
+        var useTemplate = $(this).val() === 'template';
+
+        $('#bc-template-wrap').toggleClass('d-none', !useTemplate);
+
+        // 切回「自己輸入」要把帶進來的東西清掉，否則會連同範本附件一起送出
+        if (!useTemplate) {
+            clearTemplateSelection();
+        }
+    });
+
+    $('#bc-template-id').on('change', function () {
+        var id = parseInt($(this).val(), 10);
+        var found = templates.filter(function (t) { return t.id === id; })[0];
+
+        if (!found) {
+            clearTemplateSelection();
+            return;
+        }
+
+        selectedTemplate = found;
+
+        /*
+         * 一選就把全部索引放進來 —— 後端的語意是「沒送索引＝一個都不帶」，
+         * 所以這裡必須先裝滿，使用者按叉掉才會變少。
+         */
+        keptTemplateImages = (found.image_urls || []).map(function (_, i) { return i; });
+        keptTemplateFiles = (found.file_urls || []).map(function (_, i) { return i; });
+
+        $('#bc-content').val(found.content).trigger('input');
+        renderTemplateAttachments();
+    });
+
+    function clearTemplateSelection() {
+        selectedTemplate = null;
+        keptTemplateImages = [];
+        keptTemplateFiles = [];
+        $('#bc-template-id').val('');
+        $('#bc-template-attachments').addClass('d-none');
+        $('#bc-template-attachment-list').empty();
+    }
+
+    /** 範本帶來的附件（可逐個移除，只影響這一次發送） */
+    function renderTemplateAttachments() {
+        var $wrap = $('#bc-template-attachments');
+        var $list = $('#bc-template-attachment-list').empty();
+
+        if (!selectedTemplate) { $wrap.addClass('d-none'); return; }
+
+        var total = keptTemplateImages.length + keptTemplateFiles.length;
+
+        if (total === 0) { $wrap.addClass('d-none'); return; }
+
+        keptTemplateImages.forEach(function (idx) {
+            $list.append(templateChip(selectedTemplate.image_urls[idx], 'image', idx));
+        });
+
+        keptTemplateFiles.forEach(function (idx) {
+            $list.append(templateChip(selectedTemplate.file_urls[idx], 'file', idx));
+        });
+
+        $wrap.removeClass('d-none');
+    }
+
+    /**
+     * 一個附件的小標籤（含移除鈕）
+     *
+     * @param {Object} item {path, name}
+     * @param {string} kind image / file
+     * @param {number} idx  在範本陣列裡的索引
+     */
+    function templateChip(item, kind, idx) {
+        var $chip = $('<span class="badge bg-light text-dark border d-inline-flex align-items-center gap-1">');
+
+        $chip.append($('<i>').addClass(kind === 'image' ? 'fas fa-image' : 'fas fa-file-alt'));
+        $chip.append($('<span>').text(item && item.name ? item.name : '-'));
+        $chip.append(
+            $('<button type="button" class="btn-close btn-close-sm ms-1" style="font-size:0.5rem">')
+                .on('click', function () {
+                    var list = kind === 'image' ? keptTemplateImages : keptTemplateFiles;
+                    var at = list.indexOf(idx);
+
+                    if (at !== -1) { list.splice(at, 1); }
+
+                    renderTemplateAttachments();
+                })
+        );
+
+        return $chip;
+    }
+
+    // ---------------------------------------------------------------
+    //  公告管理分頁：新增／編輯／刪除
+    // ---------------------------------------------------------------
+
+    var editingKeepImages = [];
+    var editingKeepFiles = [];
+
+    $('#tpl-content').on('input', function () {
+        $('#tpl-content-count').text($(this).val().length);
+    });
+
+    $('#btn-template-add').on('click', function () {
+        openTemplateModal(null);
+    });
+
+    $(document).on('click', '.js-template-edit', function () {
+        var id = parseInt($(this).data('id'), 10);
+
+        openTemplateModal(templates.filter(function (t) { return t.id === id; })[0]);
+    });
+
+    /**
+     * @param {Object|null} tpl null＝新增
+     */
+    function openTemplateModal(tpl) {
+        $('#modal-template-title').text(tpl ? BC_I18N.template_edit : BC_I18N.template_add);
+        $('#tpl-id').val(tpl ? tpl.id : '');
+        $('#tpl-title').val(tpl ? tpl.title : '');
+        $('#tpl-content').val(tpl ? tpl.content : '').trigger('input');
+        $('#tpl-files').val('');
+
+        /*
+         * 連同索引一起記下來 —— 送出時要給後端的是索引（它才有權威的路徑），
+         * 而畫面上要顯示的是檔名。叉掉某一個之後，剩下的索引不會重新編號。
+         */
+        editingKeepImages = withIndex(tpl ? tpl.image_urls : []);
+        editingKeepFiles = withIndex(tpl ? tpl.file_urls : []);
+        renderExistingAttachments();
+
+        showBsModal('modal-template');
+    }
+
+    /**
+     * 把附件陣列配上它在範本裡的原始索引
+     *
+     * @param {Array} list
+     * @returns {Array} [{index, name}]
+     */
+    function withIndex(list) {
+        return (list || []).map(function (item, i) {
+            return { index: i, name: item && item.name ? item.name : '-' };
+        });
+    }
+
+    /** 編輯時原有的附件（按叉掉就是不留） */
+    function renderExistingAttachments() {
+        var $wrap = $('#tpl-existing-wrap');
+        var $list = $('#tpl-existing-list').empty();
+        var total = editingKeepImages.length + editingKeepFiles.length;
+
+        if (total === 0) { $wrap.addClass('d-none'); return; }
+
+        editingKeepImages.forEach(function (item) {
+            $list.append(existingChip(item, 'image'));
+        });
+
+        editingKeepFiles.forEach(function (item) {
+            $list.append(existingChip(item, 'file'));
+        });
+
+        $wrap.removeClass('d-none');
+    }
+
+    /**
+     * @param {Object} item {index, name}
+     * @param {string} kind image / file
+     */
+    function existingChip(item, kind) {
+        var $chip = $('<span class="badge bg-light text-dark border d-inline-flex align-items-center gap-1">');
+
+        $chip.append($('<i>').addClass(kind === 'image' ? 'fas fa-image' : 'fas fa-file-alt'));
+        $chip.append($('<span>').text(item.name));
+        $chip.append(
+            $('<button type="button" class="btn-close btn-close-sm ms-1" style="font-size:0.5rem">')
+                .on('click', function () {
+                    var list = kind === 'image' ? editingKeepImages : editingKeepFiles;
+                    // 比對 index 而不是位置 —— 刪掉前面那個之後，位置會位移
+                    var at = list.map(function (x) { return x.index; }).indexOf(item.index);
+
+                    if (at !== -1) { list.splice(at, 1); }
+
+                    renderExistingAttachments();
+                })
+        );
+
+        return $chip;
+    }
+
+    $('#form-template').on('submit', function (e) {
+        e.preventDefault();
+
+        var id = $('#tpl-id').val();
+        var formData = new FormData();
+
+        formData.append('title', $('#tpl-title').val().trim());
+        formData.append('content', $('#tpl-content').val().trim());
+
+        // 同發送那邊：圖片與一般檔案拆成兩個欄位，後端驗證規則不同
+        Array.prototype.forEach.call($('#tpl-files')[0].files, function (file) {
+            formData.append(isImageFile(file) ? 'images[]' : 'files[]', file);
+        });
+
+        /*
+         * 編輯時送「要留下哪幾個」的**索引**，跟發送那條路一致。
+         *
+         * ⚠ 不送路徑：收路徑等於讓人把伺服器上任意檔案寫進範本，
+         * 下次發送就送給所有客人了。路徑一律由後端從資料庫取。
+         *
+         * ⚠ 沒送＝一個都不留（FormData 表達不出空陣列）。
+         */
+        if (id) {
+            editingKeepImages.forEach(function (item) { formData.append('keep_image_indexes[]', item.index); });
+            editingKeepFiles.forEach(function (item) { formData.append('keep_file_indexes[]', item.index); });
+        }
+
+        $('#btn-template-save').prop('disabled', true);
+
+        $.ajax({
+            url: id ? '/admin/telegram-broadcast/ajax-template/' + id : '/admin/telegram-broadcast/ajax-template',
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function (body) {
+                $('#btn-template-save').prop('disabled', false);
+                hideBsModal('modal-template');
+                showMessage(body.message);
+                loadTemplates();
+            },
+            error: function (xhr) {
+                $('#btn-template-save').prop('disabled', false);
+                showMessage((xhr.responseJSON && xhr.responseJSON.message) || BC_I18N.msg.template_failed);
+            }
+        });
+    });
+
+    $(document).on('click', '.js-template-delete', function () {
+        var id = parseInt($(this).data('id'), 10);
+        var tpl = templates.filter(function (t) { return t.id === id; })[0];
+
+        if (!tpl) { return; }
+
+        showConfirm(BC_I18N.template_delete_confirm.replace(':title', tpl.title), function () {
+            $.ajax({
+                url: '/admin/telegram-broadcast/ajax-template/' + id,
+                method: 'DELETE',
+                headers: { 'X-CSRF-TOKEN': csrfToken },
+                success: function (body) {
+                    showMessage(body.message);
+                    // 剛被刪掉的那則如果正被選用，要一起清掉
+                    if (selectedTemplate && selectedTemplate.id === id) { clearTemplateSelection(); }
+                    loadTemplates();
+                },
+                error: function (xhr) {
+                    showMessage((xhr.responseJSON && xhr.responseJSON.message) || BC_I18N.msg.template_failed);
+                }
+            });
+        });
+    });
+
+    loadTemplates();
 });
 </script>
 @endsection

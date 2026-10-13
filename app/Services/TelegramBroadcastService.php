@@ -79,22 +79,30 @@ class TelegramBroadcastService
     /**
      * 更新一則範本
      *
-     * ⚠ 附件是「保留的 ＋ 新上傳的」。前端送回要留的那幾個（使用者沒按叉掉的），
-     * 這裡接上新上傳的 —— 不是整包取代，不然每次改標題都得把附件重傳一輪。
+     * ⚠ 附件是「保留的 ＋ 新上傳的」。前端送回**索引**（使用者沒按叉掉的那幾個），
+     * 路徑由這裡從資料庫的那一筆範本取 —— 收路徑等於讓人把任意檔案寫進範本，
+     * 下次發送就送給所有客人了。
      *
      * ⚠ 被移除的附件**不刪實體檔**：同一個路徑可能已經被複製進某筆發送紀錄，
      * 刪了會讓歷史紀錄的附件變成死連結。
      *
      * @param \App\Models\BroadcastTemplate $template
-     * @param array $params   title／content／keep_images／keep_files
+     * @param array $params    title／content／keep_image_indexes／keep_file_indexes
      * @param array $newImages 新上傳的圖片
      * @param array $newFiles  新上傳的檔案
      * @return bool
      */
     public function updateTemplate($template, array $params, array $newImages, array $newFiles)
     {
-        $images = array_merge((array) Arr::get($params, 'keep_images', []), $newImages);
-        $files = array_merge((array) Arr::get($params, 'keep_files', []), $newFiles);
+        $images = array_merge(
+            $this->pickTemplateAttachments($template, 'image_urls', Arr::get($params, 'keep_image_indexes')),
+            $newImages
+        );
+
+        $files = array_merge(
+            $this->pickTemplateAttachments($template, 'file_urls', Arr::get($params, 'keep_file_indexes')),
+            $newFiles
+        );
 
         return $this->templateRepository->update($template, [
             'title'      => Arr::get($params, 'title'),

@@ -8,9 +8,12 @@ use Illuminate\Foundation\Http\FormRequest;
 /**
  * 修改公告範本
  *
- * ⚠ 跟新增的差別只有附件：這裡多一個 `keep_images` / `keep_files`，
- * 讓前端表達「原本那幾個留著、這幾個不要了」。沒有它的話，每次編輯標題
- * 都得把附件重傳一輪。
+ * ⚠ 跟新增的差別只有附件：這裡多一組「要留下哪幾個」，讓前端表達
+ * 「原本那幾個留著、這幾個不要了」。沒有它的話，每次編輯標題都得把附件重傳一輪。
+ *
+ * ⚠ **收的是索引不是路徑**。附件路徑最後會進 `sendDocument()`（吃本地絕對路徑），
+ * 收路徑等於讓人把任意檔案寫進範本，下次發送就送給所有客人了。
+ * 索引只用來從**資料庫裡那一筆範本**挑出要留的項目。
  */
 class UpdateTemplateRequest extends FormRequest
 {
@@ -31,13 +34,15 @@ class UpdateTemplateRequest extends FormRequest
             'content'  => 'required|string|max:4096',
 
             /*
-             * 要保留的既有附件（前端把原本那份陣列扣掉使用者按叉掉的，整包送回）。
-             * `present` 而不是 `required`：全部移除是合法的，那時會是空陣列。
+             * 要留下的既有附件索引。
+             *
+             * ⚠ `nullable` 而不是 `present`：FormData 送不出空陣列，
+             * 所以「全部移除」就是整個欄位不送 —— 沒送＝一個都不留。
              */
-            'keep_images'   => 'present|array',
-            'keep_images.*' => 'array',
-            'keep_files'    => 'present|array',
-            'keep_files.*'  => 'array',
+            'keep_image_indexes'   => 'nullable|array',
+            'keep_image_indexes.*' => 'integer|min:0',
+            'keep_file_indexes'    => 'nullable|array',
+            'keep_file_indexes.*'  => 'integer|min:0',
 
             'images'   => 'nullable|array|max:' . SendBroadcastRequest::$maxImages,
             'images.*' => 'image|max:' . SendBroadcastRequest::$imageMaxKb,

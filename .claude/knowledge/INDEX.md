@@ -53,6 +53,7 @@
 | [features/consumable.md](features/consumable.md) | 消耗品管理（內勤領用／使用流水、餘額計算、多品項可維護） | **已實作，待勾權限與建品項** |
 | [features/task-board.md](features/task-board.md) | 任務看板（Kanban 五欄、封存系統、活動紀錄、多人指派、留言編輯、描述勾選清單、附件上傳） | 已完成（持續迭代） |
 | [features/broadcast.md](features/broadcast.md) | 群發公告（多站台 Telegram 群發、附圖、預約傳送） | 已完成（持續迭代） |
+| [features/broadcast-template.md](features/broadcast-template.md) | 公告建檔（群發公告 → 公告管理）：標題＋內容＋附件先建好，發送時選一則帶進表單、**帶進去還能改**（範本模式，改動不回寫）；清單綁 `broadcast`、增刪改綁新的 `broadcast_template`。**附件一律只收「索引」不收路徑** —— 路徑最後會進 `sendDocument()`（吃本地絕對路徑），收路徑等於開放把任意檔案發給所有客人 | **已完成，正式機待跑 migration 與勾權限** |
 | [features/vm.md](features/vm.md) | 虛擬機管理（主機、開關機、月費帳單、繳款通知） | 已完成（持續迭代）；每天 09:30 自動發繳款通知 |
 | [features/quick-reply.md](features/quick-reply.md) | 快速回覆題庫（類別／問答維護、拖曳排序、編號與關鍵字搜尋） | 已完成（持續迭代，文件待補完） |
 | [features/shared-file.md](features/shared-file.md) | 文件區（共用／個人資料夾、子資料夾、Telegram 選檔） | 已完成（持續迭代） |
