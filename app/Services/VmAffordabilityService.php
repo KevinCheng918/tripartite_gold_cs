@@ -93,13 +93,17 @@ class VmAffordabilityService
      *     synced_at: \Illuminate\Support\Carbon|null,
      *     count: int
      * }
+     *
+     * `count` 是**這筆金額由幾台加總而來**，不是站台的機器總數 ——
+     * 一台已繳一台未繳時，`fee` 只含未繳那台，`count` 也只能算一台。
      */
     public function evaluate(Station $station, $month)
     {
         $servers = $this->vmRepository->getServersByStation($station->id, $month);
         $bills = $this->collectBillings($servers);
 
-        if (blank($bills['items'])) {
+        // 0 筆：這期真的沒有要收的（關機不出帳，或帳單還沒產）
+        if ($bills['total'] < 1) {
             return $this->result(self::RESULT_NO_BILLING);
         }
 
@@ -107,18 +111,22 @@ class VmAffordabilityService
          * ⚠ 已經繳掉的不用算 —— 問「夠不夠扣」的前提是還要扣。
          * 需求方指定的流程第一步就是「先去查看這期繳費了沒」。
          */
-        if ($bills['unpaid'] <= 0 && $bills['pending'] <= 0) {
-            return $this->result(self::RESULT_PAID, ['fee' => $bills['paid'], 'count' => count($bills['items'])]);
+        if ($bills['owed'] < 1) {
+            return $this->result(self::RESULT_PAID, [
+                'fee'   => $bills['paid'],
+                'count' => $bills['total'],
+            ]);
         }
 
         // 待審核的錢還沒入帳，所以算進「還要扣」；但要讓呼叫端講清楚是哪一種
         $fee = $bills['unpaid'] + $bills['pending'];
         $state = $bills['unpaid'] > 0 ? self::RESULT_OK : self::RESULT_PENDING;
+        $count = $bills['owed'];
 
         $credits = $this->freshCredits($station);
 
         if (blank($credits)) {
-            return $this->result(self::RESULT_SYNC_FAILED, ['fee' => $fee, 'count' => count($bills['items'])]);
+            return $this->result(self::RESULT_SYNC_FAILED, ['fee' => $fee, 'count' => $count]);
         }
 
         $rate = $this->rate();
@@ -128,7 +136,7 @@ class VmAffordabilityService
                 'fee'       => $fee,
                 'credits'   => $credits,
                 'synced_at' => $station->synced_at,
-                'count'     => count($bills['items']),
+                'count'     => $count,
             ]);
         }
 
@@ -143,7 +151,7 @@ class VmAffordabilityService
             'rate'        => (float) $rate['value'],
             'rate_source' => (string) $rate['source'],
             'synced_at'   => $station->synced_at,
-            'count'       => count($bills['items']),
+            'count'       => $count,
         ]);
     }
 
@@ -160,12 +168,19 @@ class VmAffordabilityService
      * ⚠ **待審核的照算，不分電源。** 那是客戶已經付錢等我們審的款，
      * 機器後來關機不代表那筆錢不存在。
      *
+     * ⚠ `owed` 與 `total` 要分開數。訊息上的「（N 台）」是在說**這筆金額
+     * 是幾台加起來的** —— 用全部筆數的話，一台已繳一台未繳時會寫成
+     * 「這期費用：80.00 USDT（2 台）」，但那 80 只來自一台。
+     *
      * @param \Illuminate\Database\Eloquent\Collection $servers
-     * @return array{items: array, unpaid: float, pending: float, paid: float}
+     * @return array{
+     *     total: int, owed: int, unpaid: float, pending: float, paid: float
+     * }
      */
     private function collectBillings($servers)
     {
-        $items = [];
+        $total = 0;
+        $owed = 0;
         $unpaid = 0.0;
         $pending = 0.0;
         $paid = 0.0;
@@ -175,14 +190,15 @@ class VmAffordabilityService
                 $amount = (float) $billing->amount;
 
                 if ((int) $billing->paid === (int) config('constants.VM.BILLING.PAID')) {
-                    $items[] = $billing;
+                    $total++;
                     $paid += $amount;
 
                     continue;
                 }
 
                 if ((int) $billing->paid === (int) config('constants.VM.BILLING.PENDING')) {
-                    $items[] = $billing;
+                    $total++;
+                    $owed++;
                     $pending += $amount;
 
                     continue;
@@ -193,12 +209,13 @@ class VmAffordabilityService
                     continue;
                 }
 
-                $items[] = $billing;
+                $total++;
+                $owed++;
                 $unpaid += $amount;
             }
         }
 
-        return ['items' => $items, 'unpaid' => $unpaid, 'pending' => $pending, 'paid' => $paid];
+        return ['total' => $total, 'owed' => $owed, 'unpaid' => $unpaid, 'pending' => $pending, 'paid' => $paid];
     }
 
     /**
