@@ -24,7 +24,14 @@ class BroadcastTemplateRepository
     ];
 
     /**
-     * 全部範本（最近改過的在前面）
+     * 全部範本，依公告編號排序（需求方 2026-10-13）
+     *
+     * ⚠ **沒有編號的排最後**。`code` 是 nullable（這個欄位是後來才加的，
+     * 既有資料還沒補），而 MySQL 的 `ORDER BY ... ASC` 會把 NULL 排在最前面 ——
+     * 一進畫面先看到一排「-」，真正有編號的反而被推到下面。
+     *
+     * ⚠ 字串排序，不是數值：編號是人工訂的格式（`2026-001`、`AD-10`），
+     * 本來就沒有數值可言。
      *
      * @return Collection
      */
@@ -33,7 +40,7 @@ class BroadcastTemplateRepository
         return BroadcastTemplate::query()
             ->select(self::LIST_COLUMNS)
             ->with('creator')
-            ->orderByDesc('updated_at')
+            ->orderByRaw('code IS NULL, code ASC')
             ->get();
     }
 

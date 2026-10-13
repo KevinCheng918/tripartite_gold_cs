@@ -163,10 +163,20 @@
         {{-- 公告管理 Tab --}}
         <div class="tab-pane fade" id="tab-broadcast-template">
             <div class="main-card mb-3 card">
-                <div class="card-header d-flex align-items-center">
+                <div class="card-header d-flex align-items-center flex-wrap gap-2">
                     <span class="fw-bold"><i class="fas fa-file-alt me-2 text-muted"></i>{{ trans('broadcast.tab_template') }}</span>
+                    {{-- 搜尋不包在 @can 裡：沒有建檔權限的人也看得到清單（清單綁 broadcast） --}}
+                    <div class="input-group input-group-sm ms-auto" style="width:16rem">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input type="text" class="form-control" id="template-search"
+                               placeholder="{{ trans('broadcast.template_search') }}" autocomplete="off">
+                        <button type="button" class="btn btn-outline-secondary d-none" id="btn-template-search-clear"
+                                title="{{ trans('broadcast.template_search_clear') }}">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
                     @can('telegram_chat.broadcast_template')
-                        <button type="button" class="btn btn-primary btn-sm ms-auto" id="btn-template-add">
+                        <button type="button" class="btn btn-primary btn-sm" id="btn-template-add">
                             <i class="fas fa-plus me-1"></i>{{ trans('broadcast.template_add') }}
                         </button>
                     @endcan
@@ -937,19 +947,63 @@ $(function () {
         });
     }
 
+    /**
+     * 公告管理分頁的搜尋關鍵字
+     *
+     * 純前端過濾，不打 API —— 清單整包已經在手上（人工建檔的量級），
+     * 每打一個字就往後端跑一趟只會換來延遲。
+     *
+     * @type {string}
+     */
+    var templateKeyword = '';
+
+    /**
+     * 關鍵字過濾
+     *
+     * 需求是搜公告編號，標題一起認 —— 成本相同，而「打了標題卻搜不到」
+     * 會被當成壞掉。大小寫不計（編號常是 `AD-01` 這種）。
+     *
+     * @returns {Array}
+     */
+    function filteredTemplates() {
+        if (blankKeyword()) {
+            return templates;
+        }
+
+        var kw = templateKeyword;
+
+        return templates.filter(function (t) {
+            var code = (t.code || '').toLowerCase();
+            var title = (t.title || '').toLowerCase();
+
+            return code.indexOf(kw) !== -1 || title.indexOf(kw) !== -1;
+        });
+    }
+
+    /** @returns {boolean} */
+    function blankKeyword() {
+        return templateKeyword.length === 0;
+    }
+
     /** 公告管理分頁的表格 */
     function renderTemplateList() {
         var $tbody = $('#template-list');
         var cols = canManageTemplate ? 7 : 6;
+        var rows = filteredTemplates();
 
-        if (!templates.length) {
-            $tbody.html('<tr><td colspan="' + cols + '" class="table-empty"><i class="fas fa-inbox"></i>' + BC_I18N.template_empty + '</td></tr>');
+        if (!rows.length) {
+            // 「一筆都沒建」與「搜不到」是兩件事，訊息要分開 ——
+            // 搜不到卻寫「尚無公告」會讓人以為資料不見了
+            var emptyText = blankKeyword() ? BC_I18N.template_empty : BC_I18N.template_search_empty;
+            var emptyIcon = blankKeyword() ? 'fa-inbox' : 'fa-search';
+
+            $tbody.html('<tr><td colspan="' + cols + '" class="table-empty"><i class="fas ' + emptyIcon + '"></i>' + emptyText + '</td></tr>');
             return;
         }
 
         var html = '';
 
-        templates.forEach(function (t) {
+        rows.forEach(function (t) {
             var attachCount = (t.image_urls || []).length + (t.file_urls || []).length;
 
             html += '<tr>';
@@ -1255,6 +1309,20 @@ $(function () {
         openTemplateModal(null);
     });
 
+    /*
+     * 搜尋：輸入即篩。沒有「查詢」按鈕也不用 debounce ——
+     * 過濾只是走一次記憶體裡的陣列，沒有往後端的往返要省。
+     */
+    $('#template-search').on('input', function () {
+        templateKeyword = $(this).val().trim().toLowerCase();
+        $('#btn-template-search-clear').toggleClass('d-none', blankKeyword());
+        renderTemplateList();
+    });
+
+    $('#btn-template-search-clear').on('click', function () {
+        $('#template-search').val('').trigger('input').focus();
+    });
+
     $(document).on('click', '.js-template-edit', function () {
         var id = parseInt($(this).data('id'), 10);
 
@@ -1433,6 +1501,16 @@ $(function () {
                 $('#btn-template-save').prop('disabled', false);
                 hideBsModal('modal-template');
                 showMessage(body.message);
+
+                /*
+                 * 新增完清掉搜尋：篩選中新增一筆不符關鍵字的公告，
+                 * 存檔成功卻看不到那一列 —— 看起來像沒存進去。
+                 * 編輯不清，那是在既有的檢視裡改東西，關鍵字要留著。
+                 */
+                if (!id) {
+                    $('#template-search').val('').trigger('input');
+                }
+
                 loadTemplates();
             },
             error: function (xhr) {
