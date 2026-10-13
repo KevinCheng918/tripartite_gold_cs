@@ -1555,3 +1555,27 @@ a:hover { color: #85640a; }
     border-color: rgba(212, 175, 55, 0.3) !important;
     color: rgba(255, 255, 255, 0.7) !important;
 }
+
+/* ---------------------------------------------------------------
+   拖曳上傳區
+   --------------------------------------------------------------- */
+
+/*
+ * ⚠ `border-dashed` 是 Bootstrap **5.3** 才有的工具 class，本專案是 5.1 ——
+ * 直接用的話那個 class 什麼都不會發生，邊框是實線（看起來就只是一個框，
+ * 完全讀不出「可以把檔案拖進來」）。同一個坑之前在 `*-subtle` 上踩過一次。
+ */
+.border-dashed {
+    border-style: dashed !important;
+}
+
+/* 拖曳進來時整塊變色。配色沿用 .btn-primary 那組金，不自己發明一個藍 */
+#tpl-dropzone.border-primary {
+    border-color: #a67c00 !important;
+    background-color: rgba(166, 124, 0, 0.06) !important;
+}
+
+[data-theme="dark"] #tpl-dropzone.border-primary {
+    border-color: #d4af37 !important;
+    background-color: rgba(212, 175, 55, 0.12) !important;
+}

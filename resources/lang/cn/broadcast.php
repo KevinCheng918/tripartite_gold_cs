@@ -33,6 +33,7 @@ return [
     'template_creator'     => '建档者',
     'template_updated_at'  => '最后修改',
     'template_attachments' => '附件',
+    'dropzone_hint'        => '把文件拖进来，或点这里选择',
     'template_delete_confirm' => '确定删除「:title」吗？已经用它发出去的公告不受影响。',
 
     // 发送分页的「公告来源」

@@ -35,6 +35,7 @@ return [
     'template_creator'     => '建檔者',
     'template_updated_at'  => '最後修改',
     'template_attachments' => '附件',
+    'dropzone_hint'        => '把檔案拖進來，或點這裡選擇',
     'template_delete_confirm' => '確定刪除「:title」嗎？已經用它發出去的公告不受影響。',
 
     // 發送分頁的「公告來源」

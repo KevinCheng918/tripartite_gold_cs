@@ -108,6 +108,34 @@ MySQL 的 unique 索引允許多個 NULL，所以既有的空白不會互相衝�
 
 下拉選項是「編號　標題」—— 挑公告時那串編號比標題更好認。
 
+## ⚠ 圖片與檔案在 DB 裡的形狀**不一樣**
+
+不要假設兩邊可以用同一套解讀 —— 我就是這樣寫錯一次的：
+
+| 欄位 | 存什麼 | 誰決定的 |
+|---|---|---|
+| `image_urls` | 公開**網址字串** | `uploadImages()` —— `sendPhoto` 可以直接吃 URL |
+| `file_urls`  | `[{path, name}]` | `uploadFiles()` —— `sendDocument` 要的是本地絕對路徑 |
+
+所以 `BroadcastTemplateResource::attachments()` 兩種都要認：字串是現成的網址
+（再包一次 `asset()` 會變成 `/storage/http://…` 這種死連結），陣列才需要組。
+
+## 附件的拖曳上傳與圖片放大（2026-10-13）
+
+- 拖曳區整塊可放、可點。`dragover` **一定要 `preventDefault()`**，
+  否則瀏覽器會直接開啟那個檔案，`drop` 根本不觸發。
+- 待上傳的檔案存在自己的陣列（`tplNewFiles`），不靠 `<input>` 的 `files` ——
+  FileList 是唯讀的，拖進來的塞不回去，而且「選一次再選一次」會整組被覆蓋。
+- 圖片縮圖點了放大，放大視窗**疊在編輯視窗上面而不關掉它**（關掉的話
+  看完圖回不去，打到一半的內容也沒了）。z-index 要手動調高 ——
+  Bootstrap 給所有 modal 同一個值，後開的會被先開的 backdrop 蓋住一半。
+- `border-dashed` 是 Bootstrap **5.3** 才有的，本專案是 5.1，自己補在 `custom.css`。
+  （同一個坑在 `*-subtle` 上踩過一次。）
+
+⚠ **modal 裡不要用 `text-end`**：`custom.css` 把 `.modal .text-end` 改成
+`flex + space-between`（給底部按鈕排版用），字數計數那種「數字 + 文字」
+會被拆成一左一右。要靠右就直接寫 `style="text-align:right"`。
+
 ## 其他實作細節
 
 - 標題**不會發給客人**，只在後台辨識用 —— 介面上要講明，否則會有人把

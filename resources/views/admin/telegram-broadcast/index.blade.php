@@ -383,6 +383,27 @@
         </div>
     </div>
 
+    {{--
+        圖片放大。
+
+        ⚠ 疊在「編輯公告」那個 modal 上面，所以 z-index 要比它高 ——
+        Bootstrap 給所有 modal 同一個 z-index，後開的會被先開的蓋住一半
+        （backdrop 疊在中間）。custom.css 已經處理過 backdrop 重複的問題。
+    --}}
+    <div class="modal fade" id="modal-template-image" tabindex="-1" style="z-index:1075">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-truncate" id="tpl-image-title" style="font-size:0.9375rem"></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img id="tpl-image-full" class="img-fluid" alt="">
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- 公告建檔／編輯 --}}
     <div class="modal fade" id="modal-template" tabindex="-1">
         <div class="modal-dialog modal-lg">
@@ -414,7 +435,9 @@
                         <div class="mb-3">
                             <label class="form-label" for="tpl-content">{{ trans('broadcast.field_content') }} <span class="text-danger">*</span></label>
                             <textarea class="form-control" id="tpl-content" rows="8" maxlength="4096" required></textarea>
-                            <div class="text-end mt-1" style="font-size:0.8125rem"><span id="tpl-content-count">0</span> / 4096</div>
+                            {{-- ⚠ 不要用 `text-end`：custom.css 把 modal 裡的 `.text-end` 改成
+                                 `flex + space-between`（給底部按鈕排版用），字數會被拆成一左一右 --}}
+                            <div class="mt-1" style="font-size:0.8125rem;text-align:right"><span id="tpl-content-count">0</span> / 4096</div>
                         </div>
 
                         {{-- 編輯時原有的附件：按叉掉就是不留，送出時以畫面上剩下的為準 --}}
@@ -425,8 +448,23 @@
 
                         <div class="mb-3">
                             <label class="form-label" for="tpl-files">{{ trans('broadcast.field_attachment') }}</label>
-                            {{-- 不設 accept：圖片與一般檔案都從這裡選，送出前再依 MIME 拆成兩個欄位 --}}
-                            <input type="file" class="form-control" id="tpl-files" multiple>
+
+                            {{--
+                                拖曳區。整塊都可以放，也可以點它開檔案選擇視窗。
+
+                                ⚠ `<input>` 藏在裡面而不是拿掉：鍵盤使用者要 tab 得到，
+                                而且表單的檔案選擇行為全靠它。
+                            --}}
+                            <div id="tpl-dropzone" class="border border-2 border-dashed rounded text-center py-4 px-3"
+                                 style="cursor:pointer;transition:background-color .15s,border-color .15s">
+                                <i class="fas fa-cloud-upload-alt fa-2x text-muted mb-2 d-block"></i>
+                                <div class="text-muted" style="font-size:0.875rem">{{ trans('broadcast.dropzone_hint') }}</div>
+                                {{-- 不設 accept：圖片與一般檔案都從這裡選，送出前再依 MIME 拆成兩個欄位 --}}
+                                <input type="file" id="tpl-files" multiple class="d-none">
+                            </div>
+
+                            {{-- 這次新選的檔案（還沒上傳），圖片給縮圖 --}}
+                            <div id="tpl-new-list" class="d-flex flex-wrap gap-2 mt-2"></div>
                         </div>
 
                         <div class="text-end">
@@ -1067,6 +1105,124 @@ $(function () {
     var editingKeepImages = [];
     var editingKeepFiles = [];
 
+    /*
+     * 這次新選的檔案。
+     *
+     * ⚠ 自己存成陣列而不是靠 `<input>` 的 `files` —— FileList 是唯讀的，
+     * 拖進來的檔案沒辦法塞回去，而且「選了一次再選一次」會整組被覆蓋。
+     * 送出時從這個陣列組 FormData（發送分頁的 `bcImageFiles` 也是同一招）。
+     */
+    var tplNewFiles = [];
+
+    // ---------------------------------------------------------------
+    //  拖曳上傳
+    // ---------------------------------------------------------------
+
+    var $dropzone = $('#tpl-dropzone');
+
+    $dropzone.on('click', function () {
+        $('#tpl-files').trigger('click');
+    });
+
+    /*
+     * ⚠ dragover 一定要 preventDefault，否則瀏覽器會沿用預設行為
+     * （直接開啟那個檔案），drop 根本不會觸發。
+     */
+    $dropzone.on('dragover dragenter', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        $dropzone.addClass('border-primary bg-light');
+    });
+
+    $dropzone.on('dragleave dragend', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        $dropzone.removeClass('border-primary bg-light');
+    });
+
+    $dropzone.on('drop', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        $dropzone.removeClass('border-primary bg-light');
+
+        addTemplateFiles(e.originalEvent.dataTransfer.files);
+    });
+
+    $('#tpl-files').on('change', function () {
+        addTemplateFiles(this.files);
+        // 清空 input，否則同一個檔案選第二次不會觸發 change
+        $(this).val('');
+    });
+
+    /**
+     * 把檔案加進待上傳清單
+     *
+     * @param {FileList} files
+     */
+    function addTemplateFiles(files) {
+        Array.prototype.forEach.call(files || [], function (file) {
+            tplNewFiles.push(file);
+        });
+
+        renderNewFiles();
+    }
+
+    /** 這次新選的檔案：圖片給縮圖，其他給檔名 */
+    function renderNewFiles() {
+        var $list = $('#tpl-new-list').empty();
+
+        tplNewFiles.forEach(function (file, idx) {
+            $list.append(newFileChip(file, idx));
+        });
+    }
+
+    /**
+     * @param {File}   file
+     * @param {number} idx 在 tplNewFiles 裡的位置
+     */
+    function newFileChip(file, idx) {
+        var $remove = $('<button type="button" class="btn-close" style="font-size:0.5rem">')
+            .on('click', function (e) {
+                e.stopPropagation();
+                tplNewFiles.splice(idx, 1);
+                renderNewFiles();
+            });
+
+        if (isImageFile(file)) {
+            var $thumb = $('<div class="position-relative border rounded overflow-hidden" style="width:88px;height:88px">');
+            var $img = $('<img class="w-100 h-100" style="object-fit:cover;cursor:zoom-in">')
+                .attr('alt', file.name)
+                .attr('title', file.name);
+
+            // 還沒上傳，沒有網址可用 —— 讀成 data URL 當縮圖與放大圖
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                $img.attr('src', e.target.result);
+                $img.on('click', function () {
+                    openImagePreview({ name: file.name, url: e.target.result });
+                });
+            };
+            reader.readAsDataURL(file);
+
+            $thumb.append($img);
+            $thumb.append(
+                $('<span class="position-absolute top-0 end-0 bg-white rounded-circle d-flex align-items-center justify-content-center" style="width:20px;height:20px;margin:2px">')
+                    .append($remove)
+            );
+
+            return $thumb;
+        }
+
+        var $chip = $('<span class="badge bg-light text-dark border d-inline-flex align-items-center gap-1">');
+
+        $chip.append($('<i class="fas fa-file-alt">'));
+        $chip.append($('<span>').text(file.name));
+        $chip.append($('<small class="text-muted">').text(formatSize(file.size)));
+        $chip.append($remove.addClass('ms-1'));
+
+        return $chip;
+    }
+
     $('#tpl-content').on('input', function () {
         $('#tpl-content-count').text($(this).val().length);
     });
@@ -1090,7 +1246,11 @@ $(function () {
         $('#tpl-code').val(tpl ? (tpl.code || '') : '');
         $('#tpl-title').val(tpl ? tpl.title : '');
         $('#tpl-content').val(tpl ? tpl.content : '').trigger('input');
+
+        // 上一次開視窗選到一半的檔案不能留到這一次
         $('#tpl-files').val('');
+        tplNewFiles = [];
+        renderNewFiles();
 
         /*
          * 連同索引一起記下來 —— 送出時要給後端的是索引（它才有權威的路徑），
@@ -1106,12 +1266,18 @@ $(function () {
     /**
      * 把附件陣列配上它在範本裡的原始索引
      *
+     * 索引是送回後端的憑據（「留哪幾個」），`url` 只給畫面預覽用。
+     *
      * @param {Array} list
-     * @returns {Array} [{index, name}]
+     * @returns {Array} [{index, name, url}]
      */
     function withIndex(list) {
         return (list || []).map(function (item, i) {
-            return { index: i, name: item && item.name ? item.name : '-' };
+            return {
+                index: i,
+                name: item && item.name ? item.name : '-',
+                url: item ? item.url : null
+            };
         });
     }
 
@@ -1135,28 +1301,71 @@ $(function () {
     }
 
     /**
-     * @param {Object} item {index, name}
+     * 編輯視窗裡的一個附件
+     *
+     * 圖片給縮圖（點了放大），檔案維持檔名標籤 —— 檔案沒有「看一眼就認得」
+     * 這回事，縮圖對它沒有意義。
+     *
+     * @param {Object} item {index, name, url}
      * @param {string} kind image / file
      */
     function existingChip(item, kind) {
+        var $remove = $('<button type="button" class="btn-close" style="font-size:0.5rem">')
+            .attr('title', BC_I18N.action_cancel)
+            .on('click', function (e) {
+                e.stopPropagation();
+
+                var list = kind === 'image' ? editingKeepImages : editingKeepFiles;
+                // 比對 index 而不是位置 —— 刪掉前面那個之後，位置會位移
+                var at = list.map(function (x) { return x.index; }).indexOf(item.index);
+
+                if (at !== -1) { list.splice(at, 1); }
+
+                renderExistingAttachments();
+            });
+
+        if (kind === 'image' && item.url) {
+            var $thumb = $('<div class="position-relative border rounded overflow-hidden" style="width:88px;height:88px">');
+
+            $thumb.append(
+                $('<img class="w-100 h-100" style="object-fit:cover;cursor:zoom-in">')
+                    .attr('src', item.url)
+                    .attr('alt', item.name)
+                    .attr('title', item.name)
+                    .on('click', function () { openImagePreview(item); })
+            );
+
+            // 叉掉鈕浮在縮圖右上角，白底才不會跟深色照片糊在一起
+            $thumb.append(
+                $('<span class="position-absolute top-0 end-0 bg-white rounded-circle d-flex align-items-center justify-content-center" style="width:20px;height:20px;margin:2px">')
+                    .append($remove)
+            );
+
+            return $thumb;
+        }
+
         var $chip = $('<span class="badge bg-light text-dark border d-inline-flex align-items-center gap-1">');
 
         $chip.append($('<i>').addClass(kind === 'image' ? 'fas fa-image' : 'fas fa-file-alt'));
         $chip.append($('<span>').text(item.name));
-        $chip.append(
-            $('<button type="button" class="btn-close btn-close-sm ms-1" style="font-size:0.5rem">')
-                .on('click', function () {
-                    var list = kind === 'image' ? editingKeepImages : editingKeepFiles;
-                    // 比對 index 而不是位置 —— 刪掉前面那個之後，位置會位移
-                    var at = list.map(function (x) { return x.index; }).indexOf(item.index);
-
-                    if (at !== -1) { list.splice(at, 1); }
-
-                    renderExistingAttachments();
-                })
-        );
+        $chip.append($remove.addClass('ms-1'));
 
         return $chip;
+    }
+
+    /**
+     * 放大看一張圖
+     *
+     * ⚠ 疊在編輯視窗上面，**不關掉它** —— 關掉的話看完圖回不去，
+     * 剛打到一半的內容也沒了。
+     *
+     * @param {Object} item {name, url}
+     */
+    function openImagePreview(item) {
+        $('#tpl-image-title').text(item.name);
+        $('#tpl-image-full').attr('src', item.url).attr('alt', item.name);
+
+        showBsModal('modal-template-image');
     }
 
     $('#form-template').on('submit', function (e) {
@@ -1170,7 +1379,7 @@ $(function () {
         formData.append('content', $('#tpl-content').val().trim());
 
         // 同發送那邊：圖片與一般檔案拆成兩個欄位，後端驗證規則不同
-        Array.prototype.forEach.call($('#tpl-files')[0].files, function (file) {
+        tplNewFiles.forEach(function (file) {
             formData.append(isImageFile(file) ? 'images[]' : 'files[]', file);
         });
 

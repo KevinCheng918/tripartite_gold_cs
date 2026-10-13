@@ -34,6 +34,7 @@ return [
     'template_creator'     => 'Created by',
     'template_updated_at'  => 'Last edited',
     'template_attachments' => 'Attachments',
+    'dropzone_hint'        => 'Drop files here, or click to choose',
     'template_delete_confirm' => 'Delete ":title"? Announcements already sent with it are unaffected.',
 
     // "Source" on the send tab
