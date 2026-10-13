@@ -195,6 +195,25 @@ class SupportGroupService
             return [null];
         }
 
+        $threadIds = $this->topicIdsFor($type);
+
+        // 一個都沒勾 → 發到主區（General），也就是設定還沒填時的行為
+        return filled($threadIds) ? $threadIds : [null];
+    }
+
+    /**
+     * 勾了這個類型的話題 id
+     *
+     * ⚠ 跟 `threadIdsFor()` 的差別：**一個都沒勾時回空陣列，不是 `[null]`**。
+     * 呼叫端要分得出「沒有人勾」與「勾了主區」——
+     * 預約提醒靠這個判斷「這個話題准不准排提醒」，而「沒有人勾」的意思是
+     * **不限制**（設定還沒填的那段時間不該整個停擺），跟「發到主區」完全不同。
+     *
+     * @param string $type 見 constants.SUPPORT_TOPIC.TYPES
+     * @return array<int>
+     */
+    public function topicIdsFor($type)
+    {
         $threadIds = [];
 
         foreach ($this->topics() as $topic) {
@@ -206,7 +225,7 @@ class SupportGroupService
             }
         }
 
-        return filled($threadIds) ? array_values(array_unique($threadIds)) : [null];
+        return array_values(array_unique($threadIds));
     }
 
     /**

@@ -81,6 +81,18 @@ class ScheduledReminderService
 
         $chatId = (int) Arr::get($message, 'chat.id');
         $threadId = Arr::get($message, 'message_thread_id');
+
+        /*
+         * ⚠ **擋在解析之前**：不准排的話題不該燒模型額度。
+         *
+         * 也不能靜默 —— 使用者 tag 了沒反應只會以為壞了，然後再試幾次。
+         */
+        if (!$this->isAllowedThread($threadId)) {
+            $this->reply((string) config('constants.REMINDER.WRONG_TOPIC_TEXT'), $threadId);
+
+            return true;
+        }
+
         $parsed = $this->parser->parse($body);
 
         // 模型不可用（沒設 token、額度用完、CLI 逾時）
@@ -105,6 +117,32 @@ class ScheduledReminderService
         $this->create($message, $chatId, $threadId, $parsed);
 
         return true;
+    }
+
+    /**
+     * 這個話題准不准排提醒
+     *
+     * 「通知設定 → 話題分流」裡勾了「預約提醒」的話題才可以。
+     *
+     * ⚠ **一個都沒勾 ＝ 不限制**，不是「全部停用」。設定還沒填的那段時間
+     * 不該整個停擺 —— 這是話題分流一貫的規則（沒勾的通知發到主區，
+     * 而不是不發）。上線時忘了勾不會讓功能靜悄悄失效。
+     *
+     * ⚠ 勾了之後**群組主區就不能排了**（主區沒有 thread id，比不上任何一個
+     * 勾選的話題）。那是對的：既然限定了話題，主區就不在限定範圍內。
+     *
+     * @param int|null $threadId
+     * @return bool
+     */
+    private function isAllowedThread($threadId)
+    {
+        $allowed = $this->supportGroup->topicIdsFor(self::NOTICE_TYPE);
+
+        if (blank($allowed)) {
+            return true;
+        }
+
+        return filled($threadId) && in_array((int) $threadId, $allowed, true);
     }
 
     /**

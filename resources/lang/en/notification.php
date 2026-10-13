@@ -151,6 +151,14 @@ return [
         'vm_payment_hint'        => 'The 9:30 payment notice: falls back here when a station has no group, and chases internal approval',
         'station_credit'         => 'Station credit alerts',
         'station_credit_hint'    => 'The 10:00 credit alert and top-up message, falling back here when a station has no group',
+
+        /*
+         * ⚠ This one means something different from the rest: the others pick
+         * where a notice is *sent*; this one picks where reminders may be *set*.
+         */
+        'scheduled_reminder'      => 'Scheduled reminders',
+        'scheduled_reminder_hint' => '⚠ This picks which topics may SET reminders, not where they are sent — '
+            . 'a reminder always fires back in the topic it was set in. None ticked = every topic may set them',
     ],
 
     'msg' => [
