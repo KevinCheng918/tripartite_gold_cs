@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\AutoReplySupportService;
 use App\Services\CustomerFollowupService;
 use App\Services\DailyRateService;
+use App\Services\ScheduledBroadcastCommandService;
 use App\Services\ScheduledReminderService;
 use App\Services\TelegramBotService;
 use App\Services\TelegramChatService;
@@ -26,6 +27,7 @@ class TelegramWebhookController extends Controller
     private $dailyRateService;
     private $followupService;
     private $reminderService;
+    private $broadcastCommandService;
     private $botService;
 
     public function __construct(
@@ -34,6 +36,7 @@ class TelegramWebhookController extends Controller
         DailyRateService $dailyRateService,
         CustomerFollowupService $followupService,
         ScheduledReminderService $reminderService,
+        ScheduledBroadcastCommandService $broadcastCommandService,
         TelegramBotService $botService
     ) {
         $this->chatService = $chatService;
@@ -43,6 +46,13 @@ class TelegramWebhookController extends Controller
         $this->followupService = $followupService;
         // 預約提醒：tag 機器人建立、取消按鈕（前綴 rm:）
         $this->reminderService = $reminderService;
+        /*
+         * 指令預約公告的【確認預約】【取消】（前綴 bc:）。
+         *
+         * ⚠ 訊息的分流在 `ScheduledReminderService` 裡做（兩者共用「tag 機器人」
+         * 這個入口），這裡只接按鈕 —— callback 沒有共用的入口可分。
+         */
+        $this->broadcastCommandService = $broadcastCommandService;
         // 回應 callback_query，不然按鈕會一直轉圈
         $this->botService = $botService;
     }
@@ -170,6 +180,18 @@ class TelegramWebhookController extends Controller
                 array_slice(explode(':', $data), 1),
                 Arr::get($callback, 'message.message_id'),
                 (array) Arr::get($callback, 'from', [])
+            );
+
+            return;
+        }
+
+        // 指令預約公告的【確認預約】【取消】
+        if ($prefix === (string) config('constants.BROADCAST_COMMAND.CALLBACK')) {
+            $this->botService->answerCallbackQuery(Arr::get($callback, 'id'));
+
+            $this->broadcastCommandService->handleCallback(
+                array_slice(explode(':', $data), 1),
+                Arr::get($callback, 'message.message_id')
             );
 
             return;

@@ -37,12 +37,14 @@ class ScheduledReminderService
     private $parser;
     private $supportGroup;
     private $botService;
+    private $broadcastCommand;
 
     public function __construct(
         ScheduledReminderRepository $repository,
         ReminderParser $parser,
         SupportGroupService $supportGroup,
-        TelegramBotService $botService
+        TelegramBotService $botService,
+        ScheduledBroadcastCommandService $broadcastCommand
     ) {
         $this->repository = $repository;
         // 自然語言 → 時間 ＋ 內容
@@ -50,6 +52,12 @@ class ScheduledReminderService
         $this->supportGroup = $supportGroup;
         // 判斷「這則有沒有 tag 我」要知道 Bot 自己的 username
         $this->botService = $botService;
+        /*
+         * 「發公告」走另一條路：發給客戶、要權限、要先按確認。
+         * 兩者共用同一個入口（tag 機器人），所以在這裡分流而不是在 webhook
+         * ——「有沒有 tag 到我」的判斷只該有一份。
+         */
+        $this->broadcastCommand = $broadcastCommand;
     }
 
     /**
@@ -90,6 +98,18 @@ class ScheduledReminderService
         if (!$this->isAllowedThread($threadId)) {
             $this->reply((string) config('constants.REMINDER.WRONG_TOPIC_TEXT'), $threadId);
 
+            return true;
+        }
+
+        /*
+         * 「20 分鐘後發送 T01 公告給 LV_UAT」走另一條路（發給客戶、要權限、
+         * 要先確認）。先用關鍵字粗篩，含「公告」才跑那一支模型。
+         *
+         * ⚠ 它回 false 代表「這其實不是在講發公告」（例如「明天提醒我發公告」）
+         * —— 那就繼續往下當成提醒處理，不要兩邊都不理。
+         */
+        if ($this->broadcastCommand->looksLikeCommand($body)
+            && $this->broadcastCommand->handle($body, (array) Arr::get($message, 'from', []), $threadId)) {
             return true;
         }
 

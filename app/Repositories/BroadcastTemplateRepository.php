@@ -47,6 +47,32 @@ class BroadcastTemplateRepository
     }
 
     /**
+     * 依代號找（Telegram 指令預約公告用）
+     *
+     * ⚠ **完全相符，不做模糊比對。** 「T01」與「T10」只差一個字，
+     * 猜錯的後果是錯誤的公告發到客戶群組 —— 找不到就該說找不到，
+     * 讓人重打一次比較便宜。
+     *
+     * ⚠ 大小寫不計：使用者在手機上打 `t01` 是常態。
+     * `code` 是 UNIQUE，所以不會因為大小寫而撞出兩筆。
+     *
+     * @param string $code
+     * @return BroadcastTemplate|null
+     */
+    public function findByCode($code)
+    {
+        $code = trim((string) $code);
+
+        if (blank($code)) {
+            return null;
+        }
+
+        return BroadcastTemplate::query()
+            ->whereRaw('LOWER(code) = ?', [mb_strtolower($code)])
+            ->first();
+    }
+
+    /**
      * @param array $attributes
      * @return BroadcastTemplate
      */

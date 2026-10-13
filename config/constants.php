@@ -821,6 +821,127 @@ return [
         'WHEN_PAST'  => '已經過了',
     ],
 
+    /*
+     * 用 Telegram 指令預約發送公告（2026-10-13）
+     *
+     * 「20 分鐘後發送 T01 公告給 LV_UAT」→ 解析 → **預覽 ＋ 按確認才成立**
+     * → 寫進既有的預約公告（`TelegramBroadcastService::schedule()`），
+     * 由既有的 `telegram:send-scheduled` 排程到點發送。
+     *
+     * ⚠ **這個功能的後果是公告發到客戶群組，而且不可逆。** 所以每一個環節
+     * 都往「寧可不做」的方向倒：
+     *
+     *   - 要有 `telegram_chat.broadcast` 權限（跟後台發公告同一個）
+     *   - 範本代號與站台名稱都**完全相符**，找不到就說找不到，絕不猜
+     *   - 解析完**不直接成立**，先回預覽，按下確認才寫進去
+     *   - 確認的那份暫存在 cache（30 分鐘），沒按就自然消失
+     */
+    'BROADCAST_COMMAND' => [
+        /*
+         * 粗篩用的關鍵字 —— 含這些字才跑這一支模型。
+         *
+         * ⚠ **只是粗篩，不是判斷。** 「明天提醒我發公告」含「公告」但其實是
+         * 提醒，所以解析器還能回 `not_broadcast` 讓呼叫端退回提醒那條路。
+         * 這裡的用途單純是「不要每則訊息都跑兩支模型」。
+         */
+        'KEYWORDS' => ['公告'],
+
+        /*
+         * ⚠ 樸素寫法，不要用 `**` 與 ⚠ ——
+         * 帶排版符號的 prompt 會讓模型把整包 JSON 塞進欄位裡
+         * （見 bugfix/2026-10-12-double-wrapped-json-prompt）。
+         */
+        'PROMPT' => implode("\n", [
+            '你是群組機器人的指令解析器，只負責判斷「這句話是不是要預約發送一則公告給客戶」。',
+            '',
+            'intent 怎麼填：',
+            '- broadcast：他要預約發公告（「20 分鐘後發送 T01 公告給 LV_UAT」）',
+            '- not_broadcast：這句話根本不是在講發公告（例如只是要排一個提醒）',
+            '- unknown：是在講發公告，但時間、公告代號或對象缺了其中之一',
+            '',
+            'intent = broadcast 時：',
+            '- send_at 用 YYYY-MM-DD HH:MM，依「現在時間」推算相對說法',
+            '- 算出來的時間必須在現在之後',
+            '- template_code 是公告代號原文（例如 T01），沒講就填 null',
+            '- target 是要發給誰：站台名稱原文（不要帶「群組」兩個字），',
+            '  要發給所有客戶就填 all，沒講就填 null',
+            '',
+            '時間、代號、對象缺任何一個都填 unknown，不要自己補預設值。',
+        ]),
+
+        'INPUT' => "現在時間：{now}\n對方說：{text}",
+
+        /*
+         * 預覽。按下確認之前什麼都還沒成立。
+         *
+         * ⚠ 一定要列出**對象與時間**，而且內容要給得夠多才看得出是不是拿錯範本。
+         */
+        'PREVIEW_TEXT' => "📢 <b>確認一下要發什麼</b>\n"
+            . "範本：{code}《{title}》\n"
+            . "對象：{target}\n"
+            . "時間：<b>{time}</b>（{when}）\n"
+            . "{attachments}\n"
+            . "內容預覽：\n{preview}",
+
+        'PREVIEW_ATTACHMENTS' => "附件：{images} 張圖、{files} 個檔案\n",
+        'PREVIEW_CHARS'      => 200,
+        'PREVIEW_MORE'       => '…（還有 {count} 字）',
+
+        'TARGET_ALL_TEXT' => '全部客戶（{count} 個站台）',
+
+        'BUTTON_CONFIRM' => '確認預約',
+        'BUTTON_CANCEL'  => '取消',
+
+        // callback_data 前綴：bc:{confirm|cancel}:{draft_key}
+        'CALLBACK' => 'bc',
+        'ACTION_CONFIRM' => 'ok',
+        'ACTION_CANCEL'  => 'no',
+
+        'CONFIRMED_TEXT' => "✅ 已排定\n{code}《{title}》會在 <b>{time}</b> 發送給 {target}。\n"
+            . '要取消請到後台「群發公告 → 歷史紀錄」。',
+
+        'CANCELLED_TEXT' => '已取消，這則公告不會發出去。',
+
+        /*
+         * 草稿過期。
+         *
+         * ⚠ 不能回「已排定」也不能靜默 —— 使用者按了確認，一定要知道結果。
+         */
+        'EXPIRED_TEXT' => '這則預覽已經過期了（超過 30 分鐘），請重新說一次。',
+
+        // 草稿在 cache 放多久
+        'DRAFT_TTL_MINUTES' => 30,
+
+        /*
+         * 各種擋下來的理由。
+         *
+         * ⚠ 每一種都要講**為什麼**與**下一步怎麼辦** —— 只說「不行」的話，
+         * 使用者只能猜，然後再試一次。
+         */
+        'NO_PERMISSION_TEXT' => "您沒有群發公告的權限，不能用指令預約公告 🙏\n"
+            . '需要「Telegram 客服 → 群發公告」這個權限，請找管理者開通。',
+
+        'NOT_BOUND_TEXT' => "我不知道您是哪一位後台帳號，所以沒辦法確認權限 🙏\n"
+            . '請到後台「我的帳號」產生綁定碼，私訊我完成綁定之後再試一次。',
+
+        'TEMPLATE_NOT_FOUND_TEXT' => "找不到代號 <b>{code}</b> 的公告 🙏\n"
+            . '目前有的是：{codes}',
+
+        'TEMPLATE_NONE_TEXT' => "目前一則建檔的公告都沒有 🙏\n"
+            . '請先到後台「群發公告 → 公告管理」建一則。',
+
+        'TARGET_NOT_FOUND_TEXT' => "找不到叫 <b>{target}</b> 的站台 🙏\n"
+            . '可以發的是：{names}',
+
+        'UNKNOWN_TEXT' => "我看不懂這則公告要什麼時候發、發哪一則、發給誰 🙏\n"
+            . "可以這樣說：\n"
+            . "　· 20 分鐘後發送 T01 公告給 LV_UAT\n"
+            . "　· 明天早上九點發 T03 公告給全部客戶\n"
+            . '三件事（時間、公告代號、對象）缺一不可。',
+
+        'UNAVAILABLE_TEXT' => '抱歉，現在沒辦法解析這則指令，請稍後再試一次 🙏',
+    ],
+
     'STATION' => [
         'STATUS' => [
             'ACTIVE'   => 1, // 啟用

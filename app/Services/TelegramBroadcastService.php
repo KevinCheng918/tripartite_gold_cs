@@ -196,6 +196,37 @@ class TelegramBroadcastService
         })->values()->all();
     }
 
+    /**
+     * 依名稱找一個可以發公告的站台（Telegram 指令預約公告用）
+     *
+     * ⚠ **故意走 `getTargetStations()` 而不是自己下一條查詢**：那支就是
+     * 發送頁勾選清單的來源，而發送時解析目標也是從同一組站台撈
+     * （`getActiveWithTelegram()`）。自己寫一條的話，會出現
+     * 「指令找得到這個站台、時間到了卻發不出去」那種最難查的不一致。
+     *
+     * ⚠ **完全相符（不計大小寫），不做模糊比對。** 比對不到的後果只是
+     * 「找不到、請重打」；模糊比對猜錯的後果是**公告發給錯的客戶**。
+     *
+     * @param string $name 站台名稱
+     * @return array|null getTargetStations() 的其中一筆
+     */
+    public function findTargetStationByName($name)
+    {
+        $name = mb_strtolower(trim((string) $name));
+
+        if (blank($name)) {
+            return null;
+        }
+
+        foreach ($this->getTargetStations() as $station) {
+            if (mb_strtolower((string) Arr::get($station, 'name')) === $name) {
+                return $station;
+            }
+        }
+
+        return null;
+    }
+
     public function list($perPage = 20)
     {
         return $this->broadcastRepository->paginate($perPage);
