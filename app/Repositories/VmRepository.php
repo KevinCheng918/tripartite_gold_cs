@@ -157,8 +157,9 @@ class VmRepository
      * ⚠ 條件是 `vpn_fee > 0`：有買 VPN 才需要續約。
      * 不另外開一個「啟用 VPN」的開關 —— 理由見 `VmServer::hasVpn()`。
      *
-     * ⚠ **不看開關機**（跟帳單不一樣）：關機只是這個月不收錢，
-     * VPN 的合約還是會到期。到期沒續約，機器開回來時就連不上了。
+     * ⚠ **關機就不提醒**（需求方 2026-10-13）。跟帳單同一條線：
+     * 關機的機器不收錢，也不必為它續約 —— 要用的時候再開機、再續。
+     * 提醒一台沒人在用的機器，只會讓真正要處理的那幾台被淹掉。
      *
      * @param int $daysAhead 到期前幾天開始提醒
      * @return Collection
@@ -168,6 +169,7 @@ class VmRepository
         return VmServer::query()
             ->select(self::SERVER_COLUMNS)
             ->with(['station.system'])
+            ->where('power_status', config('constants.VM.POWER.ON'))
             ->where('vpn_fee', '>', 0)
             ->whereNotNull('vpn_renew_date')
             ->whereDate('vpn_renew_date', '<=', now()->addDays((int) $daysAhead)->toDateString())
