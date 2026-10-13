@@ -47,6 +47,22 @@ class SendBroadcastRequest extends FormRequest
             'files.*'      => ['file', 'max:' . self::$fileMaxKb, $this->blockedExtensionRule('broadcast.msg.file_type_blocked')],
             // after:now 擋掉過去時間，否則排程下一輪就會立刻送出，等同沒預約
             'scheduled_at' => 'nullable|date_format:Y-m-d H:i|after:now',
+
+            /*
+             * 從建檔的公告帶附件過來。
+             *
+             * ⚠ **只收 id 與索引，絕對不收路徑**。附件最後會走
+             * `sendDocument($chatId, $diskPath, $name)`，而那支吃的是本地絕對路徑 ——
+             * 讓前端送路徑等於開放「指定伺服器上任何一個檔案，發給所有客人」，
+             * `../../.env` 就能把資料庫密碼送出去。
+             *
+             * 路徑一律由後端拿 `template_id` 去 DB 查，索引只用來挑「留哪幾個」。
+             */
+            'template_id'          => 'nullable|integer|exists:broadcast_template,id',
+            'keep_image_indexes'   => 'nullable|array',
+            'keep_image_indexes.*' => 'integer|min:0',
+            'keep_file_indexes'    => 'nullable|array',
+            'keep_file_indexes.*'  => 'integer|min:0',
         ];
     }
 

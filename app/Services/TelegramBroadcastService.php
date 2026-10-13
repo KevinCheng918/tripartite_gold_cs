@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use App\Models\TelegramBroadcast;
+use App\Repositories\BroadcastTemplateRepository;
 use App\Repositories\StationRepository;
 use App\Repositories\TelegramBroadcastRepository;
 use App\Repositories\TelegramRepository;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -21,19 +23,146 @@ class TelegramBroadcastService
     private $stationRepository;
     private $botService;
     private $imageUploadService;
+    private $templateRepository;
 
     public function __construct(
         TelegramBroadcastRepository $broadcastRepository,
         TelegramRepository $telegramRepository,
         StationRepository $stationRepository,
         TelegramBotService $botService,
-        ImageUploadService $imageUploadService
+        ImageUploadService $imageUploadService,
+        BroadcastTemplateRepository $templateRepository
     ) {
         $this->broadcastRepository = $broadcastRepository;
         $this->telegramRepository = $telegramRepository;
         $this->stationRepository = $stationRepository;
         $this->botService = $botService;
         $this->imageUploadService = $imageUploadService;
+        // 事先建檔的公告。發送時選一則帶進表單，帶進去之後還能改
+        $this->templateRepository = $templateRepository;
+    }
+
+    // ---------------------------------------------------------------
+    //  公告範本
+    // ---------------------------------------------------------------
+
+    /**
+     * 全部範本
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function templates()
+    {
+        return $this->templateRepository->getAll();
+    }
+
+    /**
+     * 建檔一則範本
+     *
+     * @param array $params title／content
+     * @param array $images 已上傳好的圖片 [{path, name}]
+     * @param array $files  已上傳好的檔案 [{path, name}]
+     * @param int   $userId
+     * @return \App\Models\BroadcastTemplate
+     */
+    public function createTemplate(array $params, array $images, array $files, $userId)
+    {
+        return $this->templateRepository->create([
+            'title'      => Arr::get($params, 'title'),
+            'content'    => Arr::get($params, 'content'),
+            'image_urls' => filled($images) ? $images : null,
+            'file_urls'  => filled($files) ? $files : null,
+            'created_by' => $userId,
+        ]);
+    }
+
+    /**
+     * 更新一則範本
+     *
+     * ⚠ 附件是「保留的 ＋ 新上傳的」。前端送回要留的那幾個（使用者沒按叉掉的），
+     * 這裡接上新上傳的 —— 不是整包取代，不然每次改標題都得把附件重傳一輪。
+     *
+     * ⚠ 被移除的附件**不刪實體檔**：同一個路徑可能已經被複製進某筆發送紀錄，
+     * 刪了會讓歷史紀錄的附件變成死連結。
+     *
+     * @param \App\Models\BroadcastTemplate $template
+     * @param array $params   title／content／keep_images／keep_files
+     * @param array $newImages 新上傳的圖片
+     * @param array $newFiles  新上傳的檔案
+     * @return bool
+     */
+    public function updateTemplate($template, array $params, array $newImages, array $newFiles)
+    {
+        $images = array_merge((array) Arr::get($params, 'keep_images', []), $newImages);
+        $files = array_merge((array) Arr::get($params, 'keep_files', []), $newFiles);
+
+        return $this->templateRepository->update($template, [
+            'title'      => Arr::get($params, 'title'),
+            'content'    => Arr::get($params, 'content'),
+            'image_urls' => filled($images) ? array_values($images) : null,
+            'file_urls'  => filled($files) ? array_values($files) : null,
+        ]);
+    }
+
+    /**
+     * 刪除範本（不碰實體檔，理由見 Repository）
+     *
+     * @param \App\Models\BroadcastTemplate $template
+     * @return bool
+     */
+    public function deleteTemplate($template)
+    {
+        return $this->templateRepository->delete($template);
+    }
+
+    /**
+     * @param int $id
+     * @return \App\Models\BroadcastTemplate|null
+     */
+    public function findTemplate($id)
+    {
+        return $this->templateRepository->find($id);
+    }
+
+    /**
+     * 發送時要從範本帶走的附件
+     *
+     * ⚠ **路徑一律從 DB 取，前端只能給索引**。這些路徑最後會進
+     * `sendDocument($chatId, $diskPath, $name)`，那支吃的是本地絕對路徑 ——
+     * 直接收前端送來的路徑等於開放「指定伺服器上任何檔案發給所有客人」。
+     *
+     * ⚠ 沒給索引＝**全部帶走**（使用者剛選範本、還沒動過任何附件）。
+     * 給了空陣列才是「全部移除」—— 兩者意思不同，不能一起當成空。
+     *
+     * @param \App\Models\BroadcastTemplate|null $template
+     * @param string     $field   image_urls 或 file_urls
+     * @param array|null $indexes 要留下的索引；null＝全留
+     * @return array [{path, name}]
+     */
+    public function pickTemplateAttachments($template, $field, $indexes)
+    {
+        if (blank($template)) {
+            return [];
+        }
+
+        $all = (array) $template->{$field};
+
+        if (!is_array($indexes)) {
+            return array_values($all);
+        }
+
+        $picked = [];
+
+        foreach ($indexes as $index) {
+            $item = Arr::get($all, (int) $index);
+
+            // 索引超出範圍就跳過 —— 範本在使用者選完之後被改過也不該炸掉
+            if (filled($item)) {
+                $picked[] = $item;
+            }
+        }
+
+        return $picked;
     }
 
     /**

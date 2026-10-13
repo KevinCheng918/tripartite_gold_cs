@@ -131,13 +131,19 @@ class SupportGroupService
     }
 
     /**
-     * 直接發到某個話題（測試發送用）
+     * 直接發到某個話題
      *
-     * @param string   $text
-     * @param int|null $threadId null 代表主區
+     * ⚠ 跟 `send()` 的差別：那支依通知類型查「這類該發到哪幾個話題」，
+     * 這支是呼叫端自己指定。**要回在使用者剛才說話的那個話題**時只能用這支
+     * —— 走 `send()` 會被話題分流設定帶到別的地方去
+     * （`/topicid` 與預約提醒都踩過這個點）。
+     *
+     * @param string     $text
+     * @param int|null   $threadId null 代表主區
+     * @param array|null $keyboard inline keyboard（預約提醒的取消按鈕用）
      * @return array|null
      */
-    public function sendToThread($text, $threadId = null)
+    public function sendToThread($text, $threadId = null, $keyboard = null)
     {
         $chatId = $this->chatId();
 
@@ -147,7 +153,7 @@ class SupportGroupService
 
         $this->switchBot();
 
-        return $this->botService->sendMessage($chatId, $text, null, null, $threadId);
+        return $this->botService->sendMessage($chatId, $text, null, $keyboard, $threadId);
     }
 
     /**

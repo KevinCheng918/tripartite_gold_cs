@@ -389,10 +389,11 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
     /**
      * 叫模型回一個符合 schema 的物件
      *
-     * `generateText()` 與 `generateFlag()` 的共用本體。跟 `resolve()` 完全
-     * 不同的任務：那支是「從題庫挑一題」（固定 schema、要回 item_id），
-     * 這支是「照指定的 schema 回一個小物件」，所以結果自己解析、不走
-     * `parseResult()`。
+     * `generateText()` 與 `generateFlag()` 的共用本體，**也直接給需要自訂
+     * schema 的呼叫端用**（2026-10-13 起：預約提醒要一次回 intent、時間、
+     * 內容三個欄位，那兩支的形狀都套不上）。跟 `resolve()` 完全不同的任務：
+     * 那支是「從題庫挑一題」（固定 schema、要回 item_id），這支是
+     * 「照指定的 schema 回一個小物件」，所以結果自己解析、不走 `parseResult()`。
      *
      * ⚠ **只走訂閱，不切備援 API**。這類文案與輔助判斷是錦上添花 ——
      * 訂閱額度用完時還去花 API 的錢並不合理，呼叫端本來就有退路。
@@ -404,7 +405,7 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
      * @param array  $schema       JSON Schema
      * @return array|null
      */
-    private function generateStructured($systemPrompt, $userPrompt, array $schema)
+    public function generateStructured($systemPrompt, $userPrompt, array $schema)
     {
         $token = $this->appSettingService->get(AppSettingService::KEY_CLAUDE_TOKEN);
 

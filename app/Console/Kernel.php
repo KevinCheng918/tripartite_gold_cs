@@ -127,6 +127,14 @@ class Kernel extends ConsoleKernel
          */
         $schedule->command('followup:ask')->everyMinute()->withoutOverlapping();
 
+        /*
+         * 預約提醒（內部群組 tag 機器人排的）。
+         *
+         * ⚠ **一定要每分鐘**：時間是使用者自己指定的，間隔再長就會偏掉 ——
+         * 說好 14:00，14:05 才跳出來的提醒已經失去意義。
+         */
+        $schedule->command('reminder:send')->everyMinute()->withoutOverlapping();
+
         // 每月 1 號凌晨 0 點產生 VM 帳單
         $schedule->command('vm:generate-billing')->monthlyOn(1, '00:00');
 

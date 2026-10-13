@@ -14,6 +14,11 @@
             </button>
         </li>
         <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-broadcast-template">
+                <i class="fas fa-file-alt me-1"></i>{{ trans('broadcast.tab_template') }}
+            </button>
+        </li>
+        <li class="nav-item">
             <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-broadcast-history">
                 <i class="fas fa-history me-1"></i>{{ trans('broadcast.tab_history') }}
             </button>
@@ -32,10 +37,35 @@
                             <i class="fas fa-paper-plane me-2 text-muted"></i>{{ trans('broadcast.tab_send') }}
                         </div>
                         <div class="card-body">
+                            {{-- 公告來源：自己打，或挑一則建檔的帶進來（帶進來之後照常可以改） --}}
+                            <div class="mb-3">
+                                <label class="form-label">{{ trans('broadcast.source_label') }}</label>
+                                <div class="d-flex flex-wrap gap-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="bc_source" value="manual" id="bc-source-manual" checked>
+                                        <label class="form-check-label" for="bc-source-manual">{{ trans('broadcast.source_manual') }}</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="bc_source" value="template" id="bc-source-template">
+                                        <label class="form-check-label" for="bc-source-template">{{ trans('broadcast.source_template') }}</label>
+                                    </div>
+                                </div>
+                                <div id="bc-template-wrap" class="mt-2 d-none">
+                                    <select id="bc-template-id" class="form-select"></select>
+                                    <small class="form-text text-muted">{{ trans('broadcast.source_hint') }}</small>
+                                </div>
+                            </div>
+
                             <div class="mb-3">
                                 <label class="form-label">{{ trans('broadcast.field_content') }} <span class="text-danger">*</span></label>
                                 <textarea id="bc-content" class="form-control" rows="10" required maxlength="4096" placeholder="{{ trans('broadcast.field_content') }}..."></textarea>
                                 <div class="text-end mt-1" style="font-size:0.8125rem"><span id="bc-content-count">0</span> / 4096</div>
+                            </div>
+
+                            {{-- 範本帶來的附件：可以逐個移除，移除只影響這一次發送，不動範本 --}}
+                            <div class="mb-3 d-none" id="bc-template-attachments">
+                                <label class="form-label">{{ trans('broadcast.template_attachments') }}</label>
+                                <div id="bc-template-attachment-list" class="d-flex flex-wrap gap-2"></div>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">{{ trans('broadcast.field_attachment') }}</label>
@@ -128,6 +158,39 @@
                 </div>
             </div>
             </form>
+        </div>
+
+        {{-- 公告管理 Tab --}}
+        <div class="tab-pane fade" id="tab-broadcast-template">
+            <div class="main-card mb-3 card">
+                <div class="card-header d-flex align-items-center">
+                    <span class="fw-bold"><i class="fas fa-file-alt me-2 text-muted"></i>{{ trans('broadcast.tab_template') }}</span>
+                    @can('telegram_chat.broadcast_template')
+                        <button type="button" class="btn btn-primary btn-sm ms-auto" id="btn-template-add">
+                            <i class="fas fa-plus me-1"></i>{{ trans('broadcast.template_add') }}
+                        </button>
+                    @endcan
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle data-table">
+                            <thead class="thead-gold">
+                                <tr>
+                                    <th>{{ trans('broadcast.template_title') }}</th>
+                                    <th>{{ trans('broadcast.field_content') }}</th>
+                                    <th class="col-num">{{ trans('broadcast.template_attachments') }}</th>
+                                    <th>{{ trans('broadcast.template_creator') }}</th>
+                                    <th>{{ trans('broadcast.template_updated_at') }}</th>
+                                    @can('telegram_chat.broadcast_template')
+                                        <th>{{ trans('broadcast.field_action') }}</th>
+                                    @endcan
+                                </tr>
+                            </thead>
+                            <tbody id="template-list"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
 
         {{-- 歷史紀錄 Tab --}}
@@ -314,6 +377,54 @@
                             <tbody id="send-detail-body"></tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- 公告建檔／編輯 --}}
+    <div class="modal fade" id="modal-template" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modal-template-title">{{ trans('broadcast.template_add') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="form-template">
+                        <input type="hidden" id="tpl-id">
+
+                        <div class="mb-3">
+                            <label class="form-label" for="tpl-title">{{ trans('broadcast.template_title') }} <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="tpl-title" maxlength="100"
+                                   placeholder="{{ trans('broadcast.template_title_ph') }}" required>
+                            {{-- 一定要講：不然會有人把「【重要】」寫進標題以為客人看得到 --}}
+                            <small class="form-text text-muted">{{ trans('broadcast.template_title_hint') }}</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="tpl-content">{{ trans('broadcast.field_content') }} <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="tpl-content" rows="8" maxlength="4096" required></textarea>
+                            <div class="text-end mt-1" style="font-size:0.8125rem"><span id="tpl-content-count">0</span> / 4096</div>
+                        </div>
+
+                        {{-- 編輯時原有的附件：按叉掉就是不留，送出時以畫面上剩下的為準 --}}
+                        <div class="mb-3 d-none" id="tpl-existing-wrap">
+                            <label class="form-label">{{ trans('broadcast.template_attachments') }}</label>
+                            <div id="tpl-existing-list" class="d-flex flex-wrap gap-2"></div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="tpl-files">{{ trans('broadcast.field_attachment') }}</label>
+                            {{-- 不設 accept：圖片與一般檔案都從這裡選，送出前再依 MIME 拆成兩個欄位 --}}
+                            <input type="file" class="form-control" id="tpl-files" multiple>
+                        </div>
+
+                        <div class="text-end">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('broadcast.action_cancel') }}</button>
+                            <button type="submit" class="btn btn-primary" id="btn-template-save">{{ trans('broadcast.action_save') }}</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -561,6 +672,26 @@ $(function () {
         bcImageFiles.forEach(function (file) {
             formData.append(isImageFile(file) ? 'images[]' : 'files[]', file);
         });
+
+        /*
+         * 選了建檔公告時，把「要帶走哪幾個附件」告訴後端。
+         *
+         * ⚠ 送的是 **id 與索引**，不是路徑 —— 路徑由後端拿 id 去資料庫查。
+         * 讓前端送路徑等於開放「指定伺服器上任何檔案發給所有客人」。
+         *
+         * ⚠ 索引陣列一定要送（哪怕是空的）：後端分得出「沒給＝全留」
+         * 與「給了空陣列＝全部移除」，少送那個欄位會變成全部都帶走。
+         */
+        if (selectedTemplate) {
+            formData.append('template_id', selectedTemplate.id);
+
+            keptTemplateImages.forEach(function (idx) { formData.append('keep_image_indexes[]', idx); });
+            keptTemplateFiles.forEach(function (idx) { formData.append('keep_file_indexes[]', idx); });
+
+            // 全部移除時 forEach 不會跑，補一個空值讓後端收得到「空陣列」
+            if (keptTemplateImages.length === 0) { formData.append('keep_image_indexes', ''); }
+            if (keptTemplateFiles.length === 0) { formData.append('keep_file_indexes', ''); }
+        }
 
         $('#btn-send').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>' + BC_I18N.sending);
 

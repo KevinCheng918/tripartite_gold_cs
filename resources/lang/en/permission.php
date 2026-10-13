@@ -95,6 +95,7 @@ return [
     ],
     'telegram_chat' => [
         'ignore_manage'   => 'Manage auto-reply exclusions',
+        'broadcast_template' => 'Manage announcement templates',
         'reply'     => 'Reply messages',
         'assign'    => 'Assign duty staff',
         'broadcast' => 'Broadcast announcement',

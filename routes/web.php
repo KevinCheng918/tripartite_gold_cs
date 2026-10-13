@@ -218,6 +218,22 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::post('/ajax-send', [TelegramBroadcastController::class, 'ajaxSend'])->middleware('can:telegram_chat.broadcast')->name('ajax-send');
         Route::get('/ajax-history', [TelegramBroadcastController::class, 'ajaxHistory'])->middleware('can:telegram_chat.broadcast')->name('ajax-history');
         Route::put('/ajax-cancel-schedule/{broadcast}', [TelegramBroadcastController::class, 'ajaxCancelSchedule'])->middleware('can:telegram_chat.broadcast')->name('ajax-cancel-schedule');
+
+        /*
+         * 公告範本。
+         *
+         * ⚠ 清單綁 `broadcast`（能發送的人要看得到下拉選項），
+         * 增刪改綁 `broadcast_template`（改公版會影響之後每一個人發出去的內容）。
+         */
+        Route::get('/ajax-templates', [TelegramBroadcastController::class, 'ajaxTemplates'])->middleware('can:telegram_chat.broadcast')->name('ajax-templates');
+        Route::post('/ajax-template', [TelegramBroadcastController::class, 'ajaxStoreTemplate'])->middleware('can:telegram_chat.broadcast_template')->name('ajax-store-template');
+        /*
+         * ⚠ 更新用 POST 不是 PUT：這支要收 multipart（附件），
+         * 而 PHP 不解析 PUT 的 multipart body，`$request->file()` 會是空的。
+         * 同一個理由，發送那支 `ajax-send` 也是 POST。
+         */
+        Route::post('/ajax-template/{template}', [TelegramBroadcastController::class, 'ajaxUpdateTemplate'])->middleware('can:telegram_chat.broadcast_template')->name('ajax-update-template');
+        Route::delete('/ajax-template/{template}', [TelegramBroadcastController::class, 'ajaxDeleteTemplate'])->middleware('can:telegram_chat.broadcast_template')->name('ajax-delete-template');
     });
 
     // 虛擬機管理

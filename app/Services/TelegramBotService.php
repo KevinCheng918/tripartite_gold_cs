@@ -4,6 +4,7 @@ namespace App\Services;
 
 use GuzzleHttp\Client;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -636,6 +637,35 @@ class TelegramBotService
 
             return null;
         }
+    }
+
+    /**
+     * 這個 Bot 自己的 username（不含 @）
+     *
+     * ⚠ **要快取**：判斷「這則訊息有沒有 tag 我」每一則都要用，
+     * 每則都打一次 API 是把 webhook 的延遲綁在 Telegram 的回應時間上。
+     * Bot 的 username 幾乎不會變，一天問一次綽綽有餘。
+     *
+     * ⚠ 失敗時回 null 而不是空字串 —— 呼叫端要分得出「查不到」
+     * 與「真的沒有名字」：前者不該把訊息當成 tag 到自己。
+     *
+     * @return string|null
+     */
+    public function getMyUsername()
+    {
+        return Cache::remember('telegram.bot.username', now()->addDay(), function () {
+            try {
+                $response = $this->client->get("{$this->getBaseUrl()}/getMe");
+                $body = json_decode($response->getBody()->getContents(), true);
+                $username = Arr::get((array) $body, 'result.username');
+
+                return filled($username) ? (string) $username : null;
+            } catch (\Exception $e) {
+                Log::error('Telegram getMe 失敗', ['error' => $e->getMessage()]);
+
+                return null;
+            }
+        });
     }
 
     /**

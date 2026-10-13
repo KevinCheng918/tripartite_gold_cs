@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\AutoReplySupportService;
 use App\Services\CustomerFollowupService;
 use App\Services\DailyRateService;
+use App\Services\ScheduledReminderService;
 use App\Services\TelegramBotService;
 use App\Services\TelegramChatService;
 use Illuminate\Http\Request;
@@ -24,6 +25,7 @@ class TelegramWebhookController extends Controller
     private $supportService;
     private $dailyRateService;
     private $followupService;
+    private $reminderService;
     private $botService;
 
     public function __construct(
@@ -31,13 +33,16 @@ class TelegramWebhookController extends Controller
         AutoReplySupportService $supportService,
         DailyRateService $dailyRateService,
         CustomerFollowupService $followupService,
+        ScheduledReminderService $reminderService,
         TelegramBotService $botService
     ) {
         $this->chatService = $chatService;
         $this->supportService = $supportService;
         $this->dailyRateService = $dailyRateService;
-        // 待追蹤事項的兩顆按鈕（callback_data 前綴 fu:）
+        // 待追蹤事項的三顆按鈕（callback_data 前綴 fu:）
         $this->followupService = $followupService;
+        // 預約提醒：tag 機器人建立、取消按鈕（前綴 rm:）
+        $this->reminderService = $reminderService;
         // 回應 callback_query，不然按鈕會一直轉圈
         $this->botService = $botService;
     }
@@ -103,6 +108,17 @@ class TelegramWebhookController extends Controller
                     return response()->json(['ok' => true]);
                 }
 
+                /*
+                 * tag 機器人 ＝ 要排預約提醒（或查清單）。
+                 *
+                 * ⚠ 擺在求助單**之前**：求助單靠「引用回覆」運作，而預約是
+                 * 直接 tag 機器人 —— 兩者的觸發條件不重疊，但先問這一支
+                 * 才不會讓「@bot 明天提醒我…」掉進求助單的作答判斷。
+                 */
+                if ($this->reminderService->handleMessage($payload)) {
+                    return response()->json(['ok' => true]);
+                }
+
                 $this->supportService->handleSupportMessage($payload);
 
                 return response()->json(['ok' => true]);
@@ -141,25 +157,37 @@ class TelegramWebhookController extends Controller
     {
         $data = (string) Arr::get($payload, 'callback_query.data');
         $prefix = (string) Arr::get(explode(':', $data), 0);
+        $callback = (array) Arr::get($payload, 'callback_query');
 
-        if ($prefix !== (string) config('constants.FOLLOWUP.CALLBACK.DECIDE')) {
-            $this->supportService->handleCallback($payload);
+        if ($prefix === (string) config('constants.FOLLOWUP.CALLBACK.DECIDE')) {
+            /*
+             * 要先回應 callback_query，否則按鈕會一直轉圈（Telegram 的規矩）。
+             * 求助單那邊是在 `handleCallback()` 裡做，這兩條路自己做一次。
+             */
+            $this->botService->answerCallbackQuery(Arr::get($callback, 'id'));
+
+            $this->followupService->handleCallback(
+                array_slice(explode(':', $data), 1),
+                Arr::get($callback, 'message.message_id'),
+                (array) Arr::get($callback, 'from', [])
+            );
 
             return;
         }
 
-        /*
-         * 要先回應 callback_query，否則按鈕會一直轉圈（Telegram 的規矩）。
-         * 求助單那邊是在 `handleCallback()` 裡做，這條路自己做一次。
-         */
-        $callback = (array) Arr::get($payload, 'callback_query');
-        $this->botService->answerCallbackQuery(Arr::get($callback, 'id'));
+        // 預約提醒的取消鈕
+        if ($prefix === (string) config('constants.REMINDER.CALLBACK')) {
+            $this->botService->answerCallbackQuery(Arr::get($callback, 'id'));
 
-        $this->followupService->handleCallback(
-            array_slice(explode(':', $data), 1),
-            Arr::get($callback, 'message.message_id'),
-            (array) Arr::get($callback, 'from', [])
-        );
+            $this->reminderService->handleCallback(
+                array_slice(explode(':', $data), 1),
+                Arr::get($callback, 'message.message_id')
+            );
+
+            return;
+        }
+
+        $this->supportService->handleCallback($payload);
     }
 
     /**

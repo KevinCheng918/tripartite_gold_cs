@@ -142,6 +142,13 @@ return [
              * 影響範圍比「回一則訊息」大，該由管理者單獨指派。
              */
             'telegram_chat.ignore_manage' => 'permission.telegram_chat.ignore_manage',
+
+            /*
+             * 建檔／修改公告範本。跟 `broadcast` 分開（需求方 2026-10-13）：
+             * 「能發公告」與「能改公版內容」是兩件事 —— 改了公版會影響
+             * 之後每一個人發出去的內容，而發送只影響這一次。
+             */
+            'telegram_chat.broadcast_template' => 'permission.telegram_chat.broadcast_template',
         ],
     ],
 

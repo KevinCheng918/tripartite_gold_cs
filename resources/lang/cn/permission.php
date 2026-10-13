@@ -99,6 +99,7 @@ return [
         'broadcast'       => '群发公告',
         'delete'          => '删除对话记录',
         'ignore_manage'   => '设定不自动回覆的成员',
+        'broadcast_template' => '建档／修改公告范本',
     ],
     'staff_manage' => [
         'view' => '查看内部管理',

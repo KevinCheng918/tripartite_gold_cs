@@ -11,6 +11,33 @@ return [
     'field_groups'    => '选择群组',
     'btn_send'        => '发送公告',
     'tab_send'        => '发送公告',
+    'tab_template'    => '公告管理',
+
+    /*
+     * 公告管理（建档的范本）。
+     *
+     * ⚠ 标题只在后台辨识用，**不会发给客人** —— 发出去的只有内容与附件。
+     */
+    'template_title'       => '公告标题',
+    'template_title_hint'  => '只在后台用来辨识，不会发送给客人',
+    'template_title_ph'    => '例如：中秋连假公告',
+    'action_save'          => '保存',
+    'action_cancel'        => '取消',
+    'template_add'         => '新增公告',
+    'template_edit'        => '编辑公告',
+    'template_delete'      => '删除公告',
+    'template_empty'       => '还没有建档的公告',
+    'template_creator'     => '建档者',
+    'template_updated_at'  => '最后修改',
+    'template_attachments' => '附件',
+    'template_delete_confirm' => '确定删除「:title」吗？已经用它发出去的公告不受影响。',
+
+    // 发送分页的「公告来源」
+    'source_label'    => '公告来源',
+    'source_manual'   => '自己输入',
+    'source_template' => '选择已建档的公告',
+    'source_pick'     => '请选择公告',
+    'source_hint'     => '选了之后内容与附件会带进下面的表单，还可以继续修改；改动不会存回公告。',
     'tab_history'     => '历史记录',
     'field_sender'    => '发送者',
     'field_time'      => '发送时间',
@@ -58,6 +85,11 @@ return [
         'send_success' => '公告已发送：共 :total 个群组，成功 :success，失败 :fail',
         'send_failed'  => '群发公告失败',
         'content_required' => '请输入公告内容',
+        'title_required'   => '请输入公告标题',
+        'title_too_long'   => '公告标题不可超过 :value 字元',
+        'template_saved'   => '公告已保存',
+        'template_deleted' => '公告已删除',
+        'template_failed'  => '公告保存失败，请稍后再试',
         'no_group_selected' => '请至少选择一个群组',
         'content_too_long'  => '公告内容不可超过 4096 字元',
         'too_many_images'   => '图片最多 :value 张',

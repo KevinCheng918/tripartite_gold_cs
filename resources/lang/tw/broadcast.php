@@ -11,7 +11,35 @@ return [
     'field_groups'    => '選擇群組',
     'btn_send'        => '發送公告',
     'tab_send'        => '發送公告',
+    'tab_template'    => '公告管理',
     'tab_history'     => '歷史紀錄',
+
+    /*
+     * 公告管理（建檔的範本）。
+     *
+     * ⚠ 標題只在後台辨識用，**不會發給客人** —— 發出去的只有內容與附件。
+     * 介面上一定要講清楚，不然會有人把「【重要】」寫進標題以為客人看得到。
+     */
+    'template_title'       => '公告標題',
+    'template_title_hint'  => '只在後台用來辨識，不會發送給客人',
+    'template_title_ph'    => '例如：中秋連假公告',
+    'action_save'          => '儲存',
+    'action_cancel'        => '取消',
+    'template_add'         => '新增公告',
+    'template_edit'        => '編輯公告',
+    'template_delete'      => '刪除公告',
+    'template_empty'       => '還沒有建檔的公告',
+    'template_creator'     => '建檔者',
+    'template_updated_at'  => '最後修改',
+    'template_attachments' => '附件',
+    'template_delete_confirm' => '確定刪除「:title」嗎？已經用它發出去的公告不受影響。',
+
+    // 發送分頁的「公告來源」
+    'source_label'    => '公告來源',
+    'source_manual'   => '自己輸入',
+    'source_template' => '選擇已建檔的公告',
+    'source_pick'     => '請選擇公告',
+    'source_hint'     => '選了之後內容與附件會帶進下面的表單，還可以繼續修改；改動不會存回公告。',
     'field_sender'    => '發送者',
     'field_time'      => '發送時間',
     'field_total'     => '總數',
@@ -58,6 +86,11 @@ return [
         'send_success' => '公告已發送：共 :total 個群組，成功 :success，失敗 :fail',
         'send_failed'  => '群發公告失敗',
         'content_required' => '請輸入公告內容',
+        'title_required'   => '請輸入公告標題',
+        'title_too_long'   => '公告標題不可超過 :value 字元',
+        'template_saved'   => '公告已儲存',
+        'template_deleted' => '公告已刪除',
+        'template_failed'  => '公告儲存失敗，請稍後再試',
         'no_group_selected' => '請至少選擇一個群組',
         'content_too_long'  => '公告內容不可超過 4096 字元',
         'too_many_images'   => '圖片最多 :value 張',

@@ -11,6 +11,34 @@ return [
     'field_groups'    => 'Select groups',
     'btn_send'        => 'Send',
     'tab_send'        => 'Send',
+    'tab_template'    => 'Saved announcements',
+
+    /*
+     * Saved announcements (templates).
+     *
+     * ⚠ The title is for back-office identification only — it is **not** sent
+     * to customers. Only the content and attachments go out.
+     */
+    'template_title'       => 'Title',
+    'template_title_hint'  => 'For identifying it in the back office only; customers never see it',
+    'template_title_ph'    => 'e.g. Mid-Autumn holiday notice',
+    'action_save'          => 'Save',
+    'action_cancel'        => 'Cancel',
+    'template_add'         => 'New announcement',
+    'template_edit'        => 'Edit announcement',
+    'template_delete'      => 'Delete announcement',
+    'template_empty'       => 'No saved announcements yet',
+    'template_creator'     => 'Created by',
+    'template_updated_at'  => 'Last edited',
+    'template_attachments' => 'Attachments',
+    'template_delete_confirm' => 'Delete ":title"? Announcements already sent with it are unaffected.',
+
+    // "Source" on the send tab
+    'source_label'    => 'Source',
+    'source_manual'   => 'Write my own',
+    'source_template' => 'Use a saved announcement',
+    'source_pick'     => 'Pick an announcement',
+    'source_hint'     => 'Its content and attachments are copied into the form below and stay editable; your edits are not written back.',
     'tab_history'     => 'History',
     'field_sender'    => 'Sender',
     'field_time'      => 'Sent at',
@@ -59,6 +87,11 @@ return [
         'send_success' => 'Sent to :total groups, :success success, :fail failed',
         'send_failed'  => 'Failed to broadcast',
         'content_required' => 'Content is required',
+        'title_required'   => 'Title is required',
+        'title_too_long'   => 'Title cannot exceed :value characters',
+        'template_saved'   => 'Announcement saved',
+        'template_deleted' => 'Announcement deleted',
+        'template_failed'  => 'Could not save the announcement, please try again later',
         'no_group_selected' => 'Please select at least one group',
         'content_too_long'  => 'Content must not exceed 4096 characters',
         'too_many_images'   => 'At most :value images',
