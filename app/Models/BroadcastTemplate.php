@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * （`[{path, name}]`），發送時整個陣列搬過去。
  *
  * @property int         $id
+ * @property string|null $code       公告編號，人工輸入（既有資料可能是空的）
  * @property string      $title      範本標題（只在後台辨識用）
  * @property string      $content    公告內容
  * @property array|null  $image_urls 圖片 [{path, name}]

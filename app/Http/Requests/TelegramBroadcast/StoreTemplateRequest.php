@@ -18,6 +18,9 @@ class StoreTemplateRequest extends FormRequest
     /** @var int 標題長度上限，對齊 DB 的 string(100) */
     public static $titleMax = 100;
 
+    /** @var int 公告編號長度上限，對齊 DB 的 string(32) */
+    public static $codeMax = 32;
+
     public function authorize()
     {
         return true;
@@ -29,6 +32,11 @@ class StoreTemplateRequest extends FormRequest
     public function rules()
     {
         return [
+            /*
+             * ⚠ 編號要唯一 —— 它的用途就是唯一識別，重複的編號等於沒有編號。
+             * DB 那一欄是 nullable（既有資料沒有編號），但表單這裡必填。
+             */
+            'code'     => 'required|string|max:' . self::$codeMax . '|unique:broadcast_template,code',
             'title'    => 'required|string|max:' . self::$titleMax,
             'content'  => 'required|string|max:4096',
             'images'   => 'nullable|array|max:' . SendBroadcastRequest::$maxImages,
@@ -41,6 +49,9 @@ class StoreTemplateRequest extends FormRequest
     public function messages()
     {
         return [
+            'code.required'    => trans('broadcast.msg.code_required'),
+            'code.max'         => trans('broadcast.msg.code_too_long', ['value' => self::$codeMax]),
+            'code.unique'      => trans('broadcast.msg.code_duplicated'),
             'title.required'   => trans('broadcast.msg.title_required'),
             'title.max'        => trans('broadcast.msg.title_too_long', ['value' => self::$titleMax]),
             'content.required' => trans('broadcast.msg.content_required'),

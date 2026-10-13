@@ -19,6 +19,9 @@ return [
      * ⚠ The title is for back-office identification only — it is **not** sent
      * to customers. Only the content and attachments go out.
      */
+    'template_code'        => 'Reference',
+    'template_code_hint'   => 'Your own reference, must be unique; like the title, customers never see it',
+    'template_code_ph'     => 'e.g. 2026-001',
     'template_title'       => 'Title',
     'template_title_hint'  => 'For identifying it in the back office only; customers never see it',
     'template_title_ph'    => 'e.g. Mid-Autumn holiday notice',
@@ -87,6 +90,9 @@ return [
         'send_success' => 'Sent to :total groups, :success success, :fail failed',
         'send_failed'  => 'Failed to broadcast',
         'content_required' => 'Content is required',
+        'code_required'    => 'Reference is required',
+        'code_too_long'    => 'Reference cannot exceed :value characters',
+        'code_duplicated'  => 'That reference is already taken, please use another one',
         'title_required'   => 'Title is required',
         'title_too_long'   => 'Title cannot exceed :value characters',
         'template_saved'   => 'Announcement saved',

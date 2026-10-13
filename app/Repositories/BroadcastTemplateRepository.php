@@ -20,7 +20,7 @@ class BroadcastTemplateRepository
      * @var array
      */
     private const LIST_COLUMNS = [
-        'id', 'title', 'content', 'image_urls', 'file_urls', 'created_by', 'updated_at',
+        'id', 'code', 'title', 'content', 'image_urls', 'file_urls', 'created_by', 'updated_at',
     ];
 
     /**

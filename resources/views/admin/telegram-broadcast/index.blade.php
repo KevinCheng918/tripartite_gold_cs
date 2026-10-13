@@ -176,6 +176,7 @@
                         <table class="table table-hover align-middle data-table">
                             <thead class="thead-gold">
                                 <tr>
+                                    <th class="col-tight">{{ trans('broadcast.template_code') }}</th>
                                     <th>{{ trans('broadcast.template_title') }}</th>
                                     <th>{{ trans('broadcast.field_content') }}</th>
                                     <th class="col-num">{{ trans('broadcast.template_attachments') }}</th>
@@ -394,12 +395,20 @@
                     <form id="form-template">
                         <input type="hidden" id="tpl-id">
 
-                        <div class="mb-3">
-                            <label class="form-label" for="tpl-title">{{ trans('broadcast.template_title') }} <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="tpl-title" maxlength="100"
-                                   placeholder="{{ trans('broadcast.template_title_ph') }}" required>
-                            {{-- 一定要講：不然會有人把「【重要】」寫進標題以為客人看得到 --}}
-                            <small class="form-text text-muted">{{ trans('broadcast.template_title_hint') }}</small>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label" for="tpl-code">{{ trans('broadcast.template_code') }} <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="tpl-code" maxlength="32"
+                                       placeholder="{{ trans('broadcast.template_code_ph') }}" required>
+                                <small class="form-text text-muted">{{ trans('broadcast.template_code_hint') }}</small>
+                            </div>
+                            <div class="col-md-8 mb-3">
+                                <label class="form-label" for="tpl-title">{{ trans('broadcast.template_title') }} <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="tpl-title" maxlength="100"
+                                       placeholder="{{ trans('broadcast.template_title_ph') }}" required>
+                                {{-- 一定要講：不然會有人把「【重要】」寫進標題以為客人看得到 --}}
+                                <small class="form-text text-muted">{{ trans('broadcast.template_title_hint') }}</small>
+                            </div>
                         </div>
 
                         <div class="mb-3">
@@ -846,7 +855,11 @@ $(function () {
     //  公告管理（建檔的範本）
     // ===============================================================
 
-    var templates = [];
+    /*
+     * 範本清單隨頁面一起到，直接畫 —— 切到「公告管理」分頁時資料已經在手上，
+     * 不會先空白一下才跳出來。異動之後才走 ajax 重載。
+     */
+    var templates = @json($templates->resolve());
     var canManageTemplate = @json(Auth::user()->hasPermission('telegram_chat.broadcast_template'));
 
     /**
@@ -858,6 +871,10 @@ $(function () {
      * @param {Function} [after] 載完要做的事（例如存完重畫）
      */
     function loadTemplates(after) {
+        // 重載時先擺一列「載入中」—— 空白的表格看起來像壞掉或沒資料
+        $('#template-list').html('<tr><td colspan="' + (canManageTemplate ? 7 : 6) + '" class="table-empty">'
+            + '<i class="fas fa-spinner fa-spin me-1"></i>' + @json(trans('common.loading')) + '</td></tr>');
+
         $.ajax({
             url: '/admin/telegram-broadcast/ajax-templates',
             headers: { 'X-CSRF-TOKEN': csrfToken },
@@ -866,6 +883,10 @@ $(function () {
                 renderTemplateList();
                 renderTemplateOptions();
                 if (after) { after(); }
+            },
+            error: function () {
+                $('#template-list').html('<tr><td colspan="' + (canManageTemplate ? 7 : 6) + '" class="table-empty text-danger">'
+                    + BC_I18N.msg.template_failed + '</td></tr>');
             }
         });
     }
@@ -873,7 +894,7 @@ $(function () {
     /** 公告管理分頁的表格 */
     function renderTemplateList() {
         var $tbody = $('#template-list');
-        var cols = canManageTemplate ? 6 : 5;
+        var cols = canManageTemplate ? 7 : 6;
 
         if (!templates.length) {
             $tbody.html('<tr><td colspan="' + cols + '" class="table-empty"><i class="fas fa-inbox"></i>' + BC_I18N.template_empty + '</td></tr>');
@@ -886,6 +907,8 @@ $(function () {
             var attachCount = (t.image_urls || []).length + (t.file_urls || []).length;
 
             html += '<tr>';
+            // 既有資料可能還沒補編號
+            html += '<td class="col-tight">' + (t.code ? escapeHtml(t.code) : '-') + '</td>';
             html += '<td><span class="cell-stack__main">' + escapeHtml(t.title) + '</span></td>';
             // 內容只給摘要 —— 整段貼進表格會把其他欄位擠掉
             html += '<td><span class="text-muted">' + escapeHtml(summarize(t.content)) + '</span></td>';
@@ -929,7 +952,10 @@ $(function () {
         var html = '<option value="">' + BC_I18N.source_pick + '</option>';
 
         templates.forEach(function (t) {
-            html += '<option value="' + t.id + '">' + escapeHtml(t.title) + '</option>';
+            // 有編號就擺前面 —— 挑公告時那串比標題更好認
+            var label = t.code ? t.code + '　' + t.title : t.title;
+
+            html += '<option value="' + t.id + '">' + escapeHtml(label) + '</option>';
         });
 
         $('#bc-template-id').html(html);
@@ -1061,6 +1087,7 @@ $(function () {
     function openTemplateModal(tpl) {
         $('#modal-template-title').text(tpl ? BC_I18N.template_edit : BC_I18N.template_add);
         $('#tpl-id').val(tpl ? tpl.id : '');
+        $('#tpl-code').val(tpl ? (tpl.code || '') : '');
         $('#tpl-title').val(tpl ? tpl.title : '');
         $('#tpl-content').val(tpl ? tpl.content : '').trigger('input');
         $('#tpl-files').val('');
@@ -1138,6 +1165,7 @@ $(function () {
         var id = $('#tpl-id').val();
         var formData = new FormData();
 
+        formData.append('code', $('#tpl-code').val().trim());
         formData.append('title', $('#tpl-title').val().trim());
         formData.append('content', $('#tpl-content').val().trim());
 
@@ -1205,7 +1233,9 @@ $(function () {
         });
     });
 
-    loadTemplates();
+    // 資料已經隨頁面到了，直接畫；不打 ajax
+    renderTemplateList();
+    renderTemplateOptions();
 });
 </script>
 @endsection

@@ -68,6 +68,7 @@ class TelegramBroadcastService
     public function createTemplate(array $params, array $images, array $files, $userId)
     {
         return $this->templateRepository->create([
+            'code'       => Arr::get($params, 'code'),
             'title'      => Arr::get($params, 'title'),
             'content'    => Arr::get($params, 'content'),
             'image_urls' => filled($images) ? $images : null,
@@ -105,6 +106,7 @@ class TelegramBroadcastService
         );
 
         return $this->templateRepository->update($template, [
+            'code'       => Arr::get($params, 'code'),
             'title'      => Arr::get($params, 'title'),
             'content'    => Arr::get($params, 'content'),
             'image_urls' => filled($images) ? array_values($images) : null,

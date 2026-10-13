@@ -26,6 +26,8 @@ class BroadcastTemplateResource extends JsonResource
     {
         return [
             'id'         => $this->id,
+            // 既有資料可能還沒補編號，前端顯示「—」
+            'code'       => $this->code,
             'title'      => $this->title,
             'content'    => $this->content,
             'image_urls' => $this->image_urls ?: [],

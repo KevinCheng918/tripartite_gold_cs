@@ -20,6 +20,9 @@ return [
      * ⚠ 標題只在後台辨識用，**不會發給客人** —— 發出去的只有內容與附件。
      * 介面上一定要講清楚，不然會有人把「【重要】」寫進標題以為客人看得到。
      */
+    'template_code'        => '公告編號',
+    'template_code_hint'   => '自己訂的編號，不可重複；跟標題一樣不會發送給客人',
+    'template_code_ph'     => '例如：2026-001',
     'template_title'       => '公告標題',
     'template_title_hint'  => '只在後台用來辨識，不會發送給客人',
     'template_title_ph'    => '例如：中秋連假公告',
@@ -86,6 +89,9 @@ return [
         'send_success' => '公告已發送：共 :total 個群組，成功 :success，失敗 :fail',
         'send_failed'  => '群發公告失敗',
         'content_required' => '請輸入公告內容',
+        'code_required'    => '請輸入公告編號',
+        'code_too_long'    => '公告編號不可超過 :value 字元',
+        'code_duplicated'  => '這個公告編號已經有人用了，請換一個',
         'title_required'   => '請輸入公告標題',
         'title_too_long'   => '公告標題不可超過 :value 字元',
         'template_saved'   => '公告已儲存',

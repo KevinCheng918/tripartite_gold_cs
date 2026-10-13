@@ -4,6 +4,7 @@ namespace App\Http\Requests\TelegramBroadcast;
 
 use App\Http\Requests\Concerns\BlocksExecutableUploads;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * 修改公告範本
@@ -30,6 +31,16 @@ class UpdateTemplateRequest extends FormRequest
     public function rules()
     {
         return [
+            /*
+             * ⚠ 唯一性要**排除自己**，不然改標題時會被自己的編號擋下來。
+             * `route('template')` 是 route model binding 綁進來的那一筆。
+             */
+            'code' => [
+                'required',
+                'string',
+                'max:' . StoreTemplateRequest::$codeMax,
+                Rule::unique('broadcast_template', 'code')->ignore($this->route('template')),
+            ],
             'title'    => 'required|string|max:' . StoreTemplateRequest::$titleMax,
             'content'  => 'required|string|max:4096',
 
@@ -54,6 +65,9 @@ class UpdateTemplateRequest extends FormRequest
     public function messages()
     {
         return [
+            'code.required'    => trans('broadcast.msg.code_required'),
+            'code.max'         => trans('broadcast.msg.code_too_long', ['value' => StoreTemplateRequest::$codeMax]),
+            'code.unique'      => trans('broadcast.msg.code_duplicated'),
             'title.required'   => trans('broadcast.msg.title_required'),
             'title.max'        => trans('broadcast.msg.title_too_long', ['value' => StoreTemplateRequest::$titleMax]),
             'content.required' => trans('broadcast.msg.content_required'),

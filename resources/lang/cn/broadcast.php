@@ -18,6 +18,9 @@ return [
      *
      * ⚠ 标题只在后台辨识用，**不会发给客人** —— 发出去的只有内容与附件。
      */
+    'template_code'        => '公告编号',
+    'template_code_hint'   => '自己订的编号，不可重复；跟标题一样不会发送给客人',
+    'template_code_ph'     => '例如：2026-001',
     'template_title'       => '公告标题',
     'template_title_hint'  => '只在后台用来辨识，不会发送给客人',
     'template_title_ph'    => '例如：中秋连假公告',
@@ -85,6 +88,9 @@ return [
         'send_success' => '公告已发送：共 :total 个群组，成功 :success，失败 :fail',
         'send_failed'  => '群发公告失败',
         'content_required' => '请输入公告内容',
+        'code_required'    => '请输入公告编号',
+        'code_too_long'    => '公告编号不可超过 :value 字元',
+        'code_duplicated'  => '这个公告编号已经有人用了，请换一个',
         'title_required'   => '请输入公告标题',
         'title_too_long'   => '公告标题不可超过 :value 字元',
         'template_saved'   => '公告已保存',

@@ -51,6 +51,13 @@ class TelegramBroadcastController extends Controller
             'groups'  => $groups,
             'systems' => $systems,
             'history' => $history,
+
+            /*
+             * 範本清單隨頁面一起送，不讓前端再打一次 ajax ——
+             * 切到「公告管理」分頁時資料已經在手上，不會先空白一下才跳出來。
+             * 新增／編輯／刪除之後才走 `ajax-templates` 重載。
+             */
+            'templates' => BroadcastTemplateResource::collection($this->broadcastService->templates()),
         ]);
     }
 
@@ -179,6 +186,9 @@ class TelegramBroadcastController extends Controller
      *
      * ⚠ 這支**不綁 `broadcast_template` 權限**：只能發送的人也要看得到清單，
      * 否則「選擇已建檔的公告」那個下拉會是空的。能不能改才是另一個權限。
+     *
+     * ⚠ 首次進頁面**不會打這支** —— 清單隨頁面一起送（見 `index()`）。
+     * 這裡只服務「新增／編輯／刪除之後的重載」。
      *
      * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection
      */
