@@ -45,6 +45,18 @@
 
 ## 權限：`station.update`
 
+介面上叫什麼：**帳號管理 → 編輯帳號 → 權限設定 → 站台管理 → 編輯站台**。
+
+| | |
+|---|---|
+| keyword | `station.update` |
+| 群組 label | `permission.group.station` → 站台管理 |
+| 項目 label | `permission.station.update` → **編輯站台** |
+
+⚠ 對外文案要寫**介面上看到的那幾個字**。第一版寫成「站台編輯」（2026-10-13
+當天就被問「station.update 是什麼？我怎麼沒看到」）—— keyword 不會出現在介面上，
+而近似說法會讓人在權限頁上找不到。
+
 後台的同步按鈕是 `can:station.update`（`routes/web.php` 的 `ajax-sync-credits`）。
 同一件事換個入口做卻不檢查，這支指令就是 RBAC 的後門 —— 所以指令也要同一個 keyword。
 
