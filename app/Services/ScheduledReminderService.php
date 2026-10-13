@@ -408,12 +408,20 @@ class ScheduledReminderService
      *
      * ⚠ 三種單位各自取整：「0 天後」看起來像壞掉，「1440 分鐘後」沒人換算得出來。
      *
+     * ⚠ **基準要截到整分鐘**（`startOfMinute()`）。`remind_at` 的秒數一律是 0
+     * （`ReminderParser` 存進去前就 `seconds(0)`），而 `now()` 帶著秒 ——
+     * 14:52:30 說「五分鐘後」排到 14:57:00，實際差距是 4 分 30 秒，
+     * `diffInMinutes()` 無條件捨去就變成「**4 分鐘後**」。
+     * 使用者剛說完五分鐘，看到 4 只會覺得系統算錯（2026-10-13 回報）。
+     *
+     * 截到整分鐘之後，14:52:00 → 14:57:00 剛好是 5，跟他講的一致。
+     *
      * @param \Illuminate\Support\Carbon $date
      * @return string
      */
     private function whenText($date)
     {
-        $minutes = now()->diffInMinutes($date, false);
+        $minutes = now()->startOfMinute()->diffInMinutes($date, false);
 
         if ($minutes < 0) {
             return (string) config('constants.REMINDER.WHEN_PAST');
