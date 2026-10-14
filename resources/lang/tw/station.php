@@ -116,6 +116,10 @@ return [
     'topup_action_deduct' => '扣點',
     'topup_credit'        => '系統點數',
     'topup_shop_credit'   => '商城點數',
+    // 其他：不呼叫主系統 API，只在這裡記一筆帳；備註必填
+    'topup_other'              => '其他',
+    'topup_other_hint'         => '「其他」不會呼叫主系統 API，點數不會真的加扣，只在這裡留一筆紀錄。備註必填。',
+    'topup_other_note_required' => '點數類型選「其他」時，備註必填（不然事後查不出這筆是什麼）',
     'topup_field_station'  => '站台',
     'topup_field_action'   => '操作',
     'topup_field_type'     => '點數類型',

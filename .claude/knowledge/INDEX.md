@@ -62,7 +62,7 @@
 | [features/quick-reply.md](features/quick-reply.md) | 快速回覆題庫（類別／問答維護、拖曳排序、編號與關鍵字搜尋） | 已完成（持續迭代，文件待補完） |
 | [features/shared-file.md](features/shared-file.md) | 文件區（共用／個人資料夾、子資料夾、Telegram 選檔） | 已完成（持續迭代） |
 | [features/station.md](features/station.md) | 站台管理（狀態定義、列表預設只看正常、預設值該放哪一層） | 已完成（持續迭代，文件待補完） |
-| [features/station-topup.md](features/station-topup.md) | 站台補點／扣點（USDT 換算或直接輸入點數、審核、均匯率統計排除規則、日期快捷鈕與共用的 `window.DateRange`） | 已完成（持續迭代） |
+| [features/station-topup.md](features/station-topup.md) | 站台補點／扣點（USDT 換算或直接輸入點數、審核、均匯率統計排除規則、日期快捷鈕與共用的 `window.DateRange`）。2026-10-14 加點數類型**「其他」**：一樣能輸入金額、一樣要通過／拒絕，但**不呼叫主系統 API**（點數不會真的加扣）、**不發客戶通知**（沒東西可通知，硬發就是騙人）、**備註必填**（沒有 `api_response` 可對照，不寫就查不出這筆是什麼）。⚠ 分支要擋在「站台沒設 API 就判失敗」**之前**，否則沒設 API 的站台連記帳都會失敗 | 已完成（持續迭代） |
 | [features/finance.md](features/finance.md) | 財務管理（收入模型：補點與虛擬機分開計算、外幣支出換算、手動覆蓋機制） | 已完成（持續迭代） |
 | [features/daily-rate.md](features/daily-rate.md) | 每日匯率報價（9 點報到內部群組、引用回覆決定、沒回每 30 分 tag 主管、客人問匯率的動態答案、歷史與手動修改） | 已完成（問匯率會直接發補點訊息含繳款圖） |
 | [features/station-credit-alert.md](features/station-credit-alert.md) | 站台餘點告警（每日同步餘點、低於門檻自動發 Telegram、**告警與補點訊息分兩則發且圖只附在補點那則**、公版與門檻在繳款設定頁維護、不收費的站台不告警、沒設群組退到內部群組、`--dry-run` 完全唯讀） | 已完成 |

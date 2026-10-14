@@ -39,6 +39,21 @@ class CreditTopup extends Model
     /** @var int 直接輸入點數，無 USDT 與匯率，不列入均匯率計算 */
     public const TYPE_CREDIT = 2;
 
+    /** @var string 系統點數（會呼叫主系統 API 真的加扣） */
+    public const CREDIT_TYPE_CREDIT = 'credit';
+    /** @var string 商城點數（會呼叫主系統 API 真的加扣） */
+    public const CREDIT_TYPE_SHOP = 'shop_credit';
+    /**
+     * 其他
+     *
+     * ⚠ **不呼叫主系統 API**（需求方 2026-10-14）。這一類是「記一筆帳」——
+     * 金額照填、照樣要人審核通過或拒絕，但主系統的點數不會動。
+     * 所以備註必填：不寫的話，事後沒人知道這筆是什麼。
+     *
+     * @var string
+     */
+    public const CREDIT_TYPE_OTHER = 'other';
+
     /** @var int 待審核 */
     public const STATUS_PENDING = 0;
     /** @var int 已完成 */
@@ -58,6 +73,22 @@ class CreditTopup extends Model
         'reviewed_at'   => 'datetime',
         'images'        => 'array',
     ];
+
+    /**
+     * 這一筆是不是「其他」
+     *
+     * ⚠ 「其他」**不呼叫主系統 API** —— 審核通過只是把這筆帳記成已完成，
+     * 主系統的點數不會動，也不會發通知給客戶（沒有東西可以通知）。
+     *
+     * 寫成 predicate 而不是讓各處自己比字串：這個判斷會出現在審核流程、
+     * 列表顯示、驗證規則幾個地方，各寫一份就會有人漏掉。
+     *
+     * @return bool
+     */
+    public function isOther()
+    {
+        return (string) $this->credit_type === self::CREDIT_TYPE_OTHER;
+    }
 
     /**
      * @return BelongsTo

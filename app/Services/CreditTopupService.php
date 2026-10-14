@@ -87,6 +87,20 @@ class CreditTopupService
             ]);
         }
 
+        /*
+         * ⚠ 「其他」**在這裡就結束**（需求方 2026-10-14）：不呼叫主系統 API、
+         * 不檢查站台有沒有設 API、也不發 Telegram 通知。
+         *
+         * 這一類是「記一筆帳」—— 主系統的點數不會動，所以沒有東西可以通知
+         * 客戶；硬發一則「已為您加點」會變成騙人。
+         *
+         * ⚠ 擺在站台 API 檢查**之前**：「其他」本來就不需要 API，
+         * 擺後面的話，沒設 API 的站台連記一筆帳都會被判成失敗。
+         */
+        if ($topup->isOther()) {
+            return $this->approveOther($topup, $reviewerId);
+        }
+
         /** @var \App\Models\Station|null $station */
         $station = $topup->station;
         if (!$station || blank($station->api_url) || blank($station->api_key)) {
@@ -137,6 +151,36 @@ class CreditTopupService
         if ((int) $updated->status === CreditTopup::STATUS_COMPLETED) {
             $this->notifyTelegram($station, $result, $reviewerId, $reviewerName);
         }
+
+        return $updated;
+    }
+
+    /**
+     * 審核通過「其他」類型：只把這筆帳記成已完成
+     *
+     * ⚠ 這裡**沒有外部呼叫**，所以也沒有「API 失敗」這種結果 ——
+     * 通過就是通過。`api_response` 留一句話說明為什麼是空的，
+     * 不然事後看紀錄的人會以為 API 回傳掉了。
+     *
+     * @param CreditTopup $topup
+     * @param int         $reviewerId
+     * @return CreditTopup
+     */
+    private function approveOther(CreditTopup $topup, $reviewerId)
+    {
+        $updated = $this->topupRepository->update($topup, [
+            'status'       => CreditTopup::STATUS_COMPLETED,
+            'api_response' => (string) config('constants.STATION.TOPUP.OTHER_API_RESPONSE'),
+            'reviewed_by'  => $reviewerId,
+            'reviewed_at'  => now(),
+        ]);
+
+        Log::info('補點審核通過（其他，未呼叫主系統 API）', [
+            'topup_id'   => $topup->id,
+            'station_id' => $topup->station_id,
+            'amount'     => $topup->credit_amount,
+            'action'     => $topup->action_type,
+        ]);
 
         return $updated;
     }

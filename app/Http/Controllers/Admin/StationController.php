@@ -360,13 +360,19 @@ class StationController extends Controller
         $params = $request->validate([
             'station_id'    => 'required|integer|exists:station,id',
             'action_type'   => 'required|integer|in:1,2',
-            'credit_type'   => 'required|string|in:credit,shop_credit',
+            // other = 不呼叫主系統 API，只記一筆帳（見 CreditTopup::CREDIT_TYPE_OTHER）
+            'credit_type'   => 'required|string|in:credit,shop_credit,other',
             // input_type = 2 為直接輸入點數，此時不需要 USDT 與匯率
             'input_type'    => 'required|integer|in:1,2',
             'usdt_amount'   => 'required_if:input_type,1|nullable|numeric|min:0.0001',
             'exchange_rate' => 'required_if:input_type,1|nullable|numeric|min:0.0001',
             'credit_amount' => 'required|numeric|min:0.01',
-            'note'          => 'nullable|string|max:500',
+            /*
+             * ⚠ 「其他」的備註**必填**（需求方 2026-10-14）。這一類不打
+             * 主系統 API，紀錄上也就沒有任何外部回應可以對照 ——
+             * 不寫備註的話，事後完全沒人知道這筆是什麼。
+             */
+            'note'          => 'required_if:credit_type,other|nullable|string|max:500',
             'images'        => 'nullable|array',
             'images.*'      => 'image|max:5120',
         ]);

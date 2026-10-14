@@ -542,7 +542,13 @@
                             <select id="topup-credit-type" class="form-select" required>
                                 <option value="credit">{{ trans('station.topup_credit') }}</option>
                                 <option value="shop_credit">{{ trans('station.topup_shop_credit') }}</option>
+                                {{-- 其他：不呼叫主系統 API，只記一筆帳。選了它備註會變必填 --}}
+                                <option value="other">{{ trans('station.topup_other') }}</option>
                             </select>
+                            {{-- 選「其他」才顯示，說明這一類不會真的動到點數 --}}
+                            <div id="topup-other-hint" class="form-text text-warning d-none">
+                                {{ trans('station.topup_other_hint') }}
+                            </div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('station.topup_field_input_type') }} <span class="text-danger">*</span></label>
@@ -581,7 +587,11 @@
                             <input id="topup-credit" type="number" class="form-control" step="0.01" min="0.01">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">{{ trans('station.topup_field_note') }}</label>
+                            <label class="form-label">
+                                {{ trans('station.topup_field_note') }}
+                                {{-- 只有「其他」必填，所以這顆星要跟著類型顯示／隱藏 --}}
+                                <span id="topup-note-required" class="text-danger d-none">*</span>
+                            </label>
                             <textarea id="topup-note" class="form-control" rows="2" maxlength="500"></textarea>
                         </div>
                         <div class="mb-3">
@@ -1267,8 +1277,25 @@ $(function () {
     }
 
     function topupActionLabel(actionType, creditType) {
-        var creditLabel = creditType === 'shop_credit' ? '商城點數' : '系統點數';
-        return parseInt(actionType, 10) === 1
+        var isAdd = parseInt(actionType, 10) === 1;
+
+        /*
+         * 「其他」不是一種點數，所以不能套「加○○點數」那個句型
+         * （會變成「加其他」）。它顯示成「加點（其他）」，
+         * 一眼看得出這筆沒有真的動到哪一種點數。
+         */
+        if (creditType === 'other') {
+            var otherLabel = (isAdd ? '加點' : '扣點') + '（{{ trans('station.topup_other') }}）';
+            return isAdd
+                ? '<span class="text-success"><i class="fas fa-plus-circle me-1"></i>' + otherLabel + '</span>'
+                : '<span class="text-danger"><i class="fas fa-minus-circle me-1"></i>' + otherLabel + '</span>';
+        }
+
+        var creditLabel = creditType === 'shop_credit'
+            ? '{{ trans('station.topup_shop_credit') }}'
+            : '{{ trans('station.topup_credit') }}';
+
+        return isAdd
             ? '<span class="text-success"><i class="fas fa-plus-circle me-1"></i>加' + creditLabel + '</span>'
             : '<span class="text-danger"><i class="fas fa-minus-circle me-1"></i>扣' + creditLabel + '</span>';
     }
@@ -1745,6 +1772,17 @@ $(function () {
 
     $('input[name="topup_input_type"]').on('change', function () { switchTopupInputType(); });
 
+    // 點數類型是「其他」時：備註必填，並說明這一類不會真的動到點數
+    function switchTopupCreditType() {
+        var isOther = $('#topup-credit-type').val() === 'other';
+        $('#topup-other-hint').toggleClass('d-none', !isOther);
+        $('#topup-note-required').toggleClass('d-none', !isOther);
+        $('#topup-note').prop('required', isOther);
+    }
+
+    $('#topup-credit-type').on('change', function () { switchTopupCreditType(); });
+    switchTopupCreditType();
+
     // 送出申請
     $('#form-topup-apply').on('submit', function (e) {
         e.preventDefault();
@@ -1767,6 +1805,11 @@ $(function () {
         }
         if (!isDirectCredit && (usdt <= 0 || rate <= 0)) {
             showMessage('請填入正確的 USDT 金額與匯率');
+            return;
+        }
+        // 「其他」不打主系統 API，紀錄上沒有外部回應可對照，沒寫備註就查無可查
+        if ($('#topup-credit-type').val() === 'other' && !$('#topup-note').val().trim()) {
+            showMessage('{{ trans('station.topup_other_note_required') }}');
             return;
         }
 
