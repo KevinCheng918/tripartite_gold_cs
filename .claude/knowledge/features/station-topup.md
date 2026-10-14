@@ -207,6 +207,32 @@ API 回應，**而且點數根本沒變** —— 硬發一則就是在騙客戶�
   系統點數＋無備註 → 通過；不存在的類型 → 擋下 ✓
 - `reject()` 本來就不碰 API，其他類型直接沿用 ✓
 
+### 驗證搬到 `StoreTopupRequest`
+
+`ajaxTopupStore` 的驗證原本寫在 Controller 的 `validate()` 裡。搬出來成
+`app/Http/Requests/Station/StoreTopupRequest.php` 的理由不只是照 PROMPTS.md
+的「有 Request 就補驗證檔」——
+
+⚠ **是為了一句中文訊息。** 寫在 Controller 裡只能吃 Laravel 的預設文案
+（"The note field is required when credit type is other."），結果變成
+**前端擋下來講中文、後端擋下來講英文**，同一條規則兩種臉。
+`messages()` 讓它用上已經寫好的 `station.topup_other_note_required`。
+
+⚠ 規則裡的類型字串改用 `CreditTopup::CREDIT_TYPE_*` 常數組出來，
+不再寫死 `'in:credit,shop_credit,other'` —— 日後加第四種類型時，
+Model 跟驗證不會各改各的。
+
+### 還沒補的（`station` 模組既有缺口）
+
+- **只有 `ajaxTopupStore` 有 Request 檔**。同一個 Controller 的
+  `ajaxStore` / `ajaxUpdate` / `ajaxStoreSystem` 仍是 inline `validate()`。
+  其餘 20 個模組都有自己的 `app/Http/Requests/<模組>/`，`station` 是例外。
+  本次只搬了碰到的那一支，沒有順手改其他的（那是動到正在運作的金流端點）。
+- **`public/js/station.js` 是死檔**（613 行，沒有任何 Blade 載入它），
+  站台頁的 JS 全部 inline 在 `index.blade.php` 裡（1800+ 行）。
+  PROMPTS.md 要求 JS 分到 `public/js`，這一塊整個沒照做 —— 本次新增的
+  ~10 行跟著既有寫法放在 Blade 裡，沒有單獨為它開一個檔案。
+
 ### 沒做的
 
 - **沒有 migration**：`credit_type` 本來就是 `varchar(20)`，放得下 `other`。

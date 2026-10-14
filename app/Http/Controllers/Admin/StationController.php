@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Station\StoreTopupRequest;
 use App\Http\Resources\CreditTopupResource;
 use App\Presenters\NumberPresenter;
 use App\Http\Resources\StationResource;
@@ -352,30 +353,15 @@ class StationController extends Controller
     /**
      * Ajax 申請補點/扣點
      *
-     * @param Request $request
+     * 驗證在 `StoreTopupRequest`：「其他」類型的備註必填需要一句中文訊息，
+     * 寫在這裡的 `validate()` 只能吃 Laravel 的英文預設文案。
+     *
+     * @param StoreTopupRequest $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function ajaxTopupStore(Request $request)
+    public function ajaxTopupStore(StoreTopupRequest $request)
     {
-        $params = $request->validate([
-            'station_id'    => 'required|integer|exists:station,id',
-            'action_type'   => 'required|integer|in:1,2',
-            // other = 不呼叫主系統 API，只記一筆帳（見 CreditTopup::CREDIT_TYPE_OTHER）
-            'credit_type'   => 'required|string|in:credit,shop_credit,other',
-            // input_type = 2 為直接輸入點數，此時不需要 USDT 與匯率
-            'input_type'    => 'required|integer|in:1,2',
-            'usdt_amount'   => 'required_if:input_type,1|nullable|numeric|min:0.0001',
-            'exchange_rate' => 'required_if:input_type,1|nullable|numeric|min:0.0001',
-            'credit_amount' => 'required|numeric|min:0.01',
-            /*
-             * ⚠ 「其他」的備註**必填**（需求方 2026-10-14）。這一類不打
-             * 主系統 API，紀錄上也就沒有任何外部回應可以對照 ——
-             * 不寫備註的話，事後完全沒人知道這筆是什麼。
-             */
-            'note'          => 'required_if:credit_type,other|nullable|string|max:500',
-            'images'        => 'nullable|array',
-            'images.*'      => 'image|max:5120',
-        ]);
+        $params = $request->validated();
 
         try {
             $params['images'] = $request->hasFile('images')
