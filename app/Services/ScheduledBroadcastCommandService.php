@@ -89,7 +89,9 @@ class ScheduledBroadcastCommandService
             return false;
         }
 
-        if ($intent !== BroadcastCommandParser::INTENT_BROADCAST) {
+        $isMessage = $intent === BroadcastCommandParser::INTENT_MESSAGE;
+
+        if (!$isMessage && $intent !== BroadcastCommandParser::INTENT_BROADCAST) {
             $this->reply((string) config('constants.BROADCAST_COMMAND.UNKNOWN_TEXT'), $threadId);
 
             return true;
@@ -113,18 +115,41 @@ class ScheduledBroadcastCommandService
             return true;
         }
 
-        $template = $this->templateRepository->findByCode(Arr::get($parsed, 'template_code'));
+        /*
+         * 自己打的訊息沒有範本，內容就是句子裡那段字。
+         *
+         * ⚠ 底層完全共用 —— `TelegramBroadcastService::schedule()` 本來就吃
+         * `content`，`template_code` 是選填。所以這裡只是把「內容從哪來」
+         * 換掉，預約、送出、歷史紀錄、取消全部沿用同一條管線。
+         */
+        $template = null;
 
-        if (blank($template)) {
-            $this->replyTemplateNotFound(Arr::get($parsed, 'template_code'), $threadId);
+        if (!$isMessage) {
+            $template = $this->templateRepository->findByCode(Arr::get($parsed, 'template_code'));
 
-            return true;
+            if (blank($template)) {
+                $this->replyTemplateNotFound(Arr::get($parsed, 'template_code'), $threadId);
+
+                return true;
+            }
         }
 
         $target = $this->resolveTarget(Arr::get($parsed, 'target'));
 
         if (blank($target)) {
             $this->replyTargetNotFound(Arr::get($parsed, 'target'), $threadId);
+
+            return true;
+        }
+
+        if ($isMessage) {
+            $this->replyMessagePreview(
+                (string) Arr::get($parsed, 'content'),
+                $target,
+                Arr::get($parsed, 'send_at'),
+                $user,
+                $threadId
+            );
 
             return true;
         }
@@ -196,7 +221,14 @@ class ScheduledBroadcastCommandService
             return;
         }
 
-        $this->supportGroup->editMessage($messageId, strtr((string) Arr::get($config, 'CONFIRMED_TEXT'), [
+        /*
+         * ⚠ 自訂訊息沒有代號，套公告那句會變成「《自訂訊息》」——
+         * 讀起來像漏字。兩種各有一句。`is_message` 是布林，用 `(bool)`
+         * 不用 `filled()`（`filled(false)` 回的是 true）。
+         */
+        $textKey = (bool) Arr::get($draft, 'is_message') ? 'MESSAGE_CONFIRMED_TEXT' : 'CONFIRMED_TEXT';
+
+        $this->supportGroup->editMessage($messageId, strtr((string) Arr::get($config, $textKey), [
             '{code}'   => (string) Arr::get($draft, 'code'),
             '{title}'  => (string) Arr::get($draft, 'title'),
             '{time}'   => (string) Arr::get($draft, 'send_at'),
@@ -248,6 +280,63 @@ class ScheduledBroadcastCommandService
             '{when}'        => $this->whenText($sendAt),
             '{attachments}' => $this->attachmentLine($template, $config),
             '{preview}'     => $this->contentPreview((string) $template->content, $config),
+        ]);
+
+        $this->supportGroup->sendToThread($text, $threadId, $this->confirmKeyboard($key, $config));
+    }
+
+    /**
+     * 自己打的訊息：預覽 ＋ 確認按鈕
+     *
+     * 草稿的形狀跟公告那條**完全一樣**，只是 `code` 空白、沒有附件 ——
+     * 這樣 `confirm()` 不必分兩種走法。
+     *
+     * ⚠ **預覽要貼完整內容，不截斷**（跟公告那條不同）。公告是建檔好的，
+     * 截斷只是看不到全文；這一段是模型剛剛從句子裡抄出來的，**抄錯、漏字、
+     * 多抄了「給 lv-uat」那段都有可能**，而它會原封不動發給客戶。
+     * 唯一能在發出去之前抓到的機會就是這份預覽。
+     *
+     * @param string                     $content
+     * @param array                      $target
+     * @param \Illuminate\Support\Carbon $sendAt
+     * @param \App\Models\User           $user
+     * @param int|null                   $threadId
+     * @return void
+     */
+    private function replyMessagePreview($content, array $target, $sendAt, $user, $threadId)
+    {
+        $config = (array) config('constants.BROADCAST_COMMAND');
+        $key = Str::random(16);
+
+        Cache::put(self::DRAFT_PREFIX . $key, [
+            // 自己打的訊息沒有代號，歷史紀錄上的「公告編號」會顯示「-」
+            'code'         => '',
+            'title'        => (string) Arr::get($config, 'MESSAGE_TITLE'),
+            // 確認訊息要挑對模板：公告講「範本《標題》」，這一種沒有代號可講
+            'is_message'   => true,
+            'content'      => (string) $content,
+            'image_urls'   => null,
+            'file_urls'    => null,
+            'target_type'  => (int) Arr::get($target, 'type'),
+            'station_ids'  => (array) Arr::get($target, 'station_ids', []),
+            'target_label' => (string) Arr::get($target, 'label'),
+            'send_at'      => $sendAt->format('Y-m-d H:i'),
+            'user_id'      => (int) $user->id,
+        ], now()->addMinutes((int) Arr::get($config, 'DRAFT_TTL_MINUTES')));
+
+        /*
+         * ⚠ **不要在這裡 `e()`。** `TelegramBotService::sendMessage()` 送出前
+         * 已經跑過 `escapeHtml()`（先全轉義、再還原 b/i/u/s/code/pre/a）——
+         * 這裡再跳脫一次，`<` 會變成 `&amp;lt;` 顯示成亂碼。
+         *
+         * 而且不跳脫才**忠實**：預覽與真正發出去的那則走的是同一支
+         * `sendMessage()`，看到什麼樣子就是客戶會看到的樣子。
+         */
+        $text = strtr((string) Arr::get($config, 'MESSAGE_PREVIEW_TEXT'), [
+            '{target}'  => (string) Arr::get($target, 'label'),
+            '{time}'    => $sendAt->format('Y-m-d H:i'),
+            '{when}'    => $this->whenText($sendAt),
+            '{content}' => $content,
         ]);
 
         $this->supportGroup->sendToThread($text, $threadId, $this->confirmKeyboard($key, $config));

@@ -25,6 +25,19 @@ class BroadcastCommandParser
     /** @var string 要預約發公告 */
     const INTENT_BROADCAST = 'broadcast';
 
+    /**
+     * 預約傳送**自己打的訊息**（沒有公告代號，內容直接寫在句子裡）
+     *
+     * 「我要預約傳送訊息給 lv-uat，時間是 1 小時後，訊息內容是…」
+     *
+     * 跟 `broadcast` 共用同一條預約管線（`TelegramBroadcastService::schedule()`
+     * 本來就吃 `content`，`template_code` 是選填），差別只在內容從哪來：
+     * 一個是建檔公告，一個是當場打的字。
+     *
+     * @var string
+     */
+    const INTENT_MESSAGE = 'message';
+
     /** @var string 看起來不是在講發公告（呼叫端要退回提醒那條路） */
     const INTENT_NOT_BROADCAST = 'not_broadcast';
 
@@ -99,6 +112,10 @@ class BroadcastCommandParser
             return $this->notBroadcast();
         }
 
+        if ($intent === self::INTENT_MESSAGE) {
+            return $this->normalizeMessage($result, $now);
+        }
+
         if ($intent !== self::INTENT_BROADCAST) {
             return $this->unknown();
         }
@@ -122,7 +139,69 @@ class BroadcastCommandParser
             'send_at'       => $sendAt,
             'template_code' => $code,
             'target'        => $target,
+            'content'       => null,
         ];
+    }
+
+    /**
+     * 預約自己打的訊息
+     *
+     * ⚠ **時間、對象、內容缺一不可**，跟公告那條一樣 —— 自己補預設值
+     * （「沒說對象就發給全部」）是這個功能最危險的事。
+     *
+     * ⚠ **內容要原文**。這段字會原封不動發給客戶，模型只能把它抄出來，
+     * 不能改寫、不能補字、不能截斷。
+     *
+     * ⚠ `looksLikeJson()` 擋整包 JSON 被塞進 content —— 這一欄正是
+     * 2026-10-12 那個 bug 出現的地方（見
+     * bugfix/2026-10-12-double-wrapped-json-prompt）。
+     *
+     * @param array                      $result
+     * @param \Illuminate\Support\Carbon $now
+     * @return array
+     */
+    private function normalizeMessage(array $result, $now)
+    {
+        $sendAt = $this->parseTime(Arr::get($result, 'send_at'));
+        $target = trim((string) Arr::get($result, 'target'));
+        $content = trim((string) Arr::get($result, 'content'));
+
+        if (blank($sendAt) || blank($target) || blank($content) || $sendAt->lessThanOrEqualTo($now)) {
+            Log::info('預約自訂訊息解析結果不完整', [
+                'send_at' => Arr::get($result, 'send_at'),
+                'target'  => $target,
+                'has_content' => filled($content),
+            ]);
+
+            return $this->unknown();
+        }
+
+        if ($this->looksLikeJson($content)) {
+            Log::warning('預約自訂訊息的內容是一整包 JSON，不可用', ['content' => $content]);
+
+            return $this->unknown();
+        }
+
+        return [
+            'intent'        => self::INTENT_MESSAGE,
+            'send_at'       => $sendAt,
+            'template_code' => null,
+            'target'        => $target,
+            'content'       => $content,
+        ];
+    }
+
+    /**
+     * 這段內容是不是一整包 JSON
+     *
+     * 誤殺的代價只是請對方重講一次；放過去的代價是**客戶收到一串大括號**。
+     *
+     * @param string $content
+     * @return bool
+     */
+    private function looksLikeJson($content)
+    {
+        return is_array(json_decode($content, true));
     }
 
     /**
@@ -130,7 +209,10 @@ class BroadcastCommandParser
      */
     private function unknown()
     {
-        return ['intent' => self::INTENT_UNKNOWN, 'send_at' => null, 'template_code' => null, 'target' => null];
+        return [
+            'intent' => self::INTENT_UNKNOWN, 'send_at' => null,
+            'template_code' => null, 'target' => null, 'content' => null,
+        ];
     }
 
     /**
@@ -138,7 +220,10 @@ class BroadcastCommandParser
      */
     private function notBroadcast()
     {
-        return ['intent' => self::INTENT_NOT_BROADCAST, 'send_at' => null, 'template_code' => null, 'target' => null];
+        return [
+            'intent' => self::INTENT_NOT_BROADCAST, 'send_at' => null,
+            'template_code' => null, 'target' => null, 'content' => null,
+        ];
     }
 
     /**
@@ -177,8 +262,13 @@ class BroadcastCommandParser
             'properties' => [
                 'intent' => [
                     'type' => 'string',
-                    'enum' => [self::INTENT_BROADCAST, self::INTENT_NOT_BROADCAST, self::INTENT_UNKNOWN],
-                    'description' => '要預約發公告（broadcast）、根本不是在講發公告（not_broadcast）、還是在講但看不懂（unknown）',
+                    'enum' => [
+                        self::INTENT_BROADCAST,
+                        self::INTENT_MESSAGE,
+                        self::INTENT_NOT_BROADCAST,
+                        self::INTENT_UNKNOWN,
+                    ],
+                    'description' => '要預約發建檔公告（broadcast）、要預約傳送自己打的訊息（message）、根本不是在講這兩種（not_broadcast）、是在講但缺東西（unknown）',
                 ],
                 'send_at' => [
                     'type'        => ['string', 'null'],
@@ -192,8 +282,12 @@ class BroadcastCommandParser
                     'type'        => ['string', 'null'],
                     'description' => '要發給誰：群組名稱原文（例如 LV_UAT，不要帶「群組」兩字），要發給所有客戶就填 all。沒講就填 null',
                 ],
+                'content' => [
+                    'type'        => ['string', 'null'],
+                    'description' => 'intent=message 時：要發出去的訊息內容，照抄原文不要改寫、不要補字、不要截斷，也不要包含時間與對象那段描述。純文字、不要放 JSON。其他 intent 一律填 null',
+                ],
             ],
-            'required' => ['intent', 'send_at', 'template_code', 'target'],
+            'required' => ['intent', 'send_at', 'template_code', 'target', 'content'],
         ];
     }
 }
