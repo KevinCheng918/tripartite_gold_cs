@@ -104,6 +104,7 @@ return [
         'vm_query'        => '用指令查虚拟机',
         'credit_alert'    => '用指令发余点告警给客户',
         'task_query'      => '用指令查卡片进度',
+        'rate_query'      => '用指令查今日汇率',
     ],
     'staff_manage' => [
         'view' => '查看内部管理',

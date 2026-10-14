@@ -157,6 +157,31 @@ class SupportGroupService
     }
 
     /**
+     * 直接發圖到某個話題
+     *
+     * ⚠ 跟 `sendPhoto()` 的差別跟 `sendToThread()` vs `send()` 一樣：
+     * 那支依通知類型查「這類該發到哪幾個話題」，這支是呼叫端自己指定。
+     * **要回在使用者剛才說話的那個話題**時只能用這支。
+     *
+     * @param string      $photoUrl
+     * @param string|null $caption  圖說。Telegram 上限 1024 字，超過會整則失敗
+     * @param int|null    $threadId null 代表主區
+     * @return array|null
+     */
+    public function sendPhotoToThread($photoUrl, $caption = null, $threadId = null)
+    {
+        $chatId = $this->chatId();
+
+        if (blank($chatId)) {
+            return null;
+        }
+
+        $this->switchBot();
+
+        return $this->botService->sendPhoto($chatId, $photoUrl, $caption, $threadId);
+    }
+
+    /**
      * 上一次送出失敗時，Telegram 告知的新 chat_id
      *
      * 群組開了話題功能會被升級成 supergroup，chat_id 跟著換 ——

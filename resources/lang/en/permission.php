@@ -100,6 +100,7 @@ return [
         'vm_query' => 'Query virtual machines by command',
         'credit_alert' => 'Send credit alert to customers by command',
         'task_query' => 'Query task card progress by command',
+        'rate_query' => "Query today's rate message by command",
         'reply'     => 'Reply messages',
         'assign'    => 'Assign duty staff',
         'broadcast' => 'Broadcast announcement',

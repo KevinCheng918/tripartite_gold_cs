@@ -53,6 +53,28 @@ class PaymentConfigRepository
     }
 
     /**
+     * 全部啟用中的繳款設定（不分系統）
+     *
+     * 「今天匯率多少」那支指令要一次把每個系統的補點訊息都列出來 ——
+     * 不同系統的收款方式不一樣，併成一則會讓人貼錯給客戶。
+     *
+     * ⚠ 帶 `system` 關聯：回報時每一則前面要標是哪個系統的，
+     * 不帶的話就是一則一查（N+1）。
+     *
+     * @return Collection
+     */
+    public function getAllActive()
+    {
+        return PaymentConfig::query()
+            ->select(self::COLUMNS)
+            ->with(['system'])
+            ->where('status', 1)
+            ->orderBy('system_id')
+            ->orderBy('sort_order')
+            ->get();
+    }
+
+    /**
      * 依 ID 查詢
      *
      * @param int $id

@@ -192,6 +192,14 @@ return [
              * 「後台看看板」與「用指令查某個人手上有什麼」是兩件事。
              */
             'telegram_chat.task_query' => 'permission.telegram_chat.task_query',
+
+            /*
+             * 在內部群組 tag 機器人要今天的匯率補點訊息。
+             *
+             * ⚠ 回的是**客戶實際會收到的那一則**（含匯款資訊與繳款圖），
+             * 拿到就能直接貼給客戶 —— 所以不跟「看匯率報價」混為一談。
+             */
+            'telegram_chat.rate_query' => 'permission.telegram_chat.rate_query',
         ],
     ],
 

@@ -84,6 +84,16 @@ class PaymentConfigService
     }
 
     /**
+     * 全部啟用中的繳款設定（不分系統）
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getAllActive()
+    {
+        return $this->repository->getAllActive();
+    }
+
+    /**
      * 套用模板變數，產生文案
      *
      * 繳款通知與站台餘點告警共用這支 —— 兩邊的公版都是客服在後台自己維護的，
