@@ -156,6 +156,57 @@ class TaskRepository
     }
 
     /**
+     * 查某個人的卡片用：撈還沒封存的（含已解決）
+     *
+     * ⚠ 跟 `getOpenForNotice()` 差在**要帶已解決的**：這支指令要回報
+     * 「兩天內完成了什麼」，而通知那支問的是「手上還剩什麼」。
+     *
+     * ⚠ 一樣一次撈完再在 PHP 分人（理由同 `getOpenForNotice()`：
+     * `assignee_ids` 存的是 JSON 字串而且欄位型別是 longtext，
+     * `whereJsonContains` 不保證可用，逐人查又是一人一趟）。
+     *
+     * @return Collection
+     */
+    public function getForAssigneeQuery()
+    {
+        $query = Task::query()
+            ->select(['id', 'project_id', 'title', 'status', 'priority', 'assignee_id', 'assignee_ids', 'due_date', 'updated_at'])
+            ->with('project')
+            ->where('status', '!=', config('constants.TASK.STATUS.ARCHIVED'))
+            // 逾期最久的排前面；沒設期限的排最後
+            ->orderByRaw('due_date IS NULL, due_date ASC')
+            ->orderBy('id');
+
+        $this->onlyActiveProject($query);
+
+        return $query->get();
+    }
+
+    /**
+     * 最近 N 天內「被移到某個狀態」的紀錄
+     *
+     * ⚠ **`task` 表沒有 `resolved_at`**，所以「什麼時候完成的」只能從
+     * 活動紀錄回推。不能用 `task.updated_at` —— 卡片解決之後任何一次編輯
+     * （改標題、改指派人）都會把它往後推，於是一張上個月解決的卡會被算成
+     * 「兩天內完成」。
+     *
+     * ⚠ `changes` 欄位是 longtext 存 JSON，所以**撈回來在 PHP 比對**
+     * `狀態.to`，不在 SQL 裡解 JSON。兩天內的活動量很小。
+     *
+     * @param int $days
+     * @return Collection
+     */
+    public function getRecentStatusMoves($days)
+    {
+        return TaskActivity::query()
+            ->select(['id', 'task_id', 'action', 'changes', 'created_at'])
+            ->where('action', 'moved')
+            ->where('created_at', '>=', now()->subDays((int) $days))
+            ->orderByDesc('created_at')
+            ->get();
+    }
+
+    /**
      * 依 ID 查詢（含詳細描述）
      *
      * @param int $id

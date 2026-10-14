@@ -980,6 +980,93 @@ return [
     ],
 
     /*
+     * 用 Telegram 指令查某個人的卡片進度。
+     *
+     * 「確認一下 @aabb123 的卡片進度狀況」
+     *
+     * ⚠ 純讀本地資料、不發給客戶、沒有副作用，所以**不做二次確認**。
+     */
+    'TASK_QUERY_COMMAND' => [
+        /*
+         * ⚠ 樸素寫法，不要用 `**` 與 ⚠ ——
+         * 帶排版符號的 prompt 會讓模型把整包 JSON 塞進欄位裡
+         * （見 bugfix/2026-10-12-double-wrapped-json-prompt）。
+         */
+        'PROMPT' => implode("\n", [
+            '你是群組機器人的指令解析器，只負責判斷「這句話是不是要查某個人的任務卡片進度」。',
+            '',
+            'intent 怎麼填：',
+            '- task：他要看某個人手上的卡片進度',
+            '  （「確認一下 @aabb123 的卡片進度狀況」「@abc 現在有哪些卡」都算）',
+            '- not_task：這句話不是在問卡片',
+            '  （查餘點、查虛擬機、發告警、發公告、排提醒都是 not_task）',
+            '- unknown：是在問卡片，但沒講要查誰',
+            '',
+            'account 填句子裡那個 @帳號，原文照抄。',
+            '那是 Telegram 帳號，不要改寫、不要換成暱稱、不要去掉底線或數字。',
+            '沒講是誰就填 null。',
+            '一次只查一個人；他講了兩個以上就填 unknown。',
+        ]),
+
+        'INPUT' => '對方說：{text}',
+
+        // 已解決的只列最近幾天完成的（需求方 2026-10-14）
+        'RESOLVED_DAYS' => 2,
+
+        'TITLE' => "📋 <b>{name}</b> 的卡片進度\n",
+
+        /*
+         * ⚠ **沒有卡片的那一段，連大標題一起不印**（需求方 2026-10-14）。
+         * 印一個底下空空的「進行中」只會讓人以為載入失敗。
+         */
+        'SECTION_PENDING'     => "\n🗒 待處理（{count}）\n",
+        'SECTION_IN_PROGRESS' => "\n🔨 進行中（{count}）\n",
+        'SECTION_TESTING'     => "\n🧪 測試中（{count}）\n",
+        'SECTION_IN_REVIEW'   => "\n🔍 審核中（{count}）\n",
+        'SECTION_RESOLVED'    => "\n✅ 已解決（{days} 天內，{count}）\n",
+
+        // 待處理不講預計完成時間 —— 還沒開始做，那個日期沒有參考價值
+        'LINE_PLAIN' => "• {title}\n",
+
+        // 進行中／測試中／審核中要附預計完成時間，逾期的要看得出來
+        'LINE_DUE'    => "• {title}　<i>（{due}）</i>\n",
+        'DUE_NONE'    => '未設定期限',
+        'DUE_OVERDUE' => '⚠️ 逾期 {days} 天',
+        'DUE_TODAY'   => '今天到期',
+        'DUE_FUTURE'  => '還有 {days} 天',
+
+        'EMPTY_TEXT' => '<b>{name}</b> 目前沒有任何卡片 👍',
+
+        'NOT_FOUND_TEXT' => "找不到 <b>{account}</b> 這個人 🙏\n"
+            . '（對方要先在「帳號管理」填好 Telegram 帳號才查得到）',
+
+        'UNKNOWN_TEXT' => "要查誰的卡片呢 🙏\n"
+            . '可以這樣說：確認一下 @aabb123 的卡片進度狀況',
+
+        'UNAVAILABLE_TEXT' => '抱歉，現在沒辦法解析這則指令，請稍後再試一次 🙏',
+
+        /*
+         * 清單上限。
+         *
+         * ⚠ 多撈一筆才分得出「剛好 N 筆」與「還有更多」
+         * （做法同 REMINDER.LIST_MAX）。這裡是逐段落計算。
+         */
+        'SECTION_MAX' => 15,
+        'LIST_MORE'   => "　…這一段還有 {count} 張\n",
+
+        /*
+         * 權限。
+         *
+         * ⚠ 名稱要跟**介面上看到的字**一樣（帳號管理 → 權限設定 →
+         * Telegram 客服 → 用指令查卡片進度）。
+         */
+        'NOT_BOUND_TEXT' => "這則指令要先把 Telegram 綁到系統帳號才能用 🙏\n"
+            . '（後台「帳號管理」→ 編輯自己的帳號 → 填 Telegram 使用者 ID）',
+
+        'NO_PERMISSION_TEXT' => '這個操作需要「Telegram 客服 → 用指令查卡片進度」權限 🙏',
+    ],
+
+    /*
      * 用 Telegram 指令發餘點告警 ＋ 補點通知給客戶。
      *
      * 「傳餘點告警給 LV_UAT」→ 確認 → 同步當下點數 → 發兩則給客戶群。

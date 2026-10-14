@@ -99,6 +99,7 @@ return [
         'station_credit' => 'Query station credits by command',
         'vm_query' => 'Query virtual machines by command',
         'credit_alert' => 'Send credit alert to customers by command',
+        'task_query' => 'Query task card progress by command',
         'reply'     => 'Reply messages',
         'assign'    => 'Assign duty staff',
         'broadcast' => 'Broadcast announcement',

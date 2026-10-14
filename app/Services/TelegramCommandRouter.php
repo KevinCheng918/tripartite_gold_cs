@@ -13,6 +13,7 @@ use Illuminate\Support\Arr;
  *   ├─ 發餘點告警（要權限、要先確認、**會發給客戶**）
  *   ├─ 同步站台餘點（要權限、要先確認）
  *   ├─ 查站台虛擬機（要權限，純讀不必確認）
+ *   ├─ 查某人的卡片進度（要權限，純讀不必確認）
  *   └─ 預約提醒（擺最後，也是看不懂時的歸宿）
  * ```
  *
@@ -39,6 +40,7 @@ class TelegramCommandRouter
     private $alertCommand;
     private $creditCommand;
     private $vmCommand;
+    private $taskCommand;
     private $reminder;
 
     public function __construct(
@@ -48,6 +50,7 @@ class TelegramCommandRouter
         CreditAlertCommandService $alertCommand,
         StationCreditCommandService $creditCommand,
         VmQueryCommandService $vmCommand,
+        TaskQueryCommandService $taskCommand,
         ScheduledReminderService $reminder
     ) {
         $this->supportGroup = $supportGroup;
@@ -58,6 +61,7 @@ class TelegramCommandRouter
         $this->alertCommand = $alertCommand;
         $this->creditCommand = $creditCommand;
         $this->vmCommand = $vmCommand;
+        $this->taskCommand = $taskCommand;
         // 擺最後：它同時是「看不懂」時的歸宿
         $this->reminder = $reminder;
     }
@@ -138,6 +142,7 @@ class TelegramCommandRouter
         $alert = $this->alertCommand;
         $credit = $this->creditCommand;
         $vm = $this->vmCommand;
+        $task = $this->taskCommand;
         $reminder = $this->reminder;
 
         return [
@@ -158,6 +163,9 @@ class TelegramCommandRouter
             },
             function ($body, $from, $threadId) use ($vm) {
                 return $vm->handle($body, $from, $threadId);
+            },
+            function ($body, $from, $threadId) use ($task) {
+                return $task->handle($body, $from, $threadId);
             },
             function ($body, $from, $threadId, $message) use ($reminder) {
                 return $reminder->handle($body, $threadId, $message);

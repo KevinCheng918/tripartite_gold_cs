@@ -184,6 +184,14 @@ return [
              * 不等於可以替公司發通知給客戶。
              */
             'telegram_chat.credit_alert' => 'permission.telegram_chat.credit_alert',
+
+            /*
+             * 在內部群組 tag 機器人查某個人的任務卡片進度。
+             *
+             * ⚠ 不沿用後台的 `task_board.view`，理由同前面幾項：
+             * 「後台看看板」與「用指令查某個人手上有什麼」是兩件事。
+             */
+            'telegram_chat.task_query' => 'permission.telegram_chat.task_query',
         ],
     ],
 

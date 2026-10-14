@@ -96,6 +96,7 @@ return [
         'station_credit'  => '用指令查站台餘點',
         'vm_query'        => '用指令查虛擬機',
         'credit_alert'    => '用指令發餘點告警給客戶',
+        'task_query'      => '用指令查卡片進度',
     ],
     'setting' => [
         'view'   => '檢視 AI 引擎設定與用量',
