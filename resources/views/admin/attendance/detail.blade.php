@@ -103,7 +103,55 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($records as $r)
+                        @forelse($timeline as $row)
+                            @php
+                                /*
+                                 * ⚠ 跑的是**時間軸**不是出勤紀錄：每一天都有一列，
+                                 * 沒有紀錄的那天 `$r` 會是 null（見
+                                 * AttendanceService::getMonthlyTimeline）。
+                                 *
+                                 * 最常見的就是請整天假 —— 那天本來就不會有出勤紀錄，
+                                 * 以前整列直接消失，看起來像漏掉了一天。
+                                 */
+                                $r = $row['record'];
+                                $rowDate = $row['date'];
+                                $leave = $row['leave'];
+                            @endphp
+
+                            @if(blank($r))
+                                {{-- 那天沒有出勤紀錄：請假，或本來就沒班 --}}
+                                <tr class="text-muted">
+                                    <td>{{ \App\Presenters\DatePresenter::withWeekday($rowDate) }}</td>
+                                    <td>-</td>
+                                    <td>-</td>
+                                    <td>-</td>
+                                    <td>-</td>
+                                    <td>-</td>
+                                    <td>-</td>
+                                    <td>-</td>
+                                    <td>
+                                        @if(filled($leave))
+                                            <span class="badge bg-info">{{ trans('attendance.status_on_leave') }}</span>
+                                        @else
+                                            <span class="badge bg-secondary">{{ trans('attendance.status_day_off') }}</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if(filled($leave))
+                                            @if($leave['is_full_day'] === 1)
+                                                <span class="badge bg-info">{{ trans('attendance.leave_full_day') }}</span>
+                                            @else
+                                                <span class="badge bg-info">{{ substr($leave['start_time'], 0, 5) }} ~ {{ substr($leave['end_time'], 0, 5) }}</span>
+                                            @endif
+                                        @else
+                                            -
+                                        @endif
+                                    </td>
+                                    <td>-</td>
+                                </tr>
+                                @continue
+                            @endif
+
                             @php
                                 /*
                                  * 那天本來幾點上下班。輪班來自排班、固定班來自帳號設定，

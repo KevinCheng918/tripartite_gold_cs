@@ -20,6 +20,15 @@ return [
     'status_early_leave' => '早退',
     'status_late_early'  => '遲到+早退',
     'status_absent'      => '曠工',
+    /*
+     * 以下兩個是「那天沒有出勤紀錄」的狀態，不存在資料庫的 status 欄位裡 ——
+     * 出勤明細把每一天都列出來之後才需要（見 getMonthlyTimeline）。
+     *
+     * 請整天假的那天不會有出勤紀錄（MarkAbsentCommand 刻意跳過），
+     * 有排班卻沒打卡的會被補成曠工紀錄 —— 所以沒紀錄又沒請假的必然是休假日。
+     */
+    'status_on_leave'    => '請假',
+    'status_day_off'     => '休假',
 
     // 欄位
     'field_date'         => '日期',

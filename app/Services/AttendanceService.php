@@ -424,21 +424,143 @@ class AttendanceService
     {
         $records = $this->attendanceRepository->getByUserAndMonth($userId, $yearMonth);
 
-        // 帶入每天的請假資訊
-        $records->each(function ($record) use ($userId) {
-            $date = $record->date->format('Y-m-d');
-            $leaves = $this->leaveRepository->getApprovedOnDate($userId, $date);
-            if ($leaves->isNotEmpty()) {
-                $leave = $leaves->first();
-                $record->leave_info = [
-                    'is_full_day' => (int) $leave->is_full_day,
-                    'start_time'  => $leave->start_time,
-                    'end_time'    => $leave->end_time,
-                ];
+        if ($records->isEmpty()) {
+            return $records;
+        }
+
+        /*
+         * ⚠ 請假一次撈完再攤開，不要逐筆查（原本是一筆紀錄一次
+         * `getApprovedOnDate()`，一個月就是 31 次查詢）。
+         */
+        $leaveMap = $this->leaveMapFor($userId, $yearMonth);
+
+        $records->each(function ($record) use ($leaveMap) {
+            $leave = Arr::get($leaveMap, $record->date->format('Y-m-d'));
+
+            if (filled($leave)) {
+                $record->leave_info = $leave;
             }
         });
 
         return $records;
+    }
+
+    /**
+     * 出勤明細的「每一天」時間軸
+     *
+     * ⚠ **每天都要有一列，沒有出勤紀錄也要**（需求方 2026-10-14）。
+     *
+     * 原本明細頁直接跑 `getMonthlyRecords()`，於是**沒有紀錄的那天整天消失**。
+     * 最常見的就是請整天假 —— `MarkAbsentCommand` 對請整天假的人**刻意不建
+     * 曠工紀錄**，所以那天連一列都沒有，看起來像漏掉了。
+     *
+     * ⚠ 當月只排到**今天**：還沒到的日子列出來只是一長串空列，
+     * 而且會讓人以為那幾天也缺卡。過去的月份則是整個月。
+     *
+     * ⚠ 沒有紀錄又沒請假的那幾天，是「那天本來就沒班」——
+     * 有排班卻沒打卡的會被 `MarkAbsentCommand` 補成曠工紀錄，
+     * 所以走到這裡的必然是休假日。
+     *
+     * @param int    $userId
+     * @param string $yearMonth Y-m
+     * @return \Illuminate\Support\Collection<array{
+     *     date: \Illuminate\Support\Carbon,
+     *     record: \App\Models\AttendanceRecord|null,
+     *     leave: array|null
+     * }>
+     */
+    public function getMonthlyTimeline($userId, $yearMonth)
+    {
+        $records = $this->getMonthlyRecords($userId, $yearMonth);
+        $leaveMap = $this->leaveMapFor($userId, $yearMonth);
+
+        $byDate = [];
+
+        foreach ($records as $record) {
+            $byDate[$record->date->format('Y-m-d')] = $record;
+        }
+
+        $cursor = Carbon::createFromFormat('Y-m', $yearMonth)->startOfMonth();
+        $last = $cursor->copy()->endOfMonth();
+        $today = now()->startOfDay();
+
+        // 當月只排到今天；過去的月份整個月
+        if ($last->greaterThan($today)) {
+            $last = $today;
+        }
+
+        $timeline = collect();
+
+        while ($cursor->lessThanOrEqualTo($last)) {
+            $date = $cursor->format('Y-m-d');
+
+            $timeline->push([
+                'date'   => $cursor->copy(),
+                'record' => Arr::get($byDate, $date),
+                'leave'  => Arr::get($leaveMap, $date),
+            ]);
+
+            $cursor->addDay();
+        }
+
+        return $timeline;
+    }
+
+    /**
+     * 某個月每一天的請假資訊
+     *
+     * 一次撈完整個月的核准請假，再攤成 `Y-m-d => 請假資訊` ——
+     * 一筆請假可能橫跨好幾天，所以要逐日展開。
+     *
+     * ⚠ 同一天有多筆時取**第一筆**，與原本 `getApprovedOnDate()->first()`
+     * 的行為一致（實務上不會重疊，真的重疊也是資料有問題）。
+     *
+     * @param int    $userId
+     * @param string $yearMonth Y-m
+     * @return array<string, array{is_full_day: int, start_time: string, end_time: string}>
+     */
+    private function leaveMapFor($userId, $yearMonth)
+    {
+        $start = Carbon::createFromFormat('Y-m', $yearMonth)->startOfMonth();
+        $end = $start->copy()->endOfMonth();
+
+        $leaves = $this->leaveRepository->getApprovedInRange(
+            $userId,
+            $start->format('Y-m-d'),
+            $end->format('Y-m-d')
+        );
+
+        $map = [];
+
+        foreach ($leaves as $leave) {
+            $cursor = Carbon::parse($leave->start_date)->startOfDay();
+            $until = Carbon::parse($leave->end_date)->startOfDay();
+
+            // 請假可能從上個月開始、到下個月結束，所以夾在查詢的月份內
+            if ($cursor->lessThan($start)) {
+                $cursor = $start->copy();
+            }
+
+            if ($until->greaterThan($end)) {
+                $until = $end->copy();
+            }
+
+            while ($cursor->lessThanOrEqualTo($until)) {
+                $date = $cursor->format('Y-m-d');
+
+                if (!array_key_exists($date, $map)) {
+                    $map[$date] = [
+                        'is_full_day' => (int) $leave->is_full_day,
+                        'start_time'  => $leave->start_time,
+                        'end_time'    => $leave->end_time,
+                    ];
+                }
+
+                $cursor->addDay();
+            }
+        }
+
+        return $map;
     }
 
     /**

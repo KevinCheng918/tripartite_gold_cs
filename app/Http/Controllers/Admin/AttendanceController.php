@@ -149,7 +149,16 @@ class AttendanceController extends Controller
         return view('admin.attendance.detail', [
             'targetUserId' => $userId,
             'targetUser'   => $targetUser,
+            /*
+             * ⚠ `records` 與 `timeline` **兩個都要傳**，用途不同：
+             *
+             * - `records`：上面那排統計（總天數、正常、遲到…）。只能算**真的有
+             *   出勤紀錄**的那幾天 —— 用時間軸去算，總天數會變成「這個月幾天」。
+             * - `timeline`：下面的表格。每一天都有一列，沒紀錄的也在
+             *   （請整天假那天本來就不會有紀錄，見 `getMonthlyTimeline()`）。
+             */
             'records'      => $records,
+            'timeline'     => $this->attendanceService->getMonthlyTimeline((int) $userId, $yearMonth),
             'yearMonth'    => $yearMonth,
             'amendments'   => $amendments,
             /*

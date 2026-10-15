@@ -18,6 +18,8 @@ return [
     'status_early_leave' => 'Early Leave',
     'status_late_early'  => 'Late + Early',
     'status_absent'      => 'Absent',
+    'status_on_leave'    => 'On Leave',
+    'status_day_off'     => 'Day Off',
 
     'field_date'         => 'Date',
     'field_clock_in'     => 'Clock In',

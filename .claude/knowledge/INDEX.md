@@ -42,7 +42,7 @@
 | [features/unread-badge.md](features/unread-badge.md) | 未讀數（對話列表各自的則數 ＋ sidebar 的「有未讀的對話數」）：已讀**每人各自**存在新表 `telegram_group_read`，`telegram_message.replied` 回歸「真的回了」原意；Pusher 連線全站共用一條（`window.AppPusher`）；順手修掉 `getConversationList()` 逐群組 COUNT 的 N+1。**`updateOrCreate` 不是原子操作，要用 `upsert`** | **已完成，正式機待跑 migration** |
 | [features/telegram-upload-limit.md](features/telegram-upload-limit.md) | 為什麼機器人只能傳 50MB 而自己的帳號可以傳 2GB（限制在官方的 Bot API 橋接伺服器，自架可到 2000MB）；附帶發現 purge 不刪實體檔 | 調查紀錄 |
 | [features/fixed-work-hours.md](features/fixed-work-hours.md) | 固定上下班時間（工程不排班也要算出勤）：帳號上設「輪班／固定時間」，輪班吃原本的排班、固定班吃帳號上的起訖與上班日；遲到／早退／加班／曠工四處都改走同一支 `resolveWorkTime()`；排班紀錄**合成顯示**固定班的客服而不寫實體 assignment（避免每人一個 shift、避免跑進換班選單、避免改設定要回頭補刪未來的列）。實作時發現同一條規則其實散在**五處**（補打卡那套完全獨立、Blade 裡還有一份）；`end_minutes` 統一在 `buildWorkTime()` 換算好跨日，呼叫端不再各自認 `00:00` | **已完成，正式機待跑 migration（沒跑會直接壞帳號頁）** |
-| [features/attendance.md](features/attendance.md) | 打卡出勤 | 已完成（持續迭代） |
+| [features/attendance.md](features/attendance.md) | 打卡出勤。2026-10-14：個人每日出勤狀況改成**每一天都有一列**（`getMonthlyTimeline()`）—— 原本跑的是出勤紀錄清單，所以**請整天假那天整個消失**（`MarkAbsentCommand` 對請整天假的人刻意不建曠工紀錄）。⚠ `records`（統計用，只能算真有紀錄的）與 `timeline`（表格用）**兩個都要傳**，共用的話總天數會變成「這個月幾天」。沒紀錄又沒請假的標「休假」——那是安全推論：有排班沒打卡的會被補成曠工紀錄。順手修掉逐筆查請假的 N+1 | 已完成（持續迭代） |
 | [features/changelog.md](features/changelog.md) | 版本紀錄（左下角變更日誌） | 規劃中 |
 | [features/auto-reply.md](features/auto-reply.md) | 自動回覆（Claude 從題庫挑答案、低信心反問、答不出來轉內部支援群組並回填題庫、全域設定頁） | **已實作，待上線前置作業** |
 | [features/auto-reply-burst.md](features/auto-reply-burst.md) | 客人連發多則時只回一次的設計稿；**附帶查出正式機 `QUEUE_CONNECTION=sync`，佇列從來沒生效** —— 連帶 Telegram 重送與 php-fpm worker 被佔住兩個高風險問題 | 設計稿，等確認 |

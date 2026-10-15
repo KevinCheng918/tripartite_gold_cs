@@ -126,6 +126,32 @@ class LeaveRequestRepository
     }
 
     /**
+     * 一段期間內所有已核准的請假（出勤明細的時間軸用）
+     *
+     * ⚠ 取代「逐日呼叫 `getApprovedOnDate()`」—— 出勤明細要跑一整個月，
+     * 那樣就是 31 次查詢。這支一次撈完，呼叫端自己攤成每天。
+     *
+     * 條件是**區間有交集**（不是被包含）：請假 10/01～10/31、查詢 10/15～10/20
+     * 也要撈得到。
+     *
+     * @param int    $userId
+     * @param string $start Y-m-d
+     * @param string $end   Y-m-d（含當天）
+     * @return Collection
+     */
+    public function getApprovedInRange($userId, $start, $end)
+    {
+        return LeaveRequest::query()
+            ->select(self::LIST_COLUMNS)
+            ->where('user_id', $userId)
+            ->where('status', LeaveRequest::STATUS_APPROVED)
+            ->where('start_date', '<=', $end)
+            ->where('end_date', '>=', $start)
+            ->orderBy('start_date')
+            ->get();
+    }
+
+    /**
      * 指定日期是否有整天的已通過請假
      *
      * @param int    $userId
