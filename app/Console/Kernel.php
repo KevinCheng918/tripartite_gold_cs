@@ -2,6 +2,7 @@
 
 namespace App\Console;
 
+use App\Services\DailyRateService;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -157,9 +158,27 @@ class Kernel extends ConsoleKernel
          */
         $schedule->command('vm:send-payment-notice')->dailyAt('09:30')->withoutOverlapping();
 
-        // 每日上午 10 點同步各站台系統餘點，低於門檻發告警
-        // withoutOverlapping：逐站打主系統 API，站台多的時候可能跑超過一輪
-        $schedule->command('station:sync-credit')->dailyAt('10:00')->withoutOverlapping();
+        /*
+         * 同步各站台系統餘點，低於門檻發告警。
+         *
+         * ⚠ **不是固定時間，是「決定匯率之後的下一個整點」**（需求方 2026-10-18）。
+         *
+         * 原本固定 10:00。但匯率 09:00 才問，這一小時沒決定好的話，告警就少了
+         * 第二則補點訊息（沒有匯率組不出來）—— 客戶收到「點數不足」卻不知道
+         * 要匯多少。所以改成每個整點都來問一次，由
+         * `DailyRateService::claimCreditAlertSlot()` 決定這一刻該不該發。
+         *
+         * ⚠ 判斷**不寫在指令裡**：手動跑 `station:sync-credit`（含 --dry-run）
+         * 要能隨時執行，不該被「現在不是那個整點」擋掉。
+         *
+         * withoutOverlapping：逐站打主系統 API，站台多的時候可能跑超過一輪
+         */
+        $schedule->command('station:sync-credit')
+            ->hourly()
+            ->when(function () {
+                return app(DailyRateService::class)->claimCreditAlertSlot();
+            })
+            ->withoutOverlapping();
 
         $this->scheduleQueueWorker($schedule);
     }

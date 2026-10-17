@@ -8,6 +8,7 @@ use App\Repositories\QuickReplyRepository;
 use App\Repositories\UserRepository;
 use HeadlessChromium\BrowserFactory;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -31,6 +32,16 @@ class DailyRateService
      * 由設定頁的話題清單勾選。沒被任何話題勾到就發到群組主區。
      */
     const NOTICE_TYPE = 'daily_rate';
+
+    /**
+     * 「這一天的餘點告警已經發過了」的快取前綴
+     *
+     * ⚠ 存在 Cache 不是資料庫：它只需要活一兩天，而且加一個欄位就要跑
+     * migration。`CACHE_DRIVER=file` 會留在磁碟上，重啟不會掉。
+     *
+     * @var string
+     */
+    private const CREDIT_ALERT_SENT_PREFIX = 'credit_alert_sent:';
 
     /** @var array 回覆內容視為「採用建議值」的詞 */
     private const ACCEPT_WORDS = ['好', '好的', 'ok', 'OK', 'Ok', '可以', '就這樣', '同意', 'yes', 'Yes'];
@@ -396,6 +407,9 @@ class DailyRateService
             self::NOTICE_TYPE
         );
 
+        // 告警已經發過又改匯率 → 問要不要用新匯率重發（只問，不自動發）
+        $this->askResendCreditAlert($record, $previous, $rate);
+
         Log::info('今日匯率已決定', [
             'date'     => $record->date->toDateString(),
             'rate'     => $rate,
@@ -503,6 +517,140 @@ class DailyRateService
     // ---------------------------------------------------------------
 
     /**
+     * 匯率改掉時，問要不要用新匯率把餘點告警重發一次
+     *
+     * ⚠ **只在「今天的告警已經發出去了」而且「匯率真的變了」時才問**
+     * （需求方 2026-10-18）。
+     *
+     * 第一次決定匯率時不問 —— 那時候告警還沒發，等排程的下一個整點就好。
+     * 改成同一個數字也不問：客戶手上那則沒有過期，再吵一輪沒有意義。
+     *
+     * ⚠ **只問，不自動重發。** 重發等於每個站台的客戶群再收一輪訊息，
+     * 而「改匯率」有時只是修個錯字 —— 要不要吵客戶交給按的人決定。
+     *
+     * @param \App\Models\DailyRate $record
+     * @param float|null            $previous 改之前的匯率
+     * @param float                 $rate     改之後的匯率
+     * @return void
+     */
+    private function askResendCreditAlert($record, $previous, $rate)
+    {
+        $date = $record->date->toDateString();
+
+        // 今天的告警還沒發 → 等排程的下一個整點，不必問
+        if (!Cache::has(self::CREDIT_ALERT_SENT_PREFIX . $date)) {
+            return;
+        }
+
+        // 改成同一個數字 → 客戶手上那則沒有過期
+        if (filled($previous) && abs((float) $previous - (float) $rate) < 0.0001) {
+            return;
+        }
+
+        $config = (array) config('constants.CREDIT_ALERT_RESEND');
+        $prefix = (string) Arr::get($config, 'CALLBACK');
+        $confirm = (string) Arr::get($config, 'ACTION_CONFIRM');
+        $cancel = (string) Arr::get($config, 'ACTION_CANCEL');
+
+        $keyboard = [[
+            ['text' => (string) Arr::get($config, 'BUTTON_CONFIRM'), 'callback_data' => "{$prefix}:{$confirm}"],
+            ['text' => (string) Arr::get($config, 'BUTTON_CANCEL'), 'callback_data' => "{$prefix}:{$cancel}"],
+        ]];
+
+        $this->supportGroup->send(strtr((string) Arr::get($config, 'ASK_TEXT'), [
+            '{previous}' => filled($previous) ? $this->format($previous) : '-',
+            '{rate}'     => $this->format($rate),
+        ]), $keyboard, null, self::NOTICE_TYPE);
+
+        Log::info('匯率改動，已詢問是否重發餘點告警', [
+            'date'     => $date,
+            'previous' => $previous,
+            'rate'     => $rate,
+        ]);
+    }
+
+    /**
+     * 這個整點該不該發餘點告警（排程的 `when()` 用）
+     *
+     * 規則：**決定匯率之後的下一個整點**（需求方 2026-10-18）。
+     *
+     * ```
+     * 10:30 決定 → 11:00 發
+     * 11:01 決定 → 12:00 發
+     * 11:00 決定 → 12:00 發（剛好整點也算下一個整點，不是當下那個）
+     * 23:30 決定 → 隔天 00:00 發
+     * 整天沒決定 → 不發
+     * ```
+     *
+     * ⚠ 原本是固定 10:00 發。問題是匯率 09:00 才問，這一小時沒決定好的話，
+     * 告警就少了第二則補點訊息（`buildTopupMessage()` 沒有匯率不會組）——
+     * 客戶收到「點數不足」卻不知道要匯多少。
+     *
+     * ⚠ **沒決定就整天不發**（需求方選的）。保底的代價是客戶收到沒有匯率的
+     * 告警，需求方寧可不發。
+     *
+     * ⚠ **要看昨天那筆**：23:xx 決定時，下一個整點落在隔天 00:00，
+     * 那時候「今天」的紀錄還沒有人決定。
+     *
+     * ⚠ **回 true 的同時會把這一天標記成已發**。`setRate()` 會把 `replied_at`
+     * 改成當下時間 —— 有人事後修正匯率的話，下一個整點會再觸發一次，
+     * 客戶就收到第二封告警。標記擋掉這種重送。
+     *
+     * @return bool
+     */
+    public function claimCreditAlertSlot()
+    {
+        $now = now()->startOfHour();
+
+        foreach ([now()->toDateString(), now()->subDay()->toDateString()] as $date) {
+            $record = $this->rateRepository->findByDate($date);
+
+            if (blank($record) || blank($record->replied_at)) {
+                continue;
+            }
+
+            // 下一個整點：10:30 → 11:00、11:00 → 12:00
+            $due = $record->replied_at->copy()->addHour()->startOfHour();
+
+            if (!$due->equalTo($now)) {
+                continue;
+            }
+
+            /*
+             * ⚠ 已經發過就不再自動發。有人事後改匯率時 `setRate()` 會把
+             * `replied_at` 改成當下，下一個整點又會對上 —— 不擋的話客戶
+             * 就收到第二封。
+             *
+             * 要不要用新匯率重發，由 `askResendCreditAlert()` 問一次，
+             * 按了按鈕才發（見 `CreditAlertResendService`）。
+             */
+            $key = self::CREDIT_ALERT_SENT_PREFIX . $date;
+
+            if (Cache::has($key)) {
+                Log::info('餘點告警：這一天已經發過，不自動重發', [
+                    'date'       => $date,
+                    'replied_at' => $record->replied_at->toDateTimeString(),
+                ]);
+
+                return false;
+            }
+
+            // 保留兩天：23:xx 決定的那筆要跨過午夜才用得到
+            Cache::put($key, now()->toDateTimeString(), now()->addDays(2));
+
+            Log::info('餘點告警：時間到，準備發送', [
+                'date'       => $date,
+                'replied_at' => $record->replied_at->toDateTimeString(),
+                'due'        => $due->toDateTimeString(),
+            ]);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * 今天的對客報價
      *
      * @return float|null 還沒定下來時回 null
@@ -571,6 +719,9 @@ class DailyRateService
             'replied_by' => $userId,
             'replied_at' => now(),
         ]);
+
+        // 告警已經發過又改匯率 → 問要不要用新匯率重發（只問，不自動發）
+        $this->askResendCreditAlert($record, $previous, (float) $rate);
 
         Log::info('後台手動設定匯率', [
             'date'     => $date,

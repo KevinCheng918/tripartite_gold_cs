@@ -7,6 +7,7 @@ use App\Services\AutoReplySupportService;
 use App\Services\CustomerFollowupService;
 use App\Services\DailyRateService;
 use App\Services\CreditAlertCommandService;
+use App\Services\CreditAlertResendService;
 use App\Services\ScheduledBroadcastCommandService;
 use App\Services\ScheduledReminderService;
 use App\Services\StationCreditCommandService;
@@ -34,6 +35,7 @@ class TelegramWebhookController extends Controller
     private $broadcastCommandService;
     private $creditCommandService;
     private $alertCommandService;
+    private $alertResendService;
     private $botService;
 
     public function __construct(
@@ -46,6 +48,7 @@ class TelegramWebhookController extends Controller
         ScheduledBroadcastCommandService $broadcastCommandService,
         StationCreditCommandService $creditCommandService,
         CreditAlertCommandService $alertCommandService,
+        CreditAlertResendService $alertResendService,
         TelegramBotService $botService
     ) {
         $this->chatService = $chatService;
@@ -66,6 +69,8 @@ class TelegramWebhookController extends Controller
         $this->broadcastCommandService = $broadcastCommandService;
         $this->creditCommandService = $creditCommandService;
         $this->alertCommandService = $alertCommandService;
+        // 匯率被改掉時問「要不要用新匯率重發告警」的那兩顆按鈕（前綴 cr:）
+        $this->alertResendService = $alertResendService;
         // 回應 callback_query，不然按鈕會一直轉圈
         $this->botService = $botService;
     }
@@ -254,6 +259,24 @@ class TelegramWebhookController extends Controller
             $this->botService->answerCallbackQuery(Arr::get($callback, 'id'));
 
             $this->alertCommandService->handleCallback(
+                array_slice(explode(':', $data), 1),
+                Arr::get($callback, 'message.message_id'),
+                (array) Arr::get($callback, 'from', [])
+            );
+
+            return;
+        }
+
+        /*
+         * 匯率改掉之後的【重新發送】【不用】。
+         *
+         * ⚠ 按下去會把餘點告警重發給**全部低於門檻的站台客戶**，
+         * 所以 service 裡會再驗一次權限（按的人不一定是改匯率的人）。
+         */
+        if ($prefix === (string) config('constants.CREDIT_ALERT_RESEND.CALLBACK')) {
+            $this->botService->answerCallbackQuery(Arr::get($callback, 'id'));
+
+            $this->alertResendService->handleCallback(
                 array_slice(explode(':', $data), 1),
                 Arr::get($callback, 'message.message_id'),
                 (array) Arr::get($callback, 'from', [])
