@@ -77,6 +77,49 @@ $sort.val($sort.find('option[selected]').val() || $sort.find('option').first().v
 - `resources/views/admin/staff-manage/index.blade.php` — 排序 comparator、選項順序與預設值、`resetSortSelect()`
 - `resources/lang/{tw,cn,en}/staff_manage.php` — 身份排序標籤加註「同身份依年資」
 
+## 新增設備的人員選單（2026-10-19 修）
+
+> 需求方：「設備管理的新增設備，這邊的選擇，要有其他 level 的人，
+> 老闆、主管也可能會領用設備」
+
+同一個頁面用了**兩個不同條件**：
+
+| | 查詢 | 條件 | 誰進得來 |
+|---|---|---|---|
+| 設備**列表** | `getAllCsUsersWithDetail()` | `level != ADMIN` | 老闆1／主管2／工程3／客服4 |
+| **新增設備**的下拉 | `getAllCsUsers()` | `level = CS` | **只有客服 4** |
+
+結果是「列表看得到老闆、主管的設備，新增時卻選不到那些人」。
+
+### 修法
+
+`StaffManageController::index()` 的 `staffList` 改用
+`getAllCsUsersWithDetail()` —— 跟列表同一支。
+
+⚠ **不改 `getAllCsUsers()` 本身**：`DashboardService` 也在用它，那裡要的
+真的是「客服」。只改這個呼叫點。
+
+⚠ 原則跟同檔案的 `consumableUsers()` 一樣（那段註解早就寫了）：
+**「列表看得到誰」就該是「登記得了誰」，條件只有一份。** 設備這邊沒照做，
+所以才分岔。
+
+⚠ 多撈了幾個用不到的欄位（到職日、設備），但內勤就幾十個人 ——
+理由同 `consumableUsers()`，比讓同一個條件散落兩處划算。
+
+管理者（level 0）仍然排除，跟列表一致。
+
+### 驗證
+
+本機只有 Admin 與客服，沒有老闆／主管帳號可以直接看出差異，所以比對 SQL：
+
+```
+舊 where `level` = ?   binding 4      → 只有客服
+新 where `level` != ?  binding 0      → 老闆/主管/工程/客服都在
+```
+
+逐 level 對照：老闆、主管、工程 **由「選不到」變成「選得到」**；
+客服不變；管理者仍選不到。整頁 `view()->render()` 通過，選單有正常填入。
+
 ## 相關
 
 - [[rbac]] — 權限（`level` 是身份，跟權限 keyword 是兩套東西）

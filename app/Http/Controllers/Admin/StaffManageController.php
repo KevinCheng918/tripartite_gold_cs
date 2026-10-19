@@ -59,8 +59,26 @@ class StaffManageController extends Controller
         }
 
         return view('admin.staff-manage.index', [
-            // 沒有 view 的人進來只有消耗品分頁，人員清單也不必查
-            'staffList'      => $canViewStaff ? $this->userRepository->getAllCsUsers() : collect(),
+            /*
+             * 「新增設備」那個下拉選單的人員清單。
+             *
+             * ⚠ **跟設備列表走同一支查詢**（`level != ADMIN`）。原本用的是
+             * `getAllCsUsers()`（`level = CS`，只有客服）—— 於是列表看得到
+             * 老闆、主管、工程的設備，新增時卻選不到那些人
+             * （需求方 2026-10-19：「老闆、主管也可能會領用設備」）。
+             *
+             * 這跟 `consumableUsers()` 是同一條原則：**「列表看得到誰」就該是
+             * 「登記得了誰」**，條件只有一份。
+             *
+             * ⚠ 不改 `getAllCsUsers()` 本身 —— Dashboard 也在用它，那裡要的
+             * 真的是「客服」。
+             *
+             * 多撈了幾個用不到的欄位（到職日、設備），但內勤就幾十個人，
+             * 比起讓同一個條件散落兩處划算得多（理由同 `consumableUsers()`）。
+             *
+             * 沒有 view 的人進來只有消耗品分頁，人員清單也不必查。
+             */
+            'staffList'      => $canViewStaff ? $this->userRepository->getAllCsUsersWithDetail() : collect(),
             'canViewStaff'   => $canViewStaff,
             'canViewConsumable' => true,
         ]);
