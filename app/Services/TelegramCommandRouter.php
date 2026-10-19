@@ -15,6 +15,7 @@ use Illuminate\Support\Arr;
  *   ├─ 查站台虛擬機（要權限，純讀不必確認）
  *   ├─ 查某人的卡片進度（要權限，純讀不必確認）
  *   ├─ 查今日匯率補點訊息（要權限，純讀不必確認）
+ *   ├─ 驗 Gmail 憑證（要權限，會打 Google；擺在通用 spider_setting 之前）
  *   ├─ 做一份 spider_setting（要權限，只產文字不寫任何系統）
  *   └─ 預約提醒（擺最後，也是看不懂時的歸宿）
  * ```
@@ -44,6 +45,7 @@ class TelegramCommandRouter
     private $vmCommand;
     private $taskCommand;
     private $rateCommand;
+    private $gmailCommand;
     private $spiderCommand;
     private $reminder;
 
@@ -56,6 +58,7 @@ class TelegramCommandRouter
         VmQueryCommandService $vmCommand,
         TaskQueryCommandService $taskCommand,
         RateQueryCommandService $rateCommand,
+        GmailCredentialCommandService $gmailCommand,
         SpiderSettingCommandService $spiderCommand,
         ScheduledReminderService $reminder
     ) {
@@ -69,6 +72,12 @@ class TelegramCommandRouter
         $this->vmCommand = $vmCommand;
         $this->taskCommand = $taskCommand;
         $this->rateCommand = $rateCommand;
+        /*
+         * 擺在通用 spider_setting 之前：Gmail 的 index 是 `cashier`，不在
+         * 那 64 個通道的清單裡 —— 「做一個 Gmail 的排程」給通用那支看，
+         * 它只能回「清單裡沒有 Gmail」或誤對到 Cashier。
+         */
+        $this->gmailCommand = $gmailCommand;
         $this->spiderCommand = $spiderCommand;
         // 擺最後：它同時是「看不懂」時的歸宿
         $this->reminder = $reminder;
@@ -152,6 +161,7 @@ class TelegramCommandRouter
         $vm = $this->vmCommand;
         $task = $this->taskCommand;
         $rate = $this->rateCommand;
+        $gmail = $this->gmailCommand;
         $spider = $this->spiderCommand;
         $reminder = $this->reminder;
 
@@ -179,6 +189,15 @@ class TelegramCommandRouter
             },
             function ($body, $from, $threadId) use ($rate) {
                 return $rate->handle($body, $from, $threadId);
+            },
+            /*
+             * ⚠ Gmail 要問在通用 spider_setting **之前**：Gmail 爬蟲掛在代收
+             * 通道（`index: cashier`）底下，不是 64 個通道裡的一個。
+             * 順序反過來的話，「做一個 Gmail 的排程」會被通用那支接走，
+             * 回一句「我的清單裡沒有 Gmail」。
+             */
+            function ($body, $from, $threadId) use ($gmail) {
+                return $gmail->handle($body, $from, $threadId);
             },
             function ($body, $from, $threadId) use ($spider) {
                 return $spider->handle($body, $from, $threadId);

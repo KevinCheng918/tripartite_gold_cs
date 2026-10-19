@@ -1034,6 +1034,140 @@ return [
     ],
 
     /*
+     * 用 Telegram 指令驗 Gmail 爬蟲憑證，並產出 spider_setting。
+     *
+     * 「驗一下 Gmail 憑證，帳號 xxx、密碼 yyy、refresh token zzz」
+     * → 三步驗證（有填齊／換得到 token／連得上信箱），通過才給 spider_setting。
+     *
+     * ⚠ 驗不過就**不給 spider_setting** —— 跟主專案後台同一個規則
+     * （`ajaxVerifyGmail()` 也是驗過才組），免得把錯的憑證套進去。
+     */
+    'GMAIL_CREDENTIAL_COMMAND' => [
+        /*
+         * ⚠ 樸素寫法，不要用 `**` 與 ⚠ ——
+         * 帶排版符號的 prompt 會讓模型把整包 JSON 塞進欄位裡
+         * （見 bugfix/2026-10-12-double-wrapped-json-prompt）。
+         */
+        'PROMPT' => implode("\n", [
+            '你是群組機器人的指令解析器。判斷這句話是不是要驗 Gmail 爬蟲憑證，',
+            '並且把他提供的憑證抓出來。',
+            '',
+            'spider_setting 在這個團隊的日常講法是「排程」或「排程設定」。',
+            '「Gmail 排程」、「做一個 Gmail 的排程」講的就是 Gmail 的 spider_setting。',
+            '這裡的「排程」不是排班、也不是預約提醒。',
+            '',
+            'intent 怎麼填：',
+            '- gmail：他要驗 Gmail 憑證，或是要做 Gmail 的 spider_setting（Gmail 排程）',
+            '- not_gmail：這句話不是在講這件事',
+            '  （查餘點、查虛擬機、查卡片、排提醒、發公告都是 not_gmail）',
+            '  做別的金流通道的排程（例如 Ckpay 的排程、Gz 的 spider_setting）也是',
+            '  not_gmail，那是另一支指令在管的',
+            '',
+            '三組憑證的別名：',
+            '- client_id 也叫「帳號」，長得像 123456-abcdef.apps.googleusercontent.com',
+            '- client_secret 也叫「密碼」、「金鑰」，通常以 GOCSPX- 開頭',
+            '- refresh_token 通常以 1// 開頭',
+            '',
+            '值一律原文照抄，一個字都不要改：不要去掉符號、不要補字、',
+            '不要把看起來像斷行的地方接起來。這些字串裡本來就有 - _ / . 這些符號。',
+            '只給了其中一兩組也照抄，沒給的填 null，不要自己編一個。',
+            '',
+            '他有提到是哪一家銀行的話，填對應的三位數代碼，清單如下：',
+            '{banks}',
+            '清單裡沒有的銀行填 null，不要自己想一個代碼。',
+        ]),
+
+        'INPUT' => '對方說：{text}',
+
+        'TITLE' => "📧 <b>Gmail 憑證驗證</b>\n\n",
+
+        /*
+         * 三個步驟的標題（跟 GmailCredentialService 的 STEP_* 對應）。
+         *
+         * ⚠ 用**名詞**不要用「都有填」「連得上」這種斷定句 —— 前面會掛上
+         * ✅／❌，「❌ 三組憑證都有填」讀起來是自相矛盾的。
+         */
+        'STEP_LABEL' => [
+            'params'  => '① 三組憑證填寫',
+            'token'   => '② 換 access_token',
+            'mailbox' => '③ 連線 Gmail',
+        ],
+
+        'STATUS_ICON' => [
+            'pass' => '✅',
+            'fail' => '❌',
+            'skip' => '⚪',
+        ],
+
+        'STEP_LINE'   => "{icon} {label}\n",
+        'DETAIL_LINE' => "　{detail}\n",
+
+        // ① 的細節
+        'PARAMS_MISSING' => '少了：{fields}',
+
+        // ② 的細節
+        'TOKEN_OK'    => '有效期 {expires} 秒',
+        'TOKEN_EMPTY' => 'Google 沒有回 access_token',
+        /*
+         * ⚠ 這一句是整支最有價值的輸出：**指出是哪一組錯**。
+         * client_id 與 client_secret 錯的時候 Google 回的 error 都是
+         * invalid_client，只有 error_description 分得出來。
+         */
+        'TOKEN_FIELD'   => '<b>{field}</b> 不正確',
+        'TOKEN_CLIENT'  => 'client_id 或 client_secret 不正確（Google：{error}）',
+        'TOKEN_UNKNOWN' => '連不上或回應非預期（{error}）',
+
+        // ③ 的細節
+        'MAILBOX_OK'        => '信箱：<b>{email}</b>（共 {total} 封）',
+        'MAILBOX_NO_EMAIL'  => '連得上，但 Google 沒有回信箱地址',
+        /*
+         * ⚠ 非 Gmail 的信箱（例如只有 Google 帳號、沒開 Gmail 服務）會回
+         * FAILED_PRECONDITION。要講明白是「這個帳號沒有 Gmail」，
+         * 不然看的人會以為憑證錯，去重新產一組一樣不會過。
+         */
+        'MAILBOX_NOT_GMAIL' => '這組憑證的帳號沒有 Gmail 信箱（沒開啟 Gmail 服務）',
+        'MAILBOX_UNKNOWN'   => '連不上 Gmail（{error}）',
+
+        // ③ 底下順手搜的銀行入帳通知
+        'BANK_FOUND'       => '{name}入帳通知：最近 {days} 天有 {count} 封',
+        /*
+         * ⚠ **搜不到信不算失敗**（照主專案的規則）：那只代表這幾天沒有入帳，
+         * 憑證本身是對的。講成「驗不過」會讓人去改根本沒壞的設定。
+         */
+        'BANK_EMPTY'       => '{name}入帳通知：最近 {days} 天沒有（不影響驗證，可能這幾天沒入帳）',
+        'BANK_UNSUPPORTED' => '銀行代碼 {code} 沒有對應的爬蟲，跳過搜信',
+        'BANK_FAILED'      => '{name}的搜信這一步沒成功（不影響驗證，憑證已經確定是對的）',
+
+        'UNREACHED' => '前面卡住，這一步沒檢查',
+
+        // 驗過之後的 spider_setting
+        'SETTING_TITLE' => "\n🧩 <b>排程設定（spider_setting）</b>\n",
+        'SETTING_BLOCK' => "<pre>{json}</pre>\n",
+        /*
+         * ⚠ `cashier_url` 刻意留空（需求方 2026-10-19）：主專案是用那個站台
+         * 自己的資料庫名稱算出來的，客服系統算不出來。這個欄位錯了收銀台會
+         * 連到別的站 —— 所以留空並且**講清楚要補**，不要猜一個填進去。
+         */
+        'SETTING_HINT' => "\n⚠️ <b>cashier_url 要您補上</b>（我算不出來，它是那個站台自己的收銀台網址）。\n"
+            . "其餘欄位照建立通道時的基底，可以直接用。\n",
+
+        /*
+         * ⚠ 不要寫「把標紅的那一組換掉」—— 失敗的原因不一定是某一組憑證
+         * （連不上 Google、帳號沒開 Gmail 都是這條路），講得太具體會叫人
+         * 去改根本沒壞的東西。
+         */
+        'FAILED_HINT' => "\n⚠️ 驗證沒通過，所以先不給排程設定 —— 免得把錯的憑證套進去。\n"
+            . '上面 ❌ 那一步處理掉之後再傳一次，我重驗一遍 🙏',
+
+        'UNAVAILABLE_TEXT' => '抱歉，現在沒辦法解析這則指令，請稍後再試一次 🙏',
+
+        'NOT_BOUND_TEXT' => "這則指令要先把 Telegram 綁到系統帳號才能用 🙏\n"
+            . '（後台「帳號管理」→ 編輯自己的帳號 → 填 Telegram 使用者 ID）',
+
+        'NO_PERMISSION_TEXT' => '這個操作需要「Telegram 客服 → 用指令驗 Gmail 憑證」權限 🙏',
+    ],
+
+    /*
      * 用 Telegram 指令做一份 Apollo 的 spider_setting。
      *
      * 「做一個 Ckpay 的 spider_setting，商戶號 12345、金鑰 abcdef」
@@ -1056,11 +1190,16 @@ return [
         'DETECT_PROMPT' => implode("\n", [
             '你是群組機器人的指令解析器，只負責判斷「這句話是不是要做一份金流通道的 spider_setting」。',
             '',
+            'spider_setting 在這個團隊的日常講法是「排程」或「排程設定」。',
+            '「做一個 Ckpay 的排程」跟「做一個 Ckpay 的 spider_setting」是同一件事。',
+            '這裡的「排程」不是排班、也不是預約提醒，是金流通道的設定值。',
+            '',
             'intent 怎麼填：',
-            '- spider：他要做一份 spider_setting，而且講得出是哪一個通道',
+            '- spider：他要做一份 spider_setting（排程），而且講得出是哪一個通道',
             '- not_spider：這句話不是在講這件事',
             '  （查餘點、查虛擬機、查卡片、排提醒、發公告都是 not_spider）',
-            '- unknown：是在講 spider_setting，但沒講是哪一個通道',
+            '  要驗 Gmail 憑證、或做 Gmail 的排程也是 not_spider，那是另一支指令在管的',
+            '- unknown：是在講 spider_setting（排程），但沒講是哪一個通道',
             '',
             'channel 只能填下面這份清單裡的其中一個，大小寫照清單抄：',
             '{channels}',
@@ -1097,7 +1236,8 @@ return [
 
         'INPUT' => '對方說：{text}',
 
-        'TITLE' => "🧩 <b>{channel}</b> 的 spider_setting\n\n",
+        // 「排程」是需求方的日常講法，括號裡附欄位名以免跟排班／提醒混淆
+        'TITLE' => "🧩 <b>{channel}</b> 的排程設定（spider_setting）\n\n",
 
         // 用 <pre> 讓 Telegram 顯示成可整段複製的區塊
         'JSON_BLOCK' => "<pre>{json}</pre>\n",
@@ -1136,8 +1276,8 @@ return [
          * ⚠ **不要把 64 個通道全列出來** —— 那在 Telegram 上是一大片，
          * 看的人反而找不到。請他直接講代號就好。
          */
-        'UNKNOWN_TEXT' => "要做哪一個通道的 spider_setting 呢 🙏\n"
-            . "可以這樣說：做一個 Ckpay 的 spider_setting，商戶號 12345、金鑰 abcdef\n"
+        'UNKNOWN_TEXT' => "要做哪一個通道的排程呢 🙏\n"
+            . "可以這樣說：做一個 Ckpay 的排程，商戶號 12345、金鑰 abcdef\n"
             . '（通道代號就是 index 那一欄的值，例如 Ckpay、Gz、Yongxin）',
 
         /*
@@ -1147,6 +1287,7 @@ return [
          * 自己打錯字，一直重打。
          */
         'NOT_FOUND_TEXT' => "我的通道清單裡沒有 <b>{channel}</b> 🙏\n"
+            . "（Gmail 排程請直接說「驗一下 Gmail 憑證」，那是另一支指令）\n"
             . "可能是打錯字，也可能是主系統新增的通道、我這份對照表還沒更新。\n"
             . '（對照表在客服系統的 config/apollo_fields.php，是從主專案掃出來的快照）',
 

@@ -106,6 +106,7 @@ return [
         'task_query'      => '用指令查卡片进度',
         'rate_query'      => '用指令查今日汇率',
         'spider_setting'  => '用指令做 spider_setting',
+        'gmail_credential' => '用指令验 Gmail 凭证',
     ],
     'staff_manage' => [
         'view' => '查看内部管理',

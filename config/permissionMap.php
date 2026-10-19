@@ -210,6 +210,15 @@ return [
              * 所以照樣要權限，不是「唯讀就人人可用」。
              */
             'telegram_chat.spider_setting' => 'permission.telegram_chat.spider_setting',
+
+            /*
+             * 在內部群組 tag 機器人，請它驗 Gmail 爬蟲憑證並產出 spider_setting。
+             *
+             * ⚠ **不沿用 `telegram_chat.spider_setting`**：那支只是查表組字串，
+             * 這支會**拿著客人給的憑證去打 Google**（外部請求，而且是金流入帳
+             * 信箱的 OAuth 憑證）。能做查表的人不一定該能拿憑證去打外部服務。
+             */
+            'telegram_chat.gmail_credential' => 'permission.telegram_chat.gmail_credential',
         ],
     ],
 

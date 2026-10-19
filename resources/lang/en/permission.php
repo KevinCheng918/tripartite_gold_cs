@@ -102,6 +102,7 @@ return [
         'task_query' => 'Query task card progress by command',
         'rate_query' => "Query today's rate message by command",
         'spider_setting' => 'Build a spider_setting by command',
+        'gmail_credential' => 'Verify Gmail credentials by command',
         'reply'     => 'Reply messages',
         'assign'    => 'Assign duty staff',
         'broadcast' => 'Broadcast announcement',
