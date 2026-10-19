@@ -1,34 +1,146 @@
-# 小幫手幫忙做 Apollo 的 spider_setting
+# 小幫手幫忙做 Apollo 的排程設定（spider_setting）
 
 > 需求（2026-10-19）：「我最近都會有需要製作 Apollo spider-setting，我想要小幫手
 > 能夠幫我製作，我會傳送資訊 tag 機器人」
 >
-> 兩個決定（問過需求方）：
-> 1. 欄位對照表 → **先掃 65 支 Apollo 存成設定檔**（不即時讀主專案）
-> 2. 產出 → **回一段可複製的 JSON**（不寫進任何系統）
+> 後續補充（同日，依序）：
+> - 「spider_setting 會稱之為排程，Gmail 排程，ckpay 的排程」
+> - 「有時候會只需要代收，有時候只需要代付，有時候兩個都要，都要的話，都要給」
+> - 「api_url 這些都要填寫上去，order_group 這個也要」
+> - 「每一個都要 api_url 才對」
+> - 「selfpay index 有 self_cashier，是用別人的收銀台」
+> - 「同單多組，這個也是在講 order_group」
+> - 「不開的話，就連同 order_group 都不要」
+>
+> 兩個決定（問過需求方）：欄位對照表**先掃 65 支 Apollo 存成設定檔**（不即時讀
+> 主專案）、產出**回一段可複製的 JSON**（不寫進任何系統）。
 
 ```
-@機器人 做一個 Ckpay 的 spider_setting，商戶號 12345、金鑰 abcdef
+@機器人 做一個 Ckpay 的代收排程，api 網址 https://pay.ck.com/api、商戶號 12345、金鑰 abcdef
   ↓
-🧩 Ckpay 的 spider_setting
-
-{
-    "index": "ckpay",
-    "app_id": "12345",
-    "app_key": "abcdef"
-}
+🧩 Ckpay 的排程設定（spider_setting）
 index 刻意用小寫，主系統有幾處是字串直接比對，請不要改成大寫。
 
-⚠️ 還缺 3 個必填欄位：
-・api_url
-・check_url
+【代收】
+{
+    "index": "ckpay",
+    "api_url": "https://pay.ck.com/api",
+    "app_id": "12345",
+    "app_key": "abcdef",
+    "ping_url": ""
+}
+
+⚠️ 還缺 1 個必填欄位：
 ・ping_url
 
-💡 這些是選填（沒填會用程式裡的預設值）：
-・currency
+💡 通道的選填欄位，要用再自己加：
+・cashier_url　・currency　・protocol_type
 
-把缺的補上再傳一次，我重做一份給您。
+💡 代收頁面／對帳的選填欄位：
+・amount_deduct　・company　・contact　・image_alert_seconds　・not_show　・note　・order_group
 ```
+
+## 「排程」就是 spider_setting
+
+需求方的日常講法是「排程」／「排程設定」（主專案的語系檔也寫
+`'spider_setting' => '排程設定'`）。兩支指令的 prompt 都明寫了這個同義詞，
+並特地講明「這裡的排程不是排班、也不是預約提醒」。
+
+⚠ 加了同義詞之後**反向測過**：「下週的排班幫我排一下」、「幫我排一個提醒」、
+「這個排程是不是掛掉了」、「查一下虛擬機排程」都要落到預約提醒那一棒。
+
+## 代收與代付是兩份設定
+
+`payment` 一列只有一種 `type`，所以一個通道兩種都做 ＝ 兩列、兩份
+`spider_setting`。**兩種都要就回兩段 JSON**，不是把欄位混在一份裡
+（混成一份會讓人以為貼一次就好）。
+
+欄位怎麼分代收／代付？**靠方法名**：
+
+| 範圍 | 方法 |
+|---|---|
+| `deposit` | `getPay*`、`verifySign`（回調）、`getRate`、收銀台相關 |
+| `withdraw` | 方法名含 withdraw（`generateWithdrawRecord`、`sendWithdraw`、`checkWithdrawStatus`） |
+| `shared` | 建構子、`initSet()`、`getBalance()` 等兩種都會走到的 |
+
+一個鍵同時出現在兩邊就歸 `shared`。例：`Ckpay` 的 `check_url` 只有代付在讀、
+`Bgp` 整支只有代付。
+
+⚠ **沒講要哪一種時兩份都給**（`unsaid`）：猜一種的話，猜錯就是只給了他不要的
+那一份，他得再問一次；兩份都給最多是多看一段。而且回覆會多一句說明
+「您沒說代收還是代付，兩種都給您（是兩份設定，不是一份）」——
+不講的話他會納悶為什麼跑出兩段，甚至以為要兩份都貼。
+
+### `TYPES`：哪些通道只做一種
+
+`config('apollo_fields.TYPES')` 記了 31 個只做代收、12 個只做代付、21 個兩種
+都做。判斷依據是**有沒有那一種方法**。
+
+⚠ 存在的理由是**不要產出沒用的東西**：有人問「Sbs 的代收排程」時，照樣組一份
+出來的話，他會拿著一份這個通道根本不做的設定去貼。現在會回
+「Sbs 沒有代收這一種，我這份對照表裡它做的是代付」。
+
+⚠ 回覆要**講出它做的是哪一種** —— 只說「不支援」的話，他不知道是自己記錯了
+通道，還是記錯了方向。
+
+⚠ 上游常把代收與代付當成兩個產品（`Teimshen` 只做代付、`TeimshenCashier` 只做
+代收），所以「同一家只有一種」是常態，不是掃錯。
+
+⚠ 對照表沒分類到的通道（主專案加了新的）**兩種都給 ＋ 寫一筆 warning**，
+不要回「不支援」—— 那會變成「新通道永遠做不出排程」，而使用者看不出是對照表
+過期了。
+
+## ⚠ 第一版漏了兩整類欄位
+
+需求方抓到的（「api_url 這些都要填寫上去，order_group 這個也要」）：
+
+| 漏掉的 | 原因 |
+|---|---|
+| `BASE`（`api_url`、`protocol_type`、`cashier_url`） | 設定檔裡有，但**服務根本沒讀它** —— 只組了通道自己的欄位 |
+| `EXTRA`（`order_group`、`amount_deduct`、`company`、`contact`、`image_alert_seconds`、`not_show`、`note`） | 掃描只看 `app/Apollos`，而這些是 Controller／Trait／Blade 在讀的 |
+
+`api_url` 是 `Apollo.php` 基底在讀的，**每一個通道、代收代付都要**
+（需求方：「每一個都要 api_url 才對」）。
+
+找出 `EXTRA` 的方法：掃**所有** decode 過 `spider_setting` 的檔案（不只 Apollo），
+找 `Arr::get($setting, 'x')` / `$setting['x']` / `$this->settings['x']`，
+再跟現有對照表 diff。一般化：**同一份資料有好幾種讀法時，只掃其中一種就是漏**。
+
+## ⚠ 必填一律寫進 JSON，選填沒給就不要寫
+
+| 分類 | 進 JSON 嗎 | 列進「還缺」嗎 |
+|---|---|---|
+| `required` | **一律寫，沒給就留空字串** | 會 |
+| `optional` | **只有給了才寫** | 不會（另外列成清單） |
+
+必填留空字串是為了「拿到一份可以直接填的範本」（需求方要的），
+而選填**絕對不能**寫空字串進去，兩個理由：
+
+1. `Arr::get($setting, 'currency', 'TWD')` 遇到 `"currency": ""` 回的是空字串
+   **不是** `TWD` —— 空值會把程式裡的預設值蓋掉
+2. 需求方 2026-10-19：「不開的話，就連同 order_group 都不要」——
+   開關型欄位留一個空值在設定裡，下一個看的人會以為有設過
+
+⚠ 同一個鍵在兩處分類不同時**必填優先**（`cashier_url` 在 `BASE` 是選填、
+在 `Totoken` 是必填）—— 少問一個必填會讓人貼上一份跑不起來的設定，
+多問一個選填只是多打一次字。
+
+⚠ 選填分兩組列（**通道的** vs **代收頁面／對帳的**）：混成一張九行的清單，
+看的人會以為那些頁面欄位也要去問上游。
+
+## ⚠ 開關型欄位的值不能照抄人話
+
+`order_group`（口語「**同單多組**」）＝ 通道接受一次送多筆匯款帳號。
+主系統判斷它只用 `filled()`／`blank()`。
+
+實測「同單多組要開」被模型抄成 `"order_group": "開"` —— **能跑，但資料是錯的**，
+下一個看到的人會以為這裡可以填中文。所以 `config('apollo_fields.FLAGS')` 列出
+開關型欄位，解析器一律改寫成 `"1"`，**不靠 prompt 自律**。
+
+實測四種模型輸出（`"開"`／`"1"`／`"要"`／`null`）→ 產出
+（`"1"`／`"1"`／`"1"`／不寫這個 key），非開關欄位不受影響。
+
+反向也測了：「這家不支援同單多組」→ 模型不填 → key 不出現 ✅
 
 ## ⚠ `index` 要 snake_case，不是 Apollo 的類別名
 
@@ -41,118 +153,95 @@ index 刻意用小寫，主系統有幾處是字串直接比對，請不要改�
 
 | 位置 | 寫法 |
 |---|---|
-| `Models/Payment::isSelfHold()` | `Arr::get($setting, 'index') === 'self_hold'` |
-| `Payments/Payment.php:1409,1433`（轉單費率） | `Str::is('self*', $spiderIndex) && !Str::is('self_hold', …)` |
-| `Traits/AvatarCallback.php:2731`（USDT 回調） | `switch (…) { case 'chno': }` |
-| `Payments/Payment.php:731` | 同上 `case 'chno'` |
+| `Models/Payment::isSelfHold()` | `=== 'self_hold'` |
+| `Payments/Payment.php:1409,1433`（轉單費率） | `Str::is('self*', $spiderIndex)` |
+| `Traits/AvatarCallback.php:2731`、`Payment.php:731` | `case 'chno'` |
 
-寫成 `SelfHold` 的話，通道能用、開單能開，但**自家轉單會被收錯費率** ——
+寫成 `SelfHold` 的話通道能用、開單能開，但**自家轉單會被收錯費率** ——
 那種錯不會報，要等對帳才發現。所以產出一律 `Str::snake($code)`，
-而且回覆裡特地加一行 `INDEX_NOTE` 叫人不要手動改成大寫。
-
-`self_hold` 與 `chno` 這兩個觀察到的真實值，正好就是 snake_case，
-也反過來證實了這個慣例。
+回覆裡還加一行 `INDEX_NOTE` 叫人不要手動改成大寫（印在標題底下**只印一次**，
+不是每一段都印）。
 
 **驗證**：64 個代號全部 `Str::studly(Str::snake($code) . 'Apollo')` 回得去
-原本的檔名（`app/Apollos/{$code}Apollo.php` 存在），沒有例外。
+原本的檔名，沒有例外；`self_hold` 與 `chno` 這兩個觀察到的真實值正好就是
+snake_case。
 
-## 欄位對照表是快照，不是即時的
+## 幾個代號光看名字猜不到（`NOTES`）
 
-`config/apollo_fields.php` 是掃 `tripartite_gold/app/Apollos/` 的 65 支檔案
-產出來的：每一支裡的 `Arr::get($this->setting, 'xxx')` 就是它會讀的欄位，
-**有給預設值的算選填、沒給的算必填**。
+| 代號 | 說明 |
+|---|---|
+| `self` | 自家系統轉單（個人銀行），收銀台是自己的 |
+| `self_cashier` | 自家系統轉單，但自行包裝收銀台畫面 ＝ **用別人的收銀台**（需求方確認） |
+| `self_hold` | **代付專用**：開單直接進「等待重送」，不讀任何設定 |
+| `cashier` | 建立代收通道時的預設 index，Gmail 爬蟲也掛在它底下 |
 
-- `BASE`：`Apollo.php` 自己讀的（必填 `api_url`，選填 `protocol_type`、`cashier_url`）
-- `CHANNELS`：64 個通道各自的（`Apollo.php` 不算通道，`Cashier` 等算）
+有 `NOTES` 的代號，回覆會在標題底下多印一行說明。
 
-⚠ **客服系統讀不到主專案的檔案**。兩個專案是不同的部署，唯一的管道是站台
-的 HTTP API —— 所以沒辦法做成即時讀取。主專案新增通道或改欄位名之後，
-這份表要**重新掃一次**，不然小幫手會少列欄位（而使用者會以為填完了）。
+⚠ `SelfHold` 一個欄位都不讀，所以它的產出只有 `index` ＋ `api_url`（基底的）
+—— 那是正確的，不是掃漏了。
 
-⚠ 認不出通道時的回覆**特地講明「可能是主系統新增、我這份對照表還沒更新」**
-——不講的話，看的人會以為自己打錯字，一直重打同一個代號。
+## 欄位清單是快照，不是即時的
 
-## 兩步問模型，各司其職
+`config/apollo_fields.php` 掃的是 `tripartite_gold/app/Apollos/` 的 65 支檔案。
 
-| 步驟 | 模型要做的事 | 為什麼分開 |
-|---|---|---|
-| `detect()` | 這句話是不是要做 spider_setting、是哪一個通道 | 一次問完的話，prompt 得塞進 64 個通道的全部欄位，又長又容易張冠李戴 |
-| `extract()` | 把「商戶號 12345」對到 `app_id: "12345"` | prompt 只帶**那一個通道**的欄位清單 |
+⚠ **客服系統讀不到主專案的檔案**（不同部署，唯一管道是站台的 HTTP API），
+所以沒辦法做成即時讀取。主專案新增通道或改欄位名之後要**重新掃一次**，
+不然小幫手會少列欄位（而使用者會以為填完了）。
+
+⚠ 認不出通道時的回覆特地講明「可能是主系統新增、我這份對照表還沒更新」——
+不講的話，看的人會以為自己打錯字，一直重打。
+
+## 模型只做對應，不想欄位名
+
+| 步驟 | 模型要做的事 |
+|---|---|
+| `detect()` | 這句話是不是要做排程、哪一個通道、代收還是代付 |
+| `extract()` | 把「商戶號 12345」對到 `app_id: "12345"` |
 
 ⚠ **模型不負責知道有哪些欄位**，欄位名一律來自對照表。讓它自己想的話，
 它會編出 `merchant_key` 這種 Apollo 根本沒讀的鍵 —— 而這份 JSON 是要貼進
 金流設定的，多一個沒人讀的鍵會讓人以為設好了。
 
-兩道防線：
-1. `extract()` 的 schema 把每個欄位**明寫成 property**（不是自由的 object），
-   模型只能填清單上的鍵
-2. `normalizeExtract()` 再把清單外的鍵一律丟掉
+兩道防線：`extract()` 的 schema 把每個欄位**明寫成 property**（不是自由的
+object）；`normalizeExtract()` 再把清單外的鍵一律丟掉。
 
-實測（真的呼叫 CLI）：
+分兩步問的理由：一次問完的話，prompt 得塞進 64 個通道的全部欄位，
+又長又容易張冠李戴。
 
-| 說法 | 對到 |
-|---|---|
-| 商戶號 12345、金鑰 abcdef | `app_id` / `app_key` |
-| hash key 是 AAA，hash iv 是 BBB，商戶號 M001 | `hash_key` / `hash_iv` / `merchant_id`（三個都對，沒有張冠李戴） |
-| 帳號 catuser、密碼 catpass | `api_username` / `api_password` |
-| api 網址 `…?a=1&b=2`、回調 …/ping、查詢 …/check、幣別 TWD | 六個全對，網址的 `&` 原樣保留 |
+## 驗證
 
-## 一個欄位都沒對到也照樣回清單
+**代收／代付的判斷（真的呼叫模型，8/8）**：代收排程、代付排程、「代收代付
+兩個都要」、沒講、「出款的排程」、「收款的排程」、「Sbs 的代收排程」、
+「入款跟出款」—— 通道與 scope 全對。
 
-「Ckpay 要填什麼」這種只是在問欄位的話，走的是同一條路（`$values` 空陣列）。
-只回一句「沒讀到資料」的話，使用者看不到這個通道到底要哪些欄位，
-而那正是他最需要的。
+**欄位對應**：代收＋代付合併的 15 個欄位清單一次問，7 個值全對且網址的 `&`
+原樣保留；「上游手續費 15」第一次漏掉 `amount_deduct`，補了講法對照之後對到。
 
-但**模型掛掉要跟「沒給值」分開講**（`EXTRACT_FAILED_HINT`）：不說的話，
-使用者會以為自己剛才打的商戶號格式不對，然後把同一串重打好幾次。
+**回覆排版 15 種分支**：代收／代付／兩種／沒講／只做代付的通道被問代收／
+一個欄位都不讀的通道／有 NOTES 的／只有 shared 的／`cashier_url` 在兩處
+分類不同的（Totoken）／通道不在清單／沒指名通道／不是這支指令／對應失敗／
+沒權限。
 
-## 排在分派器第六棒
-
-`TelegramCommandRouter` 的順序：公告 → 餘點告警 → 查餘點 → 查虛擬機 →
-查卡片 → 查匯率 → **spider_setting** → 預約提醒（看不懂的歸宿）。
-
-⚠ **上游六支全部實測讓路**（這是 2026-10-14「發送餘點告警給 lv uat」被公告
-解析器吃掉的教訓：那次只測了新的那支與隔壁，沒測上游）：
-
-| 句子 | 公告 | 告警 | 餘點 | 虛擬機 | 卡片 | 匯率 | spider |
-|---|---|---|---|---|---|---|---|
-| 做一個 Ckpay 的 spider_setting，商戶號… | 讓路 | 讓路 | 讓路 | 讓路 | 讓路 | 讓路 | ✅ `Ckpay` |
-| 幫我產一份 Gz 的 spider setting，hash key… | 讓路 | 讓路 | 讓路 | 讓路 | 讓路 | 讓路 | ✅ `Gz` |
-| 我要新增一個金流通道的設定 | 讓路 | 讓路 | 讓路 | 讓路 | 讓路 | 讓路 | ✅ `unknown`（問哪一個） |
-
-反向也測了 —— 這支**不會搶走別人的話**（9 句既有指令全部回 `not_spider`）：
-查餘點、確認 Rich 還剩多少點、查虛擬機規格、發餘點告警、今天匯率多少、
-查 @帳號 卡片進度、預約傳送訊息、明天提醒我發公告、設定補點通知群組。
-
-## 權限：`telegram_chat.spider_setting`
-
-「用指令做 spider_setting」。
-
-⚠ 這支**只產出文字、不寫任何系統**，但照樣要權限，不是「唯讀就人人可用」：
-
-1. 那段 JSON 是要貼進主系統金流設定的，貼錯直接影響收款
-2. 它會把對方給的**商戶號、金鑰原文列回群組** —— 等於把金流憑證印在聊天室
-
-⚠ 權限檢查擺在 `detect()` **之後**（確定是這支指令才檢查），
-跟其他幾支指令一致 —— 不然別人在群組聊天會一直被回「你沒有權限」。
+**分派器**：排第八棒（Gmail 之後）。上游七支實測讓路。
 
 ## 新增/修改的檔案
 
 | 檔案 | 說明 |
 |---|---|
-| `config/apollo_fields.php` | **新增**。掃主專案 65 支 Apollo 得到的欄位對照表（BASE ＋ 64 通道，各有 `required`/`optional`） |
-| `app/Services/AutoReply/SpiderSettingCommandParser.php` | **新增**。`detect()` 認通道、`extract()` 對欄位 |
-| `app/Services/SpiderSettingCommandService.php` | **新增**。查對照表、組 JSON、列缺漏、驗權限 |
-| `config/constants.php` | 新增 `SPIDER_SETTING_COMMAND`（兩段 prompt ＋ 全部回覆文字） |
-| `config/permissionMap.php` | 新增 `telegram_chat.spider_setting` |
+| `config/apollo_fields.php` | 欄位對照表。`BASE`／`EXTRA`／`TYPES`／`FLAGS`／`NOTES` ＋ 64 個通道（各自分 shared／deposit／withdraw） |
+| `app/Services/AutoReply/SpiderSettingCommandParser.php` | `detect()` 認通道與代收／代付、`extract()` 對欄位、開關型欄位改寫成 `"1"` |
+| `app/Services/SpiderSettingCommandService.php` | 合併 BASE＋EXTRA＋通道、每一種組一段 JSON、列缺漏、驗權限 |
+| `config/constants.php` | `SPIDER_SETTING_COMMAND`（兩段 prompt ＋ 全部回覆文字） |
+| `config/permissionMap.php` | `telegram_chat.spider_setting` |
 | `resources/lang/{tw,cn,en}/permission.php` | 權限名稱三語系 |
-| `app/Services/TelegramCommandRouter.php` | 掛進第六棒 |
+| `app/Services/TelegramCommandRouter.php` | 掛進第八棒 |
 
 ## 待釐清
 
 - `Trc20Usdt` → `trc20_usdt`、`TwoOneCashier` → `two_one_cashier` 這兩個代號
   **沒有在主專案裡看到實際值**，是從類別名推出來的（round-trip 回得去，
-  所以 Apollo 一定解析得到）。真的要用這兩個通道時，建議先去 `payment` 表
-  確認既有資料的 `index` 怎麼寫。
-- 對照表要**人工維護**：主專案改了欄位，這邊不會自動知道。
-  目前沒有「過期提醒」機制。
+  所以 Apollo 一定解析得到）。真的要用時建議先去 `payment` 表確認既有資料的
+  `index` 怎麼寫。
+- 對照表要**人工維護**：主專案改了欄位，這邊不會自動知道，目前沒有過期提醒。
+- `TYPES` 的判斷是方法名，**不是上游合約** —— 如果某個 Apollo 的代付是靠別的
+  方法名實作的，會被判成「只做代收」。目前 64 支都對得起來。
