@@ -362,13 +362,24 @@ class VmRepository
     /**
      * 每天自動發繳款通知要撈的帳單（未收的）
      *
-     * 四個條件：
+     * 條件：
      *   1. `paid = UNPAID` —— 已收的不發；待審核的走
      *      `getPendingBillingsForReminder()`，那是催自己人審核
-     *   2. `due_date <= 今天 + $daysAhead` —— 應收日前幾天開始發。
+     *   2. **而且沒有上傳過繳款證明**（見下方 ⚠）
+     *   3. `due_date <= 今天 + $daysAhead` —— 應收日前幾天開始發。
      *      **沒有下界**，所以逾期的會一直發到客戶繳費為止
-     *   3. 主機開機中 —— 關機的不發
-     *   4. 主機啟用中 —— 停用通常代表這台已經不服務了，還去收錢會出事
+     *   4. 主機開機中 —— 關機的不發
+     *   5. 主機啟用中 —— 停用通常代表這台已經不服務了，還去收錢會出事
+     *
+     * ⚠ **「有沒有上傳證明」也要看，不能只信 `paid`**（需求方 2026-10-19 回報）。
+     *
+     * 照理說上傳證明一定會把 `paid` 寫成 `PENDING`（`VmService::uploadProof()`
+     * 是唯一的入口），兩個訊號不會分家。但這條路是**跟客戶催錢** ——
+     * 萬一哪天多一條改 `paid` 的程式、或有人直接改資料庫，客戶就會被催
+     * 一筆他已經付過、而且證明還躺在我們後台的款。
+     *
+     * 分家時的正確去向是**催我們自己去審核**，不是催客戶，
+     * 所以 `getPendingBillingsForReminder()` 會把那種撿回去。
      *
      * @param int $daysAhead 提前幾天開始發
      * @return Collection
@@ -379,6 +390,10 @@ class VmRepository
             ->select(self::BILLING_COLUMNS)
             ->with(['vmServer.station'])
             ->where('paid', config('constants.VM.BILLING.UNPAID'))
+            // 已經有證明就不是「沒付錢」，該去審核而不是催客戶
+            ->where(function ($query) {
+                $query->whereNull('proof_image')->orWhere('proof_image', '');
+            })
             ->whereDate('due_date', '<=', now()->addDays((int) $daysAhead)->toDateString())
             // 關機就不收錢，所以也不催款（2026-10-13 起只看電源，不再看「啟用」）
             ->whereHas('vmServer', function ($query) {
@@ -391,10 +406,17 @@ class VmRepository
     /**
      * 待審核的帳單（催我方審核用）
      *
-     * ⚠ **只看 `paid = PENDING`，沒有其他條件。**
+     * ⚠ **沒有應收日／電源／啟用的條件。** 客戶已經付款並上傳證明了，
+     * 證明擺著沒人審核本身就是問題 —— 跟應收日還剩幾天、主機是不是關機
+     * 都無關。
      *
-     * 客戶已經付款並上傳證明了，證明擺著沒人審核本身就是問題 ——
-     * 跟應收日還剩幾天、主機是不是關機或停用都無關。
+     * ⚠ **`paid = PENDING` 或「還沒收但已經有證明」兩種都算**
+     * （需求方 2026-10-19 回報）。
+     *
+     * 第二種照理說不會存在（上傳證明一定會把 `paid` 寫成 `PENDING`），
+     * 但真的出現時**它必須被撿起來**：`getBillingsForNotice()` 已經不收
+     * 有證明的帳單了，這裡不接的話那一筆會從兩張清單上同時消失 ——
+     * 客戶付了錢、證明躺在後台，而沒有任何人被通知。
      *
      * @return Collection
      */
@@ -412,7 +434,15 @@ class VmRepository
              */
             ->select(array_merge(self::BILLING_COLUMNS, ['updated_at']))
             ->with(['vmServer.station'])
-            ->where('paid', config('constants.VM.BILLING.PENDING'))
+            ->where(function ($query) {
+                $query->where('paid', config('constants.VM.BILLING.PENDING'))
+                    // 狀態沒跟上，但證明已經在了 —— 一樣要有人去看
+                    ->orWhere(function ($one) {
+                        $one->where('paid', config('constants.VM.BILLING.UNPAID'))
+                            ->whereNotNull('proof_image')
+                            ->where('proof_image', '!=', '');
+                    });
+            })
             ->orderBy('due_date')
             ->get();
     }
