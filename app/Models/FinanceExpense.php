@@ -29,7 +29,22 @@ class FinanceExpense extends Model
     protected $casts = [
         'amount'        => 'decimal:2',
         'exchange_rate' => 'decimal:4',
-        'expense_date'  => 'date',
+        /*
+         * ⚠ **一定要帶 `:Y-m-d`**（2026-10-19 修）。
+         *
+         * 只寫 `'date'` 的話，轉成 JSON 會變成 **UTC 的 ISO 字串** ——
+         * 這個專案的時區是 Asia/Taipei（+8），所以 `2026-10-18` 會輸出成
+         * `2026-10-17T16:00:00.000000Z`。前端直接 `substring()` 切字串，
+         * 切出來就是 **10-17**，選 18 號顯示 17 號、選 19 號顯示 18 號。
+         *
+         * 支出日期**沒有時間的意義**，不該被時區位移。帶了格式之後
+         * 序列化就是 `2026-10-18`，前端怎麼切都不會錯。
+         *
+         * （同類型的坑見 bugfix/2026-09-30-utc-timestamp-display —— 那次是
+         * 時間欄位，靠前端 `window.formatDateTime()` 換算；日期欄位不一樣，
+         * 它根本不該有時區，所以修在序列化這一端。）
+         */
+        'expense_date'  => 'date:Y-m-d',
         'reimbursed'    => 'integer',
     ];
 
