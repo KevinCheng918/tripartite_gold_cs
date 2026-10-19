@@ -150,15 +150,16 @@ return [
         'vm_payment'             => 'VM payment notices',
         'vm_payment_hint'        => 'The 9:30 payment notice: falls back here when a station has no group, and chases internal approval',
         'station_credit'         => 'Station credit alerts',
-        'station_credit_hint'    => 'The 10:00 credit alert and top-up message, falling back here when a station has no group',
+        'station_credit_hint'    => 'The credit alert and top-up message sent on the first whole hour after the rate is decided, falling back here when a station has no group',
 
         /*
          * ⚠ This one means something different from the rest: the others pick
          * where a notice is *sent*; this one picks where reminders may be *set*.
          */
-        'scheduled_reminder'      => 'Scheduled reminders',
-        'scheduled_reminder_hint' => '⚠ This picks which topics may SET reminders, not where they are sent — '
-            . 'a reminder always fires back in the topic it was set in. None ticked = every topic may set them',
+        // key stays scheduled_reminder; only the label changed (see tw for why)
+        'scheduled_reminder'      => 'Assistant',
+        'scheduled_reminder_hint' => '⚠ This picks which topics may USE the assistant commands, not where replies go — '
+            . 'the assistant always replies in the topic you spoke in. None ticked = every topic may use it',
     ],
 
     'msg' => [
