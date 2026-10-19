@@ -98,6 +98,7 @@ return [
         'credit_alert'    => '用指令發餘點告警給客戶',
         'task_query'      => '用指令查卡片進度',
         'rate_query'      => '用指令查今日匯率',
+        'spider_setting'  => '用指令做 spider_setting',
     ],
     'setting' => [
         'view'   => '檢視 AI 引擎設定與用量',

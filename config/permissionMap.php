@@ -200,6 +200,16 @@ return [
              * 拿到就能直接貼給客戶 —— 所以不跟「看匯率報價」混為一談。
              */
             'telegram_chat.rate_query' => 'permission.telegram_chat.rate_query',
+
+            /*
+             * 在內部群組 tag 機器人，請它做一份金流通道的 spider_setting。
+             *
+             * ⚠ 這一支**只產出文字**，不會寫進任何系統 —— 但那段 JSON 是要
+             * 貼進主系統金流設定的，貼錯會直接影響收款。而且它會把對方給的
+             * 商戶號、金鑰原文列回群組，等於把金流憑證印在聊天室裡。
+             * 所以照樣要權限，不是「唯讀就人人可用」。
+             */
+            'telegram_chat.spider_setting' => 'permission.telegram_chat.spider_setting',
         ],
     ],
 

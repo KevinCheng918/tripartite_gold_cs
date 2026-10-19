@@ -1034,6 +1034,137 @@ return [
     ],
 
     /*
+     * 用 Telegram 指令做一份 Apollo 的 spider_setting。
+     *
+     * 「做一個 Ckpay 的 spider_setting，商戶號 12345、金鑰 abcdef」
+     * → 回一段可以直接複製貼到主系統後台的 JSON，並列出還缺哪些欄位。
+     *
+     * ⚠ **只產出文字，不碰主系統的資料庫**（需求方 2026-10-19）。客服系統
+     * 本來就沒有寫主系統 `payment` 表的管道，而金流設定寫錯會直接影響收款。
+     *
+     * ⚠ 欄位清單查 `config('apollo_fields')` —— 那是從主專案
+     * `app/Apollos/*Apollo.php` 掃出來的**快照**，不是即時的。
+     */
+    'SPIDER_SETTING_COMMAND' => [
+        /*
+         * 第一步：認出「要不要做」與「哪一個通道」。
+         *
+         * ⚠ 樸素寫法，不要用 `**` 與 ⚠ ——
+         * 帶排版符號的 prompt 會讓模型把整包 JSON 塞進欄位裡
+         * （見 bugfix/2026-10-12-double-wrapped-json-prompt）。
+         */
+        'DETECT_PROMPT' => implode("\n", [
+            '你是群組機器人的指令解析器，只負責判斷「這句話是不是要做一份金流通道的 spider_setting」。',
+            '',
+            'intent 怎麼填：',
+            '- spider：他要做一份 spider_setting，而且講得出是哪一個通道',
+            '- not_spider：這句話不是在講這件事',
+            '  （查餘點、查虛擬機、查卡片、排提醒、發公告都是 not_spider）',
+            '- unknown：是在講 spider_setting，但沒講是哪一個通道',
+            '',
+            'channel 只能填下面這份清單裡的其中一個，大小寫照清單抄：',
+            '{channels}',
+            '',
+            '對方可能寫小寫或少打字（ckpay、CKPay），對得起來就填清單上的寫法。',
+            '清單裡沒有的通道填 null，不要自己造一個。',
+        ]),
+
+        /*
+         * 第二步：把句子裡的資訊對到欄位。
+         *
+         * ⚠ 欄位清單由呼叫端帶進來 —— **不要讓模型自己想欄位名**，
+         * 它會編出 Apollo 根本沒讀的鍵，而這份 JSON 是要貼進金流設定的。
+         */
+        'EXTRACT_PROMPT' => implode("\n", [
+            '你要把對方提供的資訊，對到 {channel} 這個金流通道的設定欄位。',
+            '',
+            '必填欄位：{required}',
+            '選填欄位：{optional}',
+            '',
+            '規則：',
+            '- 值一律原文照抄，不要改寫、不要補零、不要去掉符號',
+            '- 對方沒提到的欄位填 null，不要自己猜一個值',
+            '- 不確定他講的是哪個欄位時填 null，寧可讓他補，不要對錯',
+            '',
+            '常見的講法對照：',
+            '- 商戶號／商號／merchant／MID → 通常是 merchant_id、app_id、user_id 之類的識別碼',
+            '- 金鑰／密鑰／key／秘鑰 → 通常是 key、app_key、hash_key',
+            '- 串接網址／API 網址 → api_url',
+            '- 回調網址／通知網址 → ping_url',
+            '- 查詢網址 → check_url',
+            '只有在那個欄位真的在上面的清單裡時才填，清單沒有就不要填。',
+        ]),
+
+        'INPUT' => '對方說：{text}',
+
+        'TITLE' => "🧩 <b>{channel}</b> 的 spider_setting\n\n",
+
+        // 用 <pre> 讓 Telegram 顯示成可整段複製的區塊
+        'JSON_BLOCK' => "<pre>{json}</pre>\n",
+
+        /*
+         * ⚠ 這一行是要防「手動把 index 改成大寫」。
+         *
+         * `Apollo::get()` 兩種寫法都解析得到，所以改成大寫不會立刻壞；
+         * 但主專案有幾處是字串直接比對（`=== 'self_hold'`、`case 'chno'`、
+         * `Str::is('self*', $index)`），改了之後是自家轉單收錯費率那種
+         * 不會報錯的壞法。
+         */
+        'INDEX_NOTE' => "<i>index 刻意用小寫，主系統有幾處是字串直接比對，請不要改成大寫。</i>\n",
+
+        'MISSING_TITLE' => "\n⚠️ 還缺 {count} 個必填欄位：\n",
+        'MISSING_LINE'  => "・{field}\n",
+        'MISSING_HINT'  => "\n把缺的補上再傳一次，我重做一份給您。",
+
+        'OPTIONAL_TITLE' => "\n💡 這些是選填（沒填會用程式裡的預設值）：\n",
+        'OPTIONAL_LINE'  => "・{field}\n",
+
+        'COMPLETE_HINT' => "\n✅ 必填的都齊了，可以直接複製貼到主系統後台。",
+
+        /*
+         * 通道認得出來，但欄位對應那一步掛了。
+         *
+         * ⚠ 要講明「是我沒讀到，不是您打錯」—— 不然使用者會以為自己給的
+         * 格式不對，然後把同一串商戶號重打好幾次。
+         */
+        'EXTRACT_FAILED_HINT' => "\n\n⚠️ 另外，剛才沒能讀取您提供的內容，上面只有欄位清單。"
+            . '麻煩再傳一次，我重做一份給您 🙏',
+
+        /*
+         * 認不出通道。
+         *
+         * ⚠ **不要把 64 個通道全列出來** —— 那在 Telegram 上是一大片，
+         * 看的人反而找不到。請他直接講代號就好。
+         */
+        'UNKNOWN_TEXT' => "要做哪一個通道的 spider_setting 呢 🙏\n"
+            . "可以這樣說：做一個 Ckpay 的 spider_setting，商戶號 12345、金鑰 abcdef\n"
+            . '（通道代號就是 index 那一欄的值，例如 Ckpay、Gz、Yongxin）',
+
+        /*
+         * 清單裡沒有這個通道。
+         *
+         * ⚠ 要講明「可能是新通道、這份表還沒更新」—— 不然看的人會以為
+         * 自己打錯字，一直重打。
+         */
+        'NOT_FOUND_TEXT' => "我的通道清單裡沒有 <b>{channel}</b> 🙏\n"
+            . "可能是打錯字，也可能是主系統新增的通道、我這份對照表還沒更新。\n"
+            . '（對照表在客服系統的 config/apollo_fields.php，是從主專案掃出來的快照）',
+
+        'UNAVAILABLE_TEXT' => '抱歉，現在沒辦法解析這則指令，請稍後再試一次 🙏',
+
+        /*
+         * 權限。
+         *
+         * ⚠ 名稱要跟**介面上看到的字**一樣（帳號管理 → 權限設定 →
+         * Telegram 客服 → 用指令做 spider_setting）。
+         */
+        'NOT_BOUND_TEXT' => "這則指令要先把 Telegram 綁到系統帳號才能用 🙏\n"
+            . '（後台「帳號管理」→ 編輯自己的帳號 → 填 Telegram 使用者 ID）',
+
+        'NO_PERMISSION_TEXT' => '這個操作需要「Telegram 客服 → 用指令做 spider_setting」權限 🙏',
+    ],
+
+    /*
      * 用 Telegram 指令看今天的匯率補點訊息。
      *
      * 「今天匯率多少」→ 每個有啟用繳款設定的系統各回一則。

@@ -15,6 +15,7 @@ use Illuminate\Support\Arr;
  *   ├─ 查站台虛擬機（要權限，純讀不必確認）
  *   ├─ 查某人的卡片進度（要權限，純讀不必確認）
  *   ├─ 查今日匯率補點訊息（要權限，純讀不必確認）
+ *   ├─ 做一份 spider_setting（要權限，只產文字不寫任何系統）
  *   └─ 預約提醒（擺最後，也是看不懂時的歸宿）
  * ```
  *
@@ -43,6 +44,7 @@ class TelegramCommandRouter
     private $vmCommand;
     private $taskCommand;
     private $rateCommand;
+    private $spiderCommand;
     private $reminder;
 
     public function __construct(
@@ -54,6 +56,7 @@ class TelegramCommandRouter
         VmQueryCommandService $vmCommand,
         TaskQueryCommandService $taskCommand,
         RateQueryCommandService $rateCommand,
+        SpiderSettingCommandService $spiderCommand,
         ScheduledReminderService $reminder
     ) {
         $this->supportGroup = $supportGroup;
@@ -66,6 +69,7 @@ class TelegramCommandRouter
         $this->vmCommand = $vmCommand;
         $this->taskCommand = $taskCommand;
         $this->rateCommand = $rateCommand;
+        $this->spiderCommand = $spiderCommand;
         // 擺最後：它同時是「看不懂」時的歸宿
         $this->reminder = $reminder;
     }
@@ -148,6 +152,7 @@ class TelegramCommandRouter
         $vm = $this->vmCommand;
         $task = $this->taskCommand;
         $rate = $this->rateCommand;
+        $spider = $this->spiderCommand;
         $reminder = $this->reminder;
 
         return [
@@ -174,6 +179,9 @@ class TelegramCommandRouter
             },
             function ($body, $from, $threadId) use ($rate) {
                 return $rate->handle($body, $from, $threadId);
+            },
+            function ($body, $from, $threadId) use ($spider) {
+                return $spider->handle($body, $from, $threadId);
             },
             function ($body, $from, $threadId, $message) use ($reminder) {
                 return $reminder->handle($body, $threadId, $message);
