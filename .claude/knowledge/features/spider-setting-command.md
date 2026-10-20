@@ -15,6 +15,7 @@
 >   api_url ＋ /api/agent/info，self 代表自己的主系統，一定要對」
 > - 「self 固定代收用 self_cashier，代付用 self」
 > - 「`"not_show":"overtime_at"` 這個也要補上去 self cashier」
+> - 「（帳號／密碼／API_KEY／後台／API／文件／Server IP）self 格式固定會長這樣」
 >
 > 兩個決定（問過需求方）：欄位對照表**先掃 65 支 Apollo 存成設定檔**（不即時讀
 > 主專案）、產出**回一段可複製的 JSON**（不寫進任何系統）。
@@ -225,6 +226,45 @@ snake_case。
 
 ⚠ `FIXED` 與 `DERIVED` 都只在**那一種真的有這個欄位**時才填
 （`self_cashier` 是代收、沒有 `check_url`，就不該冒出一個 `check_url`）。
+
+### 交接資料是固定格式
+
+需求方 2026-10-20：「self 格式固定會長這樣」——
+
+⚠ **以下是示意值，不是真的**（需求方 2026-10-20：「剛剛給的資料，是機敏資訊，
+中間都打碼，不要寫明文」）。交接資料裡的帳號與 API_KEY 就是進得去主系統的
+憑證，文件只要記得**格式**，不必記得值。
+
+```
+帳號：Ab12345
+密碼：Ab12345
+API_KEY：0123456789abcdef0123456789abcdef
+後台：https://bg.example-gold-xx.net
+API：https://data.example-gold-xx.net
+文件：https://text.example-gold-xx.net/docs/v1
+Server IP：10.0.0.1
+```
+
+對應（**在主專案核對過，不是猜的**）：
+
+| 這一行 | 對到 | 依據 |
+|---|---|---|
+| 帳號 | `agent` | `AuthHashKey` 拿它查 `'account' => $params['agent']`，所以 agent ＝ 代理的帳號 |
+| API_KEY | `key` | `SelfApollo::generateSign()` 把 `key` 當 `api_key` 算 md5，而接收端 `verifyHash()` 比的是 `$user->api_key` |
+| **標「API」的那一行** | `api_url` | — |
+| 密碼／後台／文件／Server IP | **不填** | 排程裡沒有這些欄位（密碼是登入後台用的） |
+
+⚠ **最容易出事的是網址**：這個站的「後台」是 `bg.`、「API」是 `data.`、
+「文件」是 `text.` —— 挑錯一個就是整個通道連到錯的地方，而且**不會有錯誤
+訊息**。所以 prompt 裡逐行寫明哪些不要填，並特地講「後台與文件都不是
+api_url，只有標 API 的那一行才是」。
+
+⚠ 不能靠主專案 `Converter::generateApiConfigUrl()` 的命名慣例去推
+（那邊 `backstage` → `data.`、`api` → `api.`）—— 這個站剛好相反。
+**以標籤為準，不要從子網域猜。**
+
+實測整份貼進去：`agent`／`key`／`api_url` 三個全對，密碼、後台、文件、
+Server IP 都沒被塞進去。
 
 ### 口語別名（`ALIASES`）
 
