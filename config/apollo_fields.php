@@ -78,6 +78,84 @@ return [
     ],
 
     /*
+     * 口語講法 => 對照表代號。
+     *
+     * ⚠ 需求方把自家主系統那一組叫「**selfpay**」（2026-10-20），但對照表上
+     * 沒有這個代號（檔案是 `SelfApollo`）—— 實測模型遇到「selfpay 的排程」
+     * 會回 `channel: null`，變成「我聽不懂你要哪個通道」。
+     *
+     * 這份會同時餵進 prompt（讓模型對得到）**也會**在比對時再查一次
+     * （萬一模型照抄別名）—— 兩道都做，因為漏接的下場是功能叫不出來。
+     */
+    'ALIASES' => [
+        'selfpay' => 'Self',
+    ],
+
+    /*
+     * 同一件事在代收與代付用不同的 index。
+     *
+     * ⚠ **自家主系統（self）固定是：代收走 `self_cashier`、代付走 `self`**
+     * （需求方 2026-10-20）。所以不管他說的是 self 還是 self_cashier，
+     * 產出時都要按這張表換成對的那一個 —— 兩個代號的欄位本來就不一樣
+     * （`self` 有代付的 `check_url`、`self_cashier` 沒有），用錯就接不起來。
+     *
+     * 格式：對照表代號 => [代收用哪個, 代付用哪個]
+     */
+    'SCOPE_INDEX' => [
+        'Self' => [
+            'deposit'  => 'SelfCashier',
+            'withdraw' => 'Self',
+        ],
+        'SelfCashier' => [
+            'deposit'  => 'SelfCashier',
+            'withdraw' => 'Self',
+        ],
+    ],
+
+    /*
+     * 可以從 `api_url` 推出來的欄位（後綴）。
+     *
+     * ⚠ **自家主系統的這兩個網址是固定的**（需求方 2026-10-20：「一定要對」）：
+     * - `check_url` ＝ `api_url` ＋ `/api/withdraw/info`
+     *   → `routes/api.php` 的 `withdraw/info`（`PaymentController@withdrawInfo`），
+     *     `SelfApollo::checkWithdrawStatus()` 打的就是它
+     * - `ping_url` ＝ `api_url` ＋ `/api/agent/info`
+     *   → `routes/api.php` 的 `agent/info`（`UserController@apiAuthInfo`），
+     *     `SelfApollo::getBalance()` 打的就是它
+     *
+     * ⚠ 這種能算出來的東西**不要讓人手打** —— 打錯一個字母，代付查單會一直
+     * 查不到而看起來像上游沒回應。
+     *
+     * ⚠ 只有**這個通道的那一種真的有這個欄位**時才會填（例如
+     * `self_cashier` 是代收、沒有 `check_url`，就不會冒出來）。
+     */
+    'DERIVED' => [
+        'Self' => [
+            'check_url' => '/api/withdraw/info',
+            'ping_url'  => '/api/agent/info',
+        ],
+        'SelfCashier' => [
+            'ping_url' => '/api/agent/info',
+        ],
+    ],
+
+    /*
+     * 固定值的欄位：這個通道這一欄就是這個值，不必問人。
+     *
+     * ⚠ `self_cashier` 的 `not_show` 固定 `overtime_at`
+     * （需求方 2026-10-20）。主專案建立代收通道時的基底
+     * （`PaymentController::resolveSpiderSetting()`）與 Gmail 憑證產出的
+     * `CASHIER_NOT_SHOW` 都是這個值 —— 收銀台不要顯示逾時時間。
+     *
+     * ⚠ 跟 `DERIVED` 一樣只在**那一種真的有這個欄位**時才填。
+     */
+    'FIXED' => [
+        'SelfCashier' => [
+            'not_show' => 'overtime_at',
+        ],
+    ],
+
+    /*
      * 開關型欄位：值只有「有」與「沒有」兩種意義。
      *
      * ⚠ **這些欄位的值不能照抄人話**。主系統判斷它們只用
@@ -94,8 +172,8 @@ return [
      * key 用對照表的代號（類別名），不是 snake 的 index。
      */
     'NOTES' => [
-        'Self'        => '自家系統轉單（個人銀行），收銀台是自己的',
-        'SelfCashier' => '自家系統轉單，但自行包裝收銀台畫面 ＝ 用別人的收銀台',
+        'Self'        => '自家主系統：代收固定用 self_cashier、代付固定用 self',
+        'SelfCashier' => '自家主系統，自行包裝收銀台畫面 ＝ 用別人的收銀台',
         'SelfHold'    => '代付專用：開單直接進「等待重送」，不讀任何設定',
         'Cashier'     => '建立代收通道時的預設 index，Gmail 爬蟲也掛在它底下',
     ],

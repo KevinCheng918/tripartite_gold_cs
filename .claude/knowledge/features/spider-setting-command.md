@@ -11,6 +11,10 @@
 > - 「selfpay index 有 self_cashier，是用別人的收銀台」
 > - 「同單多組，這個也是在講 order_group」
 > - 「不開的話，就連同 order_group 都不要」
+> - 「self 的 check_url 固定用 api_url ＋ /api/withdraw/info，ping_url 固定用
+>   api_url ＋ /api/agent/info，self 代表自己的主系統，一定要對」
+> - 「self 固定代收用 self_cashier，代付用 self」
+> - 「`"not_show":"overtime_at"` 這個也要補上去 self cashier」
 >
 > 兩個決定（問過需求方）：欄位對照表**先掃 65 支 Apollo 存成設定檔**（不即時讀
 > 主專案）、產出**回一段可複製的 JSON**（不寫進任何系統）。
@@ -166,6 +170,75 @@ index 刻意用小寫，主系統有幾處是字串直接比對，請不要改�
 原本的檔名，沒有例外；`self_hold` 與 `chno` 這兩個觀察到的真實值正好就是
 snake_case。
 
+## 自家主系統（self）那一組
+
+需求方 2026-10-20 的三條：
+1. 「self 固定代收用 self_cashier，代付用 self」
+2. 「self 的 check_url 固定用 api_url ＋ /api/withdraw/info，
+   ping_url 固定用 api_url ＋ /api/agent/info，self 代表自己的主系統，
+   **一定要對**」
+3. 「`"not_show":"overtime_at"` 這個也要補上去 self cashier」
+
+### 代收與代付用不同的 index（`SCOPE_INDEX`）
+
+不管他說的是 `self` 還是 `self_cashier`，產出時都按這張表換：
+
+| 要哪一種 | 實際 index |
+|---|---|
+| 代收 | `self_cashier` |
+| 代付 | `self` |
+
+⚠ 兩個代號的**欄位本來就不一樣**（`self` 有代付的 `check_url`、
+`self_cashier` 沒有），用錯就接不起來。
+
+⚠ 所以 `supportedTypes()` 遇到有 `SCOPE_INDEX` 的代號要回「兩種都做」——
+看的是「這組代號合起來」做什麼，不是單一個代號（`SelfCashier` 在 `TYPES` 裡
+只做代收，但問「self 的代付」是合理的）。
+
+⚠ 每一段的標題都帶上 index（`【代付】self`）—— 兩段長得很像，不標會貼錯。
+
+### 能算出來的就不要讓人手打（`DERIVED`）
+
+| 欄位 | 值 | 主專案哪裡在用 |
+|---|---|---|
+| `check_url` | `api_url` ＋ `/api/withdraw/info` | `routes/api.php` 的 `withdraw/info`（`PaymentController@withdrawInfo`），`SelfApollo::checkWithdrawStatus()` 打它 |
+| `ping_url` | `api_url` ＋ `/api/agent/info` | `routes/api.php` 的 `agent/info`（`UserController@apiAuthInfo`），`SelfApollo::getBalance()` 打它 |
+
+⚠ **手打錯一個字母，代付查單會一直查不到、看起來像上游沒回應** ——
+這就是「一定要對」的意思。
+
+⚠ **會蓋掉對方給的值**（固定值與算出來的以我們為準），但一定要在回覆裡
+列出「這幾個我自己填的」—— 不講的話他會以為是自己打過的，下次就不會再給、
+也不會發現被換掉。實測給一個拼錯的 `.../infoo` 會被換成正確的。
+
+⚠ 結尾斜線要處理：`rtrim($apiUrl, '/')` 再接，不然變成 `https://x//api/...`。
+
+⚠ `api_url` 沒給就算不出來 —— 那幾個欄位留空、跟著列進「還缺」，但要**另外
+講一句**「check_url、ping_url 不用給我，補上 api_url 我會自己算」。
+少了這句，他看到「還缺 api_url、check_url、ping_url」會以為要去問三個值。
+
+### 固定值（`FIXED`）
+
+`self_cashier` 的 `not_show` 固定 `overtime_at`（收銀台不顯示逾時時間）。
+主專案建立代收通道時的基底（`PaymentController::resolveSpiderSetting()`）
+與 Gmail 憑證產出的 `CASHIER_NOT_SHOW` 都是這個值。
+
+⚠ `FIXED` 與 `DERIVED` 都只在**那一種真的有這個欄位**時才填
+（`self_cashier` 是代收、沒有 `check_url`，就不該冒出一個 `check_url`）。
+
+### 口語別名（`ALIASES`）
+
+需求方把這一組叫「**selfpay**」，但對照表上沒有這個代號（檔案是
+`SelfApollo`）—— **實測模型遇到「selfpay 的排程」會回 `channel: null`**，
+變成「我聽不懂你要哪個通道」。
+
+修法是兩道：別名餵進 prompt（讓模型對到 `Self`）＋ 比對時再查一次別名
+（萬一模型照抄別名）。兩道都做，因為漏接的下場是功能叫不出來 ——
+跟 2026-10-13 拿掉關鍵字粗篩同一個理由。
+
+實測五種講法（`self`／`self 代付`／`self 代收`／`selfpay 兩種都要`／
+`self_cashier`）全部認得，模型照抄 `selfpay` 時服務這一側也接得住。
+
 ## 幾個代號光看名字猜不到（`NOTES`）
 
 | 代號 | 說明 |
@@ -228,7 +301,7 @@ object）；`normalizeExtract()` 再把清單外的鍵一律丟掉。
 
 | 檔案 | 說明 |
 |---|---|
-| `config/apollo_fields.php` | 欄位對照表。`BASE`／`EXTRA`／`TYPES`／`FLAGS`／`NOTES` ＋ 64 個通道（各自分 shared／deposit／withdraw） |
+| `config/apollo_fields.php` | 欄位對照表。`BASE`／`EXTRA`／`ALIASES`／`SCOPE_INDEX`／`DERIVED`／`FIXED`／`FLAGS`／`TYPES`／`NOTES` ＋ 64 個通道（各自分 shared／deposit／withdraw） |
 | `app/Services/AutoReply/SpiderSettingCommandParser.php` | `detect()` 認通道與代收／代付、`extract()` 對欄位、開關型欄位改寫成 `"1"` |
 | `app/Services/SpiderSettingCommandService.php` | 合併 BASE＋EXTRA＋通道、每一種組一段 JSON、列缺漏、驗權限 |
 | `config/constants.php` | `SPIDER_SETTING_COMMAND`（兩段 prompt ＋ 全部回覆文字） |

@@ -77,6 +77,7 @@ class SpiderSettingCommandParser
             $result = $this->matcher->generateStructured(
                 strtr((string) Arr::get($config, 'DETECT_PROMPT'), [
                     '{channels}' => implode('、', array_keys((array) config('apollo_fields.CHANNELS'))),
+                    '{aliases}'  => $this->aliasList(),
                 ]),
                 strtr((string) Arr::get($config, 'INPUT'), ['{text}' => $text]),
                 $this->detectSchema()
@@ -131,6 +132,25 @@ class SpiderSettingCommandParser
         }
 
         return $this->normalizeExtract($result, $keys);
+    }
+
+    /**
+     * 口語講法的對照（餵進 prompt）
+     *
+     * ⚠ 從設定檔長出來，不要在 prompt 裡寫死 —— 別名加在一個地方
+     * （`apollo_fields.ALIASES`），prompt 與比對都吃同一份。
+     *
+     * @return string
+     */
+    private function aliasList()
+    {
+        $lines = [];
+
+        foreach ((array) config('apollo_fields.ALIASES') as $alias => $code) {
+            $lines[] = "{$alias} ＝ {$code}";
+        }
+
+        return filled($lines) ? implode('、', $lines) : '（沒有）';
     }
 
     /**

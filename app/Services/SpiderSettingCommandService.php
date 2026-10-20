@@ -149,10 +149,15 @@ class SpiderSettingCommandService
             return;
         }
 
+        /*
+         * ⚠ 每一種各自解析自己的 index：自家主系統代收走 `self_cashier`、
+         * 代付走 `self`（見 `apollo_fields.SCOPE_INDEX`），兩邊的欄位不一樣。
+         */
         $groups = [];
 
         foreach ($scopes as $scope) {
-            $groups[$scope] = $this->fieldGroups($code, $scope);
+            $scopeCode = $this->scopeCode($code, $scope);
+            $groups[$scope] = ['code' => $scopeCode] + $this->fieldGroups($scopeCode, $scope);
         }
 
         $values = $this->parser->extract($text, $code, $this->allKeys($groups));
@@ -172,7 +177,7 @@ class SpiderSettingCommandService
         }
 
         foreach ($groups as $scope => $group) {
-            $reply .= $this->renderBlock($code, $scope, $group, (array) $values, $config);
+            $reply .= $this->renderBlock($scope, $group, (array) $values, $config);
         }
 
         if ($failed) {
@@ -209,6 +214,18 @@ class SpiderSettingCommandService
 
         foreach (array_keys((array) config('apollo_fields.CHANNELS')) as $code) {
             if ($this->normalizeCode($code) === $needle) {
+                return (string) $code;
+            }
+        }
+
+        /*
+         * 清單上沒有，再查一次口語別名（`selfpay` → `Self`）。
+         *
+         * ⚠ prompt 已經餵過別名了，這裡是**第二道** —— 萬一模型照抄別名
+         * 而不是換成清單上的寫法，不該因此回「清單裡沒有這個通道」。
+         */
+        foreach ((array) config('apollo_fields.ALIASES') as $alias => $code) {
+            if ($this->normalizeCode($alias) === $needle) {
                 return (string) $code;
             }
         }
@@ -260,6 +277,23 @@ class SpiderSettingCommandService
     }
 
     /**
+     * 這一種實際要用哪一個 index
+     *
+     * 自家主系統代收走 `self_cashier`、代付走 `self` —— 不管他說的是哪一個，
+     * 都換成那一種對的（需求方 2026-10-20）。
+     *
+     * @param string $code
+     * @param string $scope
+     * @return string
+     */
+    private function scopeCode($code, $scope)
+    {
+        $mapped = config("apollo_fields.SCOPE_INDEX.{$code}.{$scope}");
+
+        return filled($mapped) ? (string) $mapped : $code;
+    }
+
+    /**
      * 這個通道做代收還是代付
      *
      * @param string $code
@@ -267,6 +301,17 @@ class SpiderSettingCommandService
      */
     private function supportedTypes($code)
     {
+        /*
+         * ⚠ 有 `SCOPE_INDEX` 的（self 那一組）兩種都做 —— 看的是「這組代號
+         * 合起來」做什麼，不是單一個代號。`SelfCashier` 在 `TYPES` 裡只做
+         * 代收，但問「self 的代付」是合理的，要換成 `Self` 給他。
+         */
+        $mapping = (array) config("apollo_fields.SCOPE_INDEX.{$code}");
+
+        if (filled($mapping)) {
+            return array_keys($mapping);
+        }
+
         $types = (array) config('apollo_fields.TYPES');
 
         if (in_array($code, (array) Arr::get($types, 'both', []), true)) {
@@ -381,18 +426,22 @@ class SpiderSettingCommandService
     /**
      * 一種（代收或代付）的那一段
      *
-     * @param string $code
      * @param string $scope
-     * @param array  $group
+     * @param array  $group 含 code／required／optional／optional_page
      * @param array  $values
      * @param array  $config
      * @return string
      */
-    private function renderBlock($code, $scope, array $group, array $values, array $config)
+    private function renderBlock($scope, array $group, array $values, array $config)
     {
+        $code = (string) Arr::get($group, 'code');
         $required = (array) Arr::get($group, 'required', []);
         $optional = (array) Arr::get($group, 'optional', []);
         $optionalPage = (array) Arr::get($group, 'optional_page', []);
+
+        // 固定值與能從 api_url 算出來的，先自己填掉
+        $auto = $this->autoFill($code, $values, array_merge($required, $optional, $optionalPage));
+        $values = $auto + $values;
 
         /*
          * ⚠ `index` 擺第一個，而且**要用 snake_case**（`ckpay`、`self_hold`），
@@ -426,6 +475,7 @@ class SpiderSettingCommandService
 
         $text = strtr((string) Arr::get($config, 'SCOPE_TITLE'), [
             '{scope}' => (string) Arr::get($config, "SCOPE_LABEL.{$scope}"),
+            '{index}' => Str::snake($code),
         ]);
 
         /*
@@ -439,6 +489,27 @@ class SpiderSettingCommandService
         $text .= strtr((string) Arr::get($config, 'JSON_BLOCK'), [
             '{json}' => json_encode($json, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT),
         ]);
+
+        // 哪些是我自己填的 —— 要講出來，不然他會以為是他自己打過的
+        if (filled($auto)) {
+            $text .= strtr((string) Arr::get($config, 'AUTO_FILLED'), [
+                '{fields}' => implode('、', array_keys($auto)),
+            ]);
+        }
+
+        /*
+         * 算不出來是因為 api_url 還沒給。
+         *
+         * ⚠ 這一句很重要：少了它，上面會列「還缺 api_url、check_url、
+         * ping_url」，他會以為要去問三個值，其實只要 api_url。
+         */
+        $pending = $this->pendingDerived($code, $values, array_merge($required, $optional, $optionalPage));
+
+        if (filled($pending)) {
+            $text .= strtr((string) Arr::get($config, 'DERIVED_HINT'), [
+                '{fields}' => implode('、', $pending),
+            ]);
+        }
 
         $missing = array_values(array_filter($required, function ($key) use ($values) {
             return blank(Arr::get($values, $key));
@@ -465,6 +536,86 @@ class SpiderSettingCommandService
             $config,
             filled($missing) ? 'MISSING_HINT' : 'COMPLETE_HINT'
         );
+    }
+
+    /**
+     * 不必問人就能填的欄位
+     *
+     * 兩種：
+     * - `FIXED`：這個通道這一欄就是這個值（`self_cashier` 的
+     *   `not_show` ＝ `overtime_at`）
+     * - `DERIVED`：從 `api_url` 加後綴算出來（`self` 的
+     *   `check_url` ＝ `api_url` ＋ `/api/withdraw/info`）
+     *
+     * ⚠ **會蓋掉對方給的值**（呼叫端用 `$auto + $values`）。需求方說的是
+     * 「固定用」「一定要對」—— 這種能算出來的東西手打錯一個字母，
+     * 代付查單會一直查不到、看起來像上游沒回應。蓋掉之後會在回覆裡
+     * 列出「這幾個我自己填的」，不是偷偷換掉。
+     *
+     * ⚠ 只填**這一種真的有這個欄位**的（`self_cashier` 是代收、沒有
+     * `check_url`，就不該冒出一個 `check_url`）。
+     *
+     * ⚠ `api_url` 沒給就推不出來 —— 那幾個欄位會留空並列進「還缺」，
+     * 跟 `api_url` 一起。補上 `api_url` 再傳一次就會自己填好。
+     *
+     * @param string        $code
+     * @param array         $values
+     * @param array<string> $keys 這一種有的欄位
+     * @return array<string, string> 只含這次自己填的
+     */
+    private function autoFill($code, array $values, array $keys)
+    {
+        $auto = [];
+
+        foreach ((array) config("apollo_fields.FIXED.{$code}") as $key => $value) {
+            if (in_array($key, $keys, true)) {
+                $auto[$key] = (string) $value;
+            }
+        }
+
+        $apiUrl = trim((string) Arr::get($values, 'api_url'));
+
+        // 短路：沒有 api_url 就沒有東西可以推
+        if (blank($apiUrl)) {
+            return $auto;
+        }
+
+        foreach ((array) config("apollo_fields.DERIVED.{$code}") as $key => $suffix) {
+            if (!in_array($key, $keys, true)) {
+                continue;
+            }
+
+            // ⚠ 去掉結尾斜線再接，不然會變成 https://x.com//api/agent/info
+            $auto[$key] = rtrim($apiUrl, '/') . $suffix;
+        }
+
+        return $auto;
+    }
+
+    /**
+     * 本來算得出來、但因為 api_url 還沒給而算不出來的欄位
+     *
+     * @param string        $code
+     * @param array         $values
+     * @param array<string> $keys
+     * @return array<string>
+     */
+    private function pendingDerived($code, array $values, array $keys)
+    {
+        // 短路：有 api_url 的話就不會有「算不出來」這件事
+        if (filled(Arr::get($values, 'api_url'))) {
+            return [];
+        }
+
+        $pending = [];
+
+        foreach (array_keys((array) config("apollo_fields.DERIVED.{$code}")) as $key) {
+            if (in_array($key, $keys, true)) {
+                $pending[] = $key;
+            }
+        }
+
+        return $pending;
     }
 
     /**
