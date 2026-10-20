@@ -16,6 +16,8 @@
 > - 「self 固定代收用 self_cashier，代付用 self」
 > - 「`"not_show":"overtime_at"` 這個也要補上去 self cashier」
 > - 「（帳號／密碼／API_KEY／後台／API／文件／Server IP）self 格式固定會長這樣」
+> - 「剛剛給的資料，是機敏資訊，中間都打碼，不要寫明文」
+> - 「所有代收通道都自動帶上 not_show」
 >
 > 兩個決定（問過需求方）：欄位對照表**先掃 65 支 Apollo 存成設定檔**（不即時讀
 > 主專案）、產出**回一段可複製的 JSON**（不寫進任何系統）。
@@ -220,12 +222,30 @@ snake_case。
 
 ### 固定值（`FIXED`）
 
-`self_cashier` 的 `not_show` 固定 `overtime_at`（收銀台不顯示逾時時間）。
-主專案建立代收通道時的基底（`PaymentController::resolveSpiderSetting()`）
-與 Gmail 憑證產出的 `CASHIER_NOT_SHOW` 都是這個值。
+分兩層，**通道專屬的蓋過範圍共用的**：
+
+| 層 | 內容 |
+|---|---|
+| `SCOPE.deposit` | `not_show` ＝ `overtime_at`（收銀台不顯示逾時時間）—— **所有代收通道都帶上** |
+| `CHANNELS.<代號>` | 某個通道專屬的（目前沒有） |
+
+⚠ `not_show` 一開始只加在 `self_cashier`（需求方先提的），後來改成**全部代收
+通道**（需求方 2026-10-20 決定）。理由是主專案建立**任何**代收通道時的基底
+（`PaymentController::resolveSpiderSetting()`）與 Gmail 憑證產出的
+`CASHIER_NOT_SHOW` 都是這個值 —— 只加一個通道反而是把常態寫成例外。
+
+⚠ 分兩層是為了**日後要例外時不用動其他 30 個通道**：哪天某個通道的收銀台
+要顯示逾時時間，在 `CHANNELS` 補一筆就蓋掉了。
+
+⚠ 合併時通道專屬的要擺在 `+` **左邊** —— PHP 的 `+` 遇到重複的 key 保留
+左邊那個。擺反了就變成「範圍共用的蓋過通道專屬的」，例外永遠生效不了。
 
 ⚠ `FIXED` 與 `DERIVED` 都只在**那一種真的有這個欄位**時才填
-（`self_cashier` 是代收、沒有 `check_url`，就不該冒出一個 `check_url`）。
+（代付沒有 `not_show`，就不該冒出一個 `not_show`；`self_cashier` 是代收、
+沒有 `check_url`，就不該冒出一個 `check_url`）。
+
+實測：六個代收通道（Ckpay／Gz／Ccat／Totoken／SelfCashier／Mycash）都帶上
+`not_show`，四個代付（Ckpay／Self／Sbs／Xingxin）都沒有。
 
 ### 交接資料是固定格式
 

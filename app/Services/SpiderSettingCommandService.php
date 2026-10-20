@@ -440,7 +440,7 @@ class SpiderSettingCommandService
         $optionalPage = (array) Arr::get($group, 'optional_page', []);
 
         // 固定值與能從 api_url 算出來的，先自己填掉
-        $auto = $this->autoFill($code, $values, array_merge($required, $optional, $optionalPage));
+        $auto = $this->autoFill($code, $scope, $values, array_merge($required, $optional, $optionalPage));
         $values = $auto + $values;
 
         /*
@@ -542,8 +542,9 @@ class SpiderSettingCommandService
      * 不必問人就能填的欄位
      *
      * 兩種：
-     * - `FIXED`：這個通道這一欄就是這個值（`self_cashier` 的
-     *   `not_show` ＝ `overtime_at`）
+     * - `FIXED`：這一欄就是這個值。分兩層 —— 整個範圍共用的
+     *   （所有代收通道的 `not_show` ＝ `overtime_at`）與通道專屬的，
+     *   **通道專屬的蓋過範圍共用的**
      * - `DERIVED`：從 `api_url` 加後綴算出來（`self` 的
      *   `check_url` ＝ `api_url` ＋ `/api/withdraw/info`）
      *
@@ -559,15 +560,23 @@ class SpiderSettingCommandService
      * 跟 `api_url` 一起。補上 `api_url` 再傳一次就會自己填好。
      *
      * @param string        $code
+     * @param string        $scope
      * @param array         $values
      * @param array<string> $keys 這一種有的欄位
      * @return array<string, string> 只含這次自己填的
      */
-    private function autoFill($code, array $values, array $keys)
+    private function autoFill($code, $scope, array $values, array $keys)
     {
         $auto = [];
 
-        foreach ((array) config("apollo_fields.FIXED.{$code}") as $key => $value) {
+        /*
+         * ⚠ 通道專屬的擺在 `+` **左邊** —— PHP 的 `+` 遇到重複的 key 是
+         * 保留左邊那個，所以這樣寫才是「通道專屬的蓋過範圍共用的」。
+         */
+        $fixed = (array) config("apollo_fields.FIXED.CHANNELS.{$code}")
+            + (array) config("apollo_fields.FIXED.SCOPE.{$scope}");
+
+        foreach ($fixed as $key => $value) {
             if (in_array($key, $keys, true)) {
                 $auto[$key] = (string) $value;
             }

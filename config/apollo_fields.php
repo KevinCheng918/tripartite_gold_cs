@@ -140,18 +140,32 @@ return [
     ],
 
     /*
-     * 固定值的欄位：這個通道這一欄就是這個值，不必問人。
-     *
-     * ⚠ `self_cashier` 的 `not_show` 固定 `overtime_at`
-     * （需求方 2026-10-20）。主專案建立代收通道時的基底
-     * （`PaymentController::resolveSpiderSetting()`）與 Gmail 憑證產出的
-     * `CASHIER_NOT_SHOW` 都是這個值 —— 收銀台不要顯示逾時時間。
+     * 固定值的欄位：這一欄就是這個值，不必問人。
      *
      * ⚠ 跟 `DERIVED` 一樣只在**那一種真的有這個欄位**時才填。
+     *
+     * ⚠ 通道專屬的（`CHANNELS`）**蓋過**整個範圍的（`SCOPE`）——
+     * 哪天某個通道的收銀台要顯示逾時時間，只要在 `CHANNELS` 補一筆就好，
+     * 不必動其他 30 個代收通道。
      */
     'FIXED' => [
-        'SelfCashier' => [
-            'not_show' => 'overtime_at',
+        /*
+         * 整個範圍共用的固定值。
+         *
+         * ⚠ `not_show` ＝ `overtime_at`（收銀台不顯示逾時時間）
+         * **所有代收通道都帶上**（需求方 2026-10-20）。一開始只加在
+         * `self_cashier`，但主專案建立**任何**代收通道時的基底
+         * （`PaymentController::resolveSpiderSetting()`）與 Gmail 憑證產出的
+         * `CASHIER_NOT_SHOW` 都是這個值 —— 只加一個通道反而是例外化。
+         */
+        'SCOPE' => [
+            'deposit' => [
+                'not_show' => 'overtime_at',
+            ],
+        ],
+
+        // 某個通道專屬的固定值（目前沒有，`not_show` 已經變成全代收共用）
+        'CHANNELS' => [
         ],
     ],
 
