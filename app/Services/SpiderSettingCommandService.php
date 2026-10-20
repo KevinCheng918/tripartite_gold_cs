@@ -364,13 +364,13 @@ class SpiderSettingCommandService
         // 通道與基底的欄位
         $sources = [
             (array) config('apollo_fields.BASE.shared'),
-            (array) config('apollo_fields.BASE.' . $scope),
+            (array) config("apollo_fields.BASE.{$scope}"),
             (array) config("apollo_fields.CHANNELS.{$code}.shared"),
             (array) config("apollo_fields.CHANNELS.{$code}.{$scope}"),
         ];
 
         // 不是 Apollo 讀的，是收銀台／對帳在讀的
-        $extra = (array) config('apollo_fields.EXTRA.' . $scope);
+        $extra = (array) config("apollo_fields.EXTRA.{$scope}");
 
         $required = (array) Arr::get($extra, 'required', []);
         $optionalPage = (array) Arr::get($extra, 'optional', []);
