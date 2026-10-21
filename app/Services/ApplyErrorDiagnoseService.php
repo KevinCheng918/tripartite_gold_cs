@@ -176,7 +176,7 @@ class ApplyErrorDiagnoseService
             'flow'          => $resolved,
             'code'          => $code,
             'findings'      => $findings,
-            'customer_text' => $this->customerText($findings, $code),
+            'customer_text' => $this->customerText($findings, $code, $resolved),
             'staff_text'    => $this->staffText($resolved, $code, $flow, $findings),
         ];
     }
@@ -294,7 +294,8 @@ class ApplyErrorDiagnoseService
                 'field'  => $name,
                 'label'  => $label,
                 'reason' => 'regex',
-                'hint'   => (string) Arr::get($spec, 'regex_hint'),
+                // 給客服看的說明也用文件的講法，兩邊講同一件事比較好對
+                'hint'   => (string) Arr::get($spec, 'doc_hint'),
                 'length' => $length,
                 'code'   => Arr::get($spec, 'code_format'),
             ];
@@ -309,7 +310,8 @@ class ApplyErrorDiagnoseService
                 'field'  => $name,
                 'label'  => $label,
                 'reason' => 'in',
-                'hint'   => '只能是 ' . implode('、', $in),
+                // 只放清單本身 —— 前後的句子由文案模板決定（對客與對內講法不同）
+                'hint'   => implode('、', $in),
                 'code'   => Arr::get($spec, 'code_format'),
             ];
 
@@ -428,7 +430,7 @@ class ApplyErrorDiagnoseService
      * @param int|null $code
      * @return string 空字串 ＝ 不回客人
      */
-    private function customerText(array $findings, $code)
+    private function customerText(array $findings, $code, $flow)
     {
         $config = (array) config('constants.APPLY_DIAGNOSE');
 
@@ -441,7 +443,7 @@ class ApplyErrorDiagnoseService
         $lines = [];
 
         foreach ($tell as $finding) {
-            $lines[] = $this->customerLine($finding, $config);
+            $lines[] = $this->customerLine($finding, $config, $flow);
         }
 
         return strtr((string) Arr::get($config, 'CUSTOMER_TEXT'), [
@@ -495,36 +497,66 @@ class ApplyErrorDiagnoseService
     /**
      * 回客人的其中一條
      *
-     * @param array $finding
-     * @param array $config
+     * ⚠ **一律引文件的規格與範例**（需求方 2026-10-21）。
+     *
+     * 原本寫成「看起來應該是 6823，麻煩改填這個」—— 那像是我們在幫他猜，
+     * 還顯得是我們系統有毛病。實際上他違反的是**文件規格**，所以要講
+     * 「文件上限幾碼、範例長什麼樣、您這筆是幾碼」。
+     *
+     * ⚠ 數字一律取 `doc_*`，**不是** Laravel 的 `max` 也不是資料庫的 `db`。
+     * 文件沒寫的欄位就退成不帶數字的說法 —— 寧可講得籠統，也不要把內部的
+     * 欄位長度交出去。
+     *
+     * @param array  $finding
+     * @param array  $config
+     * @param string $flow
      * @return string
      */
-    private function customerLine(array $finding, array $config)
+    private function customerLine(array $finding, array $config, $flow)
+    {
+        $field = (string) Arr::get($finding, 'field');
+        $doc = (array) config("apply_rules.FIELDS.{$flow}.{$field}");
+
+        $replace = [
+            '{label}'       => (string) Arr::get($finding, 'label'),
+            '{length}'      => (string) Arr::get($finding, 'length'),
+            '{hint}'        => (string) Arr::get($finding, 'hint'),
+            '{doc_max}'     => (string) Arr::get($doc, 'doc_max'),
+            '{doc_hint}'    => (string) Arr::get($doc, 'doc_hint'),
+            '{doc_example}' => (string) Arr::get($doc, 'doc_example'),
+        ];
+
+        return strtr((string) Arr::get($config, 'CUSTOMER_LINE.' . $this->customerLineKey($finding, $doc)), $replace);
+    }
+
+    /**
+     * 這一條要用哪一句模板
+     *
+     * @param array $finding
+     * @param array $doc 這個欄位在規則表裡的設定
+     * @return string
+     */
+    private function customerLineKey(array $finding, array $doc)
     {
         $reason = (string) Arr::get($finding, 'reason');
 
-        $replace = [
-            '{label}'  => (string) Arr::get($finding, 'label'),
-            '{field}'  => (string) Arr::get($finding, 'field'),
-            '{limit}'  => (string) Arr::get($finding, 'limit'),
-            '{length}' => (string) Arr::get($finding, 'length'),
-            '{hint}'   => (string) Arr::get($finding, 'hint'),
-            '{value}'  => (string) Arr::get($finding, 'value'),
-            '{guess}'  => (string) Arr::get($finding, 'guess'),
-        ];
-
-        /*
-         * 長度超過資料庫上限、而且猜得出正確值時，順便把建議值寫出來
-         * —— 這是客人最需要的那一句（「改成 6823」）。
-         */
-        if ($reason === 'db_length' && filled($this->guessCode((string) Arr::get($finding, 'value')))) {
-            $replace['{guess}'] = $this->guessCode((string) Arr::get($finding, 'value'));
-
-            return strtr((string) Arr::get($config, 'CUSTOMER_LINE.db_length_guess'), $replace);
+        // 長度問題（不管是驗證層還是寫入層，對客人都是「太長」）
+        if (in_array($reason, ['db_length', 'max'], true)) {
+            return filled(Arr::get($doc, 'doc_max')) ? 'doc_max' : 'too_long';
         }
 
-        return strtr((string) Arr::get($config, "CUSTOMER_LINE.{$reason}"), $replace);
+        // 格式問題
+        if (in_array($reason, ['regex', 'db_date'], true)) {
+            return filled(Arr::get($doc, 'doc_hint')) ? 'doc_format' : 'format';
+        }
+
+        if ($reason === 'blank') {
+            return filled(Arr::get($doc, 'doc_example')) ? 'blank' : 'blank_plain';
+        }
+
+        return $reason;
     }
+
 
     /**
      * 給客服看的那一段（內部，可以講技術細節）

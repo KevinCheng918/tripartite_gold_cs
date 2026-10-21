@@ -135,6 +135,23 @@ return [
      * - `db`        ：資料庫欄位上限（**過驗證但超過這個就會變 -1**）
      * - `db_type`   ：`date` 這種要檢查格式的
      * - `code_blank`／`code_format`：違規時 API 會回的碼
+     * - `doc_max`／`doc_example`／`doc_hint`：**商戶 API 文件上寫的**規格
+     *
+     * ⚠⚠ **跟客人講的一律是 `doc_*`，不是 `max` 也不是 `db`**
+     * （需求方 2026-10-21：「應該要回文件上寫的長度是多少，然後範例是什麼」）。
+     *
+     * 三個數字常常不一樣，而**文件才是雙方的合約**：
+     *
+     * | | 文件 | Laravel | 資料庫 |
+     * |---|---|---|---|
+     * | `bank_branch_code` | **10** | 15 | 10 |
+     *
+     * 文件寫 10、資料庫也是 10 —— 中間那個 `max:15` 才是異常值。
+     * 所以客人填 14 碼是**他違反文件規格**，不是我們的問題：
+     * 要回「文件上限 10 碼、範例 0015」，不是「看起來應該是 6823」
+     * （那樣講像是我們在幫他猜，還顯得系統有毛病）。
+     *
+     * 來源：`resources/views/docs/master.blade.php`（代收段與代付段各一份表）。
      *
      * ⚠ `max` 比 `db` 大的欄位，中間那段就是「會變 -1」的區間。
      * ⚠ 沒有 `max` 但有 `db` 的欄位（`user_name`、`user_id_number`…）
@@ -146,7 +163,9 @@ return [
                 'label'       => '商戶訂單號',
                 'required'    => true,
                 'regex'       => '/^[A-Za-z0-9_]{10,50}$/',
-                'regex_hint'  => '10~50 個字，只能用英文、數字、底線（_）',
+                // ⚠ 文件寫的是「下底線(_)」，代收那邊是「連字號(-)」
+                'doc_hint'    => '長度 10~50，只能用英文(a-zA-Z)、數字(0-9)、下底線(_)',
+                'doc_example' => 'AD1234567890',
                 'db'          => 255,
                 'code_blank'  => -3,
                 'code_format' => -3,
@@ -155,7 +174,8 @@ return [
                 'label'       => '金額',
                 'required'    => true,
                 'regex'       => '/^\d+(\.\d{1,6})?$/',
-                'regex_hint'  => '數字（可帶小數，最多 6 位）',
+                'doc_hint'    => '僅允許整數，額度範圍請參考後台設定',
+                'doc_example' => '1000',
                 'code_blank'  => -4,
                 'code_format' => -4,
             ],
@@ -164,6 +184,8 @@ return [
                 'required'    => true,
                 'max'         => 30,
                 'db'          => 50,
+                'doc_max'     => 30,
+                'doc_example' => '中國信託',
                 'code_blank'  => -5,
                 'code_format' => -14,
             ],
@@ -172,6 +194,8 @@ return [
                 'required'    => true,
                 'max'         => 10,
                 'db'          => 10,
+                'doc_max'     => 10,
+                'doc_example' => '822',
                 'code_blank'  => -6,
                 'code_format' => -15,
             ],
@@ -180,6 +204,8 @@ return [
                 'required'    => true,
                 'max'         => 50,
                 'db'          => 50,
+                'doc_max'     => 50,
+                'doc_example' => '000011112222',
                 'code_blank'  => -7,
                 'code_format' => -16,
             ],
@@ -187,16 +213,23 @@ return [
                 'label'       => '分行名稱',
                 'max'         => 30,
                 'db'          => 30,
+                'doc_max'     => 30,
+                'doc_example' => '敦北分行',
                 'code_format' => -17,
             ],
             /*
              * ⚠ **這就是需求方那個案例的兇手。**
-             * 驗證 `max:15`、欄位 `varchar(10)` —— 11~15 字過驗證但插不進去。
+             *
+             * 文件 10、Laravel `max:15`、欄位 `varchar(10)` ——
+             * 11~15 字過得了驗證但插不進去，於是回通用的 `-1`。
+             * 跟客人講的是**文件的 10**（他違反的是文件規格）。
              */
             'bank_branch_code' => [
                 'label'       => '分行代碼',
                 'max'         => 15,
                 'db'          => 10,
+                'doc_max'     => 10,
+                'doc_example' => '0015',
                 'code_format' => -18,
                 'expect'      => 'code',
             ],
@@ -204,6 +237,8 @@ return [
                 'label'       => '電話',
                 'max'         => 20,
                 'db'          => 50,
+                'doc_max'     => 20,
+                'doc_example' => '0912345678',
                 'code_format' => -19,
             ],
             // 以下幾個驗證層完全沒管長度，超過資料庫上限就是 -1
@@ -216,8 +251,11 @@ return [
                 'db'    => 20,
             ],
             'user_birthday' => [
-                'label'   => '生日',
-                'db_type' => 'date',
+                'label'       => '生日',
+                'db_type'     => 'date',
+                // 文件寫的型別是 date('Y-m-d')
+                'doc_hint'    => '日期格式 Y-m-d',
+                'doc_example' => '1990-03-15',
             ],
             'client_ip' => [
                 'label' => '請求 IP',
@@ -242,7 +280,9 @@ return [
                 'label'       => '商戶訂單號',
                 'required'    => true,
                 'regex'       => '/^[A-Za-z0-9\-]{10,50}$/',
-                'regex_hint'  => '10~50 個字，只能用英文、數字、連字號（-）',
+                // ⚠ 代收文件寫的是「連字號(-)」，跟代付的「下底線(_)」不同
+                'doc_hint'    => '長度 10~50，只能用英文(a-zA-Z)、數字(0-9)、連字號(-)',
+                'doc_example' => 'AD1234567890',
                 'db'          => 100,
                 'code_blank'  => -3,
                 'code_format' => -3,
@@ -251,20 +291,57 @@ return [
                 'label'       => '金額',
                 'required'    => true,
                 'regex'       => '/^\d+(\.\d{1,6})?$/',
-                'regex_hint'  => '數字（可帶小數，最多 6 位）',
+                'doc_hint'    => '僅允許整數，額度範圍請參考後台設定',
+                'doc_example' => '1000',
                 'code_blank'  => -4,
                 'code_format' => -4,
             ],
             'bank_account' => [
                 'label'       => '銀行帳號',
                 'regex'       => '/^\d+$/',
-                'regex_hint'  => '只能是數字',
+                'doc_hint'    => '只能是數字',
+                'doc_max'     => 50,
+                'doc_example' => '000011112222',
                 'db'          => 255,
                 'code_format' => -7,
+            ],
+            'bank_name' => [
+                'label'       => '銀行名稱',
+                'max'         => 30,
+                'db'          => 50,
+                'doc_max'     => 30,
+                'doc_example' => '中國信託',
+                'code_format' => -5,
+            ],
+            'bank_code' => [
+                'label'       => '銀行代碼',
+                'max'         => 10,
+                'db'          => 10,
+                'doc_max'     => 10,
+                'doc_example' => '822',
+                'code_format' => -6,
+            ],
+            'bank_branch_name' => [
+                'label'       => '分行名稱',
+                'max'         => 30,
+                'db'          => 30,
+                'doc_max'     => 30,
+                'doc_example' => '敦北分行',
+                'code_format' => -21,
+            ],
+            'bank_branch_code' => [
+                'label'       => '分行代碼',
+                'max'         => 10,
+                'db'          => 10,
+                'doc_max'     => 10,
+                'doc_example' => '0015',
+                'code_format' => -19,
+                'expect'      => 'code',
             ],
             'bank_data_json' => [
                 'label'       => '同單多組的銀行資料',
                 'expect'      => 'json',
+                'doc_hint'    => 'JSON 陣列，每一組要有 bank_name／bank_code／bank_account',
                 'code_format' => -12,
             ],
             'pay_content' => [
@@ -272,6 +349,7 @@ return [
                 'required'    => 'conditional',
                 'max'         => 100,
                 'db'          => 255,
+                'doc_max'     => 100,
                 'code_blank'  => -9,
                 'code_format' => -9,
             ],
@@ -280,14 +358,16 @@ return [
                 'required'    => 'conditional',
                 'in'          => ['711', 'Family', 'HiLife', 'OK'],
                 'db'          => 20,
+                'doc_example' => '711',
                 'code_blank'  => -20,
                 'code_format' => -11,
             ],
             'user_phone' => [
-                'label'      => '電話',
-                'required'   => 'conditional',
-                'db'         => 255,
-                'code_blank' => -13,
+                'label'       => '電話',
+                'required'    => 'conditional',
+                'db'          => 255,
+                'doc_example' => '0912345678',
+                'code_blank'  => -13,
             ],
             'user_name' => [
                 'label'      => '姓名',
@@ -300,8 +380,10 @@ return [
                 'db'    => 20,
             ],
             'user_birthday' => [
-                'label'   => '生日',
-                'db_type' => 'date',
+                'label'       => '生日',
+                'db_type'     => 'date',
+                'doc_hint'    => '日期格式 Y-m-d',
+                'doc_example' => '1990-03-15',
             ],
             'email' => [
                 'label' => '付款人 email',
