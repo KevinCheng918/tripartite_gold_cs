@@ -53,6 +53,7 @@ class AutoReplyService
     private $paymentConfigService;
     private $splitter;
     private $waitWriter;
+    private $applyDiagnose;
 
     public function __construct(
         AutoReplyMatcher $matcher,
@@ -65,7 +66,8 @@ class AutoReplyService
         StationRepository $stationRepository,
         PaymentConfigService $paymentConfigService,
         AnswerSplitter $splitter,
-        WaitWriter $waitWriter
+        WaitWriter $waitWriter,
+        ApplyErrorDiagnoseService $applyDiagnose
     ) {
         $this->matcher = $matcher;
         $this->telegramRepository = $telegramRepository;
@@ -81,6 +83,8 @@ class AutoReplyService
         $this->splitter = $splitter;
         // 轉人工那句稍等由模型現寫，失敗才退公版
         $this->waitWriter = $waitWriter;
+        // 客人貼開單 request 時的欄位預排查（題庫答不了這種東西）
+        $this->applyDiagnose = $applyDiagnose;
     }
 
     /**
@@ -126,6 +130,19 @@ class AutoReplyService
         // 再放進脈絡只是同樣的內容送兩次
         $history = $this->buildHistory($group->id, $messageId, $run->pluck('id')->all());
 
+        /*
+         * ⚠ **開單紀錄要擋在題庫比對之前。**
+         *
+         * 客人直接貼一整坨 `print_r` 的開單失敗紀錄時，題庫裡不會有這一題
+         * —— 現在的結果一定是轉人工，而同仁要自己一欄一欄比對規則。
+         * 而且那坨很長，拿去跟題庫比對只是把額度燒在一個必然答不出來的問題上。
+         *
+         * 它自己會先用形狀粗篩（`looksLikeDump()`），不像就回 null 讓流程照走。
+         */
+        if ($this->replyApplyDiagnose($group, $question, $messageId, $history)) {
+            return;
+        }
+
         $result = $this->matcher->resolve($question, [
             'group_id' => $group->id,
             'history'  => $history,
@@ -165,6 +182,65 @@ class AutoReplyService
         // 往下一律用合併後的 $question：轉人工時求助單上也要是完整的問題，
         // 同仁只看到「這個是甚麼原因」一樣查不下去
         $this->dispatchResult($group, $result, $question, $messageId, $history);
+    }
+
+    /**
+     * 客人貼了開單失敗紀錄 —— 照規則表預排查
+     *
+     * ⚠ **找到明確原因才回客人**（需求方 2026-10-21）：
+     * 欄位有違規或超過寫入上限 → 直接告訴他哪一欄要改。
+     * 只有「可疑」或什麼都沒查到 → **不對客人猜**，走轉人工並把診斷附在
+     * 求助單上給同仁。叫客人改一個我們沒把握的欄位，他改完還是一樣錯，
+     * 而且會失去信任（跟 2026-10-14「請專員調閱」那次同一類問題）。
+     *
+     * @param TelegramGroup $group
+     * @param string        $question
+     * @param int|null      $messageId
+     * @param array         $history
+     * @return bool 有處理就回 true（呼叫端要 return）
+     */
+    private function replyApplyDiagnose(TelegramGroup $group, $question, $messageId, array $history)
+    {
+        $diagnose = $this->applyDiagnose->diagnose($question);
+
+        // 不是開單紀錄（或解析不出來）—— 讓原本的流程照走
+        if (blank($diagnose)) {
+            return false;
+        }
+
+        /*
+         * ⚠ 這一道跟題庫那條路一樣要有：解析也要跑幾秒，客人很可能在這期間
+         * 又補了一句。少了它，連著貼兩則會被回兩次。
+         */
+        if ($this->telegramRepository->hasNewerInbound($group->id, $messageId)) {
+            Log::info('開單預排查完成但不是最後一則，不送出', [
+                'group_id'   => $group->id,
+                'message_id' => $messageId,
+            ]);
+
+            return true;
+        }
+
+        $customerText = (string) Arr::get($diagnose, 'customer_text');
+
+        // 查不出明確原因 —— 轉人工，診斷結果附在求助單上
+        if (blank($customerText)) {
+            $this->replyWait($group, $question, $messageId, [], $history, null,
+                (string) Arr::get($diagnose, 'staff_text'));
+
+            return true;
+        }
+
+        Log::info('開單預排查直接回客人', [
+            'group_id'   => $group->id,
+            'message_id' => $messageId,
+            'flow'       => Arr::get($diagnose, 'flow'),
+            'code'       => Arr::get($diagnose, 'code'),
+        ]);
+
+        $this->send($group, $customerText, true);
+
+        return true;
     }
 
     /**
@@ -858,7 +934,7 @@ class AutoReplyService
      * @param string|null   $opening   模型這次生成的承接句，接在「稍等」前面
      * @return void
      */
-    private function replyWait(TelegramGroup $group, $question, $messageId, array $result = [], array $history = [], $opening = null)
+    private function replyWait(TelegramGroup $group, $question, $messageId, array $result = [], array $history = [], $opening = null, $extraHint = null)
     {
         /*
          * 這裡以前有「5 分鐘內剛說過稍等就不再回」的冷卻，已移除。
@@ -900,7 +976,7 @@ class AutoReplyService
             $group,
             $question,
             $messageId,
-            $this->buildHint($result),
+            $this->buildHint($result, $extraHint),
             $history,
             (array) Arr::get($result, 'candidates', [])
         );
@@ -978,10 +1054,15 @@ class AutoReplyService
      * @param array $result 比對器的輸出
      * @return string|null
      */
-    private function buildHint(array $result)
+    private function buildHint(array $result, $extraHint = null)
     {
+        /*
+         * ⚠ 有 `$extraHint` 時**就算 `$result` 是空的也要印**：開單預排查走的
+         * 就是「沒有比對結果、但有診斷要給同仁看」這條路，照原本的 early
+         * return 會把整份診斷丟掉。
+         */
         if (blank($result)) {
-            return null;
+            return filled($extraHint) ? (string) $extraHint : null;
         }
 
         $intents = config('constants.AUTO_REPLY.INTENT');
@@ -1002,6 +1083,10 @@ class AutoReplyService
             if (filled($item)) {
                 $lines[] = "　 最接近的題庫：#{$item->id} {$item->label}（信心不足）";
             }
+        }
+
+        if (filled($extraHint)) {
+            $lines[] = (string) $extraHint;
         }
 
         return implode("\n", $lines);
