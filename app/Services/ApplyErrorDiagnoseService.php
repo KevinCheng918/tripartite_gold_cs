@@ -428,6 +428,7 @@ class ApplyErrorDiagnoseService
      *
      * @param array    $findings
      * @param int|null $code
+     * @param string   $flow 代收還是代付（要去規則表查這個欄位的文件規格）
      * @return string 空字串 ＝ 不回客人
      */
     private function customerText(array $findings, $code, $flow)

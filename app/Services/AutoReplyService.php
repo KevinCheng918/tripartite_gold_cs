@@ -932,6 +932,7 @@ class AutoReplyService
      * @param array         $result    比對器的輸出，附在求助訊息裡給同仁參考
      * @param array         $history   近期對話，附在求助訊息裡讓同仁不用切視窗
      * @param string|null   $opening   模型這次生成的承接句，接在「稍等」前面
+     * @param string|null   $extraHint 另外要附在求助單上的內容（目前是開單預排查的診斷）
      * @return void
      */
     private function replyWait(TelegramGroup $group, $question, $messageId, array $result = [], array $history = [], $opening = null, $extraHint = null)
@@ -1051,7 +1052,8 @@ class AutoReplyService
      * 只出現在內部支援群組，客人看不到。用處是讓同仁不必從頭看就知道客人要什麼，
      * 也一眼看得出題庫缺了哪一塊、值不值得回填。
      *
-     * @param array $result 比對器的輸出
+     * @param array       $result    比對器的輸出
+     * @param string|null $extraHint 另外要附上的內容（開單預排查的診斷走這裡）
      * @return string|null
      */
     private function buildHint(array $result, $extraHint = null)

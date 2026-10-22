@@ -519,8 +519,8 @@ class ScheduledBroadcastCommandService
     /**
      * 找不到範本時，把現有的代號列出來
      *
-     * @param string|null $code
-     * @param int|null    $threadId
+     * @param array<string> $missing  查不到的代號（全部列出來，不要只講第一個）
+     * @param int|null      $threadId
      * @return void
      */
     private function replyTemplateNotFound(array $missing, $threadId)
