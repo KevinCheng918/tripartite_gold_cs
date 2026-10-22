@@ -58,7 +58,7 @@ class BroadcastCommandParser
      * 解析一句話
      *
      * @param string $text 使用者說的話（已經去掉 @機器人）
-     * @return array{intent: string, send_at: \Illuminate\Support\Carbon|null, template_code: string|null, target: string|null}|null
+     * @return array{intent: string, send_at: \Illuminate\Support\Carbon|null, template_codes: array<string>, target: string|null, content: string|null}|null
      *         回 null 代表模型不可用
      */
     public function parse($text)
@@ -121,26 +121,56 @@ class BroadcastCommandParser
         }
 
         $sendAt = $this->parseTime(Arr::get($result, 'send_at'));
-        $code = trim((string) Arr::get($result, 'template_code'));
+        $codes = $this->codes(Arr::get($result, 'template_codes'));
         $target = trim((string) Arr::get($result, 'target'));
 
-        if (blank($sendAt) || blank($code) || blank($target) || $sendAt->lessThanOrEqualTo($now)) {
+        if (blank($sendAt) || blank($codes) || blank($target) || $sendAt->lessThanOrEqualTo($now)) {
             Log::info('預約公告解析結果不完整', [
-                'send_at'  => Arr::get($result, 'send_at'),
-                'code'     => $code,
-                'target'   => $target,
+                'send_at' => Arr::get($result, 'send_at'),
+                'codes'   => $codes,
+                'target'  => $target,
             ]);
 
             return $this->unknown();
         }
 
         return [
-            'intent'        => self::INTENT_BROADCAST,
-            'send_at'       => $sendAt,
-            'template_code' => $code,
-            'target'        => $target,
-            'content'       => null,
+            'intent'         => self::INTENT_BROADCAST,
+            'send_at'        => $sendAt,
+            'template_codes' => $codes,
+            'target'         => $target,
+            'content'        => null,
         ];
+    }
+
+    /**
+     * 整理代號清單
+     *
+     * ⚠ **還是要自己拆一次**：schema 寫了陣列，但模型仍可能把兩個代號塞在
+     * 同一個元素裡（`["T11,T12"]` 或 `["T11 和 T12"]`）。2026-10-22 那次
+     * 就是接成一串送進查詢，結果回「找不到代號 T11,T12 的公告」——
+     * 而兩個代號其實都在。
+     *
+     * ⚠ 去重但**保留順序**：他講的順序就是他想發的順序。
+     *
+     * @param mixed $value
+     * @return array<string>
+     */
+    private function codes($value)
+    {
+        $codes = [];
+
+        foreach ((array) $value as $item) {
+            foreach (preg_split('/[,、\s和跟與]+/u', (string) $item) as $code) {
+                $code = trim($code);
+
+                if (filled($code) && !in_array($code, $codes, true)) {
+                    $codes[] = $code;
+                }
+            }
+        }
+
+        return $codes;
     }
 
     /**
@@ -183,11 +213,11 @@ class BroadcastCommandParser
         }
 
         return [
-            'intent'        => self::INTENT_MESSAGE,
-            'send_at'       => $sendAt,
-            'template_code' => null,
-            'target'        => $target,
-            'content'       => $content,
+            'intent'         => self::INTENT_MESSAGE,
+            'send_at'        => $sendAt,
+            'template_codes' => [],
+            'target'         => $target,
+            'content'        => $content,
         ];
     }
 
@@ -211,7 +241,7 @@ class BroadcastCommandParser
     {
         return [
             'intent' => self::INTENT_UNKNOWN, 'send_at' => null,
-            'template_code' => null, 'target' => null, 'content' => null,
+            'template_codes' => [], 'target' => null, 'content' => null,
         ];
     }
 
@@ -222,7 +252,7 @@ class BroadcastCommandParser
     {
         return [
             'intent' => self::INTENT_NOT_BROADCAST, 'send_at' => null,
-            'template_code' => null, 'target' => null, 'content' => null,
+            'template_codes' => [], 'target' => null, 'content' => null,
         ];
     }
 
@@ -274,9 +304,16 @@ class BroadcastCommandParser
                     'type'        => ['string', 'null'],
                     'description' => '什麼時候發，格式 YYYY-MM-DD HH:MM。看不懂就填 null，不要猜',
                 ],
-                'template_code' => [
-                    'type'        => ['string', 'null'],
-                    'description' => '公告的代號，例如 T01。純文字、不要放 JSON。沒講代號就填 null，不要猜一個',
+                /*
+                 * ⚠ **一次可以講好幾個代號**（需求方 2026-10-22：
+                 * 「1 分鐘後發 T11 和 T12 公告給 ED」）。原本是單一字串，
+                 * 模型把兩個代號接成 `T11,T12` 回來，查不到就回
+                 * 「找不到代號 T11,T12 的公告」—— 而兩個代號其實都存在。
+                 */
+                'template_codes' => [
+                    'type'        => 'array',
+                    'items'       => ['type' => 'string'],
+                    'description' => '公告的代號，例如 T01。他講了幾個就放幾個（「發 T11 和 T12」→ ["T11","T12"]），一個元素放一個代號、不要接成一串。沒講代號就給空陣列，不要猜一個',
                 ],
                 'target' => [
                     'type'        => ['string', 'null'],
@@ -287,7 +324,7 @@ class BroadcastCommandParser
                     'description' => 'intent=message 時：要發出去的訊息內容，照抄原文不要改寫、不要補字、不要截斷，也不要包含時間與對象那段描述。純文字、不要放 JSON。其他 intent 一律填 null',
                 ],
             ],
-            'required' => ['intent', 'send_at', 'template_code', 'target', 'content'],
+            'required' => ['intent', 'send_at', 'template_codes', 'target', 'content'],
         ];
     }
 }

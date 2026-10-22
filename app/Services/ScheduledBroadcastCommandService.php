@@ -122,13 +122,31 @@ class ScheduledBroadcastCommandService
          * `content`，`template_code` 是選填。所以這裡只是把「內容從哪來」
          * 換掉，預約、送出、歷史紀錄、取消全部沿用同一條管線。
          */
-        $template = null;
+        $templates = [];
 
         if (!$isMessage) {
-            $template = $this->templateRepository->findByCode(Arr::get($parsed, 'template_code'));
+            $codes = (array) Arr::get($parsed, 'template_codes', []);
+            $missing = [];
 
-            if (blank($template)) {
-                $this->replyTemplateNotFound(Arr::get($parsed, 'template_code'), $threadId);
+            /*
+             * ⚠ **一次可以發好幾份**（需求方 2026-10-22：「1 分鐘後發 T11 和
+             * T12 公告給 ED」）。每一個代號各自查，查不到的全部列出來 ——
+             * 只講第一個查不到的，他改完再送一次又卡在第二個。
+             */
+            foreach ($codes as $code) {
+                $template = $this->templateRepository->findByCode($code);
+
+                if (blank($template)) {
+                    $missing[] = $code;
+
+                    continue;
+                }
+
+                $templates[] = $template;
+            }
+
+            if (filled($missing)) {
+                $this->replyTemplateNotFound($missing, $threadId);
 
                 return true;
             }
@@ -154,7 +172,7 @@ class ScheduledBroadcastCommandService
             return true;
         }
 
-        $this->replyPreview($template, $target, Arr::get($parsed, 'send_at'), $user, $threadId);
+        $this->replyPreview($templates, $target, Arr::get($parsed, 'send_at'), $user, $threadId);
 
         return true;
     }
@@ -204,67 +222,127 @@ class ScheduledBroadcastCommandService
      */
     private function confirm(array $draft, $messageId, array $config)
     {
-        try {
-            $broadcast = $this->broadcastService->schedule([
-                'content'      => Arr::get($draft, 'content'),
-                'target_type'  => (int) Arr::get($draft, 'target_type'),
-                'group_ids'    => (array) Arr::get($draft, 'station_ids', []),
-                'image_urls'   => Arr::get($draft, 'image_urls'),
-                'file_urls'    => Arr::get($draft, 'file_urls'),
-                'scheduled_at' => Arr::get($draft, 'send_at'),
-            ], (int) Arr::get($draft, 'user_id'));
-        } catch (\Exception $e) {
-            Log::error('指令預約公告建立失敗', ['error' => $e->getMessage(), 'draft' => Arr::get($draft, 'code')]);
-
-            $this->supportGroup->editMessage($messageId, (string) Arr::get($config, 'UNAVAILABLE_TEXT'));
-
-            return;
-        }
+        $items = (array) Arr::get($draft, 'items', []);
+        $ids = [];
 
         /*
-         * ⚠ 自訂訊息沒有代號，套公告那句會變成「《自訂訊息》」——
-         * 讀起來像漏字。兩種各有一句。`is_message` 是布林，用 `(bool)`
-         * 不用 `filled()`（`filled(false)` 回的是 true）。
+         * ⚠ **一份公告建一筆預約**，不是把內容併成一筆。
+         *
+         * 歷史紀錄、取消、重送全都以「一筆預約」為單位 —— 併成一筆的話
+         * 那些功能會變成只能整組動，而且公告編號會不知道要填哪一個。
+         *
+         * ⚠ 中途失敗時**不往下建**：剩下的那幾份沒建到，而已經建好的也不該
+         * 回頭刪（時間可能只剩幾分鐘，刪了反而兩頭落空）。
+         * 所以回報要講清楚「建了幾份、哪一份卡住」。
          */
-        $textKey = (bool) Arr::get($draft, 'is_message') ? 'MESSAGE_CONFIRMED_TEXT' : 'CONFIRMED_TEXT';
+        foreach ($items as $item) {
+            try {
+                $broadcast = $this->broadcastService->schedule([
+                    'content'      => Arr::get($item, 'content'),
+                    'target_type'  => (int) Arr::get($draft, 'target_type'),
+                    'group_ids'    => (array) Arr::get($draft, 'station_ids', []),
+                    'image_urls'   => Arr::get($item, 'image_urls'),
+                    'file_urls'    => Arr::get($item, 'file_urls'),
+                    'scheduled_at' => Arr::get($draft, 'send_at'),
+                ], (int) Arr::get($draft, 'user_id'));
+            } catch (\Exception $e) {
+                Log::error('指令預約公告建立失敗', [
+                    'error' => $e->getMessage(),
+                    'code'  => Arr::get($item, 'code'),
+                    'done'  => $ids,
+                ]);
 
-        $this->supportGroup->editMessage($messageId, strtr((string) Arr::get($config, $textKey), [
-            '{code}'   => (string) Arr::get($draft, 'code'),
-            '{title}'  => (string) Arr::get($draft, 'title'),
-            '{time}'   => (string) Arr::get($draft, 'send_at'),
-            '{target}' => (string) Arr::get($draft, 'target_label'),
-        ]));
+                $this->supportGroup->editMessage($messageId, strtr(
+                    (string) Arr::get($config, blank($ids) ? 'UNAVAILABLE_TEXT' : 'PARTIAL_FAILED_TEXT'),
+                    [
+                        '{count}' => (string) count($ids),
+                        '{code}'  => (string) Arr::get($item, 'code'),
+                    ]
+                ));
+
+                return;
+            }
+
+            $ids[] = $broadcast->id;
+        }
+
+        $this->supportGroup->editMessage($messageId, $this->confirmedText($draft, $items, $config));
 
         Log::info('指令預約公告已建立', [
-            'broadcast_id' => $broadcast->id,
-            'code'         => Arr::get($draft, 'code'),
-            'target'       => Arr::get($draft, 'target_label'),
-            'send_at'      => Arr::get($draft, 'send_at'),
-            'user_id'      => Arr::get($draft, 'user_id'),
+            'broadcast_ids' => $ids,
+            'codes'         => array_column($items, 'code'),
+            'target'        => Arr::get($draft, 'target_label'),
+            'send_at'       => Arr::get($draft, 'send_at'),
+            'user_id'       => Arr::get($draft, 'user_id'),
         ]);
+    }
+
+    /**
+     * 建好之後要回的那句話
+     *
+     * ⚠ 三種講法：自訂訊息（沒有代號）、一份公告、好幾份公告。
+     * `is_message` 是布林，用 `(bool)` 不用 `filled()`
+     * （`filled(false)` 回的是 true）。
+     *
+     * @param array $draft
+     * @param array $items
+     * @param array $config
+     * @return string
+     */
+    private function confirmedText(array $draft, array $items, array $config)
+    {
+        $replace = [
+            '{code}'   => (string) Arr::get($items, '0.code'),
+            '{title}'  => (string) Arr::get($items, '0.title'),
+            '{codes}'  => implode('、', array_column($items, 'code')),
+            '{count}'  => (string) count($items),
+            '{time}'   => (string) Arr::get($draft, 'send_at'),
+            '{target}' => (string) Arr::get($draft, 'target_label'),
+        ];
+
+        if ((bool) Arr::get($draft, 'is_message')) {
+            return strtr((string) Arr::get($config, 'MESSAGE_CONFIRMED_TEXT'), $replace);
+        }
+
+        $key = count($items) > 1 ? 'MULTI_CONFIRMED_TEXT' : 'CONFIRMED_TEXT';
+
+        return strtr((string) Arr::get($config, $key), $replace);
     }
 
     /**
      * 回預覽並把草稿存進 cache
      *
-     * @param \App\Models\BroadcastTemplate $template
-     * @param array                         $target  resolveTarget() 的結果
-     * @param \Illuminate\Support\Carbon    $sendAt
-     * @param \App\Models\User              $user
-     * @param int|null                      $threadId
+     * ⚠ **一份草稿可以帶好幾份公告**（需求方 2026-10-22）。按下確認時
+     * 一份建一筆預約 —— `TelegramBroadcastService::schedule()` 一次只吃一份
+     * 內容，而且歷史紀錄、取消、重送都是以「一筆預約」為單位，
+     * 硬把兩份併成一筆反而會讓那些功能全部失準。
+     *
+     * @param array<\App\Models\BroadcastTemplate> $templates
+     * @param array                                $target resolveTarget() 的結果
+     * @param \Illuminate\Support\Carbon           $sendAt
+     * @param \App\Models\User                     $user
+     * @param int|null                             $threadId
      * @return void
      */
-    private function replyPreview($template, array $target, $sendAt, $user, $threadId)
+    private function replyPreview(array $templates, array $target, $sendAt, $user, $threadId)
     {
         $config = (array) config('constants.BROADCAST_COMMAND');
         $key = Str::random(16);
 
+        $items = [];
+
+        foreach ($templates as $template) {
+            $items[] = [
+                'code'       => (string) $template->code,
+                'title'      => (string) $template->title,
+                'content'    => (string) $template->content,
+                'image_urls' => $template->image_urls,
+                'file_urls'  => $template->file_urls,
+            ];
+        }
+
         Cache::put(self::DRAFT_PREFIX . $key, [
-            'code'         => (string) $template->code,
-            'title'        => (string) $template->title,
-            'content'      => (string) $template->content,
-            'image_urls'   => $template->image_urls,
-            'file_urls'    => $template->file_urls,
+            'items'        => $items,
             'target_type'  => (int) Arr::get($target, 'type'),
             'station_ids'  => (array) Arr::get($target, 'station_ids', []),
             'target_label' => (string) Arr::get($target, 'label'),
@@ -273,16 +351,55 @@ class ScheduledBroadcastCommandService
         ], now()->addMinutes((int) Arr::get($config, 'DRAFT_TTL_MINUTES')));
 
         $text = strtr((string) Arr::get($config, 'PREVIEW_TEXT'), [
-            '{code}'        => (string) $template->code,
-            '{title}'       => (string) $template->title,
-            '{target}'      => (string) Arr::get($target, 'label'),
-            '{time}'        => $sendAt->format('Y-m-d H:i'),
-            '{when}'        => $this->whenText($sendAt),
-            '{attachments}' => $this->attachmentLine($template, $config),
-            '{preview}'     => $this->contentPreview((string) $template->content, $config),
+            '{count}'  => $this->countLine(count($items), $config),
+            '{target}' => (string) Arr::get($target, 'label'),
+            '{time}'   => $sendAt->format('Y-m-d H:i'),
+            '{when}'   => $this->whenText($sendAt),
+            '{items}'  => $this->previewItems($items, $config),
         ]);
 
         $this->supportGroup->sendToThread($text, $threadId, $this->confirmKeyboard($key, $config));
+    }
+
+    /**
+     * 預覽裡每一份公告的那幾行
+     *
+     * @param array $items
+     * @param array $config
+     * @return string
+     */
+    private function previewItems(array $items, array $config)
+    {
+        $lines = [];
+
+        foreach ($items as $item) {
+            $lines[] = strtr((string) Arr::get($config, 'PREVIEW_ITEM'), [
+                '{code}'        => (string) Arr::get($item, 'code'),
+                '{title}'       => (string) Arr::get($item, 'title'),
+                '{attachments}' => $this->attachmentLine($item, $config),
+                '{preview}'     => $this->contentPreview((string) Arr::get($item, 'content'), $config),
+            ]);
+        }
+
+        return implode('', $lines);
+    }
+
+    /**
+     * 「共 N 份」那一行
+     *
+     * ⚠ 只有一份時**不印** —— 每次都寫「共 1 份」是多餘的噪音。
+     *
+     * @param int   $count
+     * @param array $config
+     * @return string
+     */
+    private function countLine($count, array $config)
+    {
+        if ($count < 2) {
+            return '';
+        }
+
+        return strtr((string) Arr::get($config, 'PREVIEW_COUNT'), ['{count}' => (string) $count]);
     }
 
     /**
@@ -309,14 +426,20 @@ class ScheduledBroadcastCommandService
         $key = Str::random(16);
 
         Cache::put(self::DRAFT_PREFIX . $key, [
-            // 自己打的訊息沒有代號，歷史紀錄上的「公告編號」會顯示「-」
-            'code'         => '',
-            'title'        => (string) Arr::get($config, 'MESSAGE_TITLE'),
+            /*
+             * 草稿的形狀跟公告那條完全一樣（`items` 陣列），只是只有一份、
+             * 沒有代號也沒有附件 —— 這樣 `confirm()` 不必分兩種走法。
+             */
+            'items' => [[
+                // 自己打的訊息沒有代號，歷史紀錄上的「公告編號」會顯示「-」
+                'code'       => '',
+                'title'      => (string) Arr::get($config, 'MESSAGE_TITLE'),
+                'content'    => (string) $content,
+                'image_urls' => null,
+                'file_urls'  => null,
+            ]],
             // 確認訊息要挑對模板：公告講「範本《標題》」，這一種沒有代號可講
             'is_message'   => true,
-            'content'      => (string) $content,
-            'image_urls'   => null,
-            'file_urls'    => null,
             'target_type'  => (int) Arr::get($target, 'type'),
             'station_ids'  => (array) Arr::get($target, 'station_ids', []),
             'target_label' => (string) Arr::get($target, 'label'),
@@ -400,7 +523,7 @@ class ScheduledBroadcastCommandService
      * @param int|null    $threadId
      * @return void
      */
-    private function replyTemplateNotFound($code, $threadId)
+    private function replyTemplateNotFound(array $missing, $threadId)
     {
         $config = (array) config('constants.BROADCAST_COMMAND');
         $codes = [];
@@ -418,7 +541,8 @@ class ScheduledBroadcastCommandService
         }
 
         $this->reply(strtr((string) Arr::get($config, 'TEMPLATE_NOT_FOUND_TEXT'), [
-            '{code}'  => (string) $code,
+            // 查不到的全部列出來 —— 只講第一個的話，他改完又卡在第二個
+            '{code}'  => implode('、', $missing),
             '{codes}' => implode('、', $codes),
         ]), $threadId);
     }
@@ -447,14 +571,14 @@ class ScheduledBroadcastCommandService
     /**
      * 附件那一行
      *
-     * @param \App\Models\BroadcastTemplate $template
-     * @param array                         $config
+     * @param array $item   草稿裡的一份公告（含 image_urls／file_urls）
+     * @param array $config
      * @return string
      */
-    private function attachmentLine($template, array $config)
+    private function attachmentLine(array $item, array $config)
     {
-        $images = count((array) $template->image_urls);
-        $files = count((array) $template->file_urls);
+        $images = count((array) Arr::get($item, 'image_urls'));
+        $files = count((array) Arr::get($item, 'file_urls'));
 
         // 沒有附件就整行不出現，不要印「0 張圖、0 個檔案」
         if ($images < 1 && $files < 1) {
