@@ -456,7 +456,8 @@
                 <i class="fas fa-keyboard"></i><span>{{ __('login.full_width_hint') }}</span>
             </div>
 
-            <form method="POST" action="{{ route('login') }}">
+            {{-- id 與 data-token-url 給 public/js/auth/login-token.js 用（送出前補最新的 CSRF token，擋 419） --}}
+            <form id="login-form" method="POST" action="{{ route('login') }}" data-token-url="{{ route('login.ajax-token') }}">
                 @csrf
                 <div class="login-input-group">
                     <i class="far fa-user input-icon"></i>
@@ -479,6 +480,7 @@
     </div>
 
     <script src="{{ asset('js/login.js') }}"></script>
+    <script src="{{ asset('js/auth/login-token.js') }}"></script>
 
 </body>
 </html>

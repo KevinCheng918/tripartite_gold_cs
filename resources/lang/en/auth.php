@@ -18,6 +18,9 @@ return [
     'throttle' => 'Too many login attempts. Please try again in :seconds seconds.',
     'logout' => 'Logout',
 
+    // Shown after being redirected back when the login page sat open too long (419)
+    'page_expired' => 'The login page was open too long. Please enter your credentials again.',
+
     // Session expiry notice (passed from the layout to AuthGuard in public/js/common.js)
     'expired_title' => 'Session expired',
     'expired_hint' => 'Please sign in again. Your last action was not saved.',

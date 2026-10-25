@@ -40,6 +40,19 @@ Route::get('/', function () {
 
 Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'login']);
+
+/*
+ * 登入頁在送出前取一份最新的 CSRF token（擋 419）。
+ *
+ * ⚠ **不能放進任何 auth／guest 群組** —— 它本來就是給還沒登入的人用的，
+ * 而會導頁的 middleware 會讓回應變成 HTML，前端解析不出 JSON 就補不到 token。
+ *
+ * ⚠ 自己給 `throttle:30`：登入頁每開一次就會打一次（送出時），
+ * 跟登入本身的次數限制分開算，免得開頁就吃掉嘗試登入的額度。
+ */
+Route::get('/login/ajax-token', [LoginController::class, 'ajaxToken'])
+    ->middleware('throttle:30')
+    ->name('login.ajax-token');
 Route::post('/logout', [LoginController::class, 'logout'])->middleware('auth')->name('logout');
 
 Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
