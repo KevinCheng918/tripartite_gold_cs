@@ -489,6 +489,15 @@ class AttendanceService
             $last = $today;
         }
 
+        /*
+         * ⚠ **那天該不該上班要查班表，不能用猜的**（需求方 2026-10-26）。
+         *
+         * 原本把「沒紀錄又沒請假」一律當成休假 —— 但**班表查得到他那天有沒有
+         * 排班、排的是什麼班**。沒去查就等於把「排了班卻沒打卡」跟
+         * 「本來就沒排班」混成同一種。
+         */
+        $dutyMap = $this->dutyMapFor($userId, $yearMonth);
+
         $timeline = collect();
 
         while ($cursor->lessThanOrEqualTo($last)) {
@@ -498,12 +507,89 @@ class AttendanceService
                 'date'   => $cursor->copy(),
                 'record' => Arr::get($byDate, $date),
                 'leave'  => Arr::get($leaveMap, $date),
+                // 那天該不該上班、上的是哪個班（null ＝ 那天本來就不用上班）
+                'duty'   => Arr::get($dutyMap, $date),
             ]);
 
             $cursor->addDay();
         }
 
         return $timeline;
+    }
+
+    /**
+     * 某個月每一天「該不該上班、上的是哪個班」
+     *
+     * ⚠ **兩種出勤模式的答案來源不一樣**：
+     * - 輪班：查**班表**（`shift_assignments`）。沒排到班就是沒排到班。
+     * - 固定班：查**帳號上的上班日**（`work_days`）。不在上班日的那天才是休假。
+     *
+     * 這也是「休假」與「未排班」的分界 —— 輪班的人沒有固定休假日，
+     * 也不放國定假日（需求方 2026-10-26），所以輪班不會有「休假」。
+     *
+     * @param int    $userId
+     * @param string $yearMonth Y-m
+     * @return array<string, array{is_fixed: bool, shift_name: string}> 那天不用上班的日期不會在裡面
+     */
+    private function dutyMapFor($userId, $yearMonth)
+    {
+        $user = $this->userRepository->find($userId);
+        $start = Carbon::createFromFormat('Y-m', $yearMonth)->startOfMonth();
+        $end = $start->copy()->endOfMonth();
+
+        // 固定班：照帳號上的上班日推，一天一天問既有的那支
+        if (filled($user) && $user->isFixedWorkMode()) {
+            return $this->fixedDutyMap($user, $start, $end);
+        }
+
+        $assignments = $this->assignmentRepository->getByUserAndDateRange(
+            $userId,
+            $start->format('Y-m-d'),
+            $end->format('Y-m-d')
+        );
+
+        $map = [];
+
+        foreach ($assignments as $assignment) {
+            $map[$assignment->date->format('Y-m-d')] = [
+                'is_fixed'   => false,
+                // 班別名稱要給得出來 —— 「那天排什麼班」是需求方要看的
+                'shift_name' => (string) optional($assignment->shift)->name,
+            ];
+        }
+
+        return $map;
+    }
+
+    /**
+     * 固定班那個月哪幾天要上班
+     *
+     * @param \App\Models\User           $user
+     * @param \Illuminate\Support\Carbon $start
+     * @param \Illuminate\Support\Carbon $end
+     * @return array<string, array{is_fixed: bool, shift_name: string}>
+     */
+    private function fixedDutyMap($user, $start, $end)
+    {
+        $map = [];
+        $cursor = $start->copy();
+
+        while ($cursor->lessThanOrEqualTo($end)) {
+            $date = $cursor->format('Y-m-d');
+
+            /*
+             * 沿用既有的 `workTimeFromUser()`：null ＝ 那天不用上班
+             * （不在 `work_days`，或設定不完整）。
+             * 另寫一份判斷會變成「同一條規則兩個地方各長各的」。
+             */
+            if (filled($this->workTimeFromUser($user, $date))) {
+                $map[$date] = ['is_fixed' => true, 'shift_name' => ''];
+            }
+
+            $cursor->addDay();
+        }
+
+        return $map;
     }
 
     /**

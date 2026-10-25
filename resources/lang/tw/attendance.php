@@ -36,6 +36,12 @@ return [
     'status_on_leave'    => '請假',
     'status_day_off'     => '休假',
     'status_no_shift'    => '未排班',
+    /*
+     * ⚠ 有排班卻一筆紀錄都沒有 —— 正常情況下 `MarkAbsentCommand` 會補成曠工，
+     * 所以看到這個標籤代表**資料有問題**（排程沒跑、紀錄被刪）。
+     * 標成「休假」或「未排班」會把異常蓋掉。
+     */
+    'status_no_record'   => '無打卡紀錄',
 
     // 欄位
     'field_date'         => '日期',

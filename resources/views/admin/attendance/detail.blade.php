@@ -116,13 +116,19 @@
                                 $r = $row['record'];
                                 $rowDate = $row['date'];
                                 $leave = $row['leave'];
+                                // 那天該不該上班、排的是哪個班（null ＝ 本來就不用上班）
+                                $duty = Arr::get($row, 'duty');
                             @endphp
 
                             @if(blank($r))
                                 {{-- 那天沒有出勤紀錄：請假，或本來就沒班 --}}
                                 <tr class="text-muted">
                                     <td>{{ \App\Presenters\DatePresenter::withWeekday($rowDate) }}</td>
-                                    <td>-</td>
+                                    {{--
+                                        ⚠ 沒打卡的日子**也要看得到排了什麼班**
+                                        （需求方 2026-10-26）。沒排班才是「-」。
+                                    --}}
+                                    <td>{{ filled(Arr::get($duty, 'shift_name')) ? Arr::get($duty, 'shift_name') : '-' }}</td>
                                     <td>-</td>
                                     <td>-</td>
                                     <td>-</td>
@@ -130,20 +136,27 @@
                                     <td>-</td>
                                     <td>-</td>
                                     <td>
+                                        {{--
+                                            ⚠ **那天該不該上班是查班表來的**（需求方 2026-10-26：
+                                            「不能統一叫做未排班，有班表可以確認他當天有沒有排班和排什麼班」）。
+                                            `duty` 由 `getMonthlyTimeline()` 算好：
+                                            輪班查 shift_assignments、固定班查帳號上的上班日，
+                                            null ＝ 那天本來就不用上班。
+
+                                            ⚠ 「休假」只有**固定班**才有 —— 輪班沒有固定休假日，
+                                            也不放國定假日，所以輪班沒排到班是「未排班」。
+                                        --}}
                                         @if(filled($leave))
                                             <span class="badge bg-info">{{ trans('attendance.status_on_leave') }}</span>
-                                        @else
-                                            {{--
-                                                ⚠ **只有固定班才有「休假」**（需求方 2026-10-26）。
-                                                輪班的人沒有固定的休假日，也不放國定假日 ——
-                                                那天沒有紀錄只代表「這天沒排到班」。
-                                                一律標「休假」會讓人以為他那天本來就該休。
-                                            --}}
+                                        @elseif(blank($duty))
                                             @if(filled($targetUser) && $targetUser->isFixedWorkMode())
                                                 <span class="badge bg-secondary">{{ trans('attendance.status_day_off') }}</span>
                                             @else
                                                 <span class="badge bg-light text-muted">{{ trans('attendance.status_no_shift') }}</span>
                                             @endif
+                                        @else
+                                            {{-- 有排班卻沒有任何紀錄：照實說，不要猜成休假 --}}
+                                            <span class="badge bg-warning text-dark">{{ trans('attendance.status_no_record') }}</span>
                                         @endif
                                     </td>
                                     <td>

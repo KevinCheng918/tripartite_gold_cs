@@ -21,6 +21,7 @@ return [
     'status_on_leave'    => 'On Leave',
     'status_day_off'     => 'Day Off',
     'status_no_shift'    => 'No Shift',
+    'status_no_record'   => 'No Clock Record',
 
     'field_date'         => 'Date',
     'field_clock_in'     => 'Clock In',
