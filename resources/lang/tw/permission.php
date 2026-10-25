@@ -69,6 +69,7 @@ return [
         'topup_view'   => '檢視補點紀錄',
         'topup_apply'  => '申請補點/扣點',
         'topup_approve' => '審核補點/扣點',
+        'credit_report' => '查看點數報表（餘點曲線）',
     ],
     'vm' => [
         'view'            => '檢視虛擬機',

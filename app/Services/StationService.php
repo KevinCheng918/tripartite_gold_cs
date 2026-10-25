@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\Station;
+use App\Models\StationCreditLog;
+use App\Repositories\StationCreditLogRepository;
 use App\Repositories\StationRepository;
 use App\Repositories\TelegramRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -18,17 +20,21 @@ class StationService
     private $telegramRepository;
     private $mainSystemApi;
     private $telegramBot;
+    private $creditLogRepository;
 
     public function __construct(
         StationRepository $stationRepository,
         TelegramRepository $telegramRepository,
         MainSystemApiService $mainSystemApi,
-        TelegramBotService $telegramBot
+        TelegramBotService $telegramBot,
+        StationCreditLogRepository $creditLogRepository
     ) {
         $this->stationRepository = $stationRepository;
         $this->telegramRepository = $telegramRepository;
         $this->mainSystemApi = $mainSystemApi;
         $this->telegramBot = $telegramBot;
+        // 每次同步記一筆，點數報表的曲線圖靠這個
+        $this->creditLogRepository = $creditLogRepository;
     }
 
     /**
@@ -163,19 +169,32 @@ class StationService
      * - usdt_deposit / atm_deposit / cvs_deposit / cc_deposit / qr_deposit / withdraw：功能開關
      * - 其他欄位全部存入 settings JSON
      *
+     * ⚠ **所有同步路徑都走這一支**（每日排程、列表的同步按鈕、小幫手查餘點、
+     * 餘點告警、虛擬機試算），所以點數報表的紀錄只掛在這裡就全部涵蓋，
+     * 日後新增路徑也不必記得補（需求方 2026-10-26：「無論是自動去同步，
+     * 或是手動去按同步，都要做紀錄」）。
+     *
      * @param Station $station
+     * @param string  $source 怎麼觸發的（見 StationCreditLog::SOURCE_*）
      * @return array|null 同步後的資料，失敗回傳 null
      */
-    public function syncInfo(Station $station)
+    public function syncInfo(Station $station, $source = StationCreditLog::SOURCE_MANUAL)
     {
         $info = $this->mainSystemApi->getStationInfo($station->api_url, $station->api_key);
 
         if (!$info) {
+            /*
+             * ⚠ **失敗也要留一筆**（需求方 2026-10-26）：沒有這一筆的話，
+             * 圖上某天沒有點就分不出是「沒人同步」還是「同步失敗」。
+             * `credits` 留 null，曲線上是斷點，下方清單才列出來。
+             */
+            $this->logCredit($station, null, $source);
+
             return null;
         }
 
         // admin_credit → credits 欄位
-        $credits = $info['admin_credit'] ?? $station->credits;
+        $credits = Arr::get($info, 'admin_credit', $station->credits);
 
         // 整包 data 存入 settings JSON
         $this->stationRepository->update($station, [
@@ -184,7 +203,42 @@ class StationService
             'synced_at' => now(),
         ]);
 
+        /*
+         * ⚠ **點數沒變也照記**（需求方 2026-10-26）：原話是「如果有去同步，
+         * 就寫一筆資料」。圖上會有一串平點，但那正好表達「這幾天確實有在同步，
+         * 只是客戶沒動」—— 不記的話看不出有沒有同步過。
+         */
+        $this->logCredit($station, $credits, $source);
+
         return $info;
+    }
+
+    /**
+     * 記一筆餘點同步紀錄
+     *
+     * ⚠ **寫紀錄失敗不能讓同步失敗**：點數本身已經更新好了，為了一筆報表用的
+     * 紀錄把整個同步往上拋，會讓排程、告警、指令全部跟著掛掉。
+     *
+     * @param Station     $station
+     * @param string|null $credits null ＝ 這次同步失敗
+     * @param string      $source
+     * @return void
+     */
+    private function logCredit(Station $station, $credits, $source)
+    {
+        try {
+            $this->creditLogRepository->create([
+                'station_id' => $station->id,
+                'credits'    => $credits,
+                'source'     => $source,
+            ]);
+        } catch (\Exception $e) {
+            Log::warning('站台餘點紀錄寫入失敗', [
+                'station_id' => $station->id,
+                'source'     => $source,
+                'error'      => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

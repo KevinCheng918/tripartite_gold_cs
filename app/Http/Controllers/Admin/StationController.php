@@ -9,10 +9,12 @@ use App\Presenters\NumberPresenter;
 use App\Http\Resources\StationResource;
 use App\Models\CreditTopup;
 use App\Models\Station;
+use App\Models\StationCreditLog;
 use App\Repositories\UserRepository;
 use App\Services\CreditTopupService;
 use App\Services\ImageUploadService;
 use App\Services\StationCreditAlertService;
+use App\Services\StationCreditReportService;
 use App\Services\StationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -29,13 +31,15 @@ class StationController extends Controller
     private $imageUploadService;
     private $userRepository;
     private $creditAlertService;
+    private $creditReportService;
 
     public function __construct(
         StationService $stationService,
         CreditTopupService $topupService,
         ImageUploadService $imageUploadService,
         UserRepository $userRepository,
-        StationCreditAlertService $creditAlertService
+        StationCreditAlertService $creditAlertService,
+        StationCreditReportService $creditReportService
     ) {
         $this->stationService = $stationService;
         $this->topupService = $topupService;
@@ -43,6 +47,38 @@ class StationController extends Controller
         $this->userRepository = $userRepository;
         // 手動發送補點通知
         $this->creditAlertService = $creditAlertService;
+        // 點數報表（餘點曲線圖）
+        $this->creditReportService = $creditReportService;
+    }
+
+    /**
+     * 點數報表頁面（餘點曲線圖）
+     *
+     * @param Station $station
+     * @return \Illuminate\View\View
+     */
+    public function creditReport(Station $station)
+    {
+        return view('admin.station.credit-report', [
+            'station'      => $station,
+            'sourceLabels' => $this->creditReportService->sourceLabels(),
+        ]);
+    }
+
+    /**
+     * Ajax 取點數報表資料
+     *
+     * @param Request $request
+     * @param Station $station
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxCreditReport(Request $request, Station $station)
+    {
+        $params = $request->only(['start', 'end']);
+
+        return response()->json(
+            $this->creditReportService->build((int) $station->id, $params)
+        );
     }
 
     /**
@@ -180,7 +216,7 @@ class StationController extends Controller
     public function ajaxSyncCredits(Station $station)
     {
         try {
-            $info = $this->stationService->syncInfo($station);
+            $info = $this->stationService->syncInfo($station, StationCreditLog::SOURCE_MANUAL);
 
             if (!$info) {
                 return response()->json(['message' => trans('station.msg.sync_failed')], 500);

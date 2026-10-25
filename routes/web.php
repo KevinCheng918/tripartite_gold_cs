@@ -214,6 +214,15 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::post('/ajax-store', [StationController::class, 'ajaxStore'])->middleware('can:station.create')->name('ajax-store');
         Route::put('/ajax-update/{station}', [StationController::class, 'ajaxUpdate'])->middleware('can:station.update')->name('ajax-update');
         Route::post('/ajax-sync-credits/{station}', [StationController::class, 'ajaxSyncCredits'])->middleware('can:station.update')->name('ajax-sync-credits');
+
+        /*
+         * 點數報表（餘點曲線圖）。
+         *
+         * ⚠ 權限**刻意不沿用 `station.view`**：看得到站台列表不代表該看得到
+         * 每天的餘點曲線 —— 那是客戶的營運資訊。權限照使用者在做什麼切。
+         */
+        Route::get('/credit-report/{station}', [StationController::class, 'creditReport'])->middleware('can:station.credit_report')->name('credit-report');
+        Route::get('/ajax-credit-report/{station}', [StationController::class, 'ajaxCreditReport'])->middleware('can:station.credit_report')->name('ajax-credit-report');
         // 手動發補點通知給客戶：會真的發訊息出去，跟「同步」同一個權限等級
         Route::post('/ajax-send-topup-notice/{station}', [StationController::class, 'ajaxSendTopupNotice'])->middleware('can:station.update')->name('ajax-send-topup-notice');
         Route::get('/ajax-systems', [StationController::class, 'ajaxSystems'])->middleware('can:station.view')->name('ajax-systems');

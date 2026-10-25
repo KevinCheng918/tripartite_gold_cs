@@ -68,6 +68,7 @@ return [
         'topup_view'   => 'View credit topup',
         'topup_apply'  => 'Apply credit topup',
         'topup_approve' => 'Approve credit topup',
+        'credit_report' => 'View credit report (balance chart)',
     ],
     'vm' => [
         'view'            => 'View VMs',

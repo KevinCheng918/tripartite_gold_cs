@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\StationCreditLog;
 use App\Repositories\StationRepository;
 use App\Repositories\UserRepository;
 use App\Services\AutoReply\StationCreditCommandParser;
@@ -239,7 +240,7 @@ class StationCreditCommandService
         ));
 
         try {
-            $info = $this->stationService->syncInfo($station);
+            $info = $this->stationService->syncInfo($station, StationCreditLog::SOURCE_COMMAND);
         } catch (\Exception $e) {
             Log::error('指令查餘點同步失敗', ['station_id' => $station->id, 'error' => $e->getMessage()]);
             $info = null;

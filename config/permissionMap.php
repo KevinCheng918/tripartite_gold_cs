@@ -107,6 +107,15 @@ return [
             'station.topup_view'   => 'permission.station.topup_view',
             'station.topup_apply'  => 'permission.station.topup_apply',
             'station.topup_approve' => 'permission.station.topup_approve',
+
+            /*
+             * 看站台的餘點曲線圖（點數報表）。
+             *
+             * ⚠ **不沿用 `station.view`**：看得到站台列表（名稱、狀態）不代表
+             * 該看得到每天的餘點走勢 —— 那是客戶的營運資訊，看得出他什麼時候
+             * 補點、消耗多快。權限照使用者在做什麼切，是這個專案一貫的做法。
+             */
+            'station.credit_report' => 'permission.station.credit_report',
         ],
     ],
 

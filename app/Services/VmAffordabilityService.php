@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Station;
+use App\Models\StationCreditLog;
 use App\Repositories\StationRepository;
 use App\Repositories\VmRepository;
 use Illuminate\Support\Arr;
@@ -282,7 +283,7 @@ class VmAffordabilityService
         }
 
         try {
-            $info = $this->stationService->syncInfo($station);
+            $info = $this->stationService->syncInfo($station, StationCreditLog::SOURCE_AFFORD);
         } catch (\Exception $e) {
             Log::error('試算餘點：同步失敗', ['station_id' => $stationId, 'error' => $e->getMessage()]);
 

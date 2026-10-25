@@ -144,4 +144,46 @@ return [
     'topup_approved'       => '補點已通過，API 呼叫成功',
     'topup_rejected'       => '補點已拒絕',
     'topup_api_failed'     => '補點 API 呼叫失敗',
+
+    /*
+     * 點數報表（餘點曲線圖）。
+     *
+     * 整組會被 `@json()` 丟給 public/js/station-credit-report.js，
+     * 所以新增 key 時前端直接取得到，不用另外傳。
+     */
+    'credit_report' => [
+        'page_title'     => '點數報表',
+        'action'         => '點數報表',
+        'date_from'      => '開始日期',
+        'date_to'        => '結束日期',
+        'search'         => '查詢',
+        'chart_label'    => '餘點',
+        'tooltip_source' => '來源',
+        'summary_range'  => '期間',
+        'summary_first'  => '期初餘點',
+        'summary_last'   => '期末餘點',
+        'summary_diff'   => '變化',
+        'summary_failed' => '同步失敗次數',
+        'empty'          => '這段期間沒有同步紀錄。',
+        'load_failed'    => '載入失敗，請稍後再試',
+        /*
+         * ⚠ 要說明為什麼是階梯線：我們只在同步的那一刻取樣，
+         * 兩點之間實際發生什麼並不知道。不講的話，看的人會把斜線
+         * 當成「等速消耗」去推估。
+         */
+        'chart_hint'     => '每次同步餘點就記一筆（每日排程、手動按同步、小幫手查餘點、餘點告警、虛擬機試算都算）。圖上用階梯線，因為我們只知道同步當下的數字，兩次同步之間的變化無從得知。',
+        'failure_title'  => '同步失敗的紀錄',
+        'failure_hint'   => '這幾次同步沒有拿到點數（主系統沒有回應），所以曲線上是斷點。',
+        'failure_at'     => '時間',
+        'failure_source' => '來源',
+    ],
+
+    // 點數紀錄的來源
+    'credit_source' => [
+        'schedule' => '每日排程',
+        'manual'   => '手動同步',
+        'command'  => '小幫手查餘點',
+        'alert'    => '餘點告警',
+        'afford'   => '虛擬機試算',
+    ],
 ];

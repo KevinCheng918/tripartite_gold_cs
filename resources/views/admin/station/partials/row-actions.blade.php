@@ -27,6 +27,19 @@
                 data-id="{{ $station->id }}">
             <i class="fas fa-info-circle btn-icon-wrapper"></i>{{ trans('station.action_detail') }}
         </button>
+        {{--
+            點數報表（餘點曲線圖）。
+
+            ⚠ 權限是 `station.credit_report` 而不是 `station.view` —— 看得到
+            站台列表不代表該看得到每天的餘點走勢（那是客戶的營運資訊）。
+            所以這顆**不包在下面的 `station.update` 區塊裡**，各自判斷。
+        --}}
+        @if(Auth::user()->hasPermission('station.credit_report'))
+            <a class="btn btn-outline-secondary btn-icon btn-transition"
+               href="{{ route('admin.stations.credit-report', $station->id) }}">
+                <i class="fas fa-chart-line btn-icon-wrapper"></i>{{ trans('station.credit_report.action') }}
+            </a>
+        @endif
     </div>
 
     @if(Auth::user()->hasPermission('station.update'))

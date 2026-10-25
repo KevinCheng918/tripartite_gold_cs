@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Station;
+use App\Models\StationCreditLog;
 use App\Presenters\TelegramUsernamePresenter;
 use App\Repositories\CreditTopupRepository;
 use App\Repositories\StationRepository;
@@ -157,6 +158,13 @@ class StationCreditAlertService
         $dryRun = (bool) Arr::get($options, 'dry_run', false);
         $stationId = Arr::get($options, 'station_id');
 
+        /*
+         * 點數報表要分得出「每天的例行同步」與「有人手動觸發告警」——
+         * 兩者都走這一支，所以由呼叫端告訴我們是哪一種（排程那支會傳
+         * `schedule`，沒傳就是 `alert`）。
+         */
+        $source = (string) Arr::get($options, 'source', StationCreditLog::SOURCE_ALERT);
+
         $stations = $this->stationRepository->getForCreditSync($stationId);
 
         if (blank($stations)) {
@@ -180,7 +188,7 @@ class StationCreditAlertService
              * 所以記 error 而不是 warning，並在結果表標成「處理時發生錯誤」。
              */
             try {
-                $results[] = $this->handleStation($station, $settings, $dryRun);
+                $results[] = $this->handleStation($station, $settings, $dryRun, $source);
             } catch (\Exception $e) {
                 Log::error('站台餘點告警處理失敗，跳過這個站台', [
                     'station_id' => $station->id,
@@ -241,7 +249,7 @@ class StationCreditAlertService
         }
 
         // 先同步，訊息裡的點數才是當下的；同步不到就不要發一個過期的數字
-        if (blank($this->stationService->syncInfo($station))) {
+        if (blank($this->stationService->syncInfo($station, StationCreditLog::SOURCE_ALERT))) {
             return ['ok' => false, 'reason' => 'sync_failed'];
         }
 
@@ -501,9 +509,10 @@ class StationCreditAlertService
      * @param Station $station
      * @param array   $settings 全站共用的設定
      * @param bool    $dryRun
+     * @param string  $source   點數報表要記的來源（排程傳 schedule，手動就是 alert）
      * @return array 處理結果
      */
-    private function handleStation(Station $station, $settings, $dryRun)
+    private function handleStation(Station $station, $settings, $dryRun, $source = StationCreditLog::SOURCE_ALERT)
     {
         $threshold = $this->thresholdFor($station, $settings['threshold']);
 
@@ -516,7 +525,7 @@ class StationCreditAlertService
          */
         $info = $dryRun
             ? $this->mainSystemApi->getStationInfo($station->api_url, $station->api_key)
-            : $this->stationService->syncInfo($station);
+            : $this->stationService->syncInfo($station, $source);
 
         if (blank($info)) {
             /*

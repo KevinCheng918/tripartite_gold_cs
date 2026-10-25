@@ -68,6 +68,7 @@ return [
         'topup_view'   => '查看补点记录',
         'topup_apply'  => '申请补点/扣点',
         'topup_approve' => '审核补点/扣点',
+        'credit_report' => '查看点数报表（余点曲线）',
     ],
     'vm' => [
         'view'            => '查看虚拟机',

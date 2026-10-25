@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\StationCreditLog;
 use App\Services\StationCreditAlertService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Arr;
@@ -62,6 +63,8 @@ class SyncStationCreditCommand extends Command
         $results = $this->alertService->run([
             'dry_run'    => $dryRun,
             'station_id' => $stationId,
+            // 點數報表上要看得出這是每天的例行同步，不是有人手動發告警
+            'source'     => StationCreditLog::SOURCE_SCHEDULE,
         ]);
 
         /*
