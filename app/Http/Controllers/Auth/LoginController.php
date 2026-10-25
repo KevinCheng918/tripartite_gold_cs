@@ -62,7 +62,8 @@ class LoginController extends Controller
             Log::warning('Failed login attempt', ['account' => $params['account'], 'ip' => $request->ip()]);
 
             $this->loginLogService->record([
-                'user_id'     => $user->id ?? null,
+                // 帳號不存在時 $user 是 null，所以不能直接取 ->id
+                'user_id'     => filled($user) ? $user->id : null,
                 'account'     => $params['account'],
                 'ip'          => $request->ip(),
                 'is_success'  => false,

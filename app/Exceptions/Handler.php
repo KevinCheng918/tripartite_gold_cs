@@ -4,6 +4,7 @@ namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Illuminate\Session\TokenMismatchException;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -59,6 +60,21 @@ class Handler extends ExceptionHandler
     public function render($request, Throwable $e)
     {
         if ($this->isLoginTokenMismatch($request, $e)) {
+            /*
+             * ⚠ **要記一筆。** 兩個理由：
+             * 1. 第一層（前端補 token）成功的話根本走不到這裡 ——
+             *    這條路有流量就代表前端那層在某些環境下沒生效，
+             *    不記的話永遠不會發現
+             * 2. 短時間大量出現是 CSRF 攻擊或設定壞掉的訊號
+             *
+             * ⚠ **只記帳號與來源，不記密碼**（連 `$request->all()` 都不要帶 ——
+             * 那會把密碼寫進 log）。
+             */
+            Log::info('登入頁 token 過期，導回登入頁', [
+                'account' => $request->input('account'),
+                'ip'      => $request->ip(),
+            ]);
+
             /*
              * ⚠ **只帶帳號回去**。`$dontFlash` 本來就含 `password`，
              * 這裡再用 `only()` 明確一次 —— 把密碼 flash 進 session
