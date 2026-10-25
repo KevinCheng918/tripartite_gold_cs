@@ -91,6 +91,43 @@
 ⚠ 滑過去的 tooltip 要顯示**來源** —— 「這個凹下去是真的掉點，還是剛好有人
 手動同步了一次」分得出來才有意義。
 
+### ⚠ 摘要小卡踩到的兩個 Bootstrap 5 grid 坑
+
+第一版寫成 `<div class="col-md col-6"><div class="border rounded p-2 h-100">`，
+畫面整個跑版 —— 四張卡變成兩兩一行、而且每張撐到將近 1000px 高。
+兩個獨立的 bug：
+
+**1. 裸的 `col-md` 打不過 `col-6`。** Bootstrap 5 的 grid 產生順序是
+「所有斷點的 `.col-{bp}` ＋ `.row-cols-*`」先出，**然後才是**「所有斷點的
+`.col-{bp}-N`」。所以在 `base.css` 裡 `.col-md`（第 606 行，`@media md` 內）
+排在 `.col-6`（第 729 行，無 media query）**之前**，兩者 specificity 相同
+→ **`.col-6` 永遠贏**，桌機也是一排兩張。
+要「桌機四等分、手機兩等分」得寫 `col-md-3 col-6`（`.col-md-3` 在第 949 行，
+壓得過 `.col-6`）。
+
+**2. `h-100` 會把格子撐爆。** `height:100%` 的父層是 `.col-*`，而 `.col-*` 是
+flex item、高度來自 flex line 的 stretch —— 兩邊互相要高度，Chrome 實測
+算出 958px。等高要用 `d-flex`（外層）＋ `flex-fill`（內層），
+不要用百分比高度。
+
+⚠ 這件事**站台列表早就踩過**，`admin/station/index.blade.php` 第 1068 行就留著
+「不加 h-100：讓每格依內容自適應高度」的註解 —— 寫新頁面前先看一下隔壁。
+
+⚠ 驗證方式：把 `public/` 用 symlink 掛進 scratchpad，`php -S` 起一個靜態站，
+用真的 `base.css` ＋ 真的 `station-credit-report.js` ＋ 假 `fetch` 重現，
+再用瀏覽器量 `offsetHeight`／`getComputedStyle`。純看 code 看不出來，
+這兩個都是「CSS 檔案裡的先後順序」與「flex 高度循環」造成的。
+
+### 摘要卡固定四張
+
+期間／期初／期末／變化。**沒有「同步失敗次數」那一張** —— 下面那張黃色的
+「同步失敗的紀錄」已經把每一筆都列出來了，上面再放一個數字只是重複，
+還會讓一排變成五張（`col-md-3` 的第五張會自己掉到第二行）。
+
+⚠ 但「這段期間一筆成功的都沒有」要跟「根本沒人同步」講不同的話
+（`empty_only_failed` vs `empty`）—— 不然畫面會同時出現「沒有同步紀錄」
+和下方一整排失敗明細，自相矛盾。
+
 ## 權限：`station.credit_report`
 
 ⚠ **不沿用 `station.view`**：看得到站台列表（名稱、狀態）不代表該看得到

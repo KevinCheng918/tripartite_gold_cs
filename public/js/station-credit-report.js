@@ -118,8 +118,11 @@
 
         // 這段期間一筆都沒有 —— 講清楚，不要只留一張空圖
         if (!summary.count) {
+            // 「每次都同步失敗」跟「根本沒人同步」是兩回事，不能講同一句
+            var emptyText = summary.failed ? i18n.empty_only_failed : i18n.empty;
+
             box.innerHTML = '<div class="col-12"><div class="alert alert-light mb-0">'
-                + escapeHtml(i18n.empty) + '</div></div>';
+                + escapeHtml(emptyText) + '</div></div>';
 
             return;
         }
@@ -134,22 +137,30 @@
             card(i18n.summary_last, formatNumber(summary.last), ''),
             card(i18n.summary_diff, diffSign + formatNumber(diff), diffClass)
         ].join('');
-
-        if (summary.failed) {
-            box.insertAdjacentHTML('beforeend',
-                card(i18n.summary_failed, String(summary.failed), 'text-warning'));
-        }
     }
 
     /**
+     * 一張摘要小卡
+     *
+     * ⚠ **欄寬要寫 `col-md-3`，不能寫裸的 `col-md`**：Bootstrap 5 的 grid 把
+     * 不帶數字的 `.col-md`（`@media md` 內）排在 `.col-6` 之前，兩者
+     * specificity 相同 —— 所以 `col-md col-6` 寫在一起時永遠是 `.col-6` 贏，
+     * 四張卡會變成兩兩一行各佔一半。`.col-md-3` 在更後面的 media query，
+     * 才壓得過 `.col-6`。
+     *
+     * ⚠ **等高用 `d-flex` + `flex-fill`，不要用 `h-100`**：父層 row 沒有確定
+     * 高度時，`height:100%` 會跟 flex 的 stretch 互相要高度，實測會撐出
+     * 將近 1000px 的空白格。站台列表那邊也踩過同一件事
+     * （見 `admin/station/index.blade.php` 的註解）。
+     *
      * @param {string} label
      * @param {string} value
      * @param {string} valueClass
      * @return {string}
      */
     function card(label, value, valueClass) {
-        return '<div class="col-md col-6">'
-            + '<div class="border rounded p-2 h-100">'
+        return '<div class="col-md-3 col-6 d-flex">'
+            + '<div class="border rounded p-2 flex-fill">'
             + '<div class="text-muted" style="font-size:0.8rem">' + escapeHtml(label) + '</div>'
             + '<div class="fw-bold ' + valueClass + '">' + value + '</div>'
             + '</div></div>';
