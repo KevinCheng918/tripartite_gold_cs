@@ -247,6 +247,7 @@ class ClockAmendmentService
      *
      * @param AttendanceRecord $record
      * @param string           $clockTime
+     * @param bool             $isOvernight 跨日班（下班時間在隔天）
      * @return int
      */
     private function calcEarlyMinutes($record, $clockTime, $isOvernight = false)
@@ -304,6 +305,7 @@ class ClockAmendmentService
      *
      * @param AttendanceRecord $record
      * @param string           $clockTime
+     * @param bool             $isOvernight 跨日班（下班時間在隔天）
      * @return int
      */
     private function calcOvertimeMinutes($record, $clockTime, $isOvernight = false)

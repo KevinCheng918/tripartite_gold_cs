@@ -419,6 +419,15 @@ class TelegramChatService
         $this->botService->sendMessage($chatId, $reply);
     }
 
+    /**
+     * 處理 Telegram webhook 送進來的一般訊息
+     *
+     * 收訊的主要入口：私訊走綁定、群組訊息建／更新對話並存下來，
+     * 再決定要不要觸發自動回覆。
+     *
+     * @param array $payload Telegram Update（整包）
+     * @return void
+     */
     public function handleIncomingMessage($payload)
     {
         $message = $payload['message'] ?? null;
@@ -1207,6 +1216,16 @@ class TelegramChatService
         return $labels[$key] ?? $labels['default'];
     }
 
+    /**
+     * 把 Telegram 上的檔案抓回本地
+     *
+     * ⚠ `file_id` 綁定收到那則訊息的 Bot，必須用**同一支 Bot 的 token**
+     * 呼叫 `getFile`，否則 Telegram 回 400（見 `switchBotToken()`）。
+     *
+     * @param string $fileId Telegram 的 file_id
+     * @param string $prefix 存檔用的前綴（決定副檔名的退路）
+     * @return string|null 本地路徑；抓不到回 null
+     */
     private function downloadTelegramFile($fileId, $prefix)
     {
         $remoteUrl = $this->botService->getFileUrl($fileId);
