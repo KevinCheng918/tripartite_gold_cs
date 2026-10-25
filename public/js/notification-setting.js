@@ -510,7 +510,33 @@
         });
     }
 
-    // ===== 分頁七：待追蹤事項 =====
+    // ===== 分頁七：申請審核（有人申請／有人審核就私訊） =====
+
+    function renderApproval() {
+        renderUserList('approval-user-list', 'js-approval-user', settings.approval.user_ids);
+        syncAll('approval-user-all', 'js-approval-user');
+    }
+
+    function bindApproval() {
+        bindSelectAll('approval-user-all', 'approval-user-list', 'js-approval-user');
+
+        document.getElementById('form-approval').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            var ids = checkedIds('js-approval-user');
+
+            submit('/admin/notification/ajax-update-approval', { approval_notice_user_ids: ids },
+                event.target.querySelector('button[type="submit"]'), function () {
+                    settings.approval.user_ids = ids;
+                });
+        });
+
+        document.getElementById('btn-test-approval').addEventListener('click', function () {
+            runTest('/admin/notification/ajax-test-approval', this, i18n.msg.approval_test_failed);
+        });
+    }
+
+    // ===== 分頁八：待追蹤事項 =====
 
     function renderFollowup() {
         var followup = settings.followup;
@@ -584,6 +610,7 @@
     renderReport();
     renderTask();
     renderAttendance();
+    renderApproval();
     renderFollowup();
     applyPermission();
 
@@ -595,6 +622,7 @@
         bindReport();
         bindTask();
         bindAttendance();
+        bindApproval();
         bindFollowup();
     }
 }());

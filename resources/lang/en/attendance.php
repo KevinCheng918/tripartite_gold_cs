@@ -20,6 +20,7 @@ return [
     'status_absent'      => 'Absent',
     'status_on_leave'    => 'On Leave',
     'status_day_off'     => 'Day Off',
+    'status_no_shift'    => 'No Shift',
 
     'field_date'         => 'Date',
     'field_clock_in'     => 'Clock In',

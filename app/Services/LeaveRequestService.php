@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\LeaveRequest;
 use App\Repositories\LeaveRequestRepository;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -13,10 +14,13 @@ use Illuminate\Validation\ValidationException;
 class LeaveRequestService
 {
     private $leaveRepository;
+    private $approvalNotice;
 
-    public function __construct(LeaveRequestRepository $leaveRepository)
+    public function __construct(LeaveRequestRepository $leaveRepository, ApprovalNoticeService $approvalNotice)
     {
         $this->leaveRepository = $leaveRepository;
+        // 申請與審核都要私訊通知主管（收件人在通知設定頁維護）
+        $this->approvalNotice = $approvalNotice;
     }
 
     /**
@@ -51,7 +55,7 @@ class LeaveRequestService
      */
     public function apply($params, $userId)
     {
-        $endDate = filled($params['end_date'] ?? null) ? $params['end_date'] : $params['start_date'];
+        $endDate = filled(Arr::get($params, 'end_date')) ? $params['end_date'] : $params['start_date'];
 
         // 檢查是否有重疊的請假
         $hasOverlap = $this->leaveRepository->hasOverlapping(
@@ -66,15 +70,25 @@ class LeaveRequestService
             ]);
         }
 
-        return $this->leaveRepository->create([
+        $leaveRequest = $this->leaveRepository->create([
             'user_id'    => $userId,
             'start_date' => $params['start_date'],
             'end_date'   => $endDate,
             'is_full_day' => (int) $params['is_full_day'],
-            'start_time' => $params['start_time'] ?? null,
-            'end_time'   => $params['end_time'] ?? null,
-            'reason'     => $params['reason'] ?? null,
+            'start_time' => Arr::get($params, 'start_time'),
+            'end_time'   => Arr::get($params, 'end_time'),
+            'reason'     => Arr::get($params, 'reason'),
         ]);
+
+        /*
+         * ⚠ **建立成功之後才通知**，而且通知失敗不會往上拋
+         * （`ApprovalNoticeService` 自己包 try/catch）——
+         * 通知沒送到頂多主管晚點看到，但申請被例外中斷的話，
+         * 同仁會以為沒送出而重複送。
+         */
+        $this->approvalNotice->leaveApplied($leaveRequest);
+
+        return $leaveRequest;
     }
 
     /**
@@ -95,7 +109,7 @@ class LeaveRequestService
             ]);
         }
 
-        return DB::transaction(function () use ($leaveRequest, $status, $reviewerId, $note) {
+        $updated = DB::transaction(function () use ($leaveRequest, $status, $reviewerId, $note) {
             return $this->leaveRepository->update($leaveRequest, [
                 'status'      => (int) $status,
                 'reviewed_by' => $reviewerId,
@@ -103,6 +117,11 @@ class LeaveRequestService
                 'review_note' => $note,
             ]);
         });
+
+        // ⚠ 擺在 transaction **外面**：通知失敗不該讓已經審好的結果被 rollback
+        $this->approvalNotice->leaveReviewed($updated, $status);
+
+        return $updated;
     }
 
     /**

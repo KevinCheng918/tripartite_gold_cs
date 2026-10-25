@@ -25,16 +25,20 @@ class ClockAmendmentService
     private $amendmentRepository;
     private $attendanceRepository;
     private $attendanceService;
+    private $approvalNotice;
 
     public function __construct(
         ClockAmendmentRepository $amendmentRepository,
         AttendanceRepository $attendanceRepository,
-        AttendanceService $attendanceService
+        AttendanceService $attendanceService,
+        ApprovalNoticeService $approvalNotice
     ) {
         $this->amendmentRepository = $amendmentRepository;
         $this->attendanceRepository = $attendanceRepository;
         // 「這個人這天幾點上下班」只有這一個答案來源
         $this->attendanceService = $attendanceService;
+        // 申請與審核都要私訊通知主管（收件人在通知設定頁維護）
+        $this->approvalNotice = $approvalNotice;
     }
 
     /**
@@ -57,13 +61,18 @@ class ClockAmendmentService
             ]);
         }
 
-        return $this->amendmentRepository->create([
+        $amendment = $this->amendmentRepository->create([
             'user_id'    => $userId,
             'date'       => $date,
             'type'       => $type,
             'clock_time' => $params['clock_time'],
-            'reason'     => $params['reason'] ?? null,
+            'reason'     => Arr::get($params, 'reason'),
         ]);
+
+        // 建立成功之後才通知；通知失敗不會往上拋（理由見 ApprovalNoticeService）
+        $this->approvalNotice->amendmentApplied($amendment);
+
+        return $amendment;
     }
 
     /**
@@ -83,7 +92,7 @@ class ClockAmendmentService
             ]);
         }
 
-        return DB::transaction(function () use ($amendment, $status, $reviewerId) {
+        $updated = DB::transaction(function () use ($amendment, $status, $reviewerId) {
             // 更新申請狀態
             $this->amendmentRepository->update($amendment, [
                 'status'      => $status,
@@ -98,6 +107,11 @@ class ClockAmendmentService
 
             return $amendment;
         });
+
+        // ⚠ 擺在 transaction 外面：通知失敗不該讓已經套用的打卡紀錄被 rollback
+        $this->approvalNotice->amendmentReviewed($updated, $status);
+
+        return $updated;
     }
 
     /**

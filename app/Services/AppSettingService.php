@@ -62,6 +62,20 @@ class AppSettingService
      */
     const KEY_ATTENDANCE_REPORT_MANAGER = 'attendance_report.manager_user_ids';
 
+    /*
+     * 有人申請請假／補打卡／代班時要私訊給誰（逗號串接的 id，可多選）。
+     * 審核之後（通過或拒絕）也發給同一份名單。
+     *
+     * ⚠ **跟上面幾份名單分開**：那幾份是定時報表（每天／每週的摘要），
+     * 這一份是「有人在等你審」—— 收件人往往不同，而且混在一起的話，
+     * 想收報表但不審申請的人就沒辦法只關掉其中一邊。
+     *
+     * ⚠ **不用職級自動篩**（需求方 2026-10-26 選的）。職級篩的好處是新主管
+     * 上任自動收到，但這邊跟其他通知一樣交給設定頁 —— 一致比較好記。
+     * 代價是**換人要記得改名單**。
+     */
+    const KEY_APPROVAL_NOTICE_MANAGER = 'approval_notice.manager_user_ids';
+
     // 內部支援群組
     const KEY_SUPPORT_CHAT_ID   = 'auto_reply.support_chat_id';
     const KEY_SUPPORT_SYSTEM_ID = 'auto_reply.support_system_id';

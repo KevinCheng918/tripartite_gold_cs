@@ -13,6 +13,7 @@ return [
     'tab_report' => 'Reminder Summary',
     'tab_task'   => 'Task Cards',
     'tab_attendance' => 'Attendance Reports',
+    'tab_approval'   => 'Approvals',
     'tab_followup'   => 'Follow-ups',
 
     'select_all' => 'Select all',
@@ -105,6 +106,18 @@ return [
     'attendance_user_hint'      => 'The weekly and monthly reports share this list. Anyone marked "not linked" cannot receive messages — ask them to DM the bot once. People selected here do not also get the personal version.',
     'attendance_test'           => 'Send test',
     'attendance_test_hint'      => 'DMs last week\'s full report to the people selected above right away. Only the full version is sent, so no one else is disturbed.',
+
+    'approval_title'           => 'Approval notice recipients',
+    'approval_desc'            => 'DMs these people when someone requests leave, a clock amendment or a shift cover, and again once it has been approved or rejected. Pick as many as you like; with none selected nothing is sent (the request itself still goes through).',
+    'approval_user'            => 'Recipients (multiple)',
+    'approval_user_hint'       => 'People marked "not bound" cannot receive messages — ask them to DM the bot once first.',
+    'approval_test'            => 'Send test',
+    'approval_test_hint'       => 'DMs a test message to the people selected above right away. These notices are event-driven, so earlier ones cannot be resent.',
+    'approval_events_title'    => 'What gets notified',
+    'approval_event_leave'     => 'Leave: on request, and on approval or rejection',
+    'approval_event_amendment' => 'Clock amendment: on request, and on approval or rejection',
+    'approval_event_cover'     => 'Shift cover: on request, when the covering colleague accepts or declines, and on approval or rejection',
+    'approval_swap_hint'       => 'Shift swaps are not included: a swap has no manager approval step — it takes effect as soon as the other colleague agrees, so there would be nothing to act on.',
     'attendance_personal_title' => 'Personal attendance report',
     'attendance_personal_desc'  => 'Every active staff member receives their own copy: late / early-leave / absence counts and minutes, clock-in amendments, leave dates, and total overtime. Anyone with no lateness, early leave or absence gets a word of encouragement instead. This is sent automatically and needs no configuration.',
     'attendance_leave_note'     => 'Each person gets one of three lines in the full report: perfect attendance (no lateness, early leave or absence, and no leave taken), on leave (how much leave, plus "otherwise clean"), or issues (counts and minutes). Approved leave is not a problem, but it is not perfect attendance either.',
@@ -209,6 +222,13 @@ return [
         'attendance_test_no_user'   => 'Select recipients and save first',
         'attendance_test_not_bound' => 'None of the selected people have DMed the bot yet, so they cannot receive messages',
         'attendance_test_failed'    => 'Send failed, please check the bot is not blocked',
+
+        'approval_user_not_found' => 'Account not found',
+        'approval_test_sent'      => 'Test message sent (:sent). Please check Telegram.',
+        'approval_test_partial'   => 'Sent :sent, but these did not receive it: :failed (ask them to DM the bot once first)',
+        'approval_test_no_user'   => 'Please select recipients and save first',
+        'approval_test_not_bound' => 'None of the selected people have DMed the bot yet, so they cannot receive messages',
+        'approval_test_failed'    => 'Send failed, please check the bot is not blocked',
 
         // Topics
         'topic_too_many'       => 'Too many topics',

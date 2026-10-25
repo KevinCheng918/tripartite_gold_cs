@@ -133,7 +133,17 @@
                                         @if(filled($leave))
                                             <span class="badge bg-info">{{ trans('attendance.status_on_leave') }}</span>
                                         @else
-                                            <span class="badge bg-secondary">{{ trans('attendance.status_day_off') }}</span>
+                                            {{--
+                                                ⚠ **只有固定班才有「休假」**（需求方 2026-10-26）。
+                                                輪班的人沒有固定的休假日，也不放國定假日 ——
+                                                那天沒有紀錄只代表「這天沒排到班」。
+                                                一律標「休假」會讓人以為他那天本來就該休。
+                                            --}}
+                                            @if(filled($targetUser) && $targetUser->isFixedWorkMode())
+                                                <span class="badge bg-secondary">{{ trans('attendance.status_day_off') }}</span>
+                                            @else
+                                                <span class="badge bg-light text-muted">{{ trans('attendance.status_no_shift') }}</span>
+                                            @endif
                                         @endif
                                     </td>
                                     <td>

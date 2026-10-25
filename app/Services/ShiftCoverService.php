@@ -6,6 +6,7 @@ use App\Models\ShiftCover;
 use App\Repositories\ShiftAssignmentRepository;
 use App\Repositories\ShiftCoverRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -19,13 +20,21 @@ class ShiftCoverService
 {
     private $coverRepository;
     private $assignmentRepository;
+    private $approvalNotice;
 
     public function __construct(
         ShiftCoverRepository $coverRepository,
-        ShiftAssignmentRepository $assignmentRepository
+        ShiftAssignmentRepository $assignmentRepository,
+        ApprovalNoticeService $approvalNotice
     ) {
         $this->coverRepository = $coverRepository;
         $this->assignmentRepository = $assignmentRepository;
+        /*
+         * 代班有**三個**時間點要通知主管：申請、代班人回應、主管審核。
+         * 代班人沒同意之前 `respondByAdmin()` 會擋，所以「代班人同意了」
+         * 那一則就是「輪到您審了」的信號。
+         */
+        $this->approvalNotice = $approvalNotice;
     }
 
     /**
@@ -70,18 +79,22 @@ class ShiftCoverService
             ]);
         }
 
-        return DB::transaction(function () use ($params, $requesterId) {
+        $cover = DB::transaction(function () use ($params, $requesterId) {
             return $this->coverRepository->create([
                 'assignment_id'    => $params['assignment_id'],
                 'requester_id'     => $requesterId,
                 'cover_user_id'    => $params['cover_user_id'],
                 'cover_start'      => $params['cover_start'],
                 'cover_end'        => $params['cover_end'],
-                'reason'           => $params['reason'] ?? null,
+                'reason'           => Arr::get($params, 'reason'),
                 'cover_user_status' => ShiftCover::STATUS_PENDING,
                 'admin_status'      => ShiftCover::STATUS_PENDING,
             ]);
         });
+
+        $this->approvalNotice->coverApplied($cover);
+
+        return $cover;
     }
 
     /**
@@ -107,12 +120,16 @@ class ShiftCoverService
             ]);
         }
 
-        return DB::transaction(function () use ($cover, $status) {
+        $updated = DB::transaction(function () use ($cover, $status) {
             return $this->coverRepository->update($cover, [
                 'cover_user_status'       => $status,
                 'cover_user_responded_at' => now(),
             ]);
         });
+
+        $this->approvalNotice->coverResponded($updated, $status);
+
+        return $updated;
     }
 
     /**
@@ -139,13 +156,17 @@ class ShiftCoverService
             ]);
         }
 
-        return DB::transaction(function () use ($cover, $status, $adminId) {
+        $updated = DB::transaction(function () use ($cover, $status, $adminId) {
             return $this->coverRepository->update($cover, [
                 'admin_status'       => $status,
                 'admin_id'           => $adminId,
                 'admin_responded_at' => now(),
             ]);
         });
+
+        $this->approvalNotice->coverReviewed($updated, $status);
+
+        return $updated;
     }
 
     /**

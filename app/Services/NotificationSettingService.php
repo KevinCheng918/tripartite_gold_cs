@@ -39,6 +39,7 @@ class NotificationSettingService
     private $remindReport;
     private $taskNotice;
     private $attendanceReport;
+    private $approvalNotice;
 
     public function __construct(
         AppSettingService $appSettingService,
@@ -50,7 +51,8 @@ class NotificationSettingService
         ShiftNoticeService $shiftNotice,
         RemindReportService $remindReport,
         TaskNoticeService $taskNotice,
-        AttendanceReportService $attendanceReport
+        AttendanceReportService $attendanceReport,
+        ApprovalNoticeService $approvalNotice
     ) {
         $this->appSettingService = $appSettingService;
         $this->stationRepository = $stationRepository;
@@ -62,6 +64,8 @@ class NotificationSettingService
         $this->remindReport = $remindReport;
         $this->taskNotice = $taskNotice;
         $this->attendanceReport = $attendanceReport;
+        // 測試發送要借它組內容與送出
+        $this->approvalNotice = $approvalNotice;
     }
 
     /**
@@ -86,6 +90,10 @@ class NotificationSettingService
                 // ⚠ 這兩個只是給人看的字，真正的排程時間在 Console\Kernel
                 'weekly_at'  => (string) config('constants.ATTENDANCE_REPORT.WEEKLY_SEND_AT'),
                 'monthly_at' => (string) config('constants.ATTENDANCE_REPORT.MONTHLY_SEND_AT'),
+            ],
+            // 有人申請／有人審核時的私訊（需求方 2026-10-26）
+            'approval' => [
+                'user_ids' => $this->appSettingService->getIntList(AppSettingService::KEY_APPROVAL_NOTICE_MANAGER),
             ],
             'followup' => $this->followupSection(),
             'options' => [
@@ -463,6 +471,39 @@ class NotificationSettingService
             $this->appSettingService->idListValue(Arr::get($params, 'attendance_report_user_ids', [])),
             $userId
         );
+    }
+
+    /**
+     * 存「有人申請／有人審核」的私訊收件人
+     *
+     * ⚠ **跟其他幾份名單分開**：那幾份是定時報表的收件人，這一份是
+     * 「有人在等你審」—— 收件人往往不同，混在一起的話，想收報表但不審申請的人
+     * 就沒辦法只關掉其中一邊。
+     *
+     * @param array    $params
+     * @param int|null $userId
+     * @return void
+     */
+    public function updateApproval($params, $userId = null)
+    {
+        $this->appSettingService->put(
+            AppSettingService::KEY_APPROVAL_NOTICE_MANAGER,
+            $this->appSettingService->idListValue(Arr::get($params, 'approval_notice_user_ids', [])),
+            $userId
+        );
+    }
+
+    /**
+     * 申請通知的測試發送
+     *
+     * ⚠ 這種通知是**事件觸發**的，沒辦法像報表那樣「補發昨天那一份」——
+     * 所以測試發的是一則說明用的訊息，確認的是「這份名單收不收得到」。
+     *
+     * @return array
+     */
+    public function testApproval()
+    {
+        return $this->approvalNotice->test();
     }
 
     /**

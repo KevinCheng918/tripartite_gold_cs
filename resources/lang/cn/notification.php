@@ -13,6 +13,7 @@ return [
     'tab_report' => '超时提醒统计',
     'tab_task'   => '任务卡通知',
     'tab_attendance' => '打卡报表',
+    'tab_approval'   => '申请审核',
     'tab_followup'   => '待跟进事项',
 
     'select_all' => '全选',
@@ -105,6 +106,18 @@ return [
     'attendance_user_hint'      => '周报与月报共用这一份名单。标示「未绑定」的同事收不到讯息，请他先私讯机器人一次。勾选的人不会再另外收到个人版。',
     'attendance_test'           => '测试发送',
     'attendance_test_hint'      => '会立刻把上周的完整报表私讯给上面勾选的人。只发完整版，不会打扰其他同事。',
+
+    'approval_title'           => '申请审核通知收件人',
+    'approval_desc'            => '有人申请请假、补打卡、代班时立刻私讯通知；审核完（不管通过或拒绝）再通知一次。可以勾多位，没勾任何人时不会发送（申请本身照样成立）。',
+    'approval_user'            => '收件人（可多选）',
+    'approval_user_hint'       => '标示「未绑定」的同事收不到讯息，请他先私讯机器人一次。',
+    'approval_test'            => '测试发送',
+    'approval_test_hint'       => '会立刻私讯一则测试讯息给上面勾选的人。这种通知是有人申请时才触发的，没办法补发先前的。',
+    'approval_events_title'    => '会通知哪些事',
+    'approval_event_leave'     => '请假：申请时、审核通过或拒绝时',
+    'approval_event_amendment' => '补打卡：申请时、审核通过或拒绝时',
+    'approval_event_cover'     => '代班：申请时、代班人同意或拒绝时、主管核准或驳回时',
+    'approval_swap_hint'       => '换班不在通知范围内：换班没有主管审核那一关，被换的同事答应就直接生效，通知了也没有需要处理的事。',
     'attendance_personal_title' => '个人打卡报表',
     'attendance_personal_desc'  => '每位在职同事都会各自收到自己的那一份：迟到、早退、旷工的次数与时间，补打卡次数，请假几号到几号，加班总时数。没有迟到、早退、旷工的人收到的是一句勉励的话。这部分自动发送，不需要设定。',
     'attendance_leave_note'     => '完整版每人一行分三种：全勤（没有迟到早退旷工，而且没请假）、有请假（报请假多久 + 其余无状况）、有状况（报次数与时间）。请假不算出状况，但也不算全勤。',
@@ -209,6 +222,13 @@ return [
         'attendance_test_no_user'   => '请先勾选收件人并储存',
         'attendance_test_not_bound' => '勾选的同事都还没私讯过机器人，所以收不到讯息',
         'attendance_test_failed'    => '发送失败，请确认同事没有屏蔽机器人',
+
+        'approval_user_not_found' => '找不到这个账号',
+        'approval_test_sent'      => '测试讯息已送出 :sent 则，请确认 Telegram 有收到',
+        'approval_test_partial'   => '已送出 :sent 则，但这几位没收到：:failed（请他们先私讯机器人一次）',
+        'approval_test_no_user'   => '请先勾选收件人并储存',
+        'approval_test_not_bound' => '勾选的同事都还没私讯过机器人，所以收不到讯息',
+        'approval_test_failed'    => '发送失败，请确认同事没有屏蔽机器人',
 
         // 话题
         'topic_too_many'       => '话题数量超过上限',

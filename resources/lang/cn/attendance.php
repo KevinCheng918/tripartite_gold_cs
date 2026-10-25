@@ -20,6 +20,7 @@ return [
     'status_absent'      => '旷工',
     'status_on_leave'    => '请假',
     'status_day_off'     => '休假',
+    'status_no_shift'    => '未排班',
 
     'field_date'         => '日期',
     'field_clock_in'     => '上班打卡',

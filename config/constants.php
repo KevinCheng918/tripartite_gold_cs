@@ -3680,6 +3680,102 @@ return [
     ],
 
     /*
+     * 申請／審核的私訊通知（需求方 2026-10-26）。
+     *
+     * 有人申請請假、補打卡、代班時私訊主管；審核之後（不管通過或拒絕）再發一則。
+     *
+     * ⚠ **換班不在內**（需求方決定）：換班沒有主管審核那一關 ——
+     * 被換的同仁答應就直接生效，主管收到也不能做什麼。
+     * 判準是「主管要不要處理」，不是「有沒有人提出申請」。
+     *
+     * ⚠ **代班有三則**：申請、代班人回應、主管審核。代班人沒同意之前主管按不了
+     * （`respondByAdmin()` 會擋），所以「代班人同意了」那一則就是
+     * 「輪到您審了」的信號 —— 少了它，主管收到申請通知之後就是一片寂靜。
+     *
+     * ⚠ 收件人**用通知設定頁的名單**，不是用職級篩（需求方決定）。
+     * 跟班表／任務／打卡報表各自一份名單是同一個做法。
+     */
+    'APPROVAL_NOTICE' => [
+        'LEAVE_APPLIED' => "📝 <b>請假申請</b>\n"
+            . "{name} 申請請假\n"
+            . "期間：{period}\n"
+            . "{reason}"
+            . '→ 請到「排班管理 → 請假申請」審核',
+
+        'LEAVE_REVIEWED' => "📝 <b>請假{result}</b>\n"
+            . "{reviewer} {result} {name} 的請假申請\n"
+            . "期間：{period}\n"
+            . '{note}',
+
+        'AMENDMENT_APPLIED' => "⏰ <b>補打卡申請</b>\n"
+            . "{name} 申請補打卡\n"
+            . "{date} {type} {time}\n"
+            . "{reason}"
+            . '→ 請到「打卡出勤 → 補打卡申請」審核',
+
+        'AMENDMENT_REVIEWED' => "⏰ <b>補打卡{result}</b>\n"
+            . "{reviewer} {result} {name} 的補打卡申請\n"
+            . '{date} {type} {time}',
+
+        'COVER_APPLIED' => "🔁 <b>代班申請</b>\n"
+            . "{name} 申請代班，請 {cover} 代\n"
+            . "時間：{period}\n"
+            . "{reason}"
+            . '→ 等待代班人回應',
+
+        /*
+         * ⚠ 同意與拒絕要講不同的下一步：同意是「換你審了」，
+         * 拒絕是「這筆結束了」—— 只寫「已回應」會讓主管還要自己去查狀態。
+         */
+        'COVER_RESPONDED' => "🔁 <b>代班人{result}</b>\n"
+            . "{cover} {result}代 {name} 的班\n"
+            . "時間：{period}\n"
+            . '{next}',
+
+        'COVER_NEXT_APPROVED' => '→ 輪到您審核了（排班管理 → 代班申請）',
+        'COVER_NEXT_REJECTED' => '→ 這筆代班申請到此結束，不需要審核',
+
+        'COVER_REVIEWED' => "🔁 <b>代班{result}</b>\n"
+            . "{reviewer} {result} {name} 的代班申請（由 {cover} 代）\n"
+            . '時間：{period}',
+
+        // 「通過／拒絕」兩種結果的字眼，各流程講法不同
+        'RESULT' => [
+            'leave' => [
+                'approved' => '已通過',
+                'rejected' => '已拒絕',
+            ],
+            'amendment' => [
+                'approved' => '已通過',
+                'rejected' => '已拒絕',
+            ],
+            'cover_user' => [
+                'approved' => '同意',
+                'rejected' => '拒絕',
+            ],
+            'cover_admin' => [
+                'approved' => '已核准',
+                'rejected' => '已駁回',
+            ],
+        ],
+
+        // 原因／備註沒填就整行不印（印「原因：（無）」只是佔位）
+        'REASON_LINE' => "原因：{reason}\n",
+        'NOTE_LINE'   => "備註：{note}\n",
+
+        // 補打卡的上下班
+        'AMENDMENT_TYPE' => [
+            1 => '上班卡',
+            2 => '下班卡',
+        ],
+
+        // 測試發送用的內容
+        'TEST_TEXT' => "📝 <b>申請通知測試</b>\n"
+            . "這是「通訊管理 → 通知設定 → 申請審核」的測試訊息。\n"
+            . '收得到這則，表示有人申請請假／補打卡／代班時您也收得到。',
+    ],
+
+    /*
      * 私訊通知的種類。
      *
      * 帳號管理可以逐個帳號關掉這幾種（`user_notice_mute`，有列＝關掉）。

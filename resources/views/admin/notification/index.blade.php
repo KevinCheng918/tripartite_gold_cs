@@ -46,6 +46,11 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#tab-approval" role="tab">
+                    <i class="fas fa-clipboard-check me-1"></i>{{ trans('notification.tab_approval') }}
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link" data-bs-toggle="tab" href="#tab-followup" role="tab">
                     <i class="fas fa-hourglass-half me-1"></i>{{ trans('notification.tab_followup') }}
                 </a>
@@ -373,6 +378,54 @@
             </div>
 
             {{-- ============ 分頁七：待追蹤事項 ============ --}}
+            {{-- 有人申請／有人審核時的私訊（需求方 2026-10-26） --}}
+            <div class="tab-pane fade" id="tab-approval" role="tabpanel">
+                <div class="row">
+                    <div class="col-lg-7">
+                        <div class="main-card mb-3 card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ trans('notification.approval_title') }}</h5>
+                                <p class="text-muted" style="font-size:0.875rem">{{ trans('notification.approval_desc') }}</p>
+                                <form id="form-approval">
+                                    <div class="mb-3">
+                                        <div class="d-flex align-items-center justify-content-between mb-2">
+                                            <label class="form-label mb-0">{{ trans('notification.approval_user') }}</label>
+                                            <div class="form-check mb-0">
+                                                <input class="form-check-input" type="checkbox" id="approval-user-all">
+                                                <label class="form-check-label" for="approval-user-all">{{ trans('notification.select_all') }}</label>
+                                            </div>
+                                        </div>
+                                        <div id="approval-user-list" class="notice-check-list p-2"></div>
+                                        <small class="form-text text-muted">{{ trans('notification.approval_user_hint') }}</small>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary js-manage-only">{{ trans('notification.action_save') }}</button>
+                                    <button type="button" class="btn btn-outline-secondary js-manage-only" id="btn-test-approval">{{ trans('notification.approval_test') }}</button>
+                                    <div class="form-text mt-2">{{ trans('notification.approval_test_hint') }}</div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- 會通知哪些事（純說明） --}}
+                    <div class="col-lg-5">
+                        <div class="main-card mb-3 card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ trans('notification.approval_events_title') }}</h5>
+                                <ul class="text-muted mb-0" style="font-size:0.875rem">
+                                    <li>{{ trans('notification.approval_event_leave') }}</li>
+                                    <li>{{ trans('notification.approval_event_amendment') }}</li>
+                                    <li>{{ trans('notification.approval_event_cover') }}</li>
+                                </ul>
+                                <hr>
+                                <p class="text-muted mb-0" style="font-size:0.875rem">
+                                    {{ trans('notification.approval_swap_hint') }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="tab-pane fade" id="tab-followup" role="tabpanel">
                 <div class="row">
                     <div class="col-lg-7">
