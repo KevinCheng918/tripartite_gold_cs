@@ -255,6 +255,73 @@ class TelegramChatService
     }
 
     /**
+     * 群組升級成 supergroup 時，把既有那一筆的 chat_id 換過去
+     *
+     * ⚠ **不換的話同一個群組會在對話列表出現兩次**（2026-10-26 需求方回報）：
+     * 升級後 Telegram 給一個全新的 chat_id，`findGroupByChatId()` 查不到就
+     * 又建一筆，舊的那筆從此不再有訊息、停在升級前的時間。
+     *
+     * Telegram 兩邊都會給線索，所以兩個都收：
+     * - 舊群組的最後一則帶 `migrate_to_chat_id`（新 id）
+     * - 新群組的第一則帶 `migrate_from_chat_id`（舊 id）
+     *
+     * 哪一則先進來都處理得了。
+     *
+     * ⚠ **這裡可以自動改，跟支援群組設定不一樣**：那邊的 chat_id 是人填的，
+     * 自動換掉等於悄悄改掉使用者填的值（所以 `TelegramBotService` 只記 log
+     * 讓人自己貼）。這裡的群組是**收到訊息自動建的**，沒有人填過什麼。
+     *
+     * @param array      $message
+     * @param int|string $chatId 這則訊息所在的 chat_id
+     * @return void
+     */
+    private function migrateChatIdIfNeeded(array $message, $chatId)
+    {
+        $toChatId = Arr::get($message, 'migrate_to_chat_id');
+        $fromChatId = Arr::get($message, 'migrate_from_chat_id');
+
+        // 短路：絕大多數訊息兩個都沒有
+        if (blank($toChatId) && blank($fromChatId)) {
+            return;
+        }
+
+        // 在舊群組收到：這一筆要換成新 id。在新群組收到：舊那一筆要換成現在這個
+        $oldChatId = filled($toChatId) ? $chatId : $fromChatId;
+        $newChatId = filled($toChatId) ? $toChatId : $chatId;
+
+        $group = $this->telegramRepository->findGroupByChatId($oldChatId);
+
+        // 舊的那筆根本不在（例如 bot 是升級後才加進來的）—— 照正常流程建新的
+        if (blank($group)) {
+            return;
+        }
+
+        /*
+         * ⚠ 新 id 已經有一筆了 —— 就是「已經重複建出來」的情況。
+         * 這裡**不自動合併**：訊息、未讀狀態、站台綁定分散在 9 張表，
+         * 要在 webhook 這種每則訊息都會跑的地方做整併太危險。
+         * 記一筆 error 並交給 `telegram:merge-group` 指令處理。
+         */
+        if (filled($this->telegramRepository->findGroupByChatId($newChatId))) {
+            Log::error('⚠ Telegram 群組升級後出現重複的對話，請用指令合併', [
+                'old_chat_id' => $oldChatId,
+                'new_chat_id' => $newChatId,
+                'action'      => "php artisan telegram:merge-group {$oldChatId} {$newChatId}",
+            ]);
+
+            return;
+        }
+
+        $this->telegramRepository->updateGroup($group, ['chat_id' => $newChatId]);
+
+        Log::info('Telegram 群組已升級成 supergroup，chat_id 已更新', [
+            'group_id'    => $group->id,
+            'old_chat_id' => $oldChatId,
+            'new_chat_id' => $newChatId,
+        ]);
+    }
+
+    /**
      * 同仁私訊 bot —— 用驗證碼完成綁定
      *
      * ⚠ **2026-10-09 之前是「username 對得上就綁」**，已移除。那個做法只看一個
@@ -399,6 +466,16 @@ class TelegramChatService
         if (!filled($text) && !filled($mediaType)) {
             return;
         }
+
+        /*
+         * ⚠ **群組升級成 supergroup 時 chat_id 會換一個**，不處理的話同一個群組
+         * 會在對話列表出現兩次（2026-10-26 需求方回報）。
+         *
+         * 開啟「話題」功能就會觸發升級。送出端早就知道這件事
+         * （`TelegramBotService::logMigration()`），但收訊端沒有 ——
+         * 新 id 的第一則訊息進來時，`findGroupByChatId()` 查不到就**又建了一筆**。
+         */
+        $this->migrateChatIdIfNeeded($message, $chatId);
 
         // 找或建群組
         $group = $this->telegramRepository->findGroupByChatId($chatId);
