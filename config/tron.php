@@ -35,8 +35,18 @@ return [
      */
     'tx_url' => 'https://tronscan.org/#/transaction/',
 
-    // 錢包的轉帳紀錄頁 —— 截圖截的就是這一頁
-    'transfers_url' => 'https://tronscan.org/#/address/{address}/transfers',
+    /*
+     * ⚠ **沒有「錢包轉帳紀錄頁」的設定，是刻意的。**
+     *
+     * 原本想截 `tronscan.org/#/address/{地址}/transfers` 附在通知上，
+     * 但那個網域在 **Cloudflare 後面，一般請求直接回 403 挑戰頁**
+     * （實測 `server: cloudflare` ＋ `challenge-platform`）——
+     * headless Chrome 配機房 IP 幾乎過不了，而且挑戰頁上等不到表格，
+     * 會白等滿 30 秒逾時才放棄。需求方 2026-10-27 決定不附圖。
+     *
+     * ⚠ 這跟上面的 `api_base` **沒有關係**：資料是打 TronGrid 的 JSON API，
+     * 不是解析網頁，沒有機器人驗證的問題。
+     */
 
     /*
      * 一次最多拿幾筆。TronGrid 的上限就是 200。

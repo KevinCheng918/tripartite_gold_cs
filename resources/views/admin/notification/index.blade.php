@@ -544,7 +544,6 @@
                                 <ul class="text-muted mb-0" style="font-size:0.875rem">
                                     <li>{{ trans('notification.wallet_event_in') }}</li>
                                     <li>{{ trans('notification.wallet_event_out') }}</li>
-                                    <li>{{ trans('notification.wallet_event_shot') }}</li>
                                 </ul>
                                 <hr>
                                 {{-- ⚠ 要講明「第一次不會通知」，不然會被當成壞掉 --}}

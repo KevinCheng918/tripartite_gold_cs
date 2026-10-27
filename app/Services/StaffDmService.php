@@ -31,16 +31,6 @@ class StaffDmService
     /** @var string 跳過原因：Telegram 拒收（多半是被封鎖） */
     const SKIP_SEND_FAILED = 'send_failed';
 
-    /**
-     * 圖片說明文字的長度上限
-     *
-     * Telegram 的 caption 上限就是 1024 字元，超過整則會被拒收。
-     * 超過時寧可不附圖、改發純文字 —— 訊息送得出去比有沒有圖重要。
-     *
-     * @var int
-     */
-    const CAPTION_LIMIT = 1024;
-
     private $userRepository;
     private $botService;
     private $muteRepository;
@@ -75,12 +65,11 @@ class StaffDmService
      * ⚠ `reason` 只在**完全沒送出任何一則**時才有值 —— 有人收到就不算失敗，
      * 不然三個人裡一個沒綁定會讓整件事看起來沒發生。
      *
-     * @param array       $userIds
-     * @param string      $text
-     * @param string|null $imagePath 要附的圖（public disk 的相對路徑）；null 就只發文字
+     * @param array  $userIds
+     * @param string $text
      * @return array sent（送出幾則）/ reason / failed（沒收到的暱稱）/ names（收到的暱稱）
      */
-    public function sendToUserIds($userIds, $text, $imagePath = null)
+    public function sendToUserIds($userIds, $text)
     {
         $userIds = array_values(array_filter((array) $userIds));
 
@@ -116,7 +105,7 @@ class StaffDmService
                 continue;
             }
 
-            if ($this->send($user, $text, null, $imagePath)) {
+            if ($this->send($user, $text)) {
                 $sent++;
                 $names[] = $user->nickname;
 
@@ -178,10 +167,9 @@ class StaffDmService
      * @param object      $user
      * @param string      $text
      * @param string|null $noticeKey constants.NOTICE.PERSONAL 的值；null＝不受靜音設定管
-     * @param string|null $imagePath 要附的圖（public disk 的相對路徑）；null 就只發文字
      * @return bool
      */
-    public function send($user, $text, $noticeKey = null, $imagePath = null)
+    public function send($user, $text, $noticeKey = null)
     {
         if (blank($user) || !$this->canDm($user)) {
             return false;
@@ -204,26 +192,7 @@ class StaffDmService
         }
 
         try {
-            /*
-             * 有圖就走 sendPhoto，文字當 caption。
-             *
-             * ⚠ **caption 上限 1024 字元**，超過 Telegram 會整則拒收 ——
-             * 所以太長的文字寧可不附圖、改發純文字，也不要訊息發不出去。
-             * `sendPhoto()` 自己還會處理「截圖太長不符 photo 規格」那一種，
-             * 改以檔案送出。
-             */
-            $withPhoto = filled($imagePath) && mb_strlen($text) <= self::CAPTION_LIMIT;
-
-            if (filled($imagePath) && !$withPhoto) {
-                Log::info('私訊內容超過 caption 上限，改發純文字不附圖', [
-                    'user_id' => $user->id,
-                    'length'  => mb_strlen($text),
-                ]);
-            }
-
-            $result = $withPhoto
-                ? $this->botService->sendPhoto($user->telegram_user_id, $imagePath, $text)
-                : $this->botService->sendMessage($user->telegram_user_id, $text);
+            $result = $this->botService->sendMessage($user->telegram_user_id, $text);
 
             if (filled(Arr::get((array) $result, 'result'))) {
                 return true;

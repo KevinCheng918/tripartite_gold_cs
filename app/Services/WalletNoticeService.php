@@ -12,13 +12,20 @@ use Illuminate\Support\Facades\Log;
  *
  * 需求方 2026-10-27：「當我的錢包有轉帳進來或轉出就要通知，**只有通知就好，
  * 不用做任何動作**，通知要包含時間、交易 hash、From、to、金額、幣別。」
- * 後續補充：通知要附一張轉帳紀錄頁的截圖。
  *
  * ⚠ **純通知**：不自動對帳、不碰補點審核、不動任何點數。
  *
+ * ⚠ **不附截圖**（需求方 2026-10-27 決定）。原本想截
+ * `tronscan.org/#/address/{地址}/transfers` 附上去，但那個網域在
+ * **Cloudflare 後面，一般請求直接回 403 挑戰頁** —— headless Chrome 配機房 IP
+ * 幾乎過不了，而且挑戰頁上等不到 `table`，會白等滿 30 秒逾時才放棄：
+ * 每一輪有東西要通知就多 30 秒，錢包一多就超過排程間隔。
+ *
+ * ⚠ 這跟資料來源**沒有關係**：交易紀錄是打 TronGrid 的 JSON API，
+ * 不是解析網頁，沒有機器人驗證的問題。
+ *
  * ⚠ **這支決定「要不要發、發什麼」**，拿資料走 `TronGridService`、
- * 送出走 `StaffDmService`、截圖走 `ScreenshotService` ——
- * 跟 `FinanceNoticeService` 同一個分工。
+ * 送出走 `StaffDmService` —— 跟 `FinanceNoticeService` 同一個分工。
  */
 class WalletNoticeService
 {
@@ -51,22 +58,18 @@ class WalletNoticeService
     private $tronGrid;
     private $transferRepository;
     private $staffDm;
-    private $screenshotService;
 
     public function __construct(
         AppSettingService $appSettingService,
         TronGridService $tronGrid,
         WalletTransferRepository $transferRepository,
-        StaffDmService $staffDm,
-        ScreenshotService $screenshotService
+        StaffDmService $staffDm
     ) {
         // 錢包清單、收件人、金額門檻都在通知設定頁維護
         $this->appSettingService = $appSettingService;
         $this->tronGrid = $tronGrid;
         $this->transferRepository = $transferRepository;
         $this->staffDm = $staffDm;
-        // 截不到圖就只發文字，理由見 captureTransfersPage()
-        $this->screenshotService = $screenshotService;
     }
 
     /**
@@ -328,26 +331,15 @@ class WalletNoticeService
             $previews[] = $this->buildText($transfer, $label);
         }
 
-        // 空跑：只把會發什麼印出來，不截圖也不送出
+        // 空跑：只把會發什麼印出來，不送出
         if (Arr::get($params, 'dry_run')) {
             return $this->result($address, $label, 0, 0, null, $previews);
         }
 
-        /*
-         * ⚠ **確定有東西要發才截圖**。截一張要跑一次 headless Chrome（約 10 秒），
-         * 而這支每分鐘跑一次、絕大多數輪是沒事做的 —— 不先判斷的話
-         * 一天會白跑 1400 次 Chrome。
-         */
-        $shot = $this->captureTransfersPage($address);
         $sent = 0;
 
-        foreach ($pending as $index => $transfer) {
-            /*
-             * ⚠ 圖只附在**第一則**。截的是「這個錢包的轉帳紀錄頁」，
-             * 是整輪共用的脈絡；每一則都附同一張只是洗版。
-             */
-            $image = ($index === 0) ? $shot : null;
-            $result = $this->staffDm->sendToUserIds($userIds, $this->buildText($transfer, $label), $image);
+        foreach ($pending as $transfer) {
+            $result = $this->staffDm->sendToUserIds($userIds, $this->buildText($transfer, $label));
 
             if ((int) Arr::get($result, 'sent') < 1) {
                 // 沒送出去就不標記 —— 下一輪會從 getPending() 再撈到它
@@ -358,53 +350,13 @@ class WalletNoticeService
             $sent++;
         }
 
-        /*
-         * 截圖只是為了送出去，送完就沒用了 —— 不刪的話 public 會一直長大。
-         * 放在迴圈外：裡面刪掉的話第二則之後就找不到檔案了（雖然用不到，
-         * 但 sendPhoto 失敗重試時會）。
-         */
-        $this->screenshotService->forget($shot);
-
         Log::info('錢包轉帳通知已送出', [
             'address' => $address,
             'sent'    => $sent,
             'pending' => count($pending),
-            'shot'    => filled($shot),
         ]);
 
         return $this->result($address, $label, $sent, count($pending) - $sent, null, $previews);
-    }
-
-    /**
-     * 截一張這個錢包的轉帳紀錄頁
-     *
-     * ⚠ **截不到就回 null，照樣發純文字**（需求方 2026-10-27 選的）。
-     * 開發機（arm64 的 Docker）沒有官方 Chrome，本來就截不了；
-     * 而「錢動了」這件事比有沒有截圖重要得多。
-     *
-     * @param string $address
-     * @return string|null public disk 的相對路徑
-     */
-    private function captureTransfersPage($address)
-    {
-        // 短路：這台機器沒有 Chrome 就不必走進去
-        if (!$this->screenshotService->isAvailable()) {
-            return null;
-        }
-
-        $url = str_replace('{address}', $address, (string) config('tron.transfers_url'));
-
-        return $this->screenshotService->capture($url, [
-            'prefix' => 'wallet',
-            /*
-             * tronscan 是 SPA，表格是後來才用 XHR 撈回來的 ——
-             * 不等的話會截到一片空白的骨架。
-             */
-            'wait_selector' => 'table',
-            'settle_ms'     => 2000,
-            'width'         => 1440,
-            'height'        => 900,
-        ]);
     }
 
     /**

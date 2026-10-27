@@ -11,7 +11,7 @@ use Illuminate\Support\Arr;
  *
  * 排程每分鐘跑一次（見 Console\Kernel）。
  *
- * 手動驗證用 --dry-run：印出「會發哪幾則、長什麼樣」但不送出、也不截圖，
+ * 手動驗證用 --dry-run：印出「會發哪幾則、長什麼樣」但不送出，
  * 否則要驗這支只能等真的有人轉帳。--address 可以只跑一個錢包。
  *
  * ⚠ --dry-run **仍然會寫資料庫**（鏈上資料照樣記一筆），只是不發通知。
@@ -21,7 +21,7 @@ use Illuminate\Support\Arr;
 class WatchWalletTransferCommand extends Command
 {
     protected $signature = 'wallet:watch-transfers
-        {--dry-run : 只印出會發什麼，不送出也不截圖（鏈上資料照樣記）}
+        {--dry-run : 只印出會發什麼，不送出（鏈上資料照樣記）}
         {--address= : 只處理這一個錢包地址}';
 
     protected $description = '查錢包有沒有新的 TRC20 轉帳，有就私訊通知';
@@ -52,7 +52,7 @@ class WatchWalletTransferCommand extends Command
         $dryRun = (bool) $this->option('dry-run');
 
         if ($dryRun) {
-            $this->warn('── 空跑模式：不會送出任何訊息，也不會截圖（鏈上資料照樣記一筆）──');
+            $this->warn('── 空跑模式：不會送出任何訊息（鏈上資料照樣記一筆）──');
         }
 
         $results = $this->noticeService->run([

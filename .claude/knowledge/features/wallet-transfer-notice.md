@@ -4,10 +4,8 @@
 > 通知設定做一個通知，當我的錢包有轉帳進來或轉出就要通知，**只有通知就好，
 > 不用做任何動作**，通知要包含時間、交易 hash、From、to、金額、幣別。」
 >
-> 補充：「我現在可以截圖，我發出通知時要附圖。」
->
-> 六題裁示：**私訊名單**／**設最低金額門檻**／**所有 TRC20 代幣**／
-> **每分鐘**／**截轉帳紀錄頁、每輪每個錢包一張**／**截不到就發純文字**。
+> 五題裁示：**私訊名單**／**設最低金額門檻**／**所有 TRC20 代幣**／
+> **每分鐘**／**不附圖，只發文字**。
 
 ## ⚠ 資料來源是 TronGrid，不是 tronscan.org 那一頁
 
@@ -149,26 +147,43 @@ tronscan 的交易頁沒有 query string 所以沒事，日後換別的網址要
 錯的地址。沒有門檻的話通知會被這種洗版。預設門檻 1 USDT，
 而且**低於門檻的仍然寫進資料表** —— 事後要查「那天到底有沒有這筆」查得到。
 
-## 截圖
+## ⚠ 為什麼不附截圖（做過又拿掉）
 
-走既有的 `ScreenshotService`（報價那邊在用），截
-`tronscan.org/#/address/{地址}/transfers`。
+一度做成「每輪每個錢包截一張 `tronscan.org/#/address/{地址}/transfers`
+附在第一則」。**需求方 2026-10-27 一句話點破：「應該會有問題，會有機器人
+驗證阻擋。」** 實測確認：
 
-⚠ **確定有東西要發才截圖**。一張要跑一次 headless Chrome（約 10 秒），
-而這支每分鐘跑一次、絕大多數輪是沒事做的 —— 不先判斷的話一天白跑 1400 次。
+```
+$ curl -A '<一般瀏覽器 UA>' https://tronscan.org/
+HTTP 403    server: cloudflare    cf-ray: …
+頁面內容：challenge-platform / cloudflare
+```
 
-⚠ **圖只附第一則**。截的是「這個錢包的轉帳紀錄頁」，是整輪共用的脈絡；
-每一則都附同一張只是洗版。
+tronscan 整站在 **Cloudflare 後面，直接回 403 挑戰頁**。
+headless Chrome 配機房 IP 幾乎過不了。
 
-⚠ **截不到就發純文字**（需求方選的）。開發機（arm64 的 Docker）沒有官方
-Chrome，本來就截不了 —— 而「錢動了」比有沒有圖重要得多。
+⚠ **真正的代價不是「沒有圖」，是「每輪多 30 秒」**：挑戰頁上等不到
+`wait_selector` 指定的 `table`，會白等滿 `ScreenshotService::WAIT_TIMEOUT`
+（30 秒）才放棄。排程每分鐘一次，三個錢包就是 90 秒 ——
+比間隔還長，`withoutOverlapping` 會開始擋掉下一輪，通知跟著延遲。
 
-⚠ tronscan 是 SPA，表格是 XHR 撈回來的，所以 `wait_selector => 'table'`
-再加 `settle_ms`。不等的話會截到一片空白的骨架。
+⚠ **這跟資料來源沒有關係**，兩條路徑完全分開：
 
-⚠ `StaffDmService` 原本只能送文字，這次加了 `$imagePath`。
-**caption 上限 1024 字元**，超過 Telegram 會整則拒收 ——
-所以太長時寧可不附圖改發純文字，不要讓訊息發不出去。
+| | 走哪裡 | 會不會被擋 |
+|---|---|---|
+| 交易資料 | TronGrid 的 **JSON API** | ❌ 不是爬蟲，不會 |
+| 截圖（已移除） | 用瀏覽器開 **tronscan 網頁** | ✅ Cloudflare 403 |
+
+⚠ **既有的 MAX 匯率截圖能過不代表這個也能過**：MAX 只擋純 HTTP 請求
+（`config/constants.php` 的註解寫了「MAX 對一般 HTTP 請求一律回 403」），
+沒有 JS 挑戰；Cloudflare 的 challenge-platform 是另一回事。
+
+拿掉之後一併還原的東西：`StaffDmService` 的 `$imagePath`／`CAPTION_LIMIT`
+（整個功能只有這裡在用，留著就是死碼）、`config/tron.php` 的
+`transfers_url`。`ScreenshotService` 回到只有報價在用。
+
+⚠ 要補回「看完整紀錄」的脈絡，靠的是訊息最後那個可點的 Tronscan 連結 ——
+**讓人點過去看**，而不是我們替他截。
 
 ## 設定（通知設定頁「錢包轉帳」分頁）
 
@@ -195,10 +210,9 @@ Chrome，本來就截不了 —— 而「錢動了」比有沒有圖重要得多
 | `app/Models/WalletTransfer.php` | **新增**。`DIRECTION_*`／`SKIP_*` |
 | `app/Repositories/WalletTransferRepository.php` | **新增** |
 | `app/Services/TronGridService.php` | **新增**。只負責拿資料與換算，不決定要不要發 |
-| `app/Services/WalletNoticeService.php` | **新增**。判斷、組訊息、截圖、送出 |
+| `app/Services/WalletNoticeService.php` | **新增**。判斷、組訊息、送出 |
 | `app/Console/Commands/WatchWalletTransferCommand.php` | **新增**。`wallet:watch-transfers` |
 | `app/Console/Kernel.php` | 每分鐘 ＋ `withoutOverlapping` |
-| `app/Services/StaffDmService.php` | `sendToUserIds()`／`send()` 多收 `$imagePath` |
 | `app/Services/AppSettingService.php`／`NotificationSettingService.php` | 四個 key ＋ 讀寫 ＋ 測試發送 |
 | `app/Http/Requests/Notification/UpdateWalletNoticeRequest.php` | **新增** |
 | `app/Http/Controllers/Admin/NotificationController.php`／`routes/web.php` | 兩支路由（`can:notification.manage`，**沒有新權限**）|
@@ -209,39 +223,40 @@ Chrome，本來就截不了 —— 而「錢動了」比有沒有圖重要得多
 
 ## 驗證
 
-**53 種情境**（TronGrid／StaffDm／Screenshot／Repository 全部假物件，
-不碰 DB、不打外網、不開 Chrome）：
+**57 種情境**（TronGrid／StaffDm／Repository 全部假物件，不碰 DB、不打外網）：
 
 - 金額換算 7 種：6 位、18 位、位數不足要左補 0、超過 float 精度的大數、
   `0.000001`、沒有小數位、null
 - 地址驗證 5 種：正確、空、少一碼、不是 T 開頭、含 base58 不收的 `0`
-- 第一輪只建立基準（不發、不截圖、全部標 baseline）
+- 第一輪只建立基準（不發、全部標 baseline）
 - 第二輪：轉入／轉出分得開、灰塵被擋但有留紀錄、千分位、尾零砍掉、
-  幣別／From／To／完整 hash／tronscan 連結都在、**圖只附第一則**、
-  截一次、用完刪掉
+  幣別／From／To／完整 hash／tronscan 連結都在
 - 重跑一輪不重發；送失敗不標記、下一輪補發出去
 - 自己轉自己不通知且標成 `self`
-- 短路：沒開／沒設錢包都不打 API；沒收件人不發也不截圖
+- 短路：沒開／沒設錢包都不打 API；沒收件人不發
 - 地址格式不對、API 掛掉（null）兩種都認得出來，不會被當成「沒有轉帳」
-- 沒有 Chrome 照樣發純文字
 - 多錢包：兩個錢包都跑到、有備註印備註、**沒填備註退而印地址**
 - 去重**一輪只查一次 DB**（不是逐筆），而且撞到唯一索引時它後面那筆照樣寫得進去
 - 排版：長值自己一行、三段有空行、「← 本錢包」標在對的那一邊且在
   `</code>` 外面、跳脫後 `<a>`／`<code>`／`<b>` 都還在、網址沒被改掉
+- **截圖真的拿乾淨了**：服務不再相依 `ScreenshotService`、建構子剩四個相依、
+  `StaffDmService::sendToUserIds()` 回到兩個參數
 
 **真的打過 TronGrid**（唯讀，拿公開的幣安熱錢包）：
 一次拿回 200 筆、排序由舊到新、`from`／`to`／`hash`／`symbol` 都解得出來，
 而且其中就有 18 位小數的代幣（`1326495690.215502 WIN`）——
 正好是用 float 會爆掉的那一種。翻頁上限的警告也如預期出現。
 
-⚠ **沒有真的私訊過，也沒有真的截過圖**（開發機 arm64 沒有官方 Chrome）。
-要在通知設定頁按「測試發送」確認名單，截圖要到正式機才驗得到。
+**真的打過 tronscan.org**（唯讀）：確認回 403 ＋ Cloudflare 挑戰頁，
+這就是不截圖的依據。
+
+⚠ **沒有真的私訊過**。要在通知設定頁按「測試發送」確認名單收不收得到。
 
 ## 待釐清
 
 - 只有 TRC20，**不含 TRX 本幣**（手續費用的那個）。要的話是另一支 API。
 - 沒有歷史查詢頁（需求方：「只有通知就好」）。資料都在 `wallet_transfer`，
   日後要加不必重跑。
-- 多個錢包同時有轉帳時，截圖是逐個錢包各截一張。錢包很多又很頻繁的話，
-  一輪可能超過一分鐘（`withoutOverlapping` 會擋住下一輪）——
-  真的發生再考慮把截圖丟 queue。
+- 真的很想要圖的話，可行的做法是**用我們自己的資料在本機渲染一張卡片再截**
+  （沒有 Cloudflare、不會白等、版面自己控制），但那張圖不會是 tronscan
+  的畫面。目前沒做。
