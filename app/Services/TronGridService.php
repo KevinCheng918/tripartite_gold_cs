@@ -152,7 +152,8 @@ class TronGridService
             $headers['TRON-PRO-API-KEY'] = $apiKey;
         }
 
-        $url = rtrim((string) config('tron.api_base'), '/') . "/v1/accounts/{$address}/transactions/trc20";
+        $base = rtrim((string) config('tron.api_base'), '/');
+        $url = "{$base}/v1/accounts/{$address}/transactions/trc20";
 
         try {
             $response = $this->client->get($url, ['query' => $query, 'headers' => $headers]);

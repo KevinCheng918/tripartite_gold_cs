@@ -193,21 +193,41 @@ class WalletNoticeService
      */
     private function store($address, array $transfers, $isFirstRun)
     {
+        if (blank($transfers)) {
+            return [];
+        }
+
+        /*
+         * ⚠ **先一次問完「哪些已經記過了」**，不要逐筆去查。
+         * 建立基準那一輪會一口氣拿回 200 筆（翻頁上限內最多 1000 筆），
+         * 逐筆查就是 1000 次 SELECT。
+         */
+        $known = $this->transferRepository->existingHashes(
+            $address,
+            collect($transfers)->pluck('tx_hash')->all()
+        );
+
         $minAmount = $this->minAmount();
         $created = [];
 
         foreach ($transfers as $transfer) {
-            $direction = $this->direction($address, $transfer);
+            $hash = (string) Arr::get($transfer, 'tx_hash');
+
+            // 記過了就跳過 —— 不然重跑一輪會把舊的全部重發一次
+            if (array_key_exists($hash, $known)) {
+                continue;
+            }
 
             /*
              * 自己轉給自己（from 與 to 都是這個錢包）時 `direction()` 回 null。
              * 不是錯誤，但也沒有「進來還是出去」可言，記下來就好、不通知。
              */
+            $direction = $this->direction($address, $transfer);
             $skipReason = $this->skipReasonFor($isFirstRun, $direction, Arr::get($transfer, 'amount'), $minAmount);
 
-            [$record, $isNew] = $this->transferRepository->firstOrCreate([
+            $record = $this->transferRepository->create([
                 'address'          => $address,
-                'tx_hash'          => Arr::get($transfer, 'tx_hash'),
+                'tx_hash'          => $hash,
                 'direction'        => filled($direction) ? $direction : WalletTransfer::DIRECTION_IN,
                 'from_address'     => Arr::get($transfer, 'from'),
                 'to_address'       => Arr::get($transfer, 'to'),
@@ -218,7 +238,8 @@ class WalletNoticeService
                 'skip_reason'      => $skipReason,
             ]);
 
-            if ($isNew) {
+            // 撞到唯一索引（兩輪重疊）會回 null —— 當成已經有了，不要卡住整批
+            if (filled($record)) {
                 $created[] = $record;
             }
         }
@@ -397,6 +418,7 @@ class WalletNoticeService
     {
         $key = $transfer->isIncoming() ? 'TRANSFER_IN' : 'TRANSFER_OUT';
         $mark = (string) config('constants.WALLET_NOTICE.OWN_MARK');
+        $txBase = (string) config('tron.tx_url');
 
         return strtr((string) config("constants.WALLET_NOTICE.{$key}"), [
             '{label}'  => $this->walletLine($label, $transfer->address),
@@ -410,7 +432,7 @@ class WalletNoticeService
             '{from_mark}' => $transfer->isIncoming() ? '' : $mark,
             '{to_mark}'   => $transfer->isIncoming() ? $mark : '',
             '{hash}'   => (string) $transfer->tx_hash,
-            '{url}'    => (string) config('tron.tx_url') . $transfer->tx_hash,
+            '{url}'    => "{$txBase}{$transfer->tx_hash}",
         ]);
     }
 

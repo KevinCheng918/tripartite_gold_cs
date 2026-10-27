@@ -4,6 +4,9 @@ namespace App\Repositories;
 
 use App\Models\WalletTransfer;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Log;
 
 /**
  * 錢包轉帳紀錄
@@ -41,28 +44,54 @@ class WalletTransferRepository
     }
 
     /**
-     * 寫一筆，已經有了就不動它
+     * 這一批 hash 裡，哪些已經記過了
      *
-     * ⚠ 靠 `(address, tx_hash)` 的唯一索引擋重複。回傳的第二個值是
-     * 「這次是不是新建的」—— 呼叫端要靠它決定「要不要發通知」，
-     * 不然重跑一輪會把舊的全部重發一次。
+     * ⚠ **一次問完，不要逐筆去查**。建立基準那一輪會一口氣拿回 200 筆
+     * （翻頁上限內最多 1000 筆），逐筆查就是 1000 次 SELECT。
      *
-     * @param array $attributes 必須含 address 與 tx_hash
-     * @return array{0: WalletTransfer, 1: bool} [紀錄, 是不是這次才建的]
+     * @param string        $address
+     * @param array<string> $hashes
+     * @return array<string, bool> 以 tx_hash 當 key，方便 O(1) 判斷
      */
-    public function firstOrCreate(array $attributes)
+    public function existingHashes($address, array $hashes)
     {
-        $existing = WalletTransfer::query()
-            ->select(self::NOTICE_COLUMNS)
-            ->where('address', $attributes['address'])
-            ->where('tx_hash', $attributes['tx_hash'])
-            ->first();
-
-        if (filled($existing)) {
-            return [$existing, false];
+        if (blank($hashes)) {
+            return [];
         }
 
-        return [WalletTransfer::query()->create($attributes), true];
+        $found = WalletTransfer::query()
+            ->select(['id', 'tx_hash'])
+            ->where('address', $address)
+            ->whereIn('tx_hash', $hashes)
+            ->pluck('tx_hash')
+            ->all();
+
+        return array_fill_keys($found, true);
+    }
+
+    /**
+     * 寫一筆
+     *
+     * ⚠ 去重由呼叫端用 `existingHashes()` 先做掉，這裡只負責寫 ——
+     * 但 `(address, tx_hash)` 的唯一索引還是最後一道：兩輪重疊時
+     * （`withoutOverlapping` 擋不住的極端情況）可能同時要寫同一筆。
+     * 撞到就回 null，呼叫端當成「已經有了」跳過，不要讓一筆卡住整批。
+     *
+     * @param array $attributes 必須含 address 與 tx_hash
+     * @return WalletTransfer|null 撞到唯一索引時回 null
+     */
+    public function create(array $attributes)
+    {
+        try {
+            return WalletTransfer::query()->create($attributes);
+        } catch (QueryException $e) {
+            Log::warning('錢包轉帳紀錄重複寫入，略過這一筆', [
+                'address' => Arr::get($attributes, 'address'),
+                'tx_hash' => Arr::get($attributes, 'tx_hash'),
+            ]);
+
+            return null;
+        }
     }
 
     /**
