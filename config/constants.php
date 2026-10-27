@@ -3875,24 +3875,36 @@ return [
      * 地址 34 碼、hash 64 碼，加起來還有很大餘裕。
      */
     'WALLET_NOTICE' => [
-        // ⚠ 轉入與轉出用不同的 emoji 開頭，掃一眼就分得出方向
-        'TRANSFER_IN' => "💰 <b>錢包轉入</b>\n"
+        /*
+         * ⚠ **長的值要自己一行**（需求方 2026-10-27：「該換行要換行」）。
+         *
+         * 地址 34 碼、hash 64 碼 —— 寫成「From：TJ9a…」那種一行到底的格式，
+         * 手機上會從地址中間折斷，看起來像壞掉的資料，也不好對照。
+         * 標題自己一行、值自己一行，折到也是整段折。
+         *
+         * ⚠ 三段用空行隔開：**發生什麼事**（方向、錢包、金額、時間）／
+         * **誰跟誰**（From、To）／**憑證**（hash、連結）。
+         * 擠成一整塊的話，急著看「多少錢」的人要從七行裡面挑。
+         *
+         * ⚠ 轉入與轉出用不同的 emoji 開頭，掃一眼就分得出方向。
+         */
+        'TRANSFER_IN' => "💰 <b>錢包轉入</b>\n\n"
             . '{label}'
-            . "時間：{time}\n"
             . "金額：<b>{amount} {symbol}</b>\n"
-            . "From：<code>{from}</code>\n"
-            . "To：<code>{to}</code>\n"
-            . "Hash：<code>{hash}</code>\n"
-            . '{url}',
+            . "時間：{time}\n\n"
+            . "From\n<code>{from}</code>{from_mark}\n\n"
+            . "To\n<code>{to}</code>{to_mark}\n\n"
+            . "Hash\n<code>{hash}</code>\n\n"
+            . '<a href="{url}">🔗 在 Tronscan 上查看這筆交易</a>',
 
-        'TRANSFER_OUT' => "📤 <b>錢包轉出</b>\n"
+        'TRANSFER_OUT' => "📤 <b>錢包轉出</b>\n\n"
             . '{label}'
-            . "時間：{time}\n"
             . "金額：<b>{amount} {symbol}</b>\n"
-            . "From：<code>{from}</code>\n"
-            . "To：<code>{to}</code>\n"
-            . "Hash：<code>{hash}</code>\n"
-            . '{url}',
+            . "時間：{time}\n\n"
+            . "From\n<code>{from}</code>{from_mark}\n\n"
+            . "To\n<code>{to}</code>{to_mark}\n\n"
+            . "Hash\n<code>{hash}</code>\n\n"
+            . '<a href="{url}">🔗 在 Tronscan 上查看這筆交易</a>',
 
         /*
          * ⚠ **這一行一定要印**（需求方 2026-10-27：「我有多個錢包…通知訊息
@@ -3900,6 +3912,16 @@ return [
          * 見 `WalletNoticeService::walletLine()`。
          */
         'LABEL_LINE' => "錢包：<b>{label}</b>\n",
+
+        /*
+         * 標在「這一邊是我的錢包」那個地址後面。
+         *
+         * ⚠ From 與 To 兩個 34 碼的地址擺在一起，哪一個是自己的要逐字比對 ——
+         * 盯好幾個錢包時尤其累。標一下就不用比。
+         *
+         * ⚠ 擺在 `</code>` **外面**：點 code 區塊複製時不該把這幾個字一起複製走。
+         */
+        'OWN_MARK' => ' ← 本錢包',
 
         /*
          * 預設的最低金額門檻。

@@ -396,6 +396,7 @@ class WalletNoticeService
     private function buildText(WalletTransfer $transfer, $label)
     {
         $key = $transfer->isIncoming() ? 'TRANSFER_IN' : 'TRANSFER_OUT';
+        $mark = (string) config('constants.WALLET_NOTICE.OWN_MARK');
 
         return strtr((string) config("constants.WALLET_NOTICE.{$key}"), [
             '{label}'  => $this->walletLine($label, $transfer->address),
@@ -405,6 +406,9 @@ class WalletNoticeService
             '{symbol}' => (string) $transfer->symbol,
             '{from}'   => (string) $transfer->from_address,
             '{to}'     => (string) $transfer->to_address,
+            // 轉入時 To 是我們、轉出時 From 是我們 —— 標出來就不必逐字比對
+            '{from_mark}' => $transfer->isIncoming() ? '' : $mark,
+            '{to_mark}'   => $transfer->isIncoming() ? $mark : '',
             '{hash}'   => (string) $transfer->tx_hash,
             '{url}'    => (string) config('tron.tx_url') . $transfer->tx_hash,
         ]);
