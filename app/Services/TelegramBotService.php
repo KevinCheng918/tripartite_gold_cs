@@ -653,19 +653,57 @@ class TelegramBotService
      */
     public function getMyUsername()
     {
-        return Cache::remember('telegram.bot.username', now()->addDay(), function () {
-            try {
-                $response = $this->client->get("{$this->getBaseUrl()}/getMe");
-                $body = json_decode($response->getBody()->getContents(), true);
-                $username = Arr::get((array) $body, 'result.username');
+        /*
+         * ⚠ 快取 key 要帶 **Bot id**：這個專案是多 Bot（`switchBotToken()`
+         * 會依站台換 token），共用一個 key 的話，第二支 Bot 會拿到第一支的
+         * 名字，「有沒有 tag 到我」就會整個判錯。
+         */
+        $key = "telegram.bot.username.{$this->getBotId()}";
+        $cached = Cache::get($key);
 
-                return filled($username) ? (string) $username : null;
-            } catch (\Exception $e) {
-                Log::error('Telegram getMe 失敗', ['error' => $e->getMessage()]);
+        if (filled($cached)) {
+            return (string) $cached;
+        }
 
-                return null;
-            }
-        });
+        /*
+         * ⚠ **失敗也要寫快取**，不能用 `Cache::remember`。
+         *
+         * remember 存進 null 等於沒存，下一則訊息又會再打一次 getMe ——
+         * 而這支是在 webhook 的同步流程裡被呼叫的，Telegram 連不上時
+         * 每則訊息都要等 client 的 10 秒逾時，webhook 會被拖垮、
+         * Telegram 跟著重送。
+         *
+         * 所以失敗時存一個空字串當「問過了，沒問到」，短 TTL 讓它自己復原。
+         */
+        if ($cached === '') {
+            return null;
+        }
+
+        $username = $this->fetchMyUsername();
+
+        Cache::put($key, (string) $username, filled($username) ? now()->addDay() : now()->addMinutes(10));
+
+        return $username;
+    }
+
+    /**
+     * 真的去問 Telegram「我是誰」
+     *
+     * @return string|null
+     */
+    private function fetchMyUsername()
+    {
+        try {
+            $response = $this->client->get("{$this->getBaseUrl()}/getMe");
+            $body = json_decode($response->getBody()->getContents(), true);
+            $username = Arr::get((array) $body, 'result.username');
+
+            return filled($username) ? (string) $username : null;
+        } catch (\Exception $e) {
+            Log::error('Telegram getMe 失敗', ['error' => $e->getMessage()]);
+
+            return null;
+        }
     }
 
     /**

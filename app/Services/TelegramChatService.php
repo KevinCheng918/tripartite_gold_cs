@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Jobs\AutoReplyJob;
 use App\Jobs\FollowupDetectJob;
 use App\Models\TelegramGroup;
+use App\Presenters\TelegramUsernamePresenter;
 use App\Repositories\AutoReplyTicketRepository;
 use App\Repositories\SharedFileRepository;
 use App\Repositories\ShiftAssignmentRepository;
@@ -579,16 +580,22 @@ class TelegramChatService
         // webhook 同步等下去會逾時，Telegram 會重送而造成重複回覆
         //
         /*
-         * 三個判斷的順序是刻意的，由便宜到貴：
+         * 四個判斷的順序是刻意的，由便宜到貴：
          *
          * 1. isAutoReplyOn()  欄位判斷，沒開自動回覆的對話什麼名單都不讀
          * 2. isStaff()        後台帳號名單，**所有對話共用同一個快取 key**；
          *                     認出是同事後才會去讀該對話的放行例外
          * 3. isIgnored()      每個對話一個 key，命中 2 就不必再去碰它
+         * 4. isTagToOutsidersOnly()
+         *                     擺最後是因為**只有它可能打 Telegram API**
+         *                     （查 Bot 自己的 username，快取一天）。前三道
+         *                     先把不必判斷的訊息擋掉，真正會走到這裡的只有
+         *                     「整則都是 tag」那種，一天最多一次外部呼叫。
          */
         if ($group->isAutoReplyOn() && filled($rawText)
             && !$this->staffIgnoreService->isStaff($from, $group->id)
-            && !$this->memberService->isIgnored($group->id, $from)) {
+            && !$this->memberService->isIgnored($group->id, $from)
+            && !$this->isTagToOutsidersOnly($message, $rawText, $group->id)) {
             /*
              * 壓一段延遲再處理，讓客人把話講完。
              *
@@ -1214,6 +1221,234 @@ class TelegramChatService
         $labels = config('constants.TELEGRAM.MEDIA_LABELS');
 
         return $labels[$key] ?? $labels['default'];
+    }
+
+    /**
+     * 這則整則都是在 tag 別人（不是我們）—— 不必自動回覆
+     *
+     * ⚠ 需求方 2026-10-27 回報：我們主動發餘點告警之後，客人回了一則
+     * 只有 `@sl0168888` 的訊息（把他自己的同事叫進來看），小幫手卻回了
+     * 「老闆，這個帳號的部分已經請專員為您確認，再麻煩您稍等一下」——
+     * **客人根本沒問我們問題**，這句是憑空生出來的，還讓同仁以為有待辦。
+     *
+     * 三道都成立才擋：
+     *
+     * 1. **整則都是 tag** —— `@sl0168888 這個帳號不能登入` 還是要回。
+     *    判斷方式是把 tag 挖掉，看剩下的還有沒有實質內容。
+     * 2. **tag 的不是我們的人** —— 需求方補充「如果是 tag 我們自己人含
+     *    機器人的話，要轉」。客人 `@我們的客服` 就是在叫我們，哪怕一個字
+     *    都沒寫也要轉確認；`@他家同事` 才是我們不該插話的場合。
+     * 3. 上面兩道都過了才擋。
+     *
+     * ⚠ 用 Telegram 的 `entities` 判斷，不要自己拆 `@` —— `text_mention`
+     * （對方沒有 username 時）文字裡根本沒有 `@`，而 `user@example.com`
+     * 這種反而會被 `@` 的正則誤判。
+     *
+     * @param array  $message Telegram 原始訊息
+     * @param string $rawText 客人真正打的字（不含媒體替代文字）
+     * @param int    $groupId 只用來寫 log
+     * @return bool
+     */
+    private function isTagToOutsidersOnly(array $message, $rawText, $groupId)
+    {
+        $mentions = $this->parseMentions($message, $rawText);
+
+        if (blank($mentions)) {
+            return false;
+        }
+
+        // 挖掉 tag 之後還有話 —— 那是真的有事要問，照常走自動回覆
+        if ($this->hasWords($this->stripMentions($rawText, $mentions))) {
+            return false;
+        }
+
+        // tag 到我們自己人（或機器人）—— 客人是在叫我們，要轉確認
+        if ($this->tagsOurSide($mentions)) {
+            return false;
+        }
+
+        Log::info('整則都是在 tag 別人，不自動回覆', [
+            'group_id' => $groupId,
+            'text'     => mb_substr($rawText, 0, 50),
+        ]);
+
+        return true;
+    }
+
+    /**
+     * 取出這則訊息裡所有的 tag
+     *
+     * ⚠ 回傳的 `offset`／`length` 單位跟 Telegram 一致，是 **UTF-16 code
+     * unit**（emoji 算兩個），不是位元組也不是 mb 字元。
+     *
+     * @param array  $message
+     * @param string $rawText
+     * @return array<int, array{offset: int, length: int, username: string|null, user_id: int|null}>
+     */
+    private function parseMentions(array $message, $rawText)
+    {
+        // caption 的 entity 在另一個 key；圖片配文字 tag 人也算同一件事
+        $entities = Arr::get($message, 'entities', Arr::get($message, 'caption_entities', []));
+        $mentions = [];
+
+        foreach ($entities as $entity) {
+            $type = Arr::get($entity, 'type');
+
+            if (!in_array($type, ['mention', 'text_mention'], true)) {
+                continue;
+            }
+
+            $mentions[] = [
+                'offset'   => (int) Arr::get($entity, 'offset'),
+                'length'   => (int) Arr::get($entity, 'length'),
+                // mention 的 username 要自己從原文切出來（entity 只給位置）；
+                // text_mention 沒有 @，但附了整個 user 物件
+                'username' => $type === 'mention'
+                    ? $this->sliceUtf16($rawText, (int) Arr::get($entity, 'offset'), (int) Arr::get($entity, 'length'))
+                    : Arr::get($entity, 'user.username'),
+                'user_id'  => (int) Arr::get($entity, 'user.id'),
+            ];
+        }
+
+        if (filled($mentions)) {
+            return $mentions;
+        }
+
+        return $this->parseMentionsByPattern($rawText);
+    }
+
+    /**
+     * 拿不到 entities 時的退路：看 `@xxx` 的樣式
+     *
+     * ⚠ 這條**只認得 `@username`**，認不出 `text_mention`（那種文字裡沒有
+     * `@`，拆不出來）。所以只是退路，有 entities 時一律以 entities 為準。
+     *
+     * @param string $rawText
+     * @return array
+     */
+    private function parseMentionsByPattern($rawText)
+    {
+        if (strpos($rawText, '@') === false) {
+            return [];
+        }
+
+        if (!preg_match_all('/@[A-Za-z0-9_]+/u', $rawText, $matches, PREG_OFFSET_CAPTURE)) {
+            return [];
+        }
+
+        $mentions = [];
+
+        foreach ($matches[0] as $match) {
+            [$token, $byteOffset] = $match;
+
+            $mentions[] = [
+                // preg 給的是位元組位置，要換算成 UTF-16 才跟 stripMentions 對得上
+                'offset'   => $this->utf16Length(substr($rawText, 0, $byteOffset)),
+                'length'   => $this->utf16Length($token),
+                'username' => $token,
+                'user_id'  => 0,
+            ];
+        }
+
+        return $mentions;
+    }
+
+    /**
+     * 這些 tag 裡有沒有我們自己人（含機器人）
+     *
+     * ⚠ 需求方 2026-10-27：「如果是 tag 我們自己人含機器人的話，要轉。」
+     *
+     * ⚠ 機器人的 username 要用**目前這支 Bot** 的（上面已經
+     * `switchBotToken()` 過）—— 多 Bot 環境下拿錯會認不出自己。
+     *
+     * @param array $mentions
+     * @return bool
+     */
+    private function tagsOurSide(array $mentions)
+    {
+        $botUsername = TelegramUsernamePresenter::normalize($this->botService->getMyUsername());
+
+        foreach ($mentions as $mention) {
+            $username = TelegramUsernamePresenter::normalize(Arr::get($mention, 'username'));
+
+            // 查不到 Bot 自己的名字時 $botUsername 是 null，不能拿來比
+            if (filled($botUsername) && $username === $botUsername) {
+                return true;
+            }
+
+            if ($this->staffIgnoreService->isOurSide(Arr::get($mention, 'user_id'), $username)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * 照 entity 的位置把 tag 從原文挖掉
+     *
+     * ⚠ **由後往前剪**，不然剪掉前面那段之後，後面每個 offset 都位移了。
+     *
+     * @param string $rawText
+     * @param array  $mentions 每個元素有 offset／length（UTF-16 單位）
+     * @return string
+     */
+    private function stripMentions($rawText, array $mentions)
+    {
+        usort($mentions, function ($a, $b) {
+            return $b['offset'] - $a['offset'];
+        });
+
+        $utf16 = mb_convert_encoding($rawText, 'UTF-16LE', 'UTF-8');
+
+        foreach ($mentions as $mention) {
+            $utf16 = substr_replace($utf16, '', $mention['offset'] * 2, $mention['length'] * 2);
+        }
+
+        return mb_convert_encoding($utf16, 'UTF-8', 'UTF-16LE');
+    }
+
+    /**
+     * 照 UTF-16 的位置從原文切一段出來
+     *
+     * ⚠ 不能用 `mb_substr` —— Telegram 給的位置是 UTF-16 code unit，
+     * emoji 佔兩個單位，用 mb 字元去數會整段偏掉。
+     *
+     * @param string $text
+     * @param int    $offset UTF-16 單位
+     * @param int    $length UTF-16 單位
+     * @return string
+     */
+    private function sliceUtf16($text, $offset, $length)
+    {
+        $utf16 = mb_convert_encoding($text, 'UTF-16LE', 'UTF-8');
+
+        return mb_convert_encoding(substr($utf16, $offset * 2, $length * 2), 'UTF-8', 'UTF-16LE');
+    }
+
+    /**
+     * 這段文字有幾個 UTF-16 code unit
+     *
+     * @param string $text
+     * @return int
+     */
+    private function utf16Length($text)
+    {
+        return (int) (strlen(mb_convert_encoding($text, 'UTF-16LE', 'UTF-8')) / 2);
+    }
+
+    /**
+     * 這段文字裡還有沒有「話」
+     *
+     * ⚠ 標點、空白、emoji 都**不算話** —— `@sl0168888 🙏` 是把人叫進來拜託
+     * 一下，不是在問我們問題。只有文字或數字才算。
+     *
+     * @param string $text
+     * @return bool
+     */
+    private function hasWords($text)
+    {
+        return (bool) preg_match('/[\p{L}\p{N}]/u', $text);
     }
 
     /**

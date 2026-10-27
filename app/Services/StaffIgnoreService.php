@@ -68,6 +68,40 @@ class StaffIgnoreService
     }
 
     /**
+     * 這組 Telegram 身分是不是我方的人
+     *
+     * ⚠ 跟 `isStaff()` 是**兩件事**，不要互相取代：
+     *
+     * - `isStaff()` 問的是「**他講的話**要不要自動回覆」，所以會看這個對話
+     *   的放行例外，而且會回填 ID。
+     * - 這一支問的是「**被 tag 到的這個人**是不是我們的人」（見
+     *   `TelegramChatService::tagsOurSide()`）。放行例外是前者的設定，
+     *   套到這裡會讓「客人 tag 到一位被放行的同事」被誤判成外人。
+     *
+     * ⚠ 也**不回填 ID** —— 被 tag 不等於本人在場發言，`mention` 這種
+     * entity 連 user 物件都沒有，拿不到可信的 ID 與 username 配對。
+     *
+     * @param int|null    $telegramUserId Telegram 的 user id（沒有就傳 0／null）
+     * @param string|null $username       已正規化的 username（不含 @）
+     * @return bool
+     */
+    public function isOurSide($telegramUserId, $username)
+    {
+        $keys = $this->keys();
+
+        // 一個同事都沒填 Telegram 身分時直接結束，不要往下比
+        if (blank($keys['ids']) && blank($keys['usernames'])) {
+            return false;
+        }
+
+        if ((int) $telegramUserId > 0 && array_key_exists((int) $telegramUserId, $keys['ids'])) {
+            return true;
+        }
+
+        return filled($username) && array_key_exists($username, $keys['usernames']);
+    }
+
+    /**
      * 要標「不自動回覆」的同事 username（訊息灰標籤用）
      *
      * 名冊（`telegram_group_member`）存的是 username，拿這批去比就能知道
