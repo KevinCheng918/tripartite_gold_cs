@@ -462,6 +462,39 @@ class StationController extends Controller
     }
 
     /**
+     * Ajax 補傳補點通知
+     *
+     * ⚠ **不會再呼叫主系統 API** —— 點數已經加扣過了，重打一次就是重複加點。
+     * 這支重發的是當初存下來的那段原文，見 `CreditTopupService::resendNotice()`。
+     *
+     * @param CreditTopup $topup
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxTopupResendNotice(CreditTopup $topup)
+    {
+        try {
+            $result = $this->topupService->resendNotice($topup, Auth::id(), Auth::user()->nickname);
+
+            // 補傳完還是有問題（例如群組還是沒綁）就要講，不要回一句「已補傳」
+            if (blank($result->notified_at)) {
+                return response()->json([
+                    'message' => trans('station.topup_resend_failed'),
+                    'issue'   => $result->notify_issue,
+                ], 422);
+            }
+
+            return response()->json([
+                'message' => trans('station.topup_resend_sent'),
+                'issue'   => $result->notify_issue,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('補點通知補傳失敗', ['error' => $e->getMessage(), 'topup_id' => $topup->id]);
+
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
      * Ajax 審核拒絕
      *
      * @param CreditTopup $topup

@@ -128,6 +128,17 @@ return [
     'topup_approved'       => '补点已通过，API 呼叫成功',
     'topup_rejected'       => '补点已拒绝',
     'topup_api_failed'     => '补点 API 呼叫失败',
+    'topup_notice_sent'        => '已通知客户',
+    'topup_notice_no_group'    => '未通知：这个站台没绑 Telegram 群组',
+    'topup_notice_no_message'  => '未通知：主系统没有回传讯息内容',
+    'topup_notice_send_failed' => '未通知：Telegram 发送失败',
+    'topup_notice_unknown'     => '未通知客户',
+    'topup_notice_old_format'  => '已通知，但主系统回的是旧格式（没有「原本点数」），建议更新该站台的主系统',
+    'topup_resend'             => '补传通知',
+    'topup_resend_sent'        => '已补传通知给客户',
+    'topup_resend_failed'      => '补传失败，原因可能还在（例如站台仍未绑定 Telegram 群组）',
+    'topup_resend_not_completed' => '只有「已完成」的补点可以补传通知',
+    'topup_resend_no_station'  => '找不到这笔补点对应的站台',
 
     'credit_report' => [
         'page_title'     => '点数报表',

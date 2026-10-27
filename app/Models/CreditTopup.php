@@ -54,6 +54,28 @@ class CreditTopup extends Model
      */
     public const CREDIT_TYPE_OTHER = 'other';
 
+    /** @var string 站台沒綁 Telegram 群組，沒有地方可以發 */
+    public const ISSUE_NO_GROUP = 'no_group';
+
+    /** @var string 主站沒回訊息，沒有內容可以發 */
+    public const ISSUE_NO_MESSAGE = 'no_message';
+
+    /** @var string Telegram 拒收或丟例外 */
+    public const ISSUE_SEND_FAILED = 'send_failed';
+
+    /**
+     * 主站回的是舊格式（沒有「原本點數」那三行）
+     *
+     * ⚠ 這一種**訊息有送出去**，只是格式舊 —— 所以 `notified_at` 會有值，
+     * 跟上面三種「根本沒送出去」不一樣。
+     *
+     * 主系統 `AdminCreditService` 在 2026-08-28 才改成三行格式，
+     * 停在那之前的站台會回舊的那一句。
+     *
+     * @var string
+     */
+    public const ISSUE_OLD_FORMAT = 'old_format';
+
     /** @var int 待審核 */
     public const STATUS_PENDING = 0;
     /** @var int 已完成 */
@@ -71,6 +93,7 @@ class CreditTopup extends Model
         'credit_amount' => 'decimal:2',
         'status'        => 'integer',
         'reviewed_at'   => 'datetime',
+        'notified_at'   => 'datetime',
         'images'        => 'array',
     ];
 

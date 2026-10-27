@@ -131,6 +131,17 @@ return [
     'topup_approved'       => 'Topup approved, API call succeeded',
     'topup_rejected'       => 'Topup rejected',
     'topup_api_failed'     => 'Topup API call failed',
+    'topup_notice_sent'        => 'Customer notified',
+    'topup_notice_no_group'    => 'Not notified: this station has no Telegram group bound',
+    'topup_notice_no_message'  => 'Not notified: the main system returned no message',
+    'topup_notice_send_failed' => 'Not notified: Telegram delivery failed',
+    'topup_notice_unknown'     => 'Customer not notified',
+    'topup_notice_old_format'  => 'Notified, but the main system returned the old format (no "original balance") — consider updating that station\'s main system',
+    'topup_resend'             => 'Resend notice',
+    'topup_resend_sent'        => 'Notice resent to the customer',
+    'topup_resend_failed'      => 'Resend failed — the cause may still apply (e.g. the station still has no Telegram group)',
+    'topup_resend_not_completed' => 'Only completed top-ups can have their notice resent',
+    'topup_resend_no_station'  => 'Cannot find the station for this top-up',
 
     'credit_report' => [
         'page_title'     => 'Credit Report',

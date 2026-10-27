@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\CreditTopup;
 use App\Repositories\CreditTopupRepository;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -149,7 +150,7 @@ class CreditTopupService
 
         // 通知放在交易外：Telegram 是外部呼叫，不該把交易撐在那邊等
         if ((int) $updated->status === CreditTopup::STATUS_COMPLETED) {
-            $this->notifyTelegram($station, $result, $reviewerId, $reviewerName);
+            $this->notifyTelegram($station, $updated, $result, $reviewerId, $reviewerName);
         }
 
         return $updated;
@@ -190,13 +191,17 @@ class CreditTopupService
      *
      * 通知失敗不能影響補點結果（點數已經加扣完成），因此只記 log 不往外拋。
      *
+     * ⚠ **內容一律是主站回的 `msg` 原文**（需求方 2026-10-27 指定）——
+     * 客服系統不自己組。這支只負責「送出去，並記下有沒有送到」。
+     *
      * @param \App\Models\Station $station
+     * @param CreditTopup         $topup  要記通知狀態的那一筆
      * @param array               $result 主站 API 回應
      * @param int                 $reviewerId
      * @param string|null         $reviewerName
      * @return void
      */
-    private function notifyTelegram($station, $result, $reviewerId, $reviewerName)
+    private function notifyTelegram($station, CreditTopup $topup, $result, $reviewerId, $reviewerName)
     {
         // 以下兩種情況是「該通知卻沒通知」，用 warning 而非 info：
         // 正式環境常把 LOG_LEVEL 設在 warning/error，info 會被整個濾掉而無從追查
@@ -206,18 +211,34 @@ class CreditTopupService
                 'station'    => $station->name,
             ]);
 
+            $this->markNotice($topup, null, CreditTopup::ISSUE_NO_GROUP);
+
             return;
         }
 
-        $message = $result['msg'] ?? null;
+        $message = Arr::get((array) $result, 'msg');
+
         if (blank($message)) {
             Log::warning('補點成功但主站未回傳訊息，略過 Telegram 通知', [
                 'station_id' => $station->id,
                 'response'   => $result,
             ]);
 
+            $this->markNotice($topup, null, CreditTopup::ISSUE_NO_MESSAGE);
+
             return;
         }
+
+        /*
+         * ⚠ **內容一律用主站回的原文**（需求方 2026-10-27 指定）。
+         * 客服系統不自己組 —— 點數異動的敘述是主系統的事。
+         *
+         * 但格式舊的要標出來：主系統 `AdminCreditService` 2026-08-28 才改成
+         * 「原本點數／操作點數／當前點數」三行，停在那之前的站台回的是
+         * 「◯◯支付系統餘額已增加 N; 當前為 M」那一句。
+         * 訊息照發（那是主站的事實），只是在後台標一下該更新那台主系統了。
+         */
+        $issue = $this->looksOldFormat($message) ? CreditTopup::ISSUE_OLD_FORMAT : null;
 
         // 主站回的是點數異動結果，補一句提醒讓客戶知道要去確認
         $footer = config('constants.STATION.TOPUP_NOTIFY_FOOTER');
@@ -243,14 +264,119 @@ class CreditTopupService
             Log::info('補點結果已發送 Telegram', [
                 'station_id'        => $station->id,
                 'telegram_group_id' => $station->telegram_group_id,
+                'issue'             => $issue,
             ]);
+
+            $this->markNotice($topup, now(), $issue);
         } catch (\Exception $e) {
             Log::error('補點結果發送 Telegram 失敗', [
                 'station_id'        => $station->id,
                 'telegram_group_id' => $station->telegram_group_id,
                 'error'             => $e->getMessage(),
             ]);
+
+            $this->markNotice($topup, null, CreditTopup::ISSUE_SEND_FAILED);
         }
+    }
+
+    /**
+     * 補傳補點通知
+     *
+     * ⚠ **絕對不會再呼叫主系統 API** —— 點數已經加扣過了，再打一次就是
+     * **重複加點**。這支重發的是當初存在 `api_response` 裡的那一段原文，
+     * 不會重算、也不會動到任何點數。
+     *
+     * ⚠ 只有「已完成」的那幾筆能補傳。待審核、拒絕、API 失敗的本來就沒有
+     * 通知可以補 —— 讓它們也能按下去只會送出一則不存在的事實。
+     *
+     * @param CreditTopup $topup
+     * @param int         $reviewerId
+     * @param string|null $reviewerName
+     * @return CreditTopup
+     * @throws ValidationException
+     */
+    public function resendNotice(CreditTopup $topup, $reviewerId, $reviewerName = null)
+    {
+        if ((int) $topup->status !== CreditTopup::STATUS_COMPLETED) {
+            throw ValidationException::withMessages([
+                'topup' => [trans('station.topup_resend_not_completed')],
+            ]);
+        }
+
+        /** @var \App\Models\Station|null $station */
+        $station = $topup->station;
+
+        if (blank($station)) {
+            throw ValidationException::withMessages([
+                'topup' => [trans('station.topup_resend_no_station')],
+            ]);
+        }
+
+        /*
+         * ⚠ 「其他」類型的 `api_response` 存的是一句說明文字不是 JSON，
+         * 而且它本來就沒有通知可發 —— `json_decode()` 會回 null，
+         * 下面的 `msg` 取不到就會被擋在「主站沒回訊息」那一關。
+         */
+        $result = json_decode((string) $topup->api_response, true);
+
+        $this->notifyTelegram($station, $topup, (array) $result, $reviewerId, $reviewerName);
+
+        return $topup->refresh();
+    }
+
+    /**
+     * 記下這一筆通知到底有沒有送出去、有什麼問題
+     *
+     * ⚠ `notified_at` 與 `notify_issue` **是兩件事**：舊格式那一種是
+     * 「有送出去但格式舊」，所以兩欄都會有值。合併成一個狀態欄就表達不了。
+     *
+     * ⚠ 整段 try/catch：**記狀態失敗不能影響補點本身**。點數已經加扣完成，
+     * 為了一個顯示用的欄位把審核流程往上拋，同仁會以為沒審過而再審一次。
+     *
+     * @param CreditTopup                        $topup
+     * @param \Illuminate\Support\Carbon|null    $notifiedAt null＝沒送出去
+     * @param string|null                        $issue      見 CreditTopup::ISSUE_*
+     * @return void
+     */
+    private function markNotice(CreditTopup $topup, $notifiedAt, $issue)
+    {
+        try {
+            $this->topupRepository->update($topup, [
+                'notified_at'  => $notifiedAt,
+                'notify_issue' => $issue,
+            ]);
+        } catch (\Exception $e) {
+            Log::warning('補點通知狀態寫入失敗', [
+                'topup_id' => $topup->id,
+                'error'    => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * 主站回的是不是舊格式
+     *
+     * 主系統 `AdminCreditService` 在 2026-08-28（commit `406fbfdc`）才改成
+     * 「原本點數／操作點數／當前點數」三行；停在那之前的站台回的是
+     * 「◯◯支付系統餘額已增加 N; 當前為 M」那一句，**少了原本點數、
+     * 數字也沒有千分位**。
+     *
+     * ⚠ 認的是「有沒有**原本點數**」而不是整段比對：主系統日後再加欄位時，
+     * 整段比對會把新格式也判成舊的。
+     *
+     * @param string $message
+     * @return bool
+     */
+    private function looksOldFormat($message)
+    {
+        $marker = (string) config('constants.STATION.TOPUP.NEW_FORMAT_MARKER');
+
+        // 短路：沒設定比對字串就不判斷（寧可不標，也不要全部標成舊的）
+        if (blank($marker)) {
+            return false;
+        }
+
+        return mb_strpos((string) $message, $marker) === false;
     }
 
     /**
