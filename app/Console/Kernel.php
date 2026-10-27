@@ -136,6 +136,19 @@ class Kernel extends ConsoleKernel
          */
         $schedule->command('reminder:send')->everyMinute()->withoutOverlapping();
 
+        /*
+         * 每分鐘查監聽中的錢包有沒有新的 TRC20 轉帳（2026-10-27）。
+         *
+         * ⚠ `withoutOverlapping` 一定要：有要通知的那幾輪會跑一次 headless
+         * Chrome 截圖（約 10 秒），錢包多的時候整輪可能超過一分鐘。
+         * 重疊的話同一批會被判斷兩次 —— 唯一索引擋得住重複寫入，
+         * 但會白打一堆 TronGrid、也白截一次圖。
+         *
+         * 功能開關預設關著（`wallet_notice.enabled`），服務自己會短路，
+         * 所以掛排程不等於開始發訊息。
+         */
+        $schedule->command('wallet:watch-transfers')->everyMinute()->withoutOverlapping();
+
         // 每月 1 號凌晨 0 點產生 VM 帳單
         $schedule->command('vm:generate-billing')->monthlyOn(1, '00:00');
 

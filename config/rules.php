@@ -79,4 +79,26 @@ return [
      * 一年足夠回看任何一段期間；真的要更長的，分兩次查。
      */
     'REPORT_RANGE_MAX_DAYS' => 366,
+
+    /*
+     * TRON 錢包地址：`T` 開頭、base58、總長 34。
+     *
+     * ⚠ 存的是**裸的 pattern** 而不是 `regex:...` 的規則字串 ——
+     * `TronGridService::isValidAddress()` 要拿去 `preg_match`，
+     * Request 那邊自己加 `regex:` 前綴。寫成兩份遲早會改一邊漏一邊，
+     * 而漏掉的後果是「通知安靜地不會來」，沒有人會發現。
+     *
+     * base58 的字母表沒有 0、O、I、l（容易看錯的那幾個）。
+     */
+    'TRON_ADDRESS_PATTERN' => '/^T[1-9A-HJ-NP-Za-km-z]{33}$/',
+
+    /*
+     * 錢包通知的最低金額門檻上限。
+     *
+     * 填太大等於把通知整個關掉卻看不出來 —— 給一個明顯不合理的上限擋住手滑。
+     */
+    'WALLET_MIN_AMOUNT_MAX' => 1000000,
+
+    // 一次最多監聽幾個錢包。每個錢包每分鐘各一次 API 呼叫，不能無限加
+    'WALLET_ADDRESS_MAX' => 20,
 ];

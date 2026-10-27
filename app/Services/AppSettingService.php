@@ -89,6 +89,36 @@ class AppSettingService
      */
     const KEY_FINANCE_NOTICE_MANAGER = 'finance_notice.manager_user_ids';
 
+    // 錢包轉帳通知（TRON）
+    const KEY_WALLET_NOTICE_ENABLED = 'wallet_notice.enabled';
+
+    /**
+     * 要監聽的錢包
+     *
+     * JSON 陣列：`[{"address": "T...", "label": "公司主錢包"}]`。
+     *
+     * ⚠ 存成 JSON 而不是開一張表：錢包就那幾個、只有「地址＋備註」兩欄，
+     * 而且跟著通知設定一起維護。真的要分權限或記誰改的再談開表。
+     */
+    const KEY_WALLET_NOTICE_ADDRESSES = 'wallet_notice.addresses';
+
+    /**
+     * 錢包轉帳通知的收件人
+     *
+     * ⚠ **跟財務申請那份分開**：盯錢包進出的人不一定要審補點申請，
+     * 混在一起就沒辦法只關掉其中一邊（理由同
+     * KEY_FINANCE_NOTICE_MANAGER 與 KEY_APPROVAL_NOTICE_MANAGER 的關係）。
+     */
+    const KEY_WALLET_NOTICE_MANAGER = 'wallet_notice.manager_user_ids';
+
+    /**
+     * 低於這個金額就不通知
+     *
+     * ⚠ TRON 有「地址投毒」攻擊：從長得很像的地址丟 0.000001 USDT 進來，
+     * 讓人下次複製到錯的地址。沒有門檻的話通知會被這種洗版。
+     */
+    const KEY_WALLET_NOTICE_MIN_AMOUNT = 'wallet_notice.min_amount';
+
     // 內部支援群組
     const KEY_SUPPORT_CHAT_ID   = 'auto_reply.support_chat_id';
     const KEY_SUPPORT_SYSTEM_ID = 'auto_reply.support_system_id';

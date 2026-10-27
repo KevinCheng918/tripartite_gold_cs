@@ -41,6 +41,7 @@ class NotificationSettingService
     private $attendanceReport;
     private $approvalNotice;
     private $financeNotice;
+    private $walletNotice;
 
     public function __construct(
         AppSettingService $appSettingService,
@@ -54,7 +55,8 @@ class NotificationSettingService
         TaskNoticeService $taskNotice,
         AttendanceReportService $attendanceReport,
         ApprovalNoticeService $approvalNotice,
-        FinanceNoticeService $financeNotice
+        FinanceNoticeService $financeNotice,
+        WalletNoticeService $walletNotice
     ) {
         $this->appSettingService = $appSettingService;
         $this->stationRepository = $stationRepository;
@@ -70,6 +72,8 @@ class NotificationSettingService
         $this->approvalNotice = $approvalNotice;
         // 財務申請（繳款證明、補點）是另一份名單，所以是另一支
         $this->financeNotice = $financeNotice;
+        // 錢包轉帳又是另一份
+        $this->walletNotice = $walletNotice;
     }
 
     /**
@@ -103,6 +107,8 @@ class NotificationSettingService
             'finance' => [
                 'user_ids' => $this->appSettingService->getIntList(AppSettingService::KEY_FINANCE_NOTICE_MANAGER),
             ],
+            // 錢包有 TRC20 轉入或轉出（需求方 2026-10-27）
+            'wallet' => $this->walletSection(),
             'followup' => $this->followupSection(),
             'options' => [
                 'systems'       => $this->systemOptions(),
@@ -544,6 +550,79 @@ class NotificationSettingService
     public function testFinance()
     {
         return $this->financeNotice->test();
+    }
+
+    /**
+     * 錢包轉帳那一頁要的資料
+     *
+     * @return array{enabled: bool, addresses: array, user_ids: array<int>, min_amount: float}
+     */
+    private function walletSection()
+    {
+        return [
+            'enabled'    => $this->appSettingService->getBool(AppSettingService::KEY_WALLET_NOTICE_ENABLED),
+            'addresses'  => $this->appSettingService->getJson(AppSettingService::KEY_WALLET_NOTICE_ADDRESSES),
+            'user_ids'   => $this->appSettingService->getIntList(AppSettingService::KEY_WALLET_NOTICE_MANAGER),
+            'min_amount' => $this->appSettingService->getFloat(
+                AppSettingService::KEY_WALLET_NOTICE_MIN_AMOUNT,
+                (float) config('constants.WALLET_NOTICE.DEFAULT_MIN_AMOUNT')
+            ),
+        ];
+    }
+
+    /**
+     * 存錢包轉帳通知的設定
+     *
+     * ⚠ 錢包清單存成 JSON（`[{address, label}]`）—— 地址格式在
+     * `UpdateWalletNoticeRequest` 擋掉，這裡只管存。
+     *
+     * @param array    $params
+     * @param int|null $userId
+     * @return void
+     */
+    public function updateWallet($params, $userId = null)
+    {
+        $addresses = [];
+
+        foreach ((array) Arr::get($params, 'wallet_addresses', []) as $wallet) {
+            $address = trim((string) Arr::get($wallet, 'address'));
+
+            // 整列空白的就當作沒填（前端多一列空的很常見）
+            if (blank($address)) {
+                continue;
+            }
+
+            $addresses[] = [
+                'address' => $address,
+                'label'   => trim((string) Arr::get($wallet, 'label')),
+            ];
+        }
+
+        $this->appSettingService->putMany([
+            AppSettingService::KEY_WALLET_NOTICE_ENABLED    => Arr::get($params, 'wallet_enabled') ? '1' : '0',
+            AppSettingService::KEY_WALLET_NOTICE_ADDRESSES  => $this->appSettingService->jsonValue($addresses),
+            AppSettingService::KEY_WALLET_NOTICE_MANAGER    => $this->appSettingService->idListValue(
+                Arr::get($params, 'wallet_notice_user_ids', [])
+            ),
+            AppSettingService::KEY_WALLET_NOTICE_MIN_AMOUNT => (string) Arr::get(
+                $params,
+                'wallet_min_amount',
+                config('constants.WALLET_NOTICE.DEFAULT_MIN_AMOUNT')
+            ),
+        ], $userId);
+    }
+
+    /**
+     * 錢包轉帳通知的測試發送
+     *
+     * ⚠ 理由同 `testApproval()`：鏈上事件觸發的通知補發不了，
+     * 測試確認的是「這份名單收不收得到」。
+     *
+     * @return array
+     */
+    public function testWallet()
+    {
+        return $this->walletNotice->test();
     }
 
     /**

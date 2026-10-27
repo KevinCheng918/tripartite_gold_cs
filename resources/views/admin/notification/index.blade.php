@@ -56,6 +56,11 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#tab-wallet" role="tab">
+                    <i class="fas fa-wallet me-1"></i>{{ trans('notification.tab_wallet') }}
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link" data-bs-toggle="tab" href="#tab-followup" role="tab">
                     <i class="fas fa-hourglass-half me-1"></i>{{ trans('notification.tab_followup') }}
                 </a>
@@ -474,6 +479,77 @@
                                 <p class="text-muted mb-0" style="font-size:0.875rem">
                                     {{ trans('notification.finance_split_hint') }}
                                 </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- ============ 錢包轉帳 ============ --}}
+            {{-- TRON 錢包有 TRC20 轉入或轉出就私訊（需求方 2026-10-27）。
+                 資料來自 TronGrid，但通知裡的連結指向 tronscan（需求方習慣看那個畫面）--}}
+            <div class="tab-pane fade" id="tab-wallet" role="tabpanel">
+                <div class="row">
+                    <div class="col-lg-7">
+                        <div class="main-card mb-3 card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ trans('notification.wallet_title') }}</h5>
+                                <p class="text-muted" style="font-size:0.875rem">{{ trans('notification.wallet_desc') }}</p>
+                                <form id="form-wallet">
+                                    <div class="form-check form-switch mb-3">
+                                        <input class="form-check-input" type="checkbox" id="wallet-enabled">
+                                        <label class="form-check-label" for="wallet-enabled">{{ trans('notification.wallet_enabled') }}</label>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">{{ trans('notification.wallet_addresses') }}</label>
+                                        <div id="wallet-address-list"></div>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="btn-wallet-add">
+                                            <i class="fas fa-plus me-1"></i>{{ trans('notification.wallet_address_add') }}
+                                        </button>
+                                        <small class="form-text text-muted d-block">{{ trans('notification.wallet_address_hint') }}</small>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label" for="wallet-min-amount">{{ trans('notification.wallet_min_amount') }}</label>
+                                        <input type="number" class="form-control" id="wallet-min-amount" min="0" step="0.000001">
+                                        <small class="form-text text-muted">{{ trans('notification.wallet_min_amount_hint') }}</small>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <div class="d-flex align-items-center justify-content-between mb-2">
+                                            <label class="form-label mb-0">{{ trans('notification.wallet_user') }}</label>
+                                            <div class="form-check mb-0">
+                                                <input class="form-check-input" type="checkbox" id="wallet-user-all">
+                                                <label class="form-check-label" for="wallet-user-all">{{ trans('notification.select_all') }}</label>
+                                            </div>
+                                        </div>
+                                        <div id="wallet-user-list" class="notice-check-list p-2"></div>
+                                        <small class="form-text text-muted">{{ trans('notification.wallet_user_hint') }}</small>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-primary js-manage-only">{{ trans('notification.action_save') }}</button>
+                                    <button type="button" class="btn btn-outline-secondary js-manage-only" id="btn-test-wallet">{{ trans('notification.wallet_test') }}</button>
+                                    <div class="form-text mt-2">{{ trans('notification.wallet_test_hint') }}</div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- 說明（純文字） --}}
+                    <div class="col-lg-5">
+                        <div class="main-card mb-3 card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ trans('notification.wallet_events_title') }}</h5>
+                                <ul class="text-muted mb-0" style="font-size:0.875rem">
+                                    <li>{{ trans('notification.wallet_event_in') }}</li>
+                                    <li>{{ trans('notification.wallet_event_out') }}</li>
+                                    <li>{{ trans('notification.wallet_event_shot') }}</li>
+                                </ul>
+                                <hr>
+                                {{-- ⚠ 要講明「第一次不會通知」，不然會被當成壞掉 --}}
+                                <p class="text-muted" style="font-size:0.875rem">{{ trans('notification.wallet_baseline_hint') }}</p>
+                                <p class="text-muted mb-0" style="font-size:0.875rem">{{ trans('notification.wallet_dust_hint') }}</p>
                             </div>
                         </div>
                     </div>

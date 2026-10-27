@@ -3862,6 +3862,59 @@ return [
     ],
 
     /*
+     * 錢包轉帳通知（2026-10-27）
+     *
+     * 監聽中的 TRON 錢包有 TRC20 轉入或轉出時，私訊通知
+     * `wallet_notice.manager_user_ids` 的名單，並附一張轉帳紀錄頁的截圖。
+     *
+     * ⚠ 地址與 hash 用 `<code>` 包起來 —— Telegram 上點一下就複製，
+     * 查帳的人不必手動選字。
+     *
+     * ⚠ 整則要控制在 1024 字元內（Telegram 的 caption 上限），
+     * 超過就附不了圖（見 `StaffDmService::CAPTION_LIMIT`）。
+     * 地址 34 碼、hash 64 碼，加起來還有很大餘裕。
+     */
+    'WALLET_NOTICE' => [
+        // ⚠ 轉入與轉出用不同的 emoji 開頭，掃一眼就分得出方向
+        'TRANSFER_IN' => "💰 <b>錢包轉入</b>\n"
+            . '{label}'
+            . "時間：{time}\n"
+            . "金額：<b>{amount} {symbol}</b>\n"
+            . "From：<code>{from}</code>\n"
+            . "To：<code>{to}</code>\n"
+            . "Hash：<code>{hash}</code>\n"
+            . '{url}',
+
+        'TRANSFER_OUT' => "📤 <b>錢包轉出</b>\n"
+            . '{label}'
+            . "時間：{time}\n"
+            . "金額：<b>{amount} {symbol}</b>\n"
+            . "From：<code>{from}</code>\n"
+            . "To：<code>{to}</code>\n"
+            . "Hash：<code>{hash}</code>\n"
+            . '{url}',
+
+        /*
+         * ⚠ **這一行一定要印**（需求方 2026-10-27：「我有多個錢包…通知訊息
+         * 內容要註明是哪一個錢包」）。沒填備註時會退而印地址 ——
+         * 見 `WalletNoticeService::walletLine()`。
+         */
+        'LABEL_LINE' => "錢包：<b>{label}</b>\n",
+
+        /*
+         * 預設的最低金額門檻。
+         *
+         * 1 USDT 擋得掉地址投毒那種 0.000001 的灰塵，又不會漏掉真的小額付款。
+         */
+        'DEFAULT_MIN_AMOUNT' => 1,
+
+        // 測試發送用的內容
+        'TEST_TEXT' => "💰 <b>錢包轉帳通知測試</b>\n"
+            . "這是「通訊管理 → 通知設定 → 錢包轉帳」的測試訊息。\n"
+            . '收得到這則，表示錢包有轉入或轉出時您也收得到。',
+    ],
+
+    /*
      * 私訊通知的種類。
      *
      * 帳號管理可以逐個帳號關掉這幾種（`user_notice_mute`，有列＝關掉）。

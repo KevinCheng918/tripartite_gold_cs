@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Notification\UpdateApprovalNoticeRequest;
 use App\Http\Requests\Notification\UpdateFinanceNoticeRequest;
+use App\Http\Requests\Notification\UpdateWalletNoticeRequest;
 use App\Http\Requests\Notification\UpdateAttendanceReportRequest;
 use App\Http\Requests\Notification\UpdateGroupRequest;
 use App\Http\Requests\Notification\UpdateFollowupRequest;
@@ -524,6 +525,69 @@ class NotificationController extends Controller
 
         return response()->json([
             'message' => Arr::get($messages, $reason, trans('notification.msg.finance_test_failed')),
+        ], 422);
+    }
+
+    /**
+     * Ajax 更新錢包轉帳通知的設定
+     *
+     * @param UpdateWalletNoticeRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxUpdateWallet(UpdateWalletNoticeRequest $request)
+    {
+        $params = $request->validated();
+
+        try {
+            $this->settingService->updateWallet($params, Auth::id());
+
+            return response()->json(['message' => trans('notification.msg.saved')]);
+        } catch (\Exception $e) {
+            Log::error('錢包轉帳通知設定更新失敗', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
+
+            return response()->json(['message' => trans('notification.msg.save_failed')], 500);
+        }
+    }
+
+    /**
+     * Ajax 錢包轉帳通知測試發送
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxTestWallet()
+    {
+        $result = $this->settingService->testWallet();
+        $sent = (int) Arr::get($result, 'sent', 0);
+
+        if ($sent > 0) {
+            // 有人收到就算成功，但沒收到的人也要講 —— 理由同 ajaxTestShift()
+            $failed = (array) Arr::get($result, 'failed', []);
+
+            if (filled($failed)) {
+                return response()->json([
+                    'message' => trans('notification.msg.wallet_test_partial', [
+                        'sent'   => $sent,
+                        'failed' => implode('、', $failed),
+                    ]),
+                ]);
+            }
+
+            return response()->json([
+                'message' => trans('notification.msg.wallet_test_sent', ['sent' => $sent]),
+            ]);
+        }
+
+        $reason = (string) Arr::get($result, 'reason');
+        $messages = [
+            StaffDmService::SKIP_NO_RECIPIENT => trans('notification.msg.wallet_test_no_user'),
+            StaffDmService::SKIP_NOT_BOUND    => trans('notification.msg.wallet_test_not_bound'),
+            StaffDmService::SKIP_SEND_FAILED  => trans('notification.msg.wallet_test_failed'),
+            // WalletNoticeService 自己的「沒設定收件人」
+            'no_manager'                      => trans('notification.msg.wallet_test_no_user'),
+        ];
+
+        return response()->json([
+            'message' => Arr::get($messages, $reason, trans('notification.msg.wallet_test_failed')),
         ], 422);
     }
 

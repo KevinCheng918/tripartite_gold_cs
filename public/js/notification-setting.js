@@ -562,6 +562,98 @@
         });
     }
 
+    // ===== 錢包轉帳（TRON 錢包有轉入或轉出就私訊） =====
+
+    /**
+     * 錢包那幾列
+     *
+     * ⚠ 存檔時是照畫面上的順序重新收集的，所以刪一列不必動 index ——
+     * 直接把那個 DOM 節點移掉就好。
+     */
+    function walletRow(wallet) {
+        var row = document.createElement('div');
+        row.className = 'input-group mb-2 js-wallet-row';
+        row.innerHTML = '<input type="text" class="form-control js-wallet-address" placeholder="'
+            + escapeHtml(i18n.wallet_address_placeholder) + '" value="' + escapeHtml(wallet.address || '') + '">'
+            + '<input type="text" class="form-control js-wallet-label" placeholder="'
+            + escapeHtml(i18n.wallet_label_placeholder) + '" value="' + escapeHtml(wallet.label || '') + '">'
+            + '<button type="button" class="btn btn-outline-danger js-wallet-remove">'
+            + '<i class="fas fa-times"></i></button>';
+
+        row.querySelector('.js-wallet-remove').addEventListener('click', function () {
+            row.parentNode.removeChild(row);
+        });
+
+        return row;
+    }
+
+    function renderWallet() {
+        var wallet = settings.wallet;
+
+        document.getElementById('wallet-enabled').checked = !!wallet.enabled;
+        document.getElementById('wallet-min-amount').value = wallet.min_amount;
+
+        var list = document.getElementById('wallet-address-list');
+        list.innerHTML = '';
+
+        (wallet.addresses || []).forEach(function (item) {
+            list.appendChild(walletRow(item));
+        });
+
+        // 一列都沒有時先給一列空的，不然使用者會以為沒地方填
+        if (!list.children.length) {
+            list.appendChild(walletRow({}));
+        }
+
+        renderUserList('wallet-user-list', 'js-wallet-user', wallet.user_ids);
+        syncAll('wallet-user-all', 'js-wallet-user');
+    }
+
+    function walletAddresses() {
+        var rows = document.querySelectorAll('#wallet-address-list .js-wallet-row');
+
+        return Array.prototype.map.call(rows, function (row) {
+            return {
+                address: row.querySelector('.js-wallet-address').value.trim(),
+                label: row.querySelector('.js-wallet-label').value.trim()
+            };
+        }).filter(function (item) {
+            // 整列空白的不送出去 —— 後端也會濾，但這樣驗證訊息不會指到空列
+            return item.address !== '';
+        });
+    }
+
+    function bindWallet() {
+        bindSelectAll('wallet-user-all', 'wallet-user-list', 'js-wallet-user');
+
+        document.getElementById('btn-wallet-add').addEventListener('click', function () {
+            document.getElementById('wallet-address-list').appendChild(walletRow({}));
+        });
+
+        document.getElementById('form-wallet').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            var payload = {
+                wallet_enabled: document.getElementById('wallet-enabled').checked,
+                wallet_addresses: walletAddresses(),
+                wallet_min_amount: document.getElementById('wallet-min-amount').value,
+                wallet_notice_user_ids: checkedIds('js-wallet-user')
+            };
+
+            submit('/admin/notification/ajax-update-wallet', payload,
+                event.target.querySelector('button[type="submit"]'), function () {
+                    settings.wallet.enabled = payload.wallet_enabled;
+                    settings.wallet.addresses = payload.wallet_addresses;
+                    settings.wallet.min_amount = payload.wallet_min_amount;
+                    settings.wallet.user_ids = payload.wallet_notice_user_ids;
+                });
+        });
+
+        document.getElementById('btn-test-wallet').addEventListener('click', function () {
+            runTest('/admin/notification/ajax-test-wallet', this, i18n.msg.wallet_test_failed);
+        });
+    }
+
     // ===== 分頁八：待追蹤事項 =====
 
     function renderFollowup() {
@@ -638,6 +730,7 @@
     renderAttendance();
     renderApproval();
     renderFinance();
+    renderWallet();
     renderFollowup();
     applyPermission();
 
@@ -651,6 +744,7 @@
         bindAttendance();
         bindApproval();
         bindFinance();
+        bindWallet();
         bindFollowup();
     }
 }());
