@@ -51,6 +51,11 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#tab-finance" role="tab">
+                    <i class="fas fa-file-invoice-dollar me-1"></i>{{ trans('notification.tab_finance') }}
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link" data-bs-toggle="tab" href="#tab-followup" role="tab">
                     <i class="fas fa-hourglass-half me-1"></i>{{ trans('notification.tab_followup') }}
                 </a>
@@ -419,6 +424,55 @@
                                 <hr>
                                 <p class="text-muted mb-0" style="font-size:0.875rem">
                                     {{ trans('notification.approval_swap_hint') }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- ============ 財務申請 ============ --}}
+            {{-- 繳款證明上傳／補點申請與其審核結果（需求方 2026-10-27）。
+                 跟上面的「申請審核」是兩份收件人名單：那邊管人事，這邊管錢 --}}
+            <div class="tab-pane fade" id="tab-finance" role="tabpanel">
+                <div class="row">
+                    <div class="col-lg-7">
+                        <div class="main-card mb-3 card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ trans('notification.finance_title') }}</h5>
+                                <p class="text-muted" style="font-size:0.875rem">{{ trans('notification.finance_desc') }}</p>
+                                <form id="form-finance">
+                                    <div class="mb-3">
+                                        <div class="d-flex align-items-center justify-content-between mb-2">
+                                            <label class="form-label mb-0">{{ trans('notification.finance_user') }}</label>
+                                            <div class="form-check mb-0">
+                                                <input class="form-check-input" type="checkbox" id="finance-user-all">
+                                                <label class="form-check-label" for="finance-user-all">{{ trans('notification.select_all') }}</label>
+                                            </div>
+                                        </div>
+                                        <div id="finance-user-list" class="notice-check-list p-2"></div>
+                                        <small class="form-text text-muted">{{ trans('notification.finance_user_hint') }}</small>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary js-manage-only">{{ trans('notification.action_save') }}</button>
+                                    <button type="button" class="btn btn-outline-secondary js-manage-only" id="btn-test-finance">{{ trans('notification.finance_test') }}</button>
+                                    <div class="form-text mt-2">{{ trans('notification.finance_test_hint') }}</div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- 會通知哪些事（純說明） --}}
+                    <div class="col-lg-5">
+                        <div class="main-card mb-3 card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ trans('notification.finance_events_title') }}</h5>
+                                <ul class="text-muted mb-0" style="font-size:0.875rem">
+                                    <li>{{ trans('notification.finance_event_proof') }}</li>
+                                    <li>{{ trans('notification.finance_event_topup') }}</li>
+                                </ul>
+                                <hr>
+                                <p class="text-muted mb-0" style="font-size:0.875rem">
+                                    {{ trans('notification.finance_split_hint') }}
                                 </p>
                             </div>
                         </div>

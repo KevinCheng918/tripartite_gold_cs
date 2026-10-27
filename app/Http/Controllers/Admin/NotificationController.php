@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Notification\UpdateApprovalNoticeRequest;
+use App\Http\Requests\Notification\UpdateFinanceNoticeRequest;
 use App\Http\Requests\Notification\UpdateAttendanceReportRequest;
 use App\Http\Requests\Notification\UpdateGroupRequest;
 use App\Http\Requests\Notification\UpdateFollowupRequest;
@@ -460,6 +461,69 @@ class NotificationController extends Controller
 
         return response()->json([
             'message' => Arr::get($messages, $reason, trans('notification.msg.approval_test_failed')),
+        ], 422);
+    }
+
+    /**
+     * Ajax 更新財務申請（繳款證明、補點）的私訊收件人
+     *
+     * @param UpdateFinanceNoticeRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxUpdateFinance(UpdateFinanceNoticeRequest $request)
+    {
+        $params = $request->validated();
+
+        try {
+            $this->settingService->updateFinance($params, Auth::id());
+
+            return response()->json(['message' => trans('notification.msg.saved')]);
+        } catch (\Exception $e) {
+            Log::error('財務申請通知設定更新失敗', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
+
+            return response()->json(['message' => trans('notification.msg.save_failed')], 500);
+        }
+    }
+
+    /**
+     * Ajax 財務申請通知測試發送
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxTestFinance()
+    {
+        $result = $this->settingService->testFinance();
+        $sent = (int) Arr::get($result, 'sent', 0);
+
+        if ($sent > 0) {
+            // 有人收到就算成功，但沒收到的人也要講 —— 理由同 ajaxTestShift()
+            $failed = (array) Arr::get($result, 'failed', []);
+
+            if (filled($failed)) {
+                return response()->json([
+                    'message' => trans('notification.msg.finance_test_partial', [
+                        'sent'   => $sent,
+                        'failed' => implode('、', $failed),
+                    ]),
+                ]);
+            }
+
+            return response()->json([
+                'message' => trans('notification.msg.finance_test_sent', ['sent' => $sent]),
+            ]);
+        }
+
+        $reason = (string) Arr::get($result, 'reason');
+        $messages = [
+            StaffDmService::SKIP_NO_RECIPIENT => trans('notification.msg.finance_test_no_user'),
+            StaffDmService::SKIP_NOT_BOUND    => trans('notification.msg.finance_test_not_bound'),
+            StaffDmService::SKIP_SEND_FAILED  => trans('notification.msg.finance_test_failed'),
+            // FinanceNoticeService 自己的「沒設定收件人」
+            'no_manager'                      => trans('notification.msg.finance_test_no_user'),
+        ];
+
+        return response()->json([
+            'message' => Arr::get($messages, $reason, trans('notification.msg.finance_test_failed')),
         ], 422);
     }
 

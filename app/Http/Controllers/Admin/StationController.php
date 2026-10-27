@@ -12,6 +12,7 @@ use App\Models\Station;
 use App\Models\StationCreditLog;
 use App\Repositories\UserRepository;
 use App\Services\CreditTopupService;
+use App\Services\FinanceNoticeService;
 use App\Services\ImageUploadService;
 use App\Services\StationCreditAlertService;
 use App\Services\StationCreditReportService;
@@ -32,6 +33,7 @@ class StationController extends Controller
     private $userRepository;
     private $creditAlertService;
     private $creditReportService;
+    private $financeNotice;
 
     public function __construct(
         StationService $stationService,
@@ -39,7 +41,8 @@ class StationController extends Controller
         ImageUploadService $imageUploadService,
         UserRepository $userRepository,
         StationCreditAlertService $creditAlertService,
-        StationCreditReportService $creditReportService
+        StationCreditReportService $creditReportService,
+        FinanceNoticeService $financeNotice
     ) {
         $this->stationService = $stationService;
         $this->topupService = $topupService;
@@ -49,6 +52,8 @@ class StationController extends Controller
         $this->creditAlertService = $creditAlertService;
         // 點數報表（餘點曲線圖）
         $this->creditReportService = $creditReportService;
+        // 補點申請／審核要私訊通知財務申請的收件人名單
+        $this->financeNotice = $financeNotice;
     }
 
     /**
@@ -404,7 +409,15 @@ class StationController extends Controller
                 ? $this->imageUploadService->uploadMultiple($request->file('images'), 'topup')
                 : [];
 
-            $this->topupService->request($params, Auth::id());
+            $topup = $this->topupService->request($params, Auth::id());
+
+            /*
+             * ⚠ 擺在申請**寫進去之後**，而且 FinanceNoticeService 自己整段
+             * try/catch —— 通知沒送到頂多主管晚點才看到，但申請被例外中斷的話
+             * 同仁會以為沒送出而重複送，而重複的補點要是被誤審，
+             * 那是真的會動到客戶的點數。
+             */
+            $this->financeNotice->topupApplied($topup);
 
             return response()->json(['message' => trans('station.topup_submitted')]);
         } catch (\Exception $e) {
@@ -428,6 +441,15 @@ class StationController extends Controller
                 ? trans('station.topup_approved')
                 : trans('station.topup_api_failed');
 
+            /*
+             * ⚠ 傳 `$result` 不是 `$topup` —— 狀態是在 approve() 裡才更新的，
+             * 拿原本那個物件會是待審核，通知會挑不到該用哪一則模板。
+             *
+             * ⚠ 「通過但主系統 API 失敗」是另一則通知（點數其實沒進去），
+             * 判斷寫在 FinanceNoticeService 裡。
+             */
+            $this->financeNotice->topupReviewed($result, Auth::id());
+
             return response()->json([
                 'message' => $msg,
                 'status'  => $result->status,
@@ -448,7 +470,10 @@ class StationController extends Controller
     public function ajaxTopupReject(CreditTopup $topup)
     {
         try {
-            $this->topupService->reject($topup, Auth::id());
+            // 同 approve()：狀態是在 reject() 裡才更新的，要拿它回傳的那個
+            $rejected = $this->topupService->reject($topup, Auth::id());
+
+            $this->financeNotice->topupReviewed($rejected, Auth::id());
 
             return response()->json(['message' => trans('station.topup_rejected')]);
         } catch (\Exception $e) {

@@ -14,6 +14,7 @@ return [
     'tab_task'   => '任務卡通知',
     'tab_attendance' => '打卡報表',
     'tab_approval'   => '申請審核',
+    'tab_finance'    => '財務申請',
     'tab_followup'   => '待追蹤事項',
 
     'select_all' => '全選',
@@ -119,6 +120,17 @@ return [
     'approval_event_cover'    => '代班：申請時、代班人同意或拒絕時、主管核准或駁回時',
     // ⚠ 要講明為什麼沒有換班，不然會被當成漏做
     'approval_swap_hint'      => '換班不在通知範圍內：換班沒有主管審核那一關，被換的同仁答應就直接生效，通知了也沒有需要處理的事。',
+    'finance_title'           => '財務申請通知收件人',
+    'finance_desc'            => '有人上傳虛擬機繳款證明、申請補點或扣點時立刻私訊通知；審核完再通知一次。可以勾多位，沒勾任何人時不會發送（上傳與申請本身照樣成立）。',
+    'finance_user'            => '收件人（可多選）',
+    'finance_user_hint'       => '標示「未綁定」的同仁收不到訊息，請他先私訊機器人一次。',
+    'finance_test'            => '測試發送',
+    'finance_test_hint'       => '會立刻私訊一則測試訊息給上面勾選的人。這種通知是有人送件時才觸發的，沒辦法補發先前的。',
+    'finance_events_title'    => '會通知哪些事',
+    'finance_event_proof'     => '虛擬機繳款證明：上傳時、審核確認收款時',
+    'finance_event_topup'     => '補點／扣點：申請時、審核通過或拒絕時（通過但主系統沒加成功會另外提醒）',
+    // ⚠ 要講明為什麼跟上一個分頁是兩份名單，不然會被當成重複設定
+    'finance_split_hint'      => '這份名單跟「申請審核」是分開的：那邊是人事（請假、補打卡、代班），這邊是錢（繳款、補點）。想收其中一種的人可以只勾一邊。',
     'attendance_personal_title' => '個人打卡報表',
     'attendance_personal_desc'  => '每位在職同仁都會各自收到自己的那一份：遲到、早退、曠工的次數與時間，補打卡次數，請假幾號到幾號，加班總時數。沒有遲到、早退、曠工的人收到的是一句勉勵的話。這部分自動發送，不需要設定。',
     'attendance_leave_note'     => '完整版每人一行分三種：全勤（沒有遲到早退曠工，而且沒請假）、有請假（報請假多久 + 其餘無狀況）、有狀況（報次數與時間）。請假不算出狀況，但也不算全勤。',
@@ -239,6 +251,12 @@ return [
         'approval_test_no_user'   => '請先勾選收件人並儲存',
         'approval_test_not_bound' => '勾選的同仁都還沒私訊過機器人，所以收不到訊息',
         'approval_test_failed'    => '發送失敗，請確認同仁沒有封鎖機器人',
+        'finance_user_not_found'  => '找不到這個帳號',
+        'finance_test_sent'       => '測試訊息已送出 :sent 則，請確認 Telegram 有收到',
+        'finance_test_partial'    => '已送出 :sent 則，但這幾位沒收到：:failed（請他們先私訊機器人一次）',
+        'finance_test_no_user'    => '請先勾選收件人並儲存',
+        'finance_test_not_bound'  => '勾選的同仁都還沒私訊過機器人，所以收不到訊息',
+        'finance_test_failed'     => '發送失敗，請確認同仁沒有封鎖機器人',
 
         // 話題
         'topic_too_many'       => '話題數量超過上限',

@@ -10,6 +10,7 @@ use App\Http\Resources\VmBillingResource;
 use App\Http\Resources\VmServerResource;
 use App\Models\VmBilling;
 use App\Models\VmServer;
+use App\Services\FinanceNoticeService;
 use App\Services\StationService;
 use App\Services\TelegramChatService;
 use App\Services\VmPaymentNoticeService;
@@ -28,14 +29,18 @@ class VmController extends Controller
     private $noticeService;
     private $chatService;
     private $stationService;
+    private $financeNotice;
 
     public function __construct(
         VmService $vmService,
         VmPaymentNoticeService $noticeService,
         TelegramChatService $chatService,
-        StationService $stationService
+        StationService $stationService,
+        FinanceNoticeService $financeNotice
     ) {
         $this->vmService = $vmService;
+        // 繳款證明上傳／審核要私訊通知財務申請的收件人名單
+        $this->financeNotice = $financeNotice;
         // 手動發送與每天 09:30 的自動發送共用同一份文案組裝
         $this->noticeService = $noticeService;
         $this->chatService = $chatService;
@@ -196,6 +201,17 @@ class VmController extends Controller
         try {
             $this->vmService->uploadProof($billing, $params['proof']);
 
+            /*
+             * ⚠ 擺在上傳**成功之後**，而且 FinanceNoticeService 自己整段
+             * try/catch —— 通知沒送到頂多主管晚點才看到，但上傳被例外中斷的話
+             * 同仁會以為沒傳成功而重複傳。
+             *
+             * ⚠ 上傳者是從這裡的 `Auth::id()` 傳進去的：`vm_billing` 沒有
+             * 「誰上傳的」這個欄位（需求方 2026-10-27 決定不加），所以這個人名
+             * 只會出現在通知裡，帳單資料本身不會記。
+             */
+            $this->financeNotice->proofUploaded($billing, Auth::id());
+
             return response()->json(['message' => trans('vm.msg.proof_uploaded')]);
         } catch (\Exception $e) {
             Log::error('繳款證明上傳失敗', ['error' => $e->getMessage(), 'billing_id' => $billing->id]);
@@ -214,6 +230,8 @@ class VmController extends Controller
     {
         try {
             $this->vmService->approvePaid($billing);
+
+            $this->financeNotice->proofApproved($billing, Auth::id());
 
             return response()->json(['message' => trans('vm.msg.approved')]);
         } catch (\Exception $e) {

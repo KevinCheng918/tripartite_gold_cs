@@ -76,6 +76,19 @@ class AppSettingService
      */
     const KEY_APPROVAL_NOTICE_MANAGER = 'approval_notice.manager_user_ids';
 
+    /**
+     * 財務申請通知的收件人
+     *
+     * 有人上傳虛擬機繳款證明、有人申請補點／扣點時要私訊給誰
+     * （逗號串接的 id，可多選）。審核之後也發給同一份名單。
+     *
+     * ⚠ **跟 KEY_APPROVAL_NOTICE_MANAGER 分開**（需求方 2026-10-27 選的）：
+     * 那一份管人事（請假、補打卡、代班），這一份管錢（繳款、補點）——
+     * 審的人多半不是同一批，合成一份的話，想收人事申請但不管財務的人
+     * 就沒辦法只關掉其中一邊。
+     */
+    const KEY_FINANCE_NOTICE_MANAGER = 'finance_notice.manager_user_ids';
+
     // 內部支援群組
     const KEY_SUPPORT_CHAT_ID   = 'auto_reply.support_chat_id';
     const KEY_SUPPORT_SYSTEM_ID = 'auto_reply.support_system_id';

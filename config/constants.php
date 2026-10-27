@@ -3776,6 +3776,92 @@ return [
     ],
 
     /*
+     * 財務申請通知（2026-10-27）
+     *
+     * 「有人上傳虛擬機繳款證明」「有人申請補點／扣點」以及它們的審核結果，
+     * 私訊通知財務申請的收件人名單（`finance_notice.manager_user_ids`）。
+     *
+     * ⚠ 跟上面的 APPROVAL_NOTICE 是**兩份名單**：那邊管人事（請假、補打卡、
+     * 代班），這邊管錢 —— 審的人多半不是同一批（需求方 2026-10-27 選的）。
+     */
+    'FINANCE_NOTICE' => [
+        'PROOF_UPLOADED' => "💳 <b>繳款證明上傳</b>\n"
+            . "{name} 上傳了繳款證明\n"
+            . "虛擬機：{vm}\n"
+            . '{station}'
+            . "月份：{month}　金額：{amount} USDT\n"
+            . '→ 請到「虛擬機管理 → 帳單」審核',
+
+        'PROOF_APPROVED' => "💳 <b>繳款證明已審核</b>\n"
+            . "{reviewer} 已確認收款\n"
+            . "虛擬機：{vm}\n"
+            . '{station}'
+            . '月份：{month}　金額：{amount} USDT',
+
+        'TOPUP_APPLIED' => "🪙 <b>{action}申請</b>\n"
+            . "{name} 申請{action}\n"
+            . "站台：{station}\n"
+            . "點數：{credit}\n"
+            . '{kind}'
+            . '{usdt}'
+            . '{note}'
+            . '→ 請到「站台管理 → 補點紀錄」審核',
+
+        'TOPUP_APPROVED' => "🪙 <b>{action}已通過</b>\n"
+            . "{reviewer} 通過了 {name} 的{action}申請\n"
+            . "站台：{station}\n"
+            . "點數：{credit}\n"
+            . '{kind}',
+
+        'TOPUP_REJECTED' => "🪙 <b>{action}已拒絕</b>\n"
+            . "{reviewer} 拒絕了 {name} 的{action}申請\n"
+            . "站台：{station}\n"
+            . "點數：{credit}\n"
+            . '{note}',
+
+        /*
+         * ⚠ 「審了但點數沒進去」一定要講清楚。
+         *
+         * 主管按了通過、主系統 API 卻失敗 —— 混成一句「已通過」會讓人
+         * 以為事情結束了，但客戶的點數其實一點都沒動。
+         */
+        'TOPUP_FAILED' => "⚠️ <b>{action}通過了，但主系統沒加成功</b>\n"
+            . "{reviewer} 通過了 {name} 的{action}申請，但呼叫主系統失敗\n"
+            . "站台：{station}\n"
+            . "點數：{credit}\n"
+            . '{error}'
+            . '→ 客戶的點數還沒有變動，請到「站台管理 → 補點紀錄」重試',
+
+        // 加點與扣點要分得出來：扣點是把客戶的點數拿掉
+        'ACTION' => [
+            1 => '補點',
+            2 => '扣點',
+        ],
+
+        /*
+         * ⚠ `other` 不會呼叫主系統 API（需求方 2026-10-14）——
+         * 不標出來的話，主管會以為按下去客戶點數就會動。
+         */
+        'CREDIT_TYPE' => [
+            'credit'      => '系統點數',
+            'shop_credit' => '商城點數',
+            'other'       => '其他（只記一筆帳，主系統點數不會動）',
+        ],
+
+        // 沒資料就整行不印（印「備註：（無）」只是佔位）
+        'KIND_LINE'    => "類型：{kind}\n",
+        'USDT_LINE'    => "USDT：{usdt}　匯率：{rate}\n",
+        'STATION_LINE' => "站台：{station}\n",
+        'NOTE_LINE'    => "備註：{note}\n",
+        'ERROR_LINE'   => "主系統回應：{error}\n",
+
+        // 測試發送用的內容
+        'TEST_TEXT' => "💳 <b>財務申請通知測試</b>\n"
+            . "這是「通訊管理 → 通知設定 → 財務申請」的測試訊息。\n"
+            . '收得到這則，表示有人上傳繳款證明或申請補點時您也收得到。',
+    ],
+
+    /*
      * 私訊通知的種類。
      *
      * 帳號管理可以逐個帳號關掉這幾種（`user_notice_mute`，有列＝關掉）。

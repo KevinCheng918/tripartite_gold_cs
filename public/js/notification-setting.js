@@ -536,6 +536,32 @@
         });
     }
 
+    // ===== 財務申請（繳款證明上傳／補點申請與其審核結果） =====
+
+    function renderFinance() {
+        renderUserList('finance-user-list', 'js-finance-user', settings.finance.user_ids);
+        syncAll('finance-user-all', 'js-finance-user');
+    }
+
+    function bindFinance() {
+        bindSelectAll('finance-user-all', 'finance-user-list', 'js-finance-user');
+
+        document.getElementById('form-finance').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            var ids = checkedIds('js-finance-user');
+
+            submit('/admin/notification/ajax-update-finance', { finance_notice_user_ids: ids },
+                event.target.querySelector('button[type="submit"]'), function () {
+                    settings.finance.user_ids = ids;
+                });
+        });
+
+        document.getElementById('btn-test-finance').addEventListener('click', function () {
+            runTest('/admin/notification/ajax-test-finance', this, i18n.msg.finance_test_failed);
+        });
+    }
+
     // ===== 分頁八：待追蹤事項 =====
 
     function renderFollowup() {
@@ -611,6 +637,7 @@
     renderTask();
     renderAttendance();
     renderApproval();
+    renderFinance();
     renderFollowup();
     applyPermission();
 
@@ -623,6 +650,7 @@
         bindTask();
         bindAttendance();
         bindApproval();
+        bindFinance();
         bindFollowup();
     }
 }());

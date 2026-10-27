@@ -40,6 +40,7 @@ class NotificationSettingService
     private $taskNotice;
     private $attendanceReport;
     private $approvalNotice;
+    private $financeNotice;
 
     public function __construct(
         AppSettingService $appSettingService,
@@ -52,7 +53,8 @@ class NotificationSettingService
         RemindReportService $remindReport,
         TaskNoticeService $taskNotice,
         AttendanceReportService $attendanceReport,
-        ApprovalNoticeService $approvalNotice
+        ApprovalNoticeService $approvalNotice,
+        FinanceNoticeService $financeNotice
     ) {
         $this->appSettingService = $appSettingService;
         $this->stationRepository = $stationRepository;
@@ -66,6 +68,8 @@ class NotificationSettingService
         $this->attendanceReport = $attendanceReport;
         // 測試發送要借它組內容與送出
         $this->approvalNotice = $approvalNotice;
+        // 財務申請（繳款證明、補點）是另一份名單，所以是另一支
+        $this->financeNotice = $financeNotice;
     }
 
     /**
@@ -94,6 +98,10 @@ class NotificationSettingService
             // 有人申請／有人審核時的私訊（需求方 2026-10-26）
             'approval' => [
                 'user_ids' => $this->appSettingService->getIntList(AppSettingService::KEY_APPROVAL_NOTICE_MANAGER),
+            ],
+            // 繳款證明上傳／補點申請與其審核結果（需求方 2026-10-27）
+            'finance' => [
+                'user_ids' => $this->appSettingService->getIntList(AppSettingService::KEY_FINANCE_NOTICE_MANAGER),
             ],
             'followup' => $this->followupSection(),
             'options' => [
@@ -504,6 +512,38 @@ class NotificationSettingService
     public function testApproval()
     {
         return $this->approvalNotice->test();
+    }
+
+    /**
+     * 存財務申請（繳款證明、補點）的私訊收件人
+     *
+     * ⚠ **跟上面那份申請審核分開**（需求方 2026-10-27）：那一份管人事，
+     * 這一份管錢 —— 審的人多半不是同一批。
+     *
+     * @param array    $params
+     * @param int|null $userId
+     * @return void
+     */
+    public function updateFinance($params, $userId = null)
+    {
+        $this->appSettingService->put(
+            AppSettingService::KEY_FINANCE_NOTICE_MANAGER,
+            $this->appSettingService->idListValue(Arr::get($params, 'finance_notice_user_ids', [])),
+            $userId
+        );
+    }
+
+    /**
+     * 財務申請通知的測試發送
+     *
+     * ⚠ 理由同 `testApproval()`：事件觸發的通知補發不了，
+     * 測試確認的是「這份名單收不收得到」。
+     *
+     * @return array
+     */
+    public function testFinance()
+    {
+        return $this->financeNotice->test();
     }
 
     /**
