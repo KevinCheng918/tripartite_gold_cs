@@ -294,20 +294,6 @@ class StationService
     }
 
     /**
-     * 新增系統
-     *
-     * @param string      $name
-     * @param string|null $botToken
-     * @return \App\Models\System
-     */
-    /**
-     * 更新系統
-     *
-     * @param \App\Models\System $system
-     * @param array $params
-     * @return \App\Models\System
-     */
-    /**
      * 取得各系統正常狀態站台數量統計
      *
      * @return array [ ['name' => '...', 'count' => N], ... ]
@@ -317,11 +303,25 @@ class StationService
         return $this->stationRepository->countActiveBySystem();
     }
 
+    /**
+     * 更新系統
+     *
+     * @param \App\Models\System $system
+     * @param array              $params
+     * @return \App\Models\System
+     */
     public function updateSystem($system, $params)
     {
         return $this->stationRepository->updateSystem($system, $params);
     }
 
+    /**
+     * 新增系統
+     *
+     * @param string      $name
+     * @param string|null $botToken
+     * @return \App\Models\System
+     */
     public function createSystem($name, $botToken = null)
     {
         $attributes = [
