@@ -121,6 +121,7 @@ return [
     'project' => [
         'view' => 'View projects',
         'edit' => 'Edit projects',
+        'assign_owner' => 'Assign project owner',
     ],
     'shared_file' => [
         'view'   => 'View shared files',

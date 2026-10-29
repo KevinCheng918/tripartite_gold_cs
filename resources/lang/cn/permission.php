@@ -121,6 +121,7 @@ return [
     'project' => [
         'view' => '查看项目管理',
         'edit' => '编辑项目',
+        'assign_owner' => '指派项目负责人',
     ],
     'shared_file' => [
         'view'   => '查看共用文件',

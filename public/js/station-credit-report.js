@@ -290,6 +290,14 @@
         var labels = buildLabels(points, shopPoints);
 
         if (chart) {
+            /*
+             * ⚠ 自己畫的 tooltip 是掛在 canvas 父層的 DOM，`destroy()` 不會帶走它 ——
+             * 重畫前要先藏起來，不然查詢換日期的那一刻會留一個貼在舊位置、
+             * 寫著舊數字的浮框在圖上。
+             */
+            var stale = ctx.parentNode.querySelector('.cr-tooltip');
+            if (stale) { stale.style.opacity = '0'; }
+
             chart.destroy();
         }
 
@@ -316,11 +324,20 @@
                 plugins: {
                     // 只有一條線時圖例是廢話，兩條線就必須標出哪條是哪條
                     legend: { display: datasets.length > 1 },
+                    /*
+                     * ⚠ **關掉內建的 canvas tooltip，改用自己畫的 HTML**
+                     * （`enabled: false` ＋ `external`）。
+                     *
+                     * 需求方 2026-10-30 要「差值換行顯示，＋紅色、−綠色」——
+                     * Chart.js 3.9.1 的 canvas tooltip 只有 `labelTextColor`，
+                     * 那是**每個項目一種顏色**（同一個 label 回傳的每一行都同色），
+                     * 做不到「餘額那行用原色、差值那行另一個顏色」。
+                     *
+                     * ⚠ `enabled: false` 不可以漏：不關的話兩個 tooltip 會疊著畫。
+                     */
                     tooltip: {
-                        callbacks: {
-                            label: tooltipLabel,
-                            afterBody: tooltipAfterBody
-                        }
+                        enabled: false,
+                        external: renderTooltip
                     }
                 },
                 scales: {
@@ -359,55 +376,154 @@
     }
 
     /**
-     * tooltip 主體：餘額 ＋ 跟前一點差多少
+     * tooltip 的那個 DOM（同一張圖重複用，不是每次 hover 都新建一個）
+     *
+     * ⚠ 掛在 canvas 的**父層**：Blade 那邊給了它 `position:relative`
+     * 與固定高度，絕對定位才有對的基準點。掛到 body 上就得自己換算整頁捲動。
+     *
+     * @param {object} chart
+     * @return {HTMLElement}
+     */
+    function tooltipElement(chart) {
+        var parent = chart.canvas.parentNode;
+        var el = parent.querySelector('.cr-tooltip');
+
+        if (el) { return el; }
+
+        el = document.createElement('div');
+        el.className = 'cr-tooltip';
+        parent.appendChild(el);
+
+        return el;
+    }
+
+    /**
+     * 加一行附註（來源、補點的原本／異動／現在）
+     *
+     * @param {HTMLElement} el
+     * @param {string}      text
+     */
+    function appendSubLine(el, text) {
+        var line = document.createElement('div');
+        line.className = 'cr-tooltip-sub';
+        // ⚠ 一律 textContent：站台名稱與來源是外部資料，innerHTML 就是 XSS
+        line.textContent = text;
+        el.appendChild(line);
+    }
+
+    /**
+     * 自己畫的 HTML tooltip（Chart.js 的 `external`）
+     *
+     * 每個資料點一段：
+     *
+     *     ■ 系統點數：1,234,567
+     *       跟前一點 +12,000      ← 自己一行，＋紅色／−綠色
+     *       來源：自動同步
      *
      * 需求方 2026-10-30：「每一天的點，都要顯示跟昨天正負多少。」同步是一小時
      * 一次，所以比的是前一個點 —— 差多少由後端算（它才知道中間有幾筆同步失敗）。
      *
-     * @param {object} item
-     * @return {string}
+     * 追加：「差值要換行顯示，＋的用紅色，−的用綠色。」
+     *
+     * ⚠ 來源與補點明細**接在各自那個點底下**，不是全部堆在最後面：
+     * 兩條線同時被 hover 到的時候（`interaction.mode: 'index'`），
+     * 堆在最後會變成四行孤立的「來源：…」，看不出哪行屬於哪條線。
+     *
+     * @param {object} context Chart.js 給的 `{chart, tooltip}`
      */
-    function tooltipLabel(item) {
-        var text = item.dataset.label + '：' + formatNumber(item.parsed.y);
-        var point = pointOf(item);
+    function renderTooltip(context) {
+        var chart = context.chart;
+        var model = context.tooltip;
+        var el = tooltipElement(chart);
 
-        // 區間第一個點沒有「前一點」可比，diff 是 null —— 不要顯示成「±0」
-        if (point && point.diff !== null && point.diff !== undefined) {
-            text += '（' + i18n.tooltip_diff + ' ' + signed(point.diff) + '）';
+        // 滑開了。⚠ 只調 opacity 不要 `display:none` —— 那會讓淡出的過場失效
+        if (model.opacity === 0) {
+            el.style.opacity = '0';
+            return;
         }
 
-        return text;
-    }
+        el.innerHTML = '';
 
-    /**
-     * tooltip 下半：來源，補點的再加上原本／異動／現在
-     *
-     * ⚠ **「原本」是後端用「現在 − 異動」算的，不是前一個點**：上次同步到補點
-     * 之間客戶照樣在消耗，前一個點不是補點前一刻的餘額。
-     *
-     * @param {Array} items
-     * @return {Array}
-     */
-    function tooltipAfterBody(items) {
-        var lines = [];
+        var title = document.createElement('div');
+        title.className = 'cr-tooltip-title';
+        title.textContent = (model.title || []).join(' ');
+        el.appendChild(title);
 
-        items.forEach(function (item) {
+        model.dataPoints.forEach(function (item) {
             var point = pointOf(item);
+
+            var row = document.createElement('div');
+            row.className = 'cr-tooltip-row';
+
+            // 兩條線的時候要分得出這一行是哪一條
+            var swatch = document.createElement('span');
+            swatch.className = 'cr-tooltip-swatch';
+            swatch.style.background = item.dataset.borderColor;
+            row.appendChild(swatch);
+
+            var balance = document.createElement('span');
+            balance.textContent = item.dataset.label + '：' + formatNumber(item.parsed.y);
+            row.appendChild(balance);
+
+            el.appendChild(row);
+
+            /*
+             * ⚠ 區間第一個點沒有「前一點」可比，`diff` 是 null ——
+             * 這一段整個不要出現，不要顯示成「±0」（那是「沒變」的意思，
+             * 跟「沒得比」是兩回事）。
+             */
+            if (point && point.diff !== null && point.diff !== undefined) {
+                var diff = document.createElement('div');
+                diff.className = 'cr-tooltip-diff ' + diffClass(point.diff);
+                diff.textContent = i18n.tooltip_diff + ' ' + signed(point.diff);
+                el.appendChild(diff);
+            }
 
             if (!point) { return; }
 
             // 滑過去要看得到「怎麼觸發的」—— 凹下去是真的掉點
             // 還是剛好有人手動同步，分得出來才有意義
-            lines.push(i18n.tooltip_source + '：' + sourceLabel(point.source));
+            appendSubLine(el, i18n.tooltip_source + '：' + sourceLabel(point.source));
 
             if (!isTopup(point)) { return; }
 
-            lines.push(i18n.tooltip_before + '：' + formatNumber(point.before));
-            lines.push(i18n.tooltip_change + '：' + signed(point.change));
-            lines.push(i18n.tooltip_after + '：' + formatNumber(point.credits));
+            /*
+             * ⚠ **「原本」是後端用「現在 − 異動」算的，不是前一個點**：
+             * 上次同步到補點之間客戶照樣在消耗，前一個點不是補點前一刻的餘額。
+             */
+            appendSubLine(el, i18n.tooltip_before + '：' + formatNumber(point.before));
+            appendSubLine(el, i18n.tooltip_change + '：' + signed(point.change));
+            appendSubLine(el, i18n.tooltip_after + '：' + formatNumber(point.credits));
         });
 
-        return lines;
+        /*
+         * `caretX／caretY` 是相對 canvas 的座標，而 tooltip 掛在 canvas 的
+         * 父層、父層又剛好包著 canvas，所以直接用就對了。
+         * 貼到點的正上方（置中與上移在 CSS 的 `transform` 裡）。
+         */
+        el.style.left = model.caretX + 'px';
+        el.style.top = model.caretY + 'px';
+        el.style.opacity = '1';
+    }
+
+    /**
+     * 差值該染什麼顏色
+     *
+     * ⚠ 配色照華人金融市場的慣例（需求方 2026-10-30 指定）：
+     * **＋（增加）紅色、−（減少）綠色** —— 跟歐美的紅跌綠漲剛好相反，
+     * 不要「順手改成比較直覺的那個」。實際色碼在
+     * public/css/station-credit-report.css。
+     *
+     * @param {number} diff
+     * @return {string} is-up ／ is-down ／ is-flat
+     */
+    function diffClass(diff) {
+        if (diff > 0) { return 'is-up'; }
+
+        if (diff < 0) { return 'is-down'; }
+
+        // 沒變化就不染色 —— 紅或綠都會讓人以為動了
+        return 'is-flat';
     }
 
     /**

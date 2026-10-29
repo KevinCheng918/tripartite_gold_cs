@@ -376,6 +376,17 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::put('/ajax-update/{project}', [ProjectController::class, 'ajaxUpdate'])->middleware('can:project.edit')->name('ajax-update');
 
         /*
+         * 專案負責人（2026-10-30）。
+         *
+         * ⚠ 自己一個 keyword，**不是 `project.edit`**：指派負責人是人事性質
+         * 的決定，理由見 `config/permissionMap.php` 那邊的註解。
+         *
+         * ⚠ 一樣要在 Controller 再過一次 `canTouchProject()` —— 權限只回答
+         * 「能不能指派負責人」，不回答「能不能碰這一個專案」。
+         */
+        Route::put('/ajax-assign-owner/{project}', [ProjectController::class, 'ajaxAssignOwner'])->middleware('can:project.assign_owner')->name('ajax-assign-owner');
+
+        /*
          * 系統規章（掛在每個專案底下，2026-10-30）。
          *
          * ⚠ 權限沿用 `project.view` / `project.edit`，但**光靠權限不夠** ——

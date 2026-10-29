@@ -1,0 +1,84 @@
+/*
+ * 點數報表的曲線 tooltip
+ *
+ * ⚠ 為什麼要自己做一個 HTML tooltip（Chart.js 的 `external`），
+ * 而不是用內建那個畫在 canvas 上的：
+ *
+ * 需求方 2026-10-30 要「跟前一點的差值換行顯示，＋紅色、−綠色」。
+ * Chart.js 3.9.1 的 canvas tooltip 只有 `labelTextColor`，而那是
+ * **每個項目一種顏色**（同一個 label 回傳的每一行都染成同一色）——
+ * 做不到「餘額那行用原色、差值那行另一個顏色」。畫在 DOM 上才逐行可控。
+ */
+
+/* 容器是 `position:relative`（Blade 那邊的固定高度框），所以用絕對定位貼上去 */
+.cr-tooltip {
+    position: absolute;
+    z-index: 5;
+    /* ⚠ `pointer-events:none` 不可以漏：tooltip 蓋在曲線上，
+       吃得到滑鼠的話游標一移到它上面圖表就判定「離開了」，
+       tooltip 會瞬間消失又出現，整個抖起來 */
+    pointer-events: none;
+    padding: 0.5rem 0.65rem;
+    border-radius: 0.375rem;
+    /* 深色半透明底 ＋ 淺色字：淺色與深色模式下都看得清楚，
+       不必為了主題再分兩套（這層是浮在圖上的，不吃頁面背景） */
+    background: rgba(24, 28, 38, 0.92);
+    color: #f8f9fa;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.12s ease;
+    /* 貼在資料點上方、水平置中 */
+    transform: translate(-50%, -112%);
+}
+
+.cr-tooltip-title {
+    margin-bottom: 0.25rem;
+    font-weight: 600;
+    color: #ced4da;
+}
+
+.cr-tooltip-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+/* 兩條線（系統點數／商城點數）的時候要分得出這一行是哪一條 */
+.cr-tooltip-swatch {
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 0.125rem;
+    flex: 0 0 auto;
+}
+
+/*
+ * 差值自己一行。
+ *
+ * ⚠ 配色照華人金融市場的慣例（需求方 2026-10-30 指定）：
+ * **＋（增加）紅色、−（減少）綠色** —— 跟歐美的紅跌綠漲剛好相反，
+ * 不要「順手改成比較直覺的那個」。
+ */
+.cr-tooltip-diff {
+    margin-left: 1.05rem; /* 對齊上一行的文字（色塊寬 ＋ gap） */
+    font-weight: 600;
+}
+
+.cr-tooltip-diff.is-up {
+    color: #ff6b81;
+}
+
+.cr-tooltip-diff.is-down {
+    color: #4ddb92;
+}
+
+/* 沒有變化就不該搶眼 —— 染成紅或綠會讓人以為動了 */
+.cr-tooltip-diff.is-flat {
+    color: #adb5bd;
+}
+
+.cr-tooltip-sub {
+    margin-left: 1.05rem;
+    color: #ced4da;
+}

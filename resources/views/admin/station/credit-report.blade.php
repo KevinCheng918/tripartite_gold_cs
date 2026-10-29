@@ -6,6 +6,10 @@
 
 @section('content')
 
+    {{-- ⚠ layout 的 @yield('css') 位在 <style> 標籤內，放 <link> 會失效，
+         所以跟 shared-file／task-board 一樣把樣式表載在 content 開頭 --}}
+    <link rel="stylesheet" href="{{ asset('css/station-credit-report.css') }}?v={{ filemtime(public_path('css/station-credit-report.css')) }}">
+
     @php
         /*
          * 日期快捷鈕。key 是 window.DateRange 的方法名（common.js），

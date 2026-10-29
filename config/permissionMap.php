@@ -291,6 +291,16 @@ return [
         'keywords' => [
             'project.view' => 'permission.project.view',
             'project.edit' => 'permission.project.edit',
+            /*
+             * ⚠ **不沿用 `project.edit`**：改名稱、改說明是維護資料，
+             * 指派負責人是**人事性質的決定** —— 它決定了這個專案出事找誰。
+             * 照「使用者在做什麼」切權限是這個專案一貫的做法
+             * （規章也從 `project.view` 裡切出了 `telegram_chat.regulation`）。
+             *
+             * ⚠ **只管「改」不管「看」**：負責人是誰，進得了這一頁的人都該看到。
+             * 把顯示也綁在這個 keyword 上，等於大部分人看不到負責人，跟需求相反。
+             */
+            'project.assign_owner' => 'permission.project.assign_owner',
         ],
     ],
 

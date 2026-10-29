@@ -32,6 +32,28 @@ class UserRepository
     private const LIST_COLUMNS = ['id', 'account', 'nickname', 'telegram_nickname', 'telegram_username', 'telegram_user_id', 'telegram_dm_ready', 'status', 'level', 'project_ids', 'hired_at', 'equipments', 'created_at', 'work_mode', 'work_start_time', 'work_end_time', 'work_days', 'show_in_shift'];
 
     /**
+     * 這一次請求撈過的「可指派成專案負責人的帳號」
+     *
+     * ⚠ 存在的理由：專案管理那一頁會問兩次 —— 「變更負責人」的下拉要逐專案篩
+     * （`getOwnerCandidatesByProject()`），「新增專案」的下拉要全部
+     * （`getAssignableForOwner()`）。沒有這個 memo 就是兩趟一模一樣的查詢。
+     *
+     * @var Collection|null
+     */
+    private $assignableForOwner = null;
+
+    /**
+     * 上面那一份撈過了沒
+     *
+     * ⚠ **要一個旗標，不能用「`$assignableForOwner` 是不是空的」代替**：
+     * 空 Collection 是合法的結果（一個可指派的帳號都沒有），
+     * 跟「還沒查」是兩回事 —— 混在一起的話那個情況每次都會重查。
+     *
+     * @var bool
+     */
+    private $assignableForOwnerLoaded = false;
+
+    /**
      * 依條件分頁查詢使用者
      *
      * @param array $filters 篩選條件：account／nickname（模糊）、status／level（精確，
@@ -105,6 +127,96 @@ class UserRepository
          * 開完帳號的人要自己找。
          */
         return $query->orderBy('level')->orderByDesc('id')->paginate($perPage);
+    }
+
+    /**
+     * 可以被指派成專案負責人的帳號（全部，不分專案）
+     *
+     * ⚠ **新增專案的下拉要用這一支，不是 `getOwnerCandidatesByProject()`**：
+     * 專案是存檔那一刻才建立的，在那之前沒有人勾得了「參與它」——
+     * 用逐專案那一支的話名單會只剩管理者，這個欄位等於沒用。
+     * 存檔後專案卡片會標紅字提醒去帳號管理把他加入參與專案。
+     *
+     * ⚠ 只收**啟用中**的帳號：停用或離職的人不該出現在下拉裡。
+     * （已經被指派的那些仍然保留並標紅字，那是另一回事。）
+     *
+     * ⚠ **排除管理者**（需求方 2026-10-30：「指派人不能有 admin」）。
+     * 不排的話管理者會出現在**每一個**專案的名單裡 ——
+     * `canAccessProject()` 對管理者一律回 true，而那個 true 的本意是
+     * 「他看得到所有專案」，不是「他適合當每個專案的負責人」。
+     *
+     * ⚠ 用 SQL 擋（`where level != ADMIN`）而不是撈回來再 `isAdmin()` 篩：
+     * 這是「這一頁要哪些人」的條件，屬於查詢，不該由 PHP 事後過濾。
+     *
+     * ⚠ `select` 要含 `level` 與 `project_ids` —— `canAccessProject()` 要它們；
+     * `level` 同時也是這裡排除管理者的依據。
+     *
+     * @return Collection
+     */
+    public function getAssignableForOwner()
+    {
+        // 短路：同一次請求問第二次就不要再查了（理由見 `$assignableForOwnerLoaded`）
+        if ($this->assignableForOwnerLoaded) {
+            return $this->assignableForOwner;
+        }
+
+        $this->assignableForOwnerLoaded = true;
+
+        $this->assignableForOwner = User::query()
+            ->select(['id', 'nickname', 'account', 'level', 'project_ids'])
+            ->where('status', config('constants.USER.STATUS.NORMAL'))
+            // 管理者不可以當負責人（需求方 2026-10-30），理由見上面的註解
+            ->where('level', '!=', config('constants.USER.LEVEL.ADMIN'))
+            ->orderBy('level')
+            ->orderByDesc('id')
+            ->get();
+
+        return $this->assignableForOwner;
+    }
+
+    /**
+     * 可以被指派成專案負責人的帳號（逐專案篩過）
+     *
+     * 需求方 2026-10-30 裁示：**只有已勾選「參與這個專案」的人**。
+     *
+     * ⚠ **一次撈完再在 PHP 分專案，不要逐專案 `whereJsonContains`**：
+     * `project_ids` 裡面可能存成字串（`["1","3"]`），`whereJsonContains`
+     * 用整數比就全部對不上 —— 而且逐專案查是一個專案一趟。客服帳號的量級
+     * 本來就小，一次撈完最省也最準。同 `TaskRepository::getOpenForNotice()`
+     * 的理由。
+     *
+     * ⚠ 判準用 `User::canAccessProject()`，**不要在這裡再寫一次
+     * `in_array(... project_ids ...)`** —— 那是同一條規則的第二份實作，
+     * 分岔的那一邊就是錯的那一邊（規章那次的教訓）。
+     *
+     * ⚠ **管理者不會出現在結果裡，但不是這一支擋的** ——
+     * `canAccessProject()` 對管理者一律回 true（他確實看得到每一個專案），
+     * 所以**光靠這裡的篩選管理者會出現在每一個專案的名單裡**。
+     * 排除管理者那一關在 `getAssignableForOwner()`
+     * （需求方 2026-10-30：「指派人不能有 admin」）。
+     *
+     * ⚠ 「只收啟用中的帳號」那一關也在 `getAssignableForOwner()`，
+     * 這裡只負責「有沒有參與這個專案」。
+     *
+     * @return \Illuminate\Support\Collection<int, Collection> 專案 id => 該專案可指派的帳號
+     */
+    public function getOwnerCandidatesByProject(array $projectIds)
+    {
+        if (blank($projectIds)) {
+            return collect();
+        }
+
+        $users = $this->getAssignableForOwner();
+
+        $byProject = collect();
+
+        foreach ($projectIds as $projectId) {
+            $byProject->put((int) $projectId, $users->filter(function ($user) use ($projectId) {
+                return $user->canAccessProject($projectId);
+            })->values());
+        }
+
+        return $byProject;
     }
 
     /**

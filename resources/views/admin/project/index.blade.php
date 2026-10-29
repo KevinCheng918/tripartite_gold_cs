@@ -6,6 +6,55 @@
 
 @section('content')
 
+    @php
+        /*
+         * 「變更負責人」下拉的候選名單，壓成 `專案 id => [{id, name}]`。
+         *
+         * ⚠ 刻意**不直接 `@json($ownerCandidates)`**：那會把 User 整個序列化
+         * 出去（含 `level`、`project_ids`），那些是後端判斷用的欄位，
+         * 沒有理由出現在畫面原始碼裡。
+         *
+         * ⚠ PHP 7.4 沒有 arrow function，一律用 `function`。
+         *
+         * @var \Illuminate\Support\Collection<int, \Illuminate\Support\Collection<int, array>>
+         */
+        $ownerOption = function ($candidate) {
+            return [
+                'id'   => (int) $candidate->id,
+                'name' => "{$candidate->nickname}（{$candidate->account}）",
+            ];
+        };
+
+        $ownerCandidateMap = $ownerCandidates->map(function ($candidates) use ($ownerOption) {
+            return $candidates->map($ownerOption)->values();
+        });
+
+        /*
+         * 「新增專案」那個下拉的名單 —— 全部啟用帳號，壓成同一個形狀。
+         *
+         * @var \Illuminate\Support\Collection<int, array>
+         */
+        $ownerAssignableList = $ownerAssignable->map($ownerOption)->values();
+    @endphp
+
+    {{-- 權限與語系由 data-* 帶給 public/js/project.js（照 shared-file 的做法）--}}
+    <div id="project-app"
+         {{-- JSON_HEX_APOS：屬性用單引號包，JSON 內的單引號會提早結束屬性 --}}
+         data-i18n='@json(trans("project"), JSON_HEX_APOS | JSON_HEX_QUOT)'
+         {{-- 「變更負責人」的候選名單，**逐專案一份**（只有參與該專案的人）。
+              ⚠ 一次全部帶給前端，不要按一次按鈕打一次 API ——
+              專案數量是個位數，而名單是開 modal 當下就要有的東西。
+              ⚠ 這裡**只帶 id 與顯示名稱**：候選名單撈的 User 還有 `level`
+              與 `project_ids`，那是後端判斷用的，沒必要吐到畫面原始碼裡。 --}}
+         data-owner-candidates='@json($ownerCandidateMap, JSON_HEX_APOS | JSON_HEX_QUOT)'
+         {{-- 「新增專案」的候選名單，**全部啟用帳號**（那一刻專案還不存在，
+              沒有人勾得了參與它）。⚠ 跟上面那一份不可以共用，兩者的差別與
+              後續補救見 .claude/knowledge/features/project-owner.md --}}
+         data-owner-assignable='@json($ownerAssignableList, JSON_HEX_APOS | JSON_HEX_QUOT)'
+         {{-- ⚠ 只帶 `project.assign_owner`：`project.edit` 的按鈕與 modal 是
+              Blade 用 `@if` 直接決定要不要輸出，JS 不需要再知道一次 --}}
+         data-can-assign-owner="{{ Auth::user()->hasPermission('project.assign_owner') ? '1' : '0' }}">
+
     {{-- 操作列 --}}
     <div class="main-card mb-3 card">
         <div class="card-header d-flex align-items-center justify-content-between">
@@ -45,6 +94,36 @@
                                     <span class="text-muted">專案名稱</span>
                                     <strong>{{ $project->name }}</strong>
                                 </div>
+                                {{-- ============ 負責人（需求方 2026-10-30）============ --}}
+                                {{-- ⚠ 刻意插在名稱之後、**建立者之前**：擺在建立者旁邊的話
+                                     兩個都是人名，一眼分不出哪個才是負責人 ——
+                                     而「建立者」恰好是現在最常被誤讀成負責人的那一欄 --}}
+                                @php($ownerIssue = $project->owner_issue)
+                                <div class="d-flex justify-content-between align-items-start mb-2" style="font-size:0.875rem">
+                                    <span class="text-muted">{{ trans('project.owner_label') }}</span>
+                                    <span class="text-end">
+                                        @if(filled($project->owner))
+                                            <strong><i class="fas fa-user-tie me-1 text-muted"></i>{{ $project->owner->nickname }}</strong>
+                                            @if(filled($ownerIssue))
+                                                {{-- ⚠ 三種原因要分開講：離職／停用要換人，沒參與是去帳號管理補勾 --}}
+                                                <span class="text-danger d-block" style="font-size:0.8rem">
+                                                    <i class="fas fa-triangle-exclamation me-1"></i>{{ trans("project.owner_issue_{$ownerIssue}") }}
+                                                </span>
+                                            @endif
+                                        @else
+                                            {{-- ⚠ 用橘色 badge 不要用「-」：「-」看起來像沒這個欄位 --}}
+                                            <span class="badge bg-warning text-dark">{{ trans('project.owner_unassigned') }}</span>
+                                        @endif
+                                        @if(Auth::user()->hasPermission('project.assign_owner'))
+                                            <button class="btn btn-link btn-sm p-0 ms-2 align-baseline js-owner-change"
+                                                data-project="{{ $project->id }}"
+                                                data-owner="{{ $project->owner_id }}"
+                                                data-owner-name="{{ filled($project->owner) ? $project->owner->nickname : '' }}"
+                                                data-issue="{{ filled($ownerIssue) ? trans("project.owner_issue_{$ownerIssue}") : '' }}"
+                                                style="font-size:0.8rem">{{ trans('project.owner_change') }}</button>
+                                        @endif
+                                    </span>
+                                </div>
                                 <div class="d-flex justify-content-between mb-2" style="font-size:0.875rem">
                                     <span class="text-muted">狀態</span>
                                     @if($project->status === 1)
@@ -55,7 +134,7 @@
                                 </div>
                                 <div class="d-flex justify-content-between mb-2" style="font-size:0.875rem">
                                     <span class="text-muted">建立者</span>
-                                    <span>{{ $project->creator ? $project->creator->nickname : '-' }}</span>
+                                    <span>{{ filled($project->creator) ? $project->creator->nickname : '-' }}</span>
                                 </div>
                                 <div class="d-flex justify-content-between mb-2" style="font-size:0.875rem">
                                     <span class="text-muted">建立時間</span>
@@ -73,11 +152,17 @@
                         </div>
                         @if(Auth::user()->hasPermission('project.edit'))
                         <div class="text-end">
+                            {{-- ⚠ 負責人那三個 data-* 是給編輯視窗的下拉用的：
+                                 要選回現任那位，而他萬一已離職／停用／沒參與，
+                                 視窗上方還要標出來（不然按確認就清空了）--}}
                             <button class="btn btn-sm btn-outline-secondary js-edit-project"
                                 data-id="{{ $project->id }}"
                                 data-name="{{ $project->name }}"
                                 data-desc="{{ $project->description }}"
-                                data-status="{{ $project->status }}">
+                                data-status="{{ $project->status }}"
+                                data-owner="{{ $project->owner_id }}"
+                                data-owner-name="{{ filled($project->owner) ? $project->owner->nickname : '' }}"
+                                data-issue="{{ filled($ownerIssue) ? trans("project.owner_issue_{$ownerIssue}") : '' }}">
                                 <i class="fas fa-edit me-1"></i>編輯
                             </button>
                         </div>
@@ -163,18 +248,28 @@
                                             <td class="text-end">
                                                 <div class="row-actions">
                                                     <div class="btn-group btn-group-sm" role="group" aria-label="{{ trans('common.row_actions.view') }}">
-                                                        <button class="btn btn-outline-secondary btn-icon btn-transition js-regulation-view" data-id="{{ $item->id }}">
+                                                        {{-- ⚠ `data-title` 是給 modal **先開起來**用的：內容要去撈
+                                                             （列表刻意沒帶 `content`），但標題這裡就有 ——
+                                                             先把標題擺上去，使用者按下去就看得到視窗 --}}
+                                                        <button class="btn btn-outline-secondary btn-icon btn-transition js-regulation-view" data-id="{{ $item->id }}" data-title="{{ $item->title }}">
                                                             <i class="fas fa-eye btn-icon-wrapper"></i>{{ trans('project.regulation_view') }}
                                                         </button>
                                                     </div>
                                                     @if(Auth::user()->hasPermission('project.edit'))
                                                     <div class="btn-group btn-group-sm" role="group" aria-label="{{ trans('common.row_actions.manage') }}">
-                                                        <button class="btn btn-outline-secondary btn-icon btn-transition js-regulation-edit" data-id="{{ $item->id }}">
+                                                        {{-- ⚠ 除了 `content` 以外的欄位列表都有 —— 全部帶上來，
+                                                             modal 就能立刻開並填好，只有內容那一格在等 --}}
+                                                        <button class="btn btn-outline-secondary btn-icon btn-transition js-regulation-edit"
+                                                            data-id="{{ $item->id }}"
+                                                            data-title="{{ $item->title }}"
+                                                            data-project="{{ $item->project_id }}"
+                                                            data-status="{{ $item->status }}"
+                                                            data-sort="{{ $item->sort }}">
                                                             <i class="fas fa-edit btn-icon-wrapper"></i>{{ trans('project.regulation_edit') }}
                                                         </button>
                                                     </div>
                                                     <div class="btn-group btn-group-sm" role="group" aria-label="{{ trans('common.row_actions.danger') }}">
-                                                        <button class="btn btn-outline-secondary btn-icon btn-transition js-regulation-delete" data-id="{{ $item->id }}">
+                                                        <button class="btn btn-outline-secondary btn-icon btn-transition js-regulation-delete" data-id="{{ $item->id }}" data-title="{{ $item->title }}">
                                                             <i class="fas fa-trash btn-icon-wrapper text-danger"></i>{{ trans('project.regulation_delete') }}
                                                         </button>
                                                     </div>
@@ -277,6 +372,21 @@
                             <label class="form-label">說明</label>
                             <textarea id="project-desc" class="form-control" rows="3" maxlength="500"></textarea>
                         </div>
+                        @if(Auth::user()->hasPermission('project.assign_owner'))
+                        {{-- 負責人：**新增與編輯都在這裡改**。
+                             ⚠ 兩種模式的候選名單不一樣（新增＝全部啟用帳號，
+                             編輯＝只有參與這個專案的人），所以選項由 JS 填，
+                             不在 Blade 寫死。理由見
+                             .claude/knowledge/features/project-owner.md --}}
+                        <div class="mb-3" id="project-owner-group">
+                            <label class="form-label">{{ trans('project.owner_label') }}</label>
+                            {{-- ⚠ 現任負責人已離職／停用／沒參與時，下拉會落在「未指派」——
+                                 這條警示要講明現況，不然按下確認就把負責人清空了 --}}
+                            <div class="alert alert-danger py-2 d-none mb-2" id="project-owner-issue" style="font-size:0.85rem"></div>
+                            <select id="project-owner" class="form-select"></select>
+                            <small class="text-muted d-block mt-1" id="project-owner-hint"></small>
+                        </div>
+                        @endif
                         <div class="mb-3" id="project-status-group" style="display:none">
                             <label class="form-label">狀態</label>
                             <select id="project-status" class="form-select">
@@ -294,6 +404,62 @@
         </div>
     </div>
 
+    @if(Auth::user()->hasPermission('project.edit'))
+    {{-- 刪除規章確認 Modal --}}
+    {{-- ⚠ **不要用 `window.confirm`**：這個系統所有對使用者的回饋一律走 modal ——
+         瀏覽器原生的 confirm 樣式不受控、套不到深色模式，而且在部分環境會被擋掉
+         （被擋掉時 `confirm()` 直接回 false，刪除會安靜地不發生）。
+         做法照 `task-board` 既有的確認視窗。 --}}
+    <div class="modal fade" id="modal-regulation-delete" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-body text-center py-4">
+                    <p class="mb-1">{{ trans('project.regulation_delete_confirm') }}</p>
+                    {{-- ⚠ 把規章標題顯示出來：一個專案可以有好幾份，
+                         只問「確定刪除嗎」的話刪錯了也不會知道 --}}
+                    <p class="text-muted mb-3" style="font-size:0.8125rem;word-break:break-all" id="regulation-delete-title"></p>
+                    <input type="hidden" id="regulation-delete-id">
+                    <div class="d-flex justify-content-center gap-2">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="button" class="btn btn-danger" id="btn-regulation-delete-ok">{{ trans('project.regulation_delete') }}</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    @if(Auth::user()->hasPermission('project.assign_owner'))
+    {{-- 變更負責人 Modal（只有負責人一個欄位，需求方 2026-10-30）--}}
+    <div class="modal fade" id="modal-owner" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">{{ trans('project.owner_change_title') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="owner-project-id">
+                    {{-- ⚠ 現任負責人不在候選名單裡（離職／停用／沒參與）時，下拉會落在
+                         「未指派」—— 這一條警示是在講「您現在看到的不是沒改，是現任
+                         負責人已經不能用了」，少了它直接按確認就把負責人清空了 --}}
+                    <div class="alert alert-danger py-2 d-none" id="owner-issue-alert" style="font-size:0.85rem"></div>
+                    <div class="mb-3">
+                        <label class="form-label">{{ trans('project.owner_label') }}</label>
+                        {{-- 選項由 JS 依專案填入（每個專案的候選名單不同）--}}
+                        <select id="owner-select" class="form-select"></select>
+                        <small class="text-muted d-block mt-1" id="owner-select-hint">{{ trans('project.owner_select_hint') }}</small>
+                    </div>
+                    <div class="text-end">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="button" class="btn btn-primary" id="btn-owner-save">確認</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
     {{-- 訊息 Modal --}}
     <div class="modal fade" id="modal-project-msg" tabindex="-1">
         <div class="modal-dialog modal-sm">
@@ -306,184 +472,12 @@
         </div>
     </div>
 
+    </div>{{-- /#project-app --}}
+
 @endsection
 
 @section('scripts')
-<script>
-$(function () {
-    var csrfToken = $('meta[name="csrf-token"]').attr('content');
-
-    function showMsg(msg) {
-        $('#modal-project-msg-text').text(msg);
-        showBsModal('modal-project-msg');
-    }
-
-    // 新增
-    $('#btn-add-project').on('click', function () {
-        $('#modal-project-title').text('新增專案');
-        $('#form-project')[0].reset();
-        $('#project-edit-id').val('');
-        $('#project-status-group').hide();
-        showBsModal('modal-project');
-    });
-
-    // 編輯
-    $(document).on('click', '.js-edit-project', function () {
-        var $btn = $(this);
-        $('#modal-project-title').text('編輯專案');
-        $('#project-edit-id').val($btn.data('id'));
-        $('#project-name').val($btn.data('name'));
-        $('#project-desc').val($btn.data('desc'));
-        $('#project-status').val($btn.data('status'));
-        $('#project-status-group').show();
-        showBsModal('modal-project');
-    });
-
-    // 送出
-    $('#form-project').on('submit', function (e) {
-        e.preventDefault();
-        var id = $('#project-edit-id').val();
-        var data = { name: $('#project-name').val().trim(), description: $('#project-desc').val().trim() };
-        if (!data.name) return;
-        if (id) { data.status = parseInt($('#project-status').val(), 10); }
-
-        $.ajax({
-            url: id ? '/admin/project/ajax-update/' + id : '/admin/project/ajax-store',
-            method: id ? 'PUT' : 'POST',
-            headers: { 'X-CSRF-TOKEN': csrfToken },
-            contentType: 'application/json',
-            data: JSON.stringify(data),
-            success: function (body) {
-                hideBsModal(document.getElementById('modal-project'));
-                setTimeout(function () { showMsg(body.message || '已儲存'); }, 400);
-                document.getElementById('modal-project-msg').addEventListener('hidden.bs.modal', function handler() {
-                    location.reload();
-                    this.removeEventListener('hidden.bs.modal', handler);
-                });
-            },
-            error: function (xhr) {
-                showMsg((xhr.responseJSON && xhr.responseJSON.message) || '操作失敗');
-            }
-        });
-    });
-
-    // ===== 系統規章（需求方 2026-10-30）=====
-
-    /** 存完要重新整理 —— 列表是 Blade 直接輸出的，沒有前端狀態可以更新 */
-    function reloadAfterMsg(message) {
-        showMsg(message);
-        document.getElementById('modal-project-msg').addEventListener('hidden.bs.modal', function handler() {
-            location.reload();
-            this.removeEventListener('hidden.bs.modal', handler);
-        });
-    }
-
-    $('.js-regulation-add').on('click', function () {
-        $('#modal-regulation-title').text('{{ trans("project.regulation_add") }}');
-        $('#regulation-id').val('');
-        $('#regulation-project-id').val($(this).data('project'));
-        $('#regulation-title').val('');
-        $('#regulation-content').val('');
-        $('#regulation-status').val('1');
-        $('#regulation-sort').val('0');
-        showBsModal('modal-regulation');
-    });
-
-    /*
-     * ⚠ 編輯與檢視都要**先去撈內容**。列表那一份刻意沒帶 `content`
-     * （規章可能上萬字，一次輸出十幾份會把頁面撐爆）。
-     */
-    function fetchRegulation(id, onDone) {
-        $.ajax({
-            url: '/admin/project/ajax-regulation/' + id,
-            method: 'GET',
-            headers: { 'X-CSRF-TOKEN': csrfToken },
-            success: function (body) { onDone(body.regulation); },
-            error: function (xhr) {
-                showMsg((xhr.responseJSON && xhr.responseJSON.message) || '操作失敗');
-            }
-        });
-    }
-
-    $('.js-regulation-view').on('click', function () {
-        fetchRegulation($(this).data('id'), function (r) {
-            $('#modal-regulation-view-title').text(r.title);
-            // ⚠ 用 text() 不是 html()：規章是使用者輸入的，塞進 HTML 會變成 XSS
-            $('#modal-regulation-view-body').text(r.content || '');
-            showBsModal('modal-regulation-view');
-        });
-    });
-
-    $('.js-regulation-edit').on('click', function () {
-        fetchRegulation($(this).data('id'), function (r) {
-            $('#modal-regulation-title').text('{{ trans("project.regulation_edit") }}');
-            $('#regulation-id').val(r.id);
-            $('#regulation-project-id').val(r.project_id);
-            $('#regulation-title').val(r.title);
-            $('#regulation-content').val(r.content || '');
-            $('#regulation-status').val(String(r.status));
-            $('#regulation-sort').val(r.sort);
-            showBsModal('modal-regulation');
-        });
-    });
-
-    $('#btn-regulation-save').on('click', function () {
-        var id = $('#regulation-id').val();
-        var data = {
-            title: $('#regulation-title').val().trim(),
-            content: $('#regulation-content').val(),
-            status: parseInt($('#regulation-status').val(), 10),
-            sort: parseInt($('#regulation-sort').val(), 10) || 0
-        };
-
-        if (!data.title || !data.content.trim()) {
-            showMsg('{{ trans("project.regulation_title_required") }}');
-            return;
-        }
-
-        // 新增才帶 project_id —— 更新不給改所屬專案（理由見 Service 的註解）
-        if (!id) { data.project_id = parseInt($('#regulation-project-id').val(), 10); }
-
-        var $btn = $(this);
-        $btn.prop('disabled', true);
-
-        $.ajax({
-            url: id ? '/admin/project/ajax-regulation-update/' + id : '/admin/project/ajax-regulation-store',
-            method: id ? 'PUT' : 'POST',
-            headers: { 'X-CSRF-TOKEN': csrfToken },
-            contentType: 'application/json',
-            data: JSON.stringify(data),
-            success: function (body) {
-                hideBsModal(document.getElementById('modal-regulation'));
-                setTimeout(function () { reloadAfterMsg(body.message || '已儲存'); }, 400);
-                $btn.prop('disabled', false);
-            },
-            error: function (xhr) {
-                showMsg((xhr.responseJSON && xhr.responseJSON.message) || '操作失敗');
-                $btn.prop('disabled', false);
-            }
-        });
-    });
-
-    /*
-     * ⚠ 刪除用瀏覽器的 confirm。這個頁面沒有既有的確認視窗元件，
-     * 而規章刪掉救不回來 —— 寧可用土法也不要少這一道。
-     */
-    $('.js-regulation-delete').on('click', function () {
-        if (!window.confirm('{{ trans("project.regulation_delete_confirm") }}')) { return; }
-
-        $.ajax({
-            url: '/admin/project/ajax-regulation-destroy/' + $(this).data('id'),
-            method: 'DELETE',
-            headers: { 'X-CSRF-TOKEN': csrfToken },
-            success: function (body) {
-                reloadAfterMsg(body.message || '已刪除');
-            },
-            error: function (xhr) {
-                showMsg((xhr.responseJSON && xhr.responseJSON.message) || '操作失敗');
-            }
-        });
-    });
-});
-</script>
+    {{-- ⚠ `?v=filemtime`：少了版本號瀏覽器會一直用舊的快取檔 ——
+         2026-10-30 點數報表就是漏了這一段，程式改好了但畫面沒變 --}}
+    <script src="{{ asset('js/project.js') }}?v={{ filemtime(public_path('js/project.js')) }}"></script>
 @endsection
