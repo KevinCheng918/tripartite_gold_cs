@@ -116,7 +116,12 @@ class ClockReminderService
             return $pending;
         }
 
-        return $this->send($pending);
+        /*
+         * ⚠ 把人直接帶進去，**不要在送出時逐人 `find()`** ——
+         * 名單上面已經撈過一次了，再查一次就是 N+1。
+         * 同一分鐘內整組人都要提醒（大家同一個班別）時特別明顯。
+         */
+        return $this->send($pending, $users->keyBy('id'));
     }
 
     /**
@@ -361,16 +366,17 @@ class ClockReminderService
      * ⚠ 一個人發不出去不能讓整輪停掉（`StaffDmService::send()` 自己
      * 不丟例外，這裡再包一層是為了狀態寫入）。
      *
-     * @param array $pending
+     * @param array                          $pending
+     * @param \Illuminate\Support\Collection $users 以 id 為 key，省掉逐人再查一次
      * @return array 真的送出去的那幾則
      */
-    private function send(array $pending)
+    private function send(array $pending, $users)
     {
         $sent = [];
 
         foreach ($pending as $item) {
             try {
-                $user = $this->userRepository->find((int) Arr::get($item, 'user_id'));
+                $user = $users->get((int) Arr::get($item, 'user_id'));
 
                 if (blank($user) || !$this->staffDm->send($user, Arr::get($item, 'text'))) {
                     continue;
