@@ -59,6 +59,27 @@ resources/js/admin/{accounts,roles}.js（純 vanilla fetch，無框架）
 `AccountService::list()`，而它只被 `AccountController::index()` 與
 `ajaxList()`（帳號選擇器）用到。
 
+### ⚠ `status` 與 `level` 的篩選不能用 `empty()` 判斷
+
+兩者的合法值都包含 **0**（`status` 的停用、`level` 的管理者）。
+`empty(0)` 是 true —— 用它判斷「有沒有帶這個篩選」的話，
+**「只看管理者」與「只看停用帳號」會安靜地變成不篩選**，列出全部人。
+不會報錯，只是篩選鈕按了沒反應。
+
+正確寫法是 `filled(Arr::get($filters, 'level'))`：`blank()` 對
+`is_numeric` 一律回 false，所以**數字永遠不算空**，`filled(0)` 是 true。
+
+原本那段寫成 `isset($f['level']) && $f['level'] !== '' && $f['level'] !== null`
+—— 行為是對的，但那是 `filled()` 的手工展開。六種輸入（`0`、`"0"`、
+`status 0`、空字串、null、key 不存在）比對過兩者完全一致才換掉。
+
+### ⚠ `findByAccount()` 目前沒有人在用
+
+登入走的是 `findByAccountForLogin()`（那一支才撈 `password`）。
+`findByAccount()` 原本是 `select *`，已改成 `LIST_COLUMNS` ——
+**不要因為「它沒撈到密碼」就改回 `select *`**，那等於把密碼撈進
+每一次查詢。要驗密碼就用另一支。
+
 ## 操作注意事項
 
 - **本機測試前務必 `php artisan config:clear`**：`phpunit.xml` 用 `<server>` 覆寫 `APP_ENV=testing` 等設定，但這些覆寫在 config 被 cache（`php artisan optimize`/`config:cache`）後會失效，測試會跑錯環境並失敗。改完 route 依 `PROMPTS.md` 要求跑完 `optimize` 後，如果接著要跑測試，記得先 clear。

@@ -6,6 +6,8 @@ use App\Criteria\CriteriaInterface;
 use App\Models\User;
 use App\Models\UserPermission;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -32,7 +34,9 @@ class UserRepository
     /**
      * 依條件分頁查詢使用者
      *
-     * @param array $filters 篩選條件（account, nickname, status, level）
+     * @param array $filters 篩選條件：account／nickname（模糊）、status／level（精確，
+     *                       **0 也算有效值**）、exclude_id（排除某人，通常是操作者自己）、
+     *                       min_level（只看階層大於等於這個數字的人）
      * @param int   $perPage
      * @return LengthAwarePaginator
      */
@@ -40,28 +44,54 @@ class UserRepository
     {
         $query = User::query()->select(self::LIST_COLUMNS)->with('permissions');
 
-        if (filled($filters['account'] ?? null)) {
-            $query->where('account', 'like', "%{$filters['account']}%");
+        $account = Arr::get($filters, 'account');
+
+        if (filled($account)) {
+            $query->where('account', 'like', "%{$account}%");
         }
 
-        if (filled($filters['nickname'] ?? null)) {
-            $query->where('nickname', 'like', "%{$filters['nickname']}%");
+        $nickname = Arr::get($filters, 'nickname');
+
+        if (filled($nickname)) {
+            $query->where('nickname', 'like', "%{$nickname}%");
         }
 
-        if (isset($filters['status']) && $filters['status'] !== '' && $filters['status'] !== null) {
-            $query->where('status', (int) $filters['status']);
+        /*
+         * ⚠ `status` 與 `level` **一定要用 `filled()` 判斷，不能用 `empty()`
+         * 或真值判斷**：兩者的合法值都包含 **0**（`status` 的停用、`level` 的
+         * 管理者）。`empty(0)` 是 true，會讓「只看管理者」「只看停用帳號」
+         * 這兩個篩選**安靜地變成不篩選**，列出全部人。
+         *
+         * `filled(0)` 在 Laravel 是 true —— `blank()` 對 `is_numeric` 一律
+         * 回 false，數字永遠不算空。
+         */
+        $status = Arr::get($filters, 'status');
+
+        if (filled($status)) {
+            $query->where('status', (int) $status);
         }
 
-        if (isset($filters['level']) && $filters['level'] !== '' && $filters['level'] !== null) {
-            $query->where('level', (int) $filters['level']);
+        $level = Arr::get($filters, 'level');
+
+        if (filled($level)) {
+            $query->where('level', (int) $level);
         }
 
-        if (filled($filters['exclude_id'] ?? null)) {
-            $query->where('id', '!=', (int) $filters['exclude_id']);
+        $excludeId = Arr::get($filters, 'exclude_id');
+
+        if (filled($excludeId)) {
+            $query->where('id', '!=', (int) $excludeId);
         }
 
-        if (filled($filters['min_level'] ?? null)) {
-            $query->where('level', '>=', (int) $filters['min_level']);
+        /*
+         * ⚠ `min_level` 是「操作者只能看比自己低階的人」，由
+         * `AccountController` 傳 `$operator->level + 1` ——
+         * 管理者（0）不會帶這個條件，所以這裡不必處理 0。
+         */
+        $minLevel = Arr::get($filters, 'min_level');
+
+        if (filled($minLevel)) {
+            $query->where('level', '>=', (int) $minLevel);
         }
 
         /*
@@ -139,12 +169,16 @@ class UserRepository
     /**
      * 依帳號查詢使用者
      *
+     * ⚠ **這一支不含密碼，不要拿來做登入驗證** —— 登入走
+     * `findByAccountForLogin()`。看到這裡沒有密碼就「順手」改成 `select *`
+     * 的話，等於把密碼撈進每一次查詢。
+     *
      * @param string $account
      * @return User|null
      */
     public function findByAccount($account)
     {
-        return User::query()->where('account', $account)->first();
+        return User::query()->select(self::LIST_COLUMNS)->where('account', $account)->first();
     }
 
     /**
@@ -209,7 +243,8 @@ class UserRepository
         DB::transaction(function () use ($user, $keywords) {
             UserPermission::query()->where('user_id', $user->id)->delete();
 
-            if (empty($keywords)) {
+            // 清空權限是合法操作 —— 刪完就結束，不要再往下組 insert
+            if (blank($keywords)) {
                 return;
             }
 
@@ -366,8 +401,13 @@ class UserRepository
     {
         $ids = array_filter((array) $ids);
 
+        /*
+         * ⚠ 空清單直接回空集合，不要 `whereRaw('1 = 0')->get()` ——
+         * 那是一趟必然沒結果的查詢，而且是 `select *`。
+         * 跟 `getMentionableByIds()` 同一個寫法。
+         */
         if (blank($ids)) {
-            return User::query()->whereRaw('1 = 0')->get();
+            return new Collection();
         }
 
         return User::query()
@@ -570,7 +610,7 @@ class UserRepository
     public function getNamesByIds($ids)
     {
         if (blank($ids)) {
-            return new \Illuminate\Database\Eloquent\Collection();
+            return new Collection();
         }
 
         return User::query()
@@ -631,8 +671,9 @@ class UserRepository
      */
     public function getMentionableByIds($ids)
     {
-        if (empty($ids)) {
-            return new \Illuminate\Database\Eloquent\Collection();
+        // 空清單就不要打 DB —— `whereIn('id', [])` 是一趟必然沒結果的查詢
+        if (blank($ids)) {
+            return new Collection();
         }
 
         return User::query()
