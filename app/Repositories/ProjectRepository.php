@@ -28,6 +28,48 @@ class ProjectRepository
     }
 
     /**
+     * 這個人看得到的專案
+     *
+     * ⚠ **「檢視專案」權限不等於看得到全部專案**（需求方 2026-10-30 回報）。
+     * 原本 `getAll()` 直接撈全部 —— 只要勾了 `project.view`，就算一個專案
+     * 都沒參與也看得到所有專案。
+     *
+     * 過濾規則照**任務看板既有的那一套**（`TaskBoardController::index()`）：
+     *
+     * | 身份 | 看得到 |
+     * |---|---|
+     * | 管理者 | 全部（系統維護用的帳號）|
+     * | 有勾參與專案 | 只有勾到的那幾個 |
+     * | 沒勾任何參與專案 | **一個都沒有** |
+     *
+     * ⚠ 最後那一列是重點：沒勾等於「空集合」，不是「不限制」。
+     * 寫成「沒勾就看全部」的話，新帳號一建立就看得到所有專案的規章。
+     *
+     * @param \App\Models\User $user
+     * @return Collection
+     */
+    public function getVisibleTo($user)
+    {
+        if ($user->isAdmin()) {
+            return $this->getAll();
+        }
+
+        $projectIds = (array) $user->project_ids;
+
+        // 短路：一個都沒勾就不必下查詢
+        if (blank($projectIds)) {
+            return Project::query()->whereRaw('1 = 0')->get();
+        }
+
+        return Project::query()
+            ->select(self::LIST_COLUMNS)
+            ->with('creator')
+            ->whereIn('id', $projectIds)
+            ->orderByDesc('id')
+            ->get();
+    }
+
+    /**
      * 取得所有啟用專案（下拉選單用）
      *
      * @return Collection

@@ -420,8 +420,19 @@ class UserRepository
      */
     public function findByTelegramUserId($telegramUserId, $exceptUserId = null)
     {
+        /*
+         * ⚠ **一定要 select `level`**（2026-10-30 修）。
+         *
+         * 所有小幫手指令都拿這支撈下指令的人，然後 `hasPermission()` 驗權限。
+         * 而 `hasPermission()` 第一行是 `isAdmin()` —— 沒撈 `level` 的話
+         * `$user->level` 是 null，舊版的 `null == 0`（管理者是 0）成立，
+         * **每一支指令對任何綁定過 Telegram 的帳號都直接放行**，
+         * 包括會發訊息給客戶的公告與餘點告警。
+         *
+         * `isAdmin()` 那一邊也補了防線，但這一欄本來就該撈。
+         */
         $query = User::query()
-            ->select(['id', 'nickname', 'account', 'telegram_user_id'])
+            ->select(['id', 'nickname', 'account', 'level', 'telegram_user_id'])
             ->where('telegram_user_id', (int) $telegramUserId);
 
         if (filled($exceptUserId)) {

@@ -64,11 +64,36 @@ class User extends Authenticatable
     /**
      * 是否為管理者
      *
+     * ⚠ **`level` 沒被 select 出來時一律回 false**（2026-10-30 修）。
+     *
+     * 管理者的 level 是 **0**，而原本寫的是 `$this->level == 0` ——
+     * 查詢沒帶 `level` 時 `$this->level` 是 `null`，而 PHP 的
+     * `null == 0` 是 **true**。於是「欄位沒撈出來」會被當成「他是管理者」，
+     * 而 `hasPermission()` 第一行就是 `isAdmin()` 回 true 就直接放行 ——
+     * **等於整個權限檢查被繞過**。
+     *
+     * 實際踩到：`UserRepository::findByTelegramUserId()` 當初沒 select
+     * `level`，所有小幫手指令（含會發訊息給客戶的公告與餘點告警）
+     * 對任何綁定過 Telegram 的帳號都直接放行。
+     *
+     * ⚠ 不能只改成 `(int) $this->level === 0` —— `(int) null` 也是 0，
+     * 一樣擋不住。要先確認那一欄真的有值。
+     *
+     * ⚠ `blank(0)` 是 **false**（Laravel 對數字一律不算空），
+     * 所以管理者的 level 0 過得了這一關、null 過不了 —— 正是要的行為。
+     *
+     * ⚠ 寧可錯殺不可錯放：真的管理者被擋下來會立刻有人回報，
+     * 非管理者被放行則是安靜出事。
+     *
      * @return bool
      */
     public function isAdmin()
     {
-        return $this->level == config('constants.USER.LEVEL.ADMIN');
+        if (blank($this->level)) {
+            return false;
+        }
+
+        return (int) $this->level === (int) config('constants.USER.LEVEL.ADMIN');
     }
 
     /**
