@@ -228,6 +228,15 @@ return [
              * 信箱的 OAuth 憑證）。能做查表的人不一定該能拿憑證去打外部服務。
              */
             'telegram_chat.gmail_credential' => 'permission.telegram_chat.gmail_credential',
+
+            /*
+             * 在內部群組 tag 機器人要系統規章（「給我三方規章」）。
+             *
+             * ⚠ **不沿用 `project.view`**（需求方 2026-10-30 選的）：
+             * 後台看得到規章是一回事，能把整份規章**貼到群組裡**是另一回事 ——
+             * 群組裡有誰、訊息會被轉去哪，不是後台權限管得到的。
+             */
+            'telegram_chat.regulation' => 'permission.telegram_chat.regulation',
         ],
     ],
 

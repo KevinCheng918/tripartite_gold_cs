@@ -47,6 +47,7 @@ class TelegramCommandRouter
     private $rateCommand;
     private $gmailCommand;
     private $spiderCommand;
+    private $regulationCommand;
     private $reminder;
 
     public function __construct(
@@ -60,6 +61,7 @@ class TelegramCommandRouter
         RateQueryCommandService $rateCommand,
         GmailCredentialCommandService $gmailCommand,
         SpiderSettingCommandService $spiderCommand,
+        RegulationCommandService $regulationCommand,
         ScheduledReminderService $reminder
     ) {
         $this->supportGroup = $supportGroup;
@@ -79,6 +81,12 @@ class TelegramCommandRouter
          */
         $this->gmailCommand = $gmailCommand;
         $this->spiderCommand = $spiderCommand;
+        /*
+         * 取系統規章。擺在 spider_setting **之後**：
+         * 那支的同義詞裡有「排程」，而規章跟排程沒有交集 —— 誰先誰後
+         * 其實都對得起來，排後面是因為它比較少被用到。
+         */
+        $this->regulationCommand = $regulationCommand;
         // 擺最後：它同時是「看不懂」時的歸宿
         $this->reminder = $reminder;
     }
@@ -163,6 +171,7 @@ class TelegramCommandRouter
         $rate = $this->rateCommand;
         $gmail = $this->gmailCommand;
         $spider = $this->spiderCommand;
+        $regulation = $this->regulationCommand;
         $reminder = $this->reminder;
 
         return [
@@ -201,6 +210,9 @@ class TelegramCommandRouter
             },
             function ($body, $from, $threadId) use ($spider) {
                 return $spider->handle($body, $from, $threadId);
+            },
+            function ($body, $from, $threadId) use ($regulation) {
+                return $regulation->handle($body, $from, $threadId);
             },
             function ($body, $from, $threadId, $message) use ($reminder) {
                 return $reminder->handle($body, $threadId, $message);

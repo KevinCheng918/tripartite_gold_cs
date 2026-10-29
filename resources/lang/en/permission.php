@@ -104,6 +104,7 @@ return [
         'rate_query' => "Query today's rate message by command",
         'spider_setting' => 'Build a spider_setting by command',
         'gmail_credential' => 'Verify Gmail credentials by command',
+        'regulation' => 'Fetch system regulations by command',
         'reply'     => 'Reply messages',
         'assign'    => 'Assign duty staff',
         'broadcast' => 'Broadcast announcement',

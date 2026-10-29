@@ -108,6 +108,7 @@ return [
         'rate_query'      => '用指令查今日汇率',
         'spider_setting'  => '用指令做 spider_setting',
         'gmail_credential' => '用指令验 Gmail 凭证',
+        'regulation' => '用指令取系统规章',
     ],
     'staff_manage' => [
         'view' => '查看内部管理',

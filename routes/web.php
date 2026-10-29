@@ -374,6 +374,18 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-list', [ProjectController::class, 'ajaxList'])->middleware('can:project.view')->name('ajax-list');
         Route::post('/ajax-store', [ProjectController::class, 'ajaxStore'])->middleware('can:project.edit')->name('ajax-store');
         Route::put('/ajax-update/{project}', [ProjectController::class, 'ajaxUpdate'])->middleware('can:project.edit')->name('ajax-update');
+
+        /*
+         * 系統規章（掛在每個專案底下，2026-10-30）。
+         *
+         * ⚠ 權限沿用 `project.view` / `project.edit`，但**光靠權限不夠** ——
+         * 規章的網址只有一個 id，沒參與那個專案的人照樣打得到。
+         * 每一支都在 Controller 再過一次 `canTouchProject()`。
+         */
+        Route::get('/ajax-regulation/{regulation}', [ProjectController::class, 'ajaxRegulationDetail'])->middleware('can:project.view')->name('ajax-regulation');
+        Route::post('/ajax-regulation-store', [ProjectController::class, 'ajaxRegulationStore'])->middleware('can:project.edit')->name('ajax-regulation-store');
+        Route::put('/ajax-regulation-update/{regulation}', [ProjectController::class, 'ajaxRegulationUpdate'])->middleware('can:project.edit')->name('ajax-regulation-update');
+        Route::delete('/ajax-regulation-destroy/{regulation}', [ProjectController::class, 'ajaxRegulationDestroy'])->middleware('can:project.edit')->name('ajax-regulation-destroy');
     });
 
     /*

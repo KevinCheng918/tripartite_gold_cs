@@ -174,7 +174,7 @@ class RegulationCommandService
                 ])
                 : '';
 
-            $this->reply($prefix . $page . $chunk, $threadId);
+            $this->reply("{$prefix}{$page}{$chunk}", $threadId);
         }
 
         Log::info('小幫手已回覆規章', [

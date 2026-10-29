@@ -84,10 +84,147 @@
                         @endif
                     </div>
                 </div>
+
+                {{-- ============ 系統規章（需求方 2026-10-30）============ --}}
+                {{-- ⚠ 一個專案可以有多份。內容不在這裡顯示（可能上萬字），
+                     點「看內容」才去撈 --}}
+                <div class="main-card mb-3 card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-book me-1"></i>{{ trans('project.regulation_section') }}
+                            </h5>
+                            @if(Auth::user()->hasPermission('project.edit'))
+                            <button class="btn btn-sm btn-primary js-regulation-add" data-project="{{ $project->id }}">
+                                <i class="fas fa-plus me-1"></i>{{ trans('project.regulation_add') }}
+                            </button>
+                            @endif
+                        </div>
+
+                        @php($items = $regulations[$project->id] ?? collect())
+
+                        @if($items->isEmpty())
+                            <p class="text-muted mb-0" style="font-size:0.875rem">{{ trans('project.regulation_empty') }}</p>
+                        @else
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>{{ trans('project.regulation_title') }}</th>
+                                            <th style="width:6rem">{{ trans('project.regulation_status') }}</th>
+                                            <th style="width:12rem">{{ trans('project.regulation_updated_by') }}</th>
+                                            <th style="width:12rem" class="text-end">{{ trans('station.field_action') }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($items as $item)
+                                        <tr>
+                                            <td>{{ $item->title }}</td>
+                                            <td>
+                                                @if($item->isActive())
+                                                    <span class="badge bg-success">{{ trans('project.regulation_active') }}</span>
+                                                @else
+                                                    {{-- ⚠ 停用的要標出來：小幫手取不到，但後台還看得到 --}}
+                                                    <span class="badge bg-secondary">{{ trans('project.regulation_disabled') }}</span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">
+                                                    {{ $item->updater ? $item->updater->nickname : '-' }}
+                                                    @if($item->updated_at)
+                                                        <div>{{ $item->updated_at->format('Y-m-d H:i') }}</div>
+                                                    @endif
+                                                </small>
+                                            </td>
+                                            <td class="text-end">
+                                                <button class="btn btn-sm btn-outline-secondary js-regulation-view" data-id="{{ $item->id }}">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                @if(Auth::user()->hasPermission('project.edit'))
+                                                <button class="btn btn-sm btn-outline-secondary js-regulation-edit" data-id="{{ $item->id }}">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger js-regulation-delete" data-id="{{ $item->id }}">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+                    </div>
+                </div>
             </div>
             @endforeach
         </div>
     @endif
+
+    {{-- 新增/編輯規章 Modal --}}
+    <div class="modal fade" id="modal-regulation" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modal-regulation-title">{{ trans('project.regulation_add') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="form-regulation">
+                        <input type="hidden" id="regulation-id">
+                        <input type="hidden" id="regulation-project-id">
+                        <div class="mb-3">
+                            <label class="form-label">{{ trans('project.regulation_title') }} <span class="text-danger">*</span></label>
+                            <input type="text" id="regulation-title" class="form-control" required
+                                maxlength="{{ config('rules.REGULATION_TITLE_MAX') }}"
+                                placeholder="{{ trans('project.regulation_title_placeholder') }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{{ trans('project.regulation_content') }} <span class="text-danger">*</span></label>
+                            <textarea id="regulation-content" class="form-control" rows="14" required
+                                maxlength="{{ config('rules.REGULATION_CONTENT_MAX') }}"></textarea>
+                            <small class="form-text text-muted">{{ trans('project.regulation_content_placeholder') }}</small>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">{{ trans('project.regulation_status') }}</label>
+                                <select id="regulation-status" class="form-select">
+                                    <option value="1">{{ trans('project.regulation_active') }}</option>
+                                    <option value="0">{{ trans('project.regulation_disabled') }}</option>
+                                </select>
+                                <small class="form-text text-muted">{{ trans('project.regulation_status_hint') }}</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">{{ trans('project.regulation_sort') }}</label>
+                                <input type="number" id="regulation-sort" class="form-control" min="0" max="9999" value="0">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="btn-regulation-save">儲存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- 看規章內容 Modal（唯讀） --}}
+    <div class="modal fade" id="modal-regulation-view" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modal-regulation-view-title"></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    {{-- ⚠ 用 pre-wrap 保留換行 —— 規章是條列式的，壓成一段就看不懂了 --}}
+                    <div id="modal-regulation-view-body" style="white-space:pre-wrap;font-size:0.9rem"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     {{-- 新增/編輯專案 Modal --}}
     <div class="modal fade" id="modal-project" tabindex="-1">
@@ -191,6 +328,124 @@ $(function () {
                     location.reload();
                     this.removeEventListener('hidden.bs.modal', handler);
                 });
+            },
+            error: function (xhr) {
+                showMsg((xhr.responseJSON && xhr.responseJSON.message) || '操作失敗');
+            }
+        });
+    });
+
+    // ===== 系統規章（需求方 2026-10-30）=====
+
+    /** 存完要重新整理 —— 列表是 Blade 直接輸出的，沒有前端狀態可以更新 */
+    function reloadAfterMsg(message) {
+        showMsg(message);
+        document.getElementById('modal-project-msg').addEventListener('hidden.bs.modal', function handler() {
+            location.reload();
+            this.removeEventListener('hidden.bs.modal', handler);
+        });
+    }
+
+    $('.js-regulation-add').on('click', function () {
+        $('#modal-regulation-title').text('{{ trans("project.regulation_add") }}');
+        $('#regulation-id').val('');
+        $('#regulation-project-id').val($(this).data('project'));
+        $('#regulation-title').val('');
+        $('#regulation-content').val('');
+        $('#regulation-status').val('1');
+        $('#regulation-sort').val('0');
+        showBsModal('modal-regulation');
+    });
+
+    /*
+     * ⚠ 編輯與檢視都要**先去撈內容**。列表那一份刻意沒帶 `content`
+     * （規章可能上萬字，一次輸出十幾份會把頁面撐爆）。
+     */
+    function fetchRegulation(id, onDone) {
+        $.ajax({
+            url: '/admin/project/ajax-regulation/' + id,
+            method: 'GET',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            success: function (body) { onDone(body.regulation); },
+            error: function (xhr) {
+                showMsg((xhr.responseJSON && xhr.responseJSON.message) || '操作失敗');
+            }
+        });
+    }
+
+    $('.js-regulation-view').on('click', function () {
+        fetchRegulation($(this).data('id'), function (r) {
+            $('#modal-regulation-view-title').text(r.title);
+            // ⚠ 用 text() 不是 html()：規章是使用者輸入的，塞進 HTML 會變成 XSS
+            $('#modal-regulation-view-body').text(r.content || '');
+            showBsModal('modal-regulation-view');
+        });
+    });
+
+    $('.js-regulation-edit').on('click', function () {
+        fetchRegulation($(this).data('id'), function (r) {
+            $('#modal-regulation-title').text('{{ trans("project.regulation_edit") }}');
+            $('#regulation-id').val(r.id);
+            $('#regulation-project-id').val(r.project_id);
+            $('#regulation-title').val(r.title);
+            $('#regulation-content').val(r.content || '');
+            $('#regulation-status').val(String(r.status));
+            $('#regulation-sort').val(r.sort);
+            showBsModal('modal-regulation');
+        });
+    });
+
+    $('#btn-regulation-save').on('click', function () {
+        var id = $('#regulation-id').val();
+        var data = {
+            title: $('#regulation-title').val().trim(),
+            content: $('#regulation-content').val(),
+            status: parseInt($('#regulation-status').val(), 10),
+            sort: parseInt($('#regulation-sort').val(), 10) || 0
+        };
+
+        if (!data.title || !data.content.trim()) {
+            showMsg('{{ trans("project.regulation_title_required") }}');
+            return;
+        }
+
+        // 新增才帶 project_id —— 更新不給改所屬專案（理由見 Service 的註解）
+        if (!id) { data.project_id = parseInt($('#regulation-project-id').val(), 10); }
+
+        var $btn = $(this);
+        $btn.prop('disabled', true);
+
+        $.ajax({
+            url: id ? '/admin/project/ajax-regulation-update/' + id : '/admin/project/ajax-regulation-store',
+            method: id ? 'PUT' : 'POST',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: function (body) {
+                hideBsModal(document.getElementById('modal-regulation'));
+                setTimeout(function () { reloadAfterMsg(body.message || '已儲存'); }, 400);
+                $btn.prop('disabled', false);
+            },
+            error: function (xhr) {
+                showMsg((xhr.responseJSON && xhr.responseJSON.message) || '操作失敗');
+                $btn.prop('disabled', false);
+            }
+        });
+    });
+
+    /*
+     * ⚠ 刪除用瀏覽器的 confirm。這個頁面沒有既有的確認視窗元件，
+     * 而規章刪掉救不回來 —— 寧可用土法也不要少這一道。
+     */
+    $('.js-regulation-delete').on('click', function () {
+        if (!window.confirm('{{ trans("project.regulation_delete_confirm") }}')) { return; }
+
+        $.ajax({
+            url: '/admin/project/ajax-regulation-destroy/' + $(this).data('id'),
+            method: 'DELETE',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            success: function (body) {
+                reloadAfterMsg(body.message || '已刪除');
             },
             error: function (xhr) {
                 showMsg((xhr.responseJSON && xhr.responseJSON.message) || '操作失敗');

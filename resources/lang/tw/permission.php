@@ -101,6 +101,7 @@ return [
         'rate_query'      => '用指令查今日匯率',
         'spider_setting'  => '用指令做 spider_setting',
         'gmail_credential' => '用指令驗 Gmail 憑證',
+        'regulation' => '用指令取系統規章',
     ],
     'setting' => [
         'view'   => '檢視 AI 引擎設定與用量',

@@ -97,7 +97,7 @@ class ProjectRegulationRepository
         return ProjectRegulation::query()
             ->with(['project'])
             ->where('status', ProjectRegulation::STATUS_ACTIVE)
-            ->where('title', 'like', '%' . $title . '%')
+            ->where('title', 'like', "%{$title}%")
             ->orderBy('sort')
             ->orderBy('id')
             ->get();

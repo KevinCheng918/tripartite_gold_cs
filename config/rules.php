@@ -101,4 +101,18 @@ return [
 
     // 一次最多監聽幾個錢包。每個錢包每分鐘各一次 API 呼叫，不能無限加
     'WALLET_ADDRESS_MAX' => 20,
+
+    // 規章標題長度。對齊 `project_regulation.title` 的 varchar(100)
+    'REGULATION_TITLE_MAX' => 100,
+
+    /*
+     * 規章內容的字數上限。
+     *
+     * ⚠ 欄位是 `longtext`（約 4GB），這個數字純粹是**不讓人把一整本手冊
+     * 貼進來** —— 小幫手要把它分段發到 Telegram，20 萬字會變成 50 則訊息。
+     *
+     * ⚠ 要用 `max:` 擋在寫入之前。靠欄位擋的話，MySQL 非 strict mode
+     * 是**安靜截斷**，存檔看起來成功、後面少一段卻沒有人會發現。
+     */
+    'REGULATION_CONTENT_MAX' => 50000,
 ];
