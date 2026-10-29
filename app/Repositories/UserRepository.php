@@ -271,6 +271,40 @@ class UserRepository
     }
 
     /**
+     * 要檢查打卡提醒的在職同仁
+     *
+     * ⚠ **不分輪班／固定班一次全撈**：打卡提醒每分鐘跑一次，逐人查是
+     * 一天幾萬次查詢。撈回來之後由 `AttendanceService` 一次算出每個人
+     * 當天的上下班時間（輪班的排班也是一次撈完）。
+     *
+     * ⚠ 條件照 `getFixedWorkModeUsers()` 的標準：**停用與離職都要排掉**。
+     * `status = 停用` 只是不能登入，真正的離職看 `resigned_at` ——
+     * 兩個都不濾的話，離職同仁會被一路提醒到有人發現為止。
+     *
+     * ⚠ select 要帶固定班那四個欄位 —— 固定班的上下班時間存在帳號上，
+     * 漏掉的話 `resolveWorkTime()` 一律回 null，固定班的人永遠收不到提醒。
+     *
+     * ⚠ 也要帶 `telegram_user_id` 與 `telegram_dm_ready`：送出端
+     * （`StaffDmService::canDm()`）要靠它判斷發不發得出去，
+     * 不帶的話每個人都會被當成沒綁定。
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<User>
+     */
+    public function getForClockReminder()
+    {
+        return User::query()
+            ->select([
+                'id', 'nickname', 'level', 'status',
+                'work_mode', 'work_start_time', 'work_end_time', 'work_days',
+                'telegram_user_id', 'telegram_dm_ready',
+            ])
+            ->where('status', '!=', config('constants.USER.STATUS.DEACTIVATE'))
+            ->whereNull('resigned_at')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
      * 取得所有正常狀態帳號（下拉選單用）
      *
      * @return \Illuminate\Database\Eloquent\Collection

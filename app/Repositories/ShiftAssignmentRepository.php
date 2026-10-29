@@ -171,6 +171,37 @@ class ShiftAssignmentRepository
     }
 
     /**
+     * 一整批人在某一天的排班
+     *
+     * ⚠ 打卡提醒每分鐘跑一次，逐人查排班是一天幾萬次查詢 ——
+     * 這支一次把所有人當天的排班撈回來（見
+     * `AttendanceService::resolveWorkTimes()`）。
+     *
+     * ⚠ `with('shift')` 不能省：上下班時間在班別上，沒有 eager load
+     * 就變成「省了一次查詢、換來每人一次」。
+     *
+     * @param array<int> $userIds
+     * @param string     $date Y-m-d
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getByUserIdsAndDate($userIds, $date)
+    {
+        $userIds = array_values(array_filter((array) $userIds));
+
+        // 短路：沒有人就不必下查詢（whereIn 空陣列在不同版本行為不一）
+        if (blank($userIds)) {
+            return ShiftAssignment::query()->whereRaw('1 = 0')->get();
+        }
+
+        return ShiftAssignment::query()
+            ->select(self::LIST_COLUMNS)
+            ->with(['shift'])
+            ->whereIn('user_id', $userIds)
+            ->where('date', $date)
+            ->get();
+    }
+
+    /**
      * 刪除排班紀錄
      *
      * @param ShiftAssignment $assignment
@@ -211,6 +242,13 @@ class ShiftAssignmentRepository
             ->exists();
     }
 
+    /**
+     * 這兩筆排班之間有沒有還沒處理完的換班申請
+     *
+     * @param int $requesterAssignmentId 提出換班的那一筆排班
+     * @param int $targetAssignmentId    想換到的那一筆排班
+     * @return bool
+     */
     public function hasPendingSwap($requesterAssignmentId, $targetAssignmentId)
     {
         return ShiftSwap::query()
@@ -220,6 +258,12 @@ class ShiftAssignmentRepository
             ->exists();
     }
 
+    /**
+     * 建立換班申請
+     *
+     * @param array $attributes
+     * @return \App\Models\ShiftSwap
+     */
     public function createSwap($attributes)
     {
         return ShiftSwap::query()->create($attributes);

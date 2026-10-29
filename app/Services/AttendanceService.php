@@ -79,6 +79,59 @@ class AttendanceService
     }
 
     /**
+     * 一整批人在某一天的標準上下班時間
+     *
+     * ⚠ **為了打卡提醒而加的**：那支每分鐘跑一次，逐人呼叫
+     * `resolveWorkTime()` 等於一天幾萬次查詢。這裡把輪班的排班**一次撈完**，
+     * 固定班則完全不必查（時間在帳號上）。
+     *
+     * ⚠ **規則沒有重寫**：兩種模式的分岔與 `buildWorkTime()` 都跟
+     * `resolveWorkTime()` 共用同一份 —— 只是把「查排班」那一步批次化。
+     * 另寫一份「有排班用排班、沒有就看固定班」遲早會跟單筆版分岔。
+     *
+     * @param \Illuminate\Support\Collection|array $users 已經撈好的 User
+     * @param string                               $date  Y-m-d
+     * @return array<int, array|null> user_id => workTime；null ＝ 這天不用上班
+     */
+    public function resolveWorkTimes($users, $date)
+    {
+        $rotating = [];
+        $result = [];
+
+        foreach ($users as $user) {
+            if ($user->isFixedWorkMode()) {
+                // 固定班不必查 DB，時間就在帳號上
+                $result[(int) $user->id] = $this->workTimeFromUser($user, $date);
+
+                continue;
+            }
+
+            $rotating[] = (int) $user->id;
+            $result[(int) $user->id] = null;
+        }
+
+        // 短路：全部都是固定班就不必碰排班表
+        if (blank($rotating)) {
+            return $result;
+        }
+
+        foreach ($this->assignmentRepository->getByUserIdsAndDate($rotating, $date) as $assignment) {
+            if (blank($assignment->shift)) {
+                continue;
+            }
+
+            $result[(int) $assignment->user_id] = $this->buildWorkTime(
+                (string) $assignment->shift->start_time,
+                (string) $assignment->shift->end_time,
+                (int) $assignment->id,
+                false
+            );
+        }
+
+        return $result;
+    }
+
+    /**
      * 輪班：從當天的排班指派拿
      *
      * @param int    $userId

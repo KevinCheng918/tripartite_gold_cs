@@ -149,6 +149,24 @@ class Kernel extends ConsoleKernel
          */
         $schedule->command('wallet:watch-transfers')->everyMinute()->withoutOverlapping();
 
+        /*
+         * 打卡提醒：上班前 15 分鐘、下班後 30 分鐘起每 30 分鐘一次
+         * （需求方 2026-10-29）。
+         *
+         * ⚠ **一定要每分鐘**：提醒的時間點是「上班前 15 分」這種相對時刻，
+         * 每個人的班別不同、分佈在一天的任何一分鐘。間隔再長就會偏掉 ——
+         * 跑五分鐘一次的話，08:45 該提醒的人可能 08:48 才收到，
+         * 而那時他已經在打卡了。
+         *
+         * ⚠ `withoutOverlapping`：這支會逐人送私訊，人多時可能跑超過一分鐘。
+         * 重疊的話同一則會被判斷兩次 —— 狀態表的唯一索引擋得住重複寫入，
+         * 但會重複發訊息給同一個人。
+         *
+         * ⚠ **沒有功能開關**：需求方指定不能關（會關掉它的人正好最需要它）。
+         * 不想收的唯一辦法是請他的班別不要排 —— 那本來就該提醒。
+         */
+        $schedule->command('attendance:remind')->everyMinute()->withoutOverlapping();
+
         // 每月 1 號凌晨 0 點產生 VM 帳單
         $schedule->command('vm:generate-billing')->monthlyOn(1, '00:00');
 
