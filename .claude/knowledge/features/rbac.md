@@ -36,6 +36,29 @@ resources/js/admin/{accounts,roles}.js（純 vanilla fetch，無框架）
 - 一帳號可多角色（many-to-many）
 - 這次一併補上最小登入/登出（原本專案完全沒有登入功能）
 
+## 帳號管理列表的排序（2026-10-30 改）
+
+需求方：「我帳號管理這邊也要用 level 去排序。」
+
+`UserRepository::paginate()` 從 `orderByDesc('id')` 改成
+**`orderBy('level')` ＋ `orderByDesc('id')`**。
+
+⚠ **方向跟其他取人清單的那幾支一致**（`getManagersForMention()`、
+`getDmCandidates()` 都是 `orderBy('level')`）：階層小的在前（管理者 0 →
+老闆 1 → 組長 2 → 工程 3 → 客服 4）。同一份人員在不同頁面順序不一致的話，
+看的人會以為少了人。
+
+⚠ **同階層內維持 `id` 由大到小**，不要換成 nickname：剛開好的帳號要還在
+那一群的最上面，不然開完帳號的人得自己去名字排序裡找。
+
+⚠ `level` 是 `tinyInteger NOT NULL default 1`，所以**沒有 null 排在最前面**
+的問題（MySQL 升冪時 null 會排在 0 前面，那會讓沒設階層的人看起來比管理者
+還大）。
+
+⚠ 影響範圍就是帳號管理那一頁 —— `paginate()` 的呼叫端只有
+`AccountService::list()`，而它只被 `AccountController::index()` 與
+`ajaxList()`（帳號選擇器）用到。
+
 ## 操作注意事項
 
 - **本機測試前務必 `php artisan config:clear`**：`phpunit.xml` 用 `<server>` 覆寫 `APP_ENV=testing` 等設定，但這些覆寫在 config 被 cache（`php artisan optimize`/`config:cache`）後會失效，測試會跑錯環境並失敗。改完 route 依 `PROMPTS.md` 要求跑完 `optimize` 後，如果接著要跑測試，記得先 clear。

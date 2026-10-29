@@ -64,7 +64,17 @@ class UserRepository
             $query->where('level', '>=', (int) $filters['min_level']);
         }
 
-        return $query->orderByDesc('id')->paginate($perPage);
+        /*
+         * ⚠ **先照階層排**（需求方 2026-10-30）：階層小的在前（管理者 0 →
+         * 老闆 1 → 組長 2 → 工程 3 → 客服 4），跟取管理者名單
+         * （`getManagersForMention()`）與通知收件人那幾支同一個方向 ——
+         * 同一份人員在不同頁面的順序不一致，看的人會以為少了人。
+         *
+         * ⚠ 同階層內**維持 id 由大到小**：剛開好的帳號還是在那一群的最上面。
+         * 第二順位換成 nickname 的話，新建的帳號會掉到名字排序的中間，
+         * 開完帳號的人要自己找。
+         */
+        return $query->orderBy('level')->orderByDesc('id')->paginate($perPage);
     }
 
     /**
