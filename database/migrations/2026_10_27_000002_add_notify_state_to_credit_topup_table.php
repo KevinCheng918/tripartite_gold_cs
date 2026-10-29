@@ -54,18 +54,30 @@ class AddNotifyStateToCreditTopupTable extends Migration
      * ⚠ 用 `reviewed_at` 而不是 `now()`：當成「審核當下就通知了」才對得上
      * 列表上的時間，填 `now()` 會變成一整批紀錄都在 migration 那一刻通知。
      *
+     * ⚠ **`reviewed_at` 可能是空的**（很早期的紀錄）—— 那幾筆退用
+     * `created_at`。漏掉它們的話，列表上還是會留著幾筆紅色的「未通知」，
+     * 而那正是這段回填要避免的事。
+     *
      * ⚠ `notify_issue` 留空 —— 不知道就不要編一個原因出來。
+     *
+     * ⚠ 這段**可以重複執行**：`whereNull('notified_at')` 讓已經回填過的不受影響。
      *
      * @return void
      */
     private function backfill()
     {
+        // 1 = STATUS_COMPLETED。只有已完成的才該有通知
         DB::table('credit_topup')
             ->whereNull('notified_at')
-            // 1 = STATUS_COMPLETED。只有已完成的才該有通知
             ->where('status', 1)
             ->whereNotNull('reviewed_at')
             ->update(['notified_at' => DB::raw('reviewed_at')]);
+
+        DB::table('credit_topup')
+            ->whereNull('notified_at')
+            ->where('status', 1)
+            ->whereNull('reviewed_at')
+            ->update(['notified_at' => DB::raw('created_at')]);
     }
 
     /**
