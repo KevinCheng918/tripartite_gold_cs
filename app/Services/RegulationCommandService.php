@@ -149,6 +149,10 @@ class RegulationCommandService
      * 所以超過就切段連發，每則標 `(1/3)` —— 不標的話看的人不知道
      * 還有沒有下文，而規章少看一段可能就是漏掉一條規則。
      *
+     * ⚠ **不掛規章名稱與專案的抬頭**（需求方 2026-10-30）：這則訊息多半是
+     * 要直接轉給客戶或同仁看的，抬頭是我們內部怎麼歸檔的事 —— 貼過去還得
+     * 先手動刪掉那兩行。規章內容本身的第一行通常就是它自己的標題。
+     *
      * @param \App\Models\ProjectRegulation $regulation
      * @param int|null                      $threadId
      * @param array                         $config
@@ -156,17 +160,11 @@ class RegulationCommandService
      */
     private function sendContent($regulation, $threadId, array $config)
     {
-        $header = strtr((string) Arr::get($config, 'HEADER'), [
-            '{title}'   => (string) $regulation->title,
-            '{project}' => filled($regulation->project) ? (string) $regulation->project->name : '-',
-        ]);
-
         $chunks = $this->split((string) $regulation->content, (int) Arr::get($config, 'CHUNK_SIZE'));
         $total = count($chunks);
 
         foreach ($chunks as $index => $chunk) {
-            // 只有第一則掛標題；每則都標頁碼（只有一則時不標，那是噪音）
-            $prefix = ($index === 0) ? $header : '';
+            // 每則都標頁碼（只有一則時不標，那是噪音）
             $page = $total > 1
                 ? strtr((string) Arr::get($config, 'PAGE'), [
                     '{current}' => $index + 1,
@@ -174,7 +172,7 @@ class RegulationCommandService
                 ])
                 : '';
 
-            $this->reply("{$prefix}{$page}{$chunk}", $threadId);
+            $this->reply("{$page}{$chunk}", $threadId);
         }
 
         Log::info('小幫手已回覆規章', [
