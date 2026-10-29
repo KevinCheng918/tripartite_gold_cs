@@ -167,7 +167,33 @@ class Kernel extends ConsoleKernel
          */
         $schedule->command('attendance:remind')->everyMinute()->withoutOverlapping();
 
-        // 每月 1 號凌晨 0 點產生 VM 帳單
+        /*
+         * VM 帳單：**月底最後兩天先產生下個月的**（需求方 2026-10-30）。
+         *
+         * ⚠ 原本只有 1 號那一次。繳款通知是每天 09:30 查「應收日 ≤ 今天+2」
+         * 的未繳帳單 —— 但 30 號那天**下個月的帳單還不存在**，所以繳費日在
+         * 1、2 號的客戶永遠收不到提前通知，最多只能在當天才收到。
+         *
+         * ⚠ `when()` 算的是「這個月的最後兩天」，不是寫死 30、31 號 ——
+         * 二月只有 28 天，寫死的話二月永遠不會跑。
+         *
+         * ⚠ 兩次都跑是刻意的，**不是重複**：
+         *
+         * | 時機 | 產哪個月 | 補什麼 |
+         * |---|---|---|
+         * | 月底最後兩天 | 下個月 | 1、2 號繳費的提前通知 |
+         * | 1 號 | 當月 | 月底那次失敗、或機器是月中才開機的 |
+         *
+         * 已經有的帳單會被 `generateMonthlyBillings()` 跳過，所以重跑無害。
+         */
+        $schedule->command('vm:generate-billing --next')
+            ->dailyAt('00:05')
+            ->when(function () {
+                return now()->day > now()->daysInMonth - 2;
+            })
+            ->withoutOverlapping();
+
+        // 每月 1 號凌晨 0 點補一次當月的（理由見上面那段）
         $schedule->command('vm:generate-billing')->monthlyOn(1, '00:00');
 
         // 每日上午 9 點在內部支援群組報匯率。週末假日照報 —— 每天都要有匯率

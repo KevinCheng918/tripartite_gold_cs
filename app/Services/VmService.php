@@ -292,6 +292,13 @@ class VmService
         ]);
 
         return [
+            /*
+             * ⚠ 把月份也回出去。這支現在會**在月底提前產生下個月**的帳單
+             * （2026-10-30），指令印出「新增幾筆」卻不說是哪個月的話，
+             * 跑的人看不出到底產到哪一個月 —— 而產錯月份正是這個改動最容易
+             * 出的錯（見 `GenerateVmBilling::nextMonth()` 的 Carbon 溢位）。
+             */
+            'month'      => $billingMonth,
             'generated'  => $generated,
             'skipped'    => $skipped,
             'updated'    => $updated,
