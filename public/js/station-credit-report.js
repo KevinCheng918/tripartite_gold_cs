@@ -2,7 +2,11 @@
  * 站台點數報表（餘點曲線圖）
  *
  * 資料來自 `station_credit_log` —— 每次同步寫一筆
- * （排程、列表的同步按鈕、小幫手查餘點、餘點告警、虛擬機試算都算）。
+ * （排程、列表的同步按鈕、小幫手查餘點、餘點告警、虛擬機試算都算），
+ * 補點審核通過也寫一筆（那幾筆才有「原本／異動／現在」）。
+ *
+ * 系統點數與商城點數是**兩條線**：主系統補點 API 回的是「被補的那一種」的
+ * 餘額，混在一條線上會變成憑空的大跳（需求方 2026-10-30）。
  */
 (function () {
     'use strict';
@@ -21,6 +25,15 @@
     var fromInput = document.getElementById('cr-date-from');
     var toInput = document.getElementById('cr-date-to');
     var chart = null;
+
+    /*
+     * 每條線對齊到共用時間軸之後的原始點（`chartSeries[datasetIndex][dataIndex]`）。
+     *
+     * ⚠ tooltip 需要的是**後端那一包原始資料**（來源、跟前一點差多少、補點的
+     * 原本／異動／現在），Chart.js 的 `item.parsed.y` 只有數字 —— 所以得自己
+     * 留一份，並且跟 dataset 的順序一致。
+     */
+    var chartSeries = [];
 
     /**
      * @param {string} target
@@ -90,6 +103,7 @@
      */
     function render(data) {
         var points = data.points || [];
+        var shopPoints = data.shop_points || [];
         var failures = data.failures || [];
         var range = data.range || {};
 
@@ -103,7 +117,7 @@
         }
 
         renderSummary(data.summary || {}, range);
-        renderChart(points);
+        renderChart(points, shopPoints);
         renderFailures(failures);
     }
 
@@ -129,13 +143,12 @@
 
         var diff = summary.diff || 0;
         var diffClass = diff > 0 ? 'text-success' : (diff < 0 ? 'text-danger' : 'text-muted');
-        var diffSign = diff > 0 ? '+' : '';
 
         box.innerHTML = [
             card(i18n.summary_range, escapeHtml(range.start + ' ~ ' + range.end), ''),
             card(i18n.summary_first, formatNumber(summary.first), ''),
             card(i18n.summary_last, formatNumber(summary.last), ''),
-            card(i18n.summary_diff, diffSign + formatNumber(diff), diffClass)
+            card(i18n.summary_diff, signed(diff), diffClass)
         ].join('');
     }
 
@@ -167,63 +180,256 @@
     }
 
     /**
+     * 兩條線共用的時間軸
+     *
+     * ⚠ **兩條線的時間點不一樣**：系統點數是每小時取樣，商城點數只有補點那
+     * 幾筆。各自用自己的 labels 畫的話，同一個 x 位置在兩條線上代表不同時間 ——
+     * 所以先取聯集當共用軸，每條線缺的位置補 null（配 `spanGaps` 跨過去）。
+     *
+     * ⚠ 字串排序就是時間排序：`YYYY-MM-DD HH:mm` 是零補位的固定格式。
+     * 不要 `new Date()` 再比 —— 那會把時區問題帶進來。
+     *
+     * @param {Array} points
+     * @param {Array} shopPoints
+     * @return {Array}
+     */
+    function buildLabels(points, shopPoints) {
+        var seen = {};
+        var labels = [];
+
+        points.concat(shopPoints).forEach(function (p) {
+            if (seen[p.at]) { return; }
+
+            seen[p.at] = true;
+            labels.push(p.at);
+        });
+
+        return labels.sort();
+    }
+
+    /**
+     * 把一條線的點對齊到共用時間軸
+     *
+     * ⚠ 同一分鐘同一種點數有兩筆時（補點剛好撞上同步）只會留**後面那一筆** ——
+     * 時間標籤只到分鐘，兩個點會疊在同一個 x 上。後端是照時間由舊到新排的，
+     * 所以留下的是較新的那個餘額，剛好是對的那一個。
+     *
+     * @param {Array} series
+     * @param {Array} labels
+     * @return {Array} 跟 labels 等長；沒有資料的位置是 null
+     */
+    function align(series, labels) {
+        var byLabel = {};
+
+        series.forEach(function (p) { byLabel[p.at] = p; });
+
+        return labels.map(function (label) {
+            return byLabel[label] || null;
+        });
+    }
+
+    /**
+     * 一條線
+     *
+     * ⚠ **補點的點要畫得比較大**：那幾個點是人為異動，跟取樣到的點意義不同；
+     * 大小一樣的話，圖上那一跳看起來就像客戶自己的變化。
+     *
+     * ⚠ **兩條線各自一個 y 軸**（`yAxisID`）：系統點數與商城點數的量級可能
+     * 差很多，共用一個軸的話小的那條會被壓成一條平貼底部的直線，看不出走勢。
+     *
+     * @param {string} label
+     * @param {Array}  aligned
+     * @param {string} color
+     * @param {string} background
+     * @param {string} axis   y／yShop
+     * @return {object}
+     */
+    function dataset(label, aligned, color, background, axis) {
+        return {
+            label: label,
+            yAxisID: axis,
+            data: aligned.map(function (p) { return p ? p.credits : null; }),
+            borderColor: color,
+            backgroundColor: background,
+            borderWidth: 2,
+            pointRadius: aligned.map(function (p) { return isTopup(p) ? 6 : 3; }),
+            pointStyle: aligned.map(function (p) { return isTopup(p) ? 'rectRot' : 'circle'; }),
+            fill: true,
+            stepped: true,
+            // 商城那條線中間大半是 null，不跨過去的話整條線都連不起來
+            spanGaps: true
+        };
+    }
+
+    /**
+     * 這個點是補點來的嗎（有異動金額的才是）
+     *
+     * @param {object} point
+     * @return {boolean}
+     */
+    function isTopup(point) {
+        return !!point && point.change !== null && point.change !== undefined;
+    }
+
+    /**
      * 畫曲線
      *
      * ⚠ **用 stepped 而不是直線**：我們只在同步的那一刻取樣，兩點之間實際
      * 發生什麼並不知道。直線會讓人以為中間是線性消耗 —— 階梯線表達的才是
      * 「上次同步到這次同步之間，我們只知道這兩個值」。
      *
-     * @param {Array} points
+     * ⚠ **商城沒有資料時不要畫那條線**：主系統的站台資訊沒有回商城餘額，
+     * 同步取樣不到，所以沒補過商城點數的站台 `shop_points` 一定是空的 ——
+     * 空 dataset 會在圖例上留一條什麼都沒有的線，看的人會以為壞了。
+     *
+     * @param {Array} points     系統點數
+     * @param {Array} shopPoints 商城點數
      */
-    function renderChart(points) {
+    function renderChart(points, shopPoints) {
         var ctx = document.getElementById('cr-chart');
+        var labels = buildLabels(points, shopPoints);
 
         if (chart) {
             chart.destroy();
         }
 
+        chartSeries = [align(points, labels)];
+
+        var datasets = [dataset(i18n.chart_label, chartSeries[0], '#3f6ad8', 'rgba(63,106,216,0.08)', 'y')];
+        var hasShop = shopPoints.length > 0;
+
+        if (hasShop) {
+            chartSeries.push(align(shopPoints, labels));
+            datasets.push(dataset(i18n.chart_label_shop, chartSeries[1], '#f7b924', 'rgba(247,185,36,0.08)', 'yShop'));
+        }
+
         chart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: points.map(function (p) { return p.at; }),
-                datasets: [{
-                    label: i18n.chart_label,
-                    data: points.map(function (p) { return p.credits; }),
-                    borderColor: '#3f6ad8',
-                    backgroundColor: 'rgba(63,106,216,0.08)',
-                    borderWidth: 2,
-                    pointRadius: 3,
-                    fill: true,
-                    stepped: true
-                }]
+                labels: labels,
+                datasets: datasets
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 interaction: { mode: 'index', intersect: false },
                 plugins: {
-                    legend: { display: false },
+                    // 只有一條線時圖例是廢話，兩條線就必須標出哪條是哪條
+                    legend: { display: datasets.length > 1 },
                     tooltip: {
                         callbacks: {
-                            // 滑過去要看得到「怎麼觸發的」—— 凹下去是真的掉點
-                            // 還是剛好有人手動同步，分得出來才有意義
-                            afterBody: function (items) {
-                                var point = points[items[0].dataIndex];
-
-                                return point ? (i18n.tooltip_source + '：' + sourceLabel(point.source)) : '';
-                            }
+                            label: tooltipLabel,
+                            afterBody: tooltipAfterBody
                         }
                     }
                 },
                 scales: {
                     y: {
                         ticks: {
+                            /*
+                             * 兩個軸的時候刻度要染成線的顏色，不然看的人不知道
+                             * 左邊那排數字是哪一條線的。只有一條線時維持預設色
+                             * （沒有別的軸要分辨，染色只是雜訊）。
+                             */
+                            color: hasShop ? '#3f6ad8' : undefined,
+                            callback: function (value) { return formatNumber(value); }
+                        }
+                    },
+                    /*
+                     * 商城點數的右側軸。
+                     *
+                     * ⚠ `display` 跟著商城有沒有資料走：沒有的時候留一個空軸
+                     * 在右邊，看的人會以為那條線沒畫出來。
+                     *
+                     * ⚠ `grid.drawOnChartArea: false`：兩個軸各畫一次格線的話，
+                     * 圖上會出現兩套對不起來的橫線。
+                     */
+                    yShop: {
+                        display: hasShop,
+                        position: 'right',
+                        grid: { drawOnChartArea: false },
+                        ticks: {
+                            color: '#f7b924',
                             callback: function (value) { return formatNumber(value); }
                         }
                     }
                 }
             }
         });
+    }
+
+    /**
+     * tooltip 主體：餘額 ＋ 跟前一點差多少
+     *
+     * 需求方 2026-10-30：「每一天的點，都要顯示跟昨天正負多少。」同步是一小時
+     * 一次，所以比的是前一個點 —— 差多少由後端算（它才知道中間有幾筆同步失敗）。
+     *
+     * @param {object} item
+     * @return {string}
+     */
+    function tooltipLabel(item) {
+        var text = item.dataset.label + '：' + formatNumber(item.parsed.y);
+        var point = pointOf(item);
+
+        // 區間第一個點沒有「前一點」可比，diff 是 null —— 不要顯示成「±0」
+        if (point && point.diff !== null && point.diff !== undefined) {
+            text += '（' + i18n.tooltip_diff + ' ' + signed(point.diff) + '）';
+        }
+
+        return text;
+    }
+
+    /**
+     * tooltip 下半：來源，補點的再加上原本／異動／現在
+     *
+     * ⚠ **「原本」是後端用「現在 − 異動」算的，不是前一個點**：上次同步到補點
+     * 之間客戶照樣在消耗，前一個點不是補點前一刻的餘額。
+     *
+     * @param {Array} items
+     * @return {Array}
+     */
+    function tooltipAfterBody(items) {
+        var lines = [];
+
+        items.forEach(function (item) {
+            var point = pointOf(item);
+
+            if (!point) { return; }
+
+            // 滑過去要看得到「怎麼觸發的」—— 凹下去是真的掉點
+            // 還是剛好有人手動同步，分得出來才有意義
+            lines.push(i18n.tooltip_source + '：' + sourceLabel(point.source));
+
+            if (!isTopup(point)) { return; }
+
+            lines.push(i18n.tooltip_before + '：' + formatNumber(point.before));
+            lines.push(i18n.tooltip_change + '：' + signed(point.change));
+            lines.push(i18n.tooltip_after + '：' + formatNumber(point.credits));
+        });
+
+        return lines;
+    }
+
+    /**
+     * tooltip 項目對應的原始資料點
+     *
+     * @param {object} item
+     * @return {object|null}
+     */
+    function pointOf(item) {
+        var series = chartSeries[item.datasetIndex];
+
+        return series ? series[item.dataIndex] : null;
+    }
+
+    /**
+     * 帶正負號的數字（0 不加號）
+     *
+     * @param {number} value
+     * @return {string}
+     */
+    function signed(value) {
+        return (value > 0 ? '+' : '') + formatNumber(value);
     }
 
     /**

@@ -17,7 +17,7 @@ class StationCreditLogRepository
      *
      * @var array<string>
      */
-    private const REPORT_COLUMNS = ['id', 'station_id', 'credits', 'source', 'created_at'];
+    private const REPORT_COLUMNS = ['id', 'station_id', 'credits', 'credit_type', 'change_amount', 'source', 'created_at'];
 
     /**
      * 記一筆
@@ -54,6 +54,9 @@ class StationCreditLogRepository
     /**
      * 某站台最後一筆（還沒有任何紀錄時回 null）
      *
+     * ⚠ **只看系統點數**：商城補點那幾筆的 `credits` 是商城餘額 ——
+     * 不濾的話，一筆商城補點就會被當成「最新的系統餘點」。
+     *
      * @param int $stationId
      * @return StationCreditLog|null
      */
@@ -62,6 +65,7 @@ class StationCreditLogRepository
         return StationCreditLog::query()
             ->select(self::REPORT_COLUMNS)
             ->where('station_id', $stationId)
+            ->where('credit_type', StationCreditLog::CREDIT_TYPE_CREDIT)
             ->orderByDesc('created_at')
             ->first();
     }

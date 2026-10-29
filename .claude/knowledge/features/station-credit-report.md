@@ -32,7 +32,43 @@
 （只問 API 不寫 DB），所以也不會污染報表 —— 這是既有設計，剛好正確。
 
 ⚠ 反過來說，**繞過 `syncInfo()` 直接改 `credits` 的地方不會被記錄**。
-目前沒有這種地方（補點走主系統 API 再同步回來），但日後要留意。
+補點是**唯一的例外**，而且是刻意的 —— 見下面「補點那幾筆」。
+
+## 補點那幾筆（2026-10-30 追加）
+
+> 需求：「點數報表，如果有補點，曲線圖要顯示原本是多少，補多少，現在是多少。
+> 每一天的點，都要顯示跟昨天正負多少。」
+> 追加：「商城點數要可以用另外一條線，可以跟原本的分開。」
+>
+> 兩個決定（問過需求方）：**點不變，每個點比前一個點**（同步是一小時一次，
+> 不改成一天一個點）、**審核通過就記一筆餘點紀錄**。
+
+`CreditTopupService::approve()` 成功後呼叫
+`StationService::recordTopupCredit()`，`source` 是 `topup`。
+
+⚠ **刻意不走 `syncInfo()`**：那會再打一次主系統 API，而補點回應裡的
+`data.credit` 已經是權威的新餘額了 —— 再查一次只是多一次外部請求，
+而且兩次之間客戶又消耗了點數的話，圖上那一跳反而對不起來。
+
+⚠ **異動金額要存下來，不能用「跟前一個點的差」算**：前一次同步到補點之間，
+客戶照樣在消耗點數 —— 兩點之差是「補的 ＋ 這段時間消耗的」。
+所以多一個 `change_amount` 欄位，`before` 由報表用 `現在 − 異動` 算。
+
+⚠ **商城點數必須是另一條線**：主系統 `AdminCreditService` 回的是
+`'credit' => $admin->{$column}` —— **被補的那一種**的餘額。商城補點回的是
+商城餘額，混進系統點數那條曲線會變成一個憑空的大跳。所以多一個
+`credit_type` 欄位，報表拆成 `points`／`shop_points` 兩條線、兩個 y 軸
+（量級可能差很多，共用一個軸會把小的那條壓平）。
+
+⚠ **商城那條線目前只有補點那幾筆**：主系統 `SystemController::siteInfo()`
+只回 `admin_credit`，沒有商城餘額 —— 每小時的同步取樣不到。要變成完整曲線，
+得請主系統在 `siteInfo()` 多回一個商城餘額欄位；客服端這邊
+（`credit_type` ＋ 第二條線）已經備好了。
+
+⚠ **「其他」那一類不會進圖裡**：`approve()` 一開頭就轉去 `approveOther()`，
+那一類主系統的點數根本沒動，畫進去會變成假的異動。
+
+⚠ **這次之前的補點不會回頭補**：當時沒有留異動金額，推不出來。
 
 ## 資料表 `station_credit_log`
 
@@ -40,8 +76,17 @@
 |---|---|
 | `station_id` | 哪個站台 |
 | `credits` | 同步當下的餘點，**可為 null** |
+| `credit_type` | `credit` 系統點數 / `shop_credit` 商城點數，預設 `credit` |
+| `change_amount` | 這一筆的異動金額（**帶正負號**）；只有補點那幾筆有值 |
 | `source` | 怎麼觸發的 |
 | `created_at` | 什麼時候 |
+
+⚠ `credit_type` 的 default 一定要是 `credit`：既有紀錄全部來自
+`siteInfo()` 的 `admin_credit`，不補 default 的話舊資料會變成 null
+而從兩條線上同時消失。
+
+⚠ `change_amount` 要**帶正負號**（扣點是負的）。只存絕對值的話，
+報表算「原本 ＝ 現在 − 異動」時扣點會算反。
 
 ⚠ **`credits` 可以是 null** —— 同步失敗也要留一筆（需求方選的）。
 沒有這一筆的話，圖上某天沒有點就分不出是「沒人同步」還是「同步失敗」。
@@ -155,6 +200,20 @@ flex item、高度來自 flex line 的 stretch —— 兩邊互相要高度，Ch
 | `public/js/station-credit-report.js` | **新增** |
 | `resources/lang/{tw,cn,en}/station.php`／`permission.php` | 三語系 |
 
+### 2026-10-30 追加（補點的點、每點差值、商城第二條線）
+
+| 檔案 | 說明 |
+|---|---|
+| `database/migrations/2026_10_30_000002_add_topup_columns_to_station_credit_log_table.php` | **新增**。`change_amount` ＋ `credit_type` |
+| `app/Models/StationCreditLog.php` | 加 `SOURCE_TOPUP`、`CREDIT_TYPE_CREDIT`／`CREDIT_TYPE_SHOP` |
+| `app/Repositories/StationCreditLogRepository.php` | 報表欄位多兩欄；`latestByStation()` 只看系統點數 |
+| `app/Services/StationService.php` | 新增 `recordTopupCredit()`；`logCredit()` 多收 `$changeAmount`／`$creditType` |
+| `app/Services/CreditTopupService.php` | 注入 `StationService`，審核通過後 `recordCreditLog()` |
+| `app/Services/StationCreditReportService.php` | 拆兩條線、`withDiff()` 算每點差值、補點那幾筆多帶 `before`／`change` |
+| `public/js/station-credit-report.js` | 共用時間軸 ＋ 兩條線 ＋ 右側第二個 y 軸 ＋ tooltip 顯示原本／異動／現在 |
+| `resources/lang/{tw,cn,en}/station.php` | 新增 `chart_label_shop`、`tooltip_*`、`credit_source.topup` |
+| `config/changelog.php` | v3.45 |
+
 ## 驗證
 
 **報表組裝五種情境**（repository mock，不碰 DB）：正常（含失敗那筆不進曲線、
@@ -168,8 +227,27 @@ flex item、高度來自 flex line 的 stretch —— 兩邊互相要高度，Ch
 ⚠ **沒有真的跑過一次同步**（那會寫進正式資料），也**沒有在瀏覽器看過圖**。
 上線後第一次排程跑完就會有資料。
 
+### 2026-10-30 追加的驗證
+
+**`withDiff()`**（反射叫私有方法，不碰 DB）：第一個點 `diff` 是 null 不是 0／
+正負差值／**餘額為 0 的那個點之後照樣算得出 diff**（`filled(0.0)` 在 Laravel
+是 true，數字永遠不 blank）／空陣列與單點不會爆。
+
+**前端的對齊與 tooltip**（把純函式抽出來用 node 跑）：兩條線取聯集時間軸、
+各自缺的位置補 null／補點那個點半徑 6 其餘 3／第一個點不顯示「±0」／
+補點顯示原本 800 → 異動 +500 → 現在 1,300／商城扣點顯示 −3,000 且走
+商城那條線的標籤。
+
+⚠ **沒有真的審過一筆補點**（那會呼叫主系統 API 動到真的點數），所以
+「審核通過 → 圖上多一個菱形點」這條路徑是推的，不是跑過的。
+本機也**沒有任何商城補點紀錄**，商城那條線沒有真實資料看過。
+
 ## 待釐清
 
 - 目前是**單一站台一頁**。需求方說「他的餘點」，所以先做單站；
   要多站疊在同一張圖比較的話是另一個題目。
 - 沒有清理排程。量級估下來十年都還好，但如果站台數成長很多要回來看。
+- **商城那條線要不要變成完整曲線**：得請主系統在
+  `SystemController::siteInfo()` 多回一個商城餘額（`admin_shop_credit`
+  之類），客服端 `syncInfo()` 再多記一筆 `shop_credit`。
+  現在只有補點那幾個點。

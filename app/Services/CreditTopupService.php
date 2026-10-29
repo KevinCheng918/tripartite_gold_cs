@@ -17,15 +17,19 @@ class CreditTopupService
     private $topupRepository;
     private $mainSystemApi;
     private $telegramChatService;
+    private $stationService;
 
     public function __construct(
         CreditTopupRepository $topupRepository,
         MainSystemApiService $mainSystemApi,
-        TelegramChatService $telegramChatService
+        TelegramChatService $telegramChatService,
+        StationService $stationService
     ) {
         $this->topupRepository = $topupRepository;
         $this->mainSystemApi = $mainSystemApi;
         $this->telegramChatService = $telegramChatService;
+        // 補點通過要在點數報表上留一個點，見 recordCreditLog()
+        $this->stationService = $stationService;
     }
 
     /**
@@ -150,10 +154,71 @@ class CreditTopupService
 
         // 通知放在交易外：Telegram 是外部呼叫，不該把交易撐在那邊等
         if ((int) $updated->status === CreditTopup::STATUS_COMPLETED) {
+            $this->recordCreditLog($station, $updated, $result);
             $this->notifyTelegram($station, $updated, $result, $reviewerId, $reviewerName);
         }
 
         return $updated;
+    }
+
+    /**
+     * 在點數報表上留一個點
+     *
+     * 需求方 2026-10-30：「點數報表，如果有補點，曲線圖要顯示原本是多少，
+     * 補多少，現在是多少。」沒有這一筆的話，報表只看得到一小時一次的取樣 ——
+     * 曲線上那一跳到底是補點還是客戶突然不消耗了，分不出來。
+     *
+     * ⚠ **異動金額是存下來的，不是算出來的**：前一次同步到補點之間，客戶照樣
+     * 在消耗點數 —— 「跟前一個點的差」是「補的 ＋ 這段時間消耗的」。
+     * 要講「補多少」只能用申請單上的金額。
+     *
+     * ⚠ **`credit_type` 原樣往下傳**：商城補點回的 `data.credit` 是商城餘額，
+     * 記進系統點數那條曲線會變成一個憑空的大跳，所以兩種分成兩條線
+     * （需求方 2026-10-30：「商城點數要可以用另外一條線」）。
+     *
+     * ⚠ 「其他」不會走到這裡 —— `approve()` 一開頭就轉去 `approveOther()`，
+     * 那一類主系統的點數根本沒動，記進曲線會變成假的異動。
+     *
+     * ⚠ 整段的失敗處理在 `StationService::logCredit()`：寫報表用的紀錄失敗
+     * 不能影響補點本身，點數已經加扣完成了。
+     *
+     * @param \App\Models\Station $station
+     * @param CreditTopup         $topup
+     * @param array|null          $result 主站 API 回應
+     * @return void
+     */
+    private function recordCreditLog($station, CreditTopup $topup, $result)
+    {
+        $credits = Arr::get((array) $result, 'data.credit');
+
+        /*
+         * ⚠ 拿不到新餘額就**不要記**：填 0 或填舊值都會在圖上畫出一個
+         * 假的點，比缺一個點難查得多。
+         */
+        if (blank($credits)) {
+            Log::warning('補點成功但主站未回傳餘額，略過點數報表紀錄', [
+                'topup_id'   => $topup->id,
+                'station_id' => $station->id,
+            ]);
+
+            return;
+        }
+
+        /*
+         * ⚠ 正負號用**字串**接上去，不要 `-1 * (float) $amount`：點數是
+         * decimal，轉 float 在大數字上會丟精度，而且大到一定程度會印成
+         * `1.0E+25` 寫進 decimal 欄位。同 `StationCreditLog::$credits`
+         * 不 cast float 的理由。
+         */
+        $amount = ltrim((string) $topup->credit_amount, '-');
+        $isDeduct = (int) $topup->action_type === CreditTopup::ACTION_DEDUCT;
+
+        $this->stationService->recordTopupCredit(
+            $station,
+            (string) $credits,
+            $isDeduct ? "-{$amount}" : $amount,
+            (string) $topup->credit_type
+        );
     }
 
     /**

@@ -214,29 +214,61 @@ class StationService
     }
 
     /**
-     * 記一筆餘點同步紀錄
+     * 補點審核通過時記一筆餘點紀錄
+     *
+     * ⚠ **這一支刻意不走 `syncInfo()`**：那會再打一次主系統 API，而補點
+     * 回應裡的 `data.credit` 已經是權威的新餘額了 —— 再查一次只是多一次
+     * 外部請求，而且兩次之間客戶又消耗了點數的話，圖上那一跳反而對不起來。
+     *
+     * ⚠ `$creditType` **一定要照補的那一種傳**：主系統補點 API 回的
+     * `data.credit` 是「被補的那一種」的餘額，商城補點回的是商城餘額 ——
+     * 傳錯的話那個數字會掉到另一條曲線上，變成一個憑空的大跳。
+     *
+     * @param Station     $station
+     * @param string|null $credits      補完之後的餘額
+     * @param string|null $changeAmount 這次的異動金額（帶正負號）
+     * @param string      $creditType   見 StationCreditLog::CREDIT_TYPE_*
+     * @return void
+     */
+    public function recordTopupCredit(Station $station, $credits, $changeAmount, $creditType)
+    {
+        $this->logCredit($station, $credits, StationCreditLog::SOURCE_TOPUP, $changeAmount, $creditType);
+    }
+
+    /**
+     * 記一筆餘點紀錄
      *
      * ⚠ **寫紀錄失敗不能讓同步失敗**：點數本身已經更新好了，為了一筆報表用的
      * 紀錄把整個同步往上拋，會讓排程、告警、指令全部跟著掛掉。
      *
      * @param Station     $station
-     * @param string|null $credits null ＝ 這次同步失敗
+     * @param string|null $credits      null ＝ 這次同步失敗
      * @param string      $source
+     * @param string|null $changeAmount 只有補點那幾筆有值；同步一律 null
+     * @param string      $creditType   見 StationCreditLog::CREDIT_TYPE_*
      * @return void
      */
-    private function logCredit(Station $station, $credits, $source)
-    {
+    private function logCredit(
+        Station $station,
+        $credits,
+        $source,
+        $changeAmount = null,
+        $creditType = StationCreditLog::CREDIT_TYPE_CREDIT
+    ) {
         try {
             $this->creditLogRepository->create([
-                'station_id' => $station->id,
-                'credits'    => $credits,
-                'source'     => $source,
+                'station_id'    => $station->id,
+                'credits'       => $credits,
+                'credit_type'   => $creditType,
+                'change_amount' => $changeAmount,
+                'source'        => $source,
             ]);
         } catch (\Exception $e) {
             Log::warning('站台餘點紀錄寫入失敗', [
-                'station_id' => $station->id,
-                'source'     => $source,
-                'error'      => $e->getMessage(),
+                'station_id'  => $station->id,
+                'source'      => $source,
+                'credit_type' => $creditType,
+                'error'       => $e->getMessage(),
             ]);
         }
     }
