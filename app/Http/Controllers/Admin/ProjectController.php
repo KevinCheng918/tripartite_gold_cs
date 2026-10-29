@@ -234,20 +234,15 @@ class ProjectController extends Controller
      * 規章的網址只有一個 id，沒參與那個專案的人照樣打得到
      * （需求方 2026-10-30 問的就是這個行為）。
      *
-     * ⚠ 判準跟 `ProjectRepository::getVisibleTo()` **走同一份**：
-     * 管理者全部、有勾參與專案的只有勾到的、一個都沒勾就什麼都碰不到。
+     * ⚠ 判準在 `User::canAccessProject()`，跟
+     * `ProjectRepository::getVisibleTo()` **是同一份** —— 這裡只是轉呼叫。
+     * 各寫一份遲早會分岔，而分岔的那一邊就是資料外洩。
      *
      * @param int $projectId
      * @return bool
      */
     private function canTouchProject($projectId)
     {
-        $user = Auth::user();
-
-        if ($user->isAdmin()) {
-            return true;
-        }
-
-        return in_array($projectId, array_map('intval', (array) $user->project_ids), true);
+        return Auth::user()->canAccessProject($projectId);
     }
 }

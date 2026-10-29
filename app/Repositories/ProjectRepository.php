@@ -54,7 +54,8 @@ class ProjectRepository
             return $this->getAll();
         }
 
-        $projectIds = (array) $user->project_ids;
+        // ⚠ 正規化與「碰不碰得到」的判準都在 User 上，這裡不另外寫一份
+        $projectIds = $user->projectIdList();
 
         // 短路：一個都沒勾就不必下查詢
         if (blank($projectIds)) {

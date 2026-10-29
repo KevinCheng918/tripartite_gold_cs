@@ -238,7 +238,7 @@ class TelegramCommandRouter
             return '';
         }
 
-        $mention = '@' . $username;
+        $mention = "@{$username}";
 
         if (mb_stripos($text, $mention) === false) {
             return '';

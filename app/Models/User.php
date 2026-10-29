@@ -55,6 +55,7 @@ class User extends Authenticatable
      * 密碼寫入時自動以 Crypt::encrypt 加密
      *
      * @param string $password
+     * @return void
      */
     public function setPasswordAttribute($password)
     {
@@ -180,6 +181,46 @@ class User extends Authenticatable
      * @param string $keyword 權限 keyword
      * @return bool
      */
+    /**
+     * 這個人被勾了哪些參與專案
+     *
+     * ⚠ 正規化成整數陣列 —— `project_ids` 是 JSON 欄位，裡面可能是字串
+     * （前端送來的是 `["1","2"]`），拿去跟 `$project->id` 做 `in_array(…, true)`
+     * 會全部對不上。
+     *
+     * ⚠ **空陣列是「一個都沒參與」，不是「不限制」。** 專案管理與系統規章
+     * 都靠這一點 —— 當成不限制的話，新帳號一建立就看得到所有專案的規章。
+     *
+     * @return array<int>
+     */
+    public function projectIdList()
+    {
+        return array_map('intval', (array) $this->project_ids);
+    }
+
+    /**
+     * 這個人碰得到這個專案嗎
+     *
+     * ⚠ 「有檢視專案的權限」與「看得到哪幾個專案」是兩件事
+     * （需求方 2026-10-30）—— 權限管的是進不進得了那一頁，
+     * 參與專案管的是看得到哪幾個。
+     *
+     * ⚠ 這一支是**唯一的判準**：`ProjectRepository::getVisibleTo()` 組清單、
+     * Controller 擋單筆 API，兩邊都問它。各寫一份遲早會分岔，
+     * 而分岔的那一邊就是資料外洩。
+     *
+     * @param int $projectId
+     * @return bool
+     */
+    public function canAccessProject($projectId)
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        return in_array((int) $projectId, $this->projectIdList(), true);
+    }
+
     public function hasPermission($keyword)
     {
         if ($this->isAdmin()) {

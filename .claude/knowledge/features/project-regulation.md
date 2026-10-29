@@ -31,8 +31,17 @@
 | 有勾參與專案 | 只有勾到的那幾個 |
 | **沒勾任何參與專案** | **一個都沒有** |
 
-規則抄任務看板既有的那一套（`TaskBoardController::index()`），
-收斂在 `ProjectRepository::getVisibleTo()`。
+規則抄任務看板既有的那一套（`TaskBoardController::index()`）。
+
+⚠ **判準只有一份**：`User::canAccessProject()`。組清單的
+`ProjectRepository::getVisibleTo()` 與擋單筆 API 的 `canTouchProject()`
+兩邊都問它 —— 第一版各寫了一次 `in_array(… project_ids …)`，
+那是同一條規則的兩份實作，分岔的那一邊就是資料外洩。
+
+⚠ `project_ids` 是 JSON 欄位，裡面**可能是字串**（`["1","3"]`）——
+`User::projectIdList()` 統一 `intval` 正規化。不正規化而用
+`in_array(…, true)` 嚴格比對的話會全部對不上，
+結果是「明明勾了卻還是看不到」。
 
 ⚠ **最後那一列是重點**：沒勾等於空集合，不是「不限制」。
 寫成「沒勾就看全部」的話，新帳號一建立就看得到所有專案的規章。
@@ -135,6 +144,7 @@ Telegram，20 萬字會變成 50 則訊息。
 | `app/Services/TelegramCommandRouter.php` | 多一棒 |
 | `app/Http/Controllers/Admin/ProjectController.php`／`routes/web.php` | 四支 ajax ＋ `canTouchProject()` |
 | `app/Repositories/ProjectRepository.php` | **新增 `getVisibleTo()`**（參與專案過濾）|
+| `app/Models/User.php` | **新增 `canAccessProject()` / `projectIdList()`**（唯一判準）|
 | `config/permissionMap.php` | `telegram_chat.regulation` |
 | `config/constants.php`／`config/rules.php` | 文案、字數上限、`CHUNK_SIZE` |
 | `resources/views/admin/project/index.blade.php` | 規章區塊 ＋ 兩個 modal |
@@ -156,6 +166,8 @@ Telegram，20 萬字會變成 50 則訊息。
 - 分段（實測 9,892 字）：分成多則、**每則都在 4096 內**、有頁碼、
   只有第一則有標題、**分段之後內容沒有掉字**
 - 切點落在換行（不切在句子中間）、中文沒有被切壞
+
+**參與專案的判斷 12 種情境**：管理者沒勾也碰得到、有勾的碰得到勾到的、碰不到沒勾的、**`project_ids` 是字串也對得上**、空陣列與 null 都是「什麼都碰不到」、**沒 select `level` 的半套 Model 不會被當成管理者**、傳字串 id 也對得上。
 
 另外確認：容器解得開五個新類別、四支路由都掛上、`permissionMap` 有新 keyword、
 三語系 `project.php` 28 個 key 完全對齊、blade 內嵌 JS 通過 `node --check`。
