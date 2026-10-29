@@ -1267,50 +1267,15 @@ $(function () {
     var allSystems = @json($systems->map(function ($s) { return ['id' => $s->id, 'name' => $s->name]; }));
 
     /*
-     * 「有沒有通知到客戶」。
+     * ⚠ **列表上不顯示「有沒有通知到客戶」**（需求方 2026-10-29 要求拔掉）。
      *
-     * ⚠ 這件事以前**只寫在 log** —— 站台沒綁群組、主站沒回訊息、Telegram
-     * 拒收，三種都是靜悄悄的，後台只顯示「已完成」，沒有人知道客戶其實
-     * 什麼都沒收到（需求方 2026-10-27：「有問題就顯示」）。
+     * 一度做成在狀態欄標出「未通知／已通知／格式較舊」，還附一顆補傳鈕。
+     * 但那一欄是後來才加的，**既有紀錄全是空的**，於是整頁歷史都被標成紅色
+     * 的「未通知客戶」—— 那是假警報，而且會訓練人忽略這個標示。
      *
-     * ⚠ `notified_at` 與 `notify_issue` 是**兩件事**：舊格式那一種是
-     * 「有送出去但格式舊」，兩欄都有值。
+     * 狀態仍然寫進 `credit_topup.notified_at` / `notify_issue`（給查問題用），
+     * 只是不往畫面上放。
      */
-    var topupNoticeLabels = {
-        no_group: '{{ trans("station.topup_notice_no_group") }}',
-        no_message: '{{ trans("station.topup_notice_no_message") }}',
-        send_failed: '{{ trans("station.topup_notice_send_failed") }}',
-        old_format: '{{ trans("station.topup_notice_old_format") }}'
-    };
-
-    function topupNoticeBadge(t) {
-        // 只有「已完成」才該有通知；待審核／拒絕／API 失敗本來就沒有
-        if (parseInt(t.status, 10) !== 1) { return ''; }
-
-        // 「其他」類型不呼叫主系統 API，本來就不發通知 —— 標了反而像壞掉
-        if (t.credit_type === 'other') { return ''; }
-
-        if (!t.notified_at) {
-            var reason = topupNoticeLabels[t.notify_issue] || '{{ trans("station.topup_notice_unknown") }}';
-
-            return '<div class="cell-stack__sub text-danger">'
-                + '<i class="fas fa-bell-slash me-1"></i>' + reason + '</div>';
-        }
-
-        if (t.notify_issue === 'old_format') {
-            return '<div class="cell-stack__sub text-warning">'
-                + '<i class="fas fa-exclamation-triangle me-1"></i>' + topupNoticeLabels.old_format + '</div>';
-        }
-
-        return '<div class="cell-stack__sub text-muted">'
-            + '<i class="fas fa-paper-plane me-1"></i>{{ trans("station.topup_notice_sent") }}</div>';
-    }
-
-    /** 這一筆需不需要補傳（已完成、不是「其他」、而且沒送到） */
-    function topupNeedsResend(t) {
-        return parseInt(t.status, 10) === 1 && t.credit_type !== 'other' && !t.notified_at;
-    }
-
     function topupStatusBadge(status) {
         var map = {
             0: '<span class="badge" style="background:rgba(255,193,7,0.15);color:#b8860b;border-radius:9999px;padding:0.3em 0.8em">{{ trans("station.topup_status_pending") }}</span>',
@@ -1546,7 +1511,7 @@ $(function () {
             html += '<td>' + topupActionLabel(t.action_type, t.credit_type) + '</td>';
             html += '<td class="col-num">' + topupUsdtCell(t) + '</td>';
             html += '<td class="col-num"><strong>' + t.credit_amount + '</strong></td>';
-            html += '<td>' + topupStatusBadge(t.status) + topupNoticeBadge(t) + '</td>';
+            html += '<td>' + topupStatusBadge(t.status) + '</td>';
             html += '<td>' + t.requester + (t.reviewer ? '<div class="cell-stack__sub">審核：' + t.reviewer + '</div>' : '') + '</td>';
             html += '<td><small class="text-muted">' + t.created_at + '</small>' + (t.reviewed_at ? '<div class="cell-stack__sub">' + t.reviewed_at + '</div>' : '') + '</td>';
             /*
@@ -1566,13 +1531,6 @@ $(function () {
                 html += '<button class="btn btn-outline-secondary btn-icon btn-transition js-topup-approve" data-id="' + t.id + '" data-station="' + t.station + '" data-amount="' + t.credit_amount + '" data-action="' + t.action_type + '"><i class="fas fa-check btn-icon-wrapper text-success"></i>通過</button>';
                 html += '<button class="btn btn-outline-secondary btn-icon btn-transition js-topup-reject" data-id="' + t.id + '"><i class="fas fa-times btn-icon-wrapper text-danger"></i>拒絕</button>';
                 html += '</div></div>';
-            } else if (topupNeedsResend(t) && hasTopupApprove) {
-                /*
-                 * ⚠ 補傳**不會再呼叫主系統 API**，重發的是當初存下來的原文 ——
-                 * 不會重複加點。按鈕文案也要講清楚，不然沒人敢按。
-                 */
-                html += '<button class="btn btn-sm btn-outline-warning js-topup-resend" data-id="' + t.id + '">'
-                    + '<i class="fas fa-paper-plane me-1"></i>{{ trans("station.topup_resend") }}</button>';
             } else {
                 html += '<span class="text-muted">-</span>';
             }
@@ -1606,11 +1564,6 @@ $(function () {
             html += '<div class="data-card__row"><span>申請人</span><span>' + t.requester + (t.reviewer ? '／審核：' + t.reviewer : '') + '</span></div>';
             html += '<div class="data-card__row"><span>{{ trans("station.topup_field_attachment") }}</span><span>' + topupAttachmentCell(t) + '</span></div>';
             html += '<div class="cell-stack__sub mb-2">' + t.created_at + (t.reviewed_at ? '　→　' + t.reviewed_at : '') + '</div>';
-            html += topupNoticeBadge(t);
-            if (topupNeedsResend(t) && hasTopupApprove) {
-                html += '<div class="row-actions mt-2"><button class="btn btn-sm btn-outline-warning js-topup-resend" data-id="' + t.id + '">'
-                    + '<i class="fas fa-paper-plane me-1"></i>{{ trans("station.topup_resend") }}</button></div>';
-            }
             if (parseInt(t.status, 10) === 0 && hasTopupApprove) {
                 html += '<div class="row-actions"><div class="btn-group btn-group-sm" role="group" aria-label="{{ trans("station.field_action") }}">';
                 html += '<button class="btn btn-outline-secondary btn-icon btn-transition js-topup-approve" data-id="' + t.id + '" data-station="' + t.station + '" data-amount="' + t.credit_amount + '" data-action="' + t.action_type + '"><i class="fas fa-check btn-icon-wrapper text-success"></i>通過</button>';
@@ -1638,33 +1591,6 @@ $(function () {
             $('#topup-confirm-action').val('reject');
             $('#topup-confirm-text').html('確定<strong class="text-danger">拒絕</strong>此筆補點申請？');
             showBsModal('modal-topup-confirm');
-        });
-
-        /*
-         * 補傳補點通知。
-         *
-         * ⚠ **不會再呼叫主系統 API** —— 重發的是當初存下來的那段原文，
-         * 不會重複加點。所以不必像審核那樣跳確認視窗。
-         */
-        $('.js-topup-resend').off('click').on('click', function () {
-            var $btn = $(this);
-            $btn.prop('disabled', true);
-
-            $.ajax({
-                url: '/admin/stations/ajax-topup-resend-notice/' + $btn.data('id'),
-                method: 'POST',
-                headers: { 'X-CSRF-TOKEN': csrfToken },
-                contentType: 'application/json',
-                success: function (body) {
-                    showMessage(body.message || '{{ trans("station.topup_resend_sent") }}');
-                    loadTopupList();
-                },
-                error: function (xhr) {
-                    // 補傳失敗多半是原因還在（群組還是沒綁），要照實講
-                    showMessage((xhr.responseJSON && xhr.responseJSON.message) || '{{ trans("station.topup_resend_failed") }}');
-                    $btn.prop('disabled', false);
-                }
-            });
         });
 
         $('.js-topup-note').off('click').on('click', function () {

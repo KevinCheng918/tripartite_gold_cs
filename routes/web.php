@@ -237,13 +237,6 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::post('/ajax-topup-store', [StationController::class, 'ajaxTopupStore'])->middleware('can:station.topup_apply')->name('ajax-topup-store');
         Route::put('/ajax-topup-approve/{topup}', [StationController::class, 'ajaxTopupApprove'])->middleware('can:station.topup_approve')->name('ajax-topup-approve');
         Route::put('/ajax-topup-reject/{topup}', [StationController::class, 'ajaxTopupReject'])->middleware('can:station.topup_approve')->name('ajax-topup-reject');
-        /*
-         * 補傳補點通知。
-         *
-         * ⚠ 權限沿用 `station.topup_approve`：這會**發訊息到客戶群**，
-         * 跟審核同一個等級。不要降到 `topup_view`。
-         */
-        Route::post('/ajax-topup-resend-notice/{topup}', [StationController::class, 'ajaxTopupResendNotice'])->middleware('can:station.topup_approve')->name('ajax-topup-resend-notice');
     });
 
     // Telegram 群發公告

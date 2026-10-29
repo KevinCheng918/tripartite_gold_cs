@@ -144,19 +144,6 @@ return [
     'topup_approved'       => '補點已通過，API 呼叫成功',
     'topup_rejected'       => '補點已拒絕',
     'topup_api_failed'     => '補點 API 呼叫失敗',
-    // 補點通知有沒有送到客戶
-    'topup_notice_sent'        => '已通知客戶',
-    'topup_notice_no_group'    => '未通知：這個站台沒綁 Telegram 群組',
-    'topup_notice_no_message'  => '未通知：主系統沒有回傳訊息內容',
-    'topup_notice_send_failed' => '未通知：Telegram 發送失敗',
-    'topup_notice_unknown'     => '未通知客戶',
-    // ⚠ 這一種「有送出去」，只是格式舊 —— 文案要讓人知道該去更新那台主系統
-    'topup_notice_old_format'  => '已通知，但主系統回的是舊格式（沒有「原本點數」），建議更新該站台的主系統',
-    'topup_resend'             => '補傳通知',
-    'topup_resend_sent'        => '已補傳通知給客戶',
-    'topup_resend_failed'      => '補傳失敗，原因可能還在（例如站台仍未綁定 Telegram 群組）',
-    'topup_resend_not_completed' => '只有「已完成」的補點可以補傳通知',
-    'topup_resend_no_station'  => '找不到這筆補點對應的站台',
 
     /*
      * 點數報表（餘點曲線圖）。

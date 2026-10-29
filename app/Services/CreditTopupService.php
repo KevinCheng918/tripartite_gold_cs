@@ -280,51 +280,6 @@ class CreditTopupService
     }
 
     /**
-     * 補傳補點通知
-     *
-     * ⚠ **絕對不會再呼叫主系統 API** —— 點數已經加扣過了，再打一次就是
-     * **重複加點**。這支重發的是當初存在 `api_response` 裡的那一段原文，
-     * 不會重算、也不會動到任何點數。
-     *
-     * ⚠ 只有「已完成」的那幾筆能補傳。待審核、拒絕、API 失敗的本來就沒有
-     * 通知可以補 —— 讓它們也能按下去只會送出一則不存在的事實。
-     *
-     * @param CreditTopup $topup
-     * @param int         $reviewerId
-     * @param string|null $reviewerName
-     * @return CreditTopup
-     * @throws ValidationException
-     */
-    public function resendNotice(CreditTopup $topup, $reviewerId, $reviewerName = null)
-    {
-        if ((int) $topup->status !== CreditTopup::STATUS_COMPLETED) {
-            throw ValidationException::withMessages([
-                'topup' => [trans('station.topup_resend_not_completed')],
-            ]);
-        }
-
-        /** @var \App\Models\Station|null $station */
-        $station = $topup->station;
-
-        if (blank($station)) {
-            throw ValidationException::withMessages([
-                'topup' => [trans('station.topup_resend_no_station')],
-            ]);
-        }
-
-        /*
-         * ⚠ 「其他」類型的 `api_response` 存的是一句說明文字不是 JSON，
-         * 而且它本來就沒有通知可發 —— `json_decode()` 會回 null，
-         * 下面的 `msg` 取不到就會被擋在「主站沒回訊息」那一關。
-         */
-        $result = json_decode((string) $topup->api_response, true);
-
-        $this->notifyTelegram($station, $topup, (array) $result, $reviewerId, $reviewerName);
-
-        return $topup->refresh();
-    }
-
-    /**
      * 記下這一筆通知到底有沒有送出去、有什麼問題
      *
      * ⚠ `notified_at` 與 `notify_issue` **是兩件事**：舊格式那一種是

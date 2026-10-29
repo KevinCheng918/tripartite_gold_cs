@@ -34,13 +34,6 @@ class CreditTopupResource extends JsonResource
             'requester'     => $this->requester ? $this->requester->nickname : '-',
             'reviewer'      => $this->reviewer ? $this->reviewer->nickname : null,
             'reviewed_at'   => $this->reviewed_at ? $this->reviewed_at->format('Y-m-d H:i') : null,
-            /*
-             * ⚠ 這兩個是**兩件事**：`notify_issue` 是 `old_format` 時
-             * `notified_at` 仍然有值（訊息有送出去，只是格式舊）。
-             * 前端要靠這個組合分出「沒送到」與「送到了但該更新主系統」。
-             */
-            'notified_at'   => $this->notified_at ? $this->notified_at->format('Y-m-d H:i') : null,
-            'notify_issue'  => $this->notify_issue,
             'note'          => $this->note,
             'images'        => array_map(function ($path) {
                 return asset("storage/{$path}");
