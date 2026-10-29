@@ -98,5 +98,9 @@
 @section('scripts')
     {{-- 跟儀表板的匯率圖同一個版本，不另外引一套 --}}
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
-    <script src="{{ asset('js/station-credit-report.js') }}"></script>
+    {{-- ⚠ `?v=filemtime` 是這個專案所有 JS/CSS 的慣例，**不可以漏**：
+         漏掉的話改完 JS 使用者的瀏覽器還是跑舊的那一份，而且畫面有一半
+         是新的（語系從後端渲染進 data-i18n）、一半是舊的，很難判斷。
+         2026-10-30 報的「報表沒顯示跟上一點的差值」就是漏了這個。 --}}
+    <script src="{{ asset('js/station-credit-report.js') }}?v={{ filemtime(public_path('js/station-credit-report.js')) }}"></script>
 @endsection

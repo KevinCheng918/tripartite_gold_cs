@@ -113,7 +113,9 @@
                                             <th>{{ trans('project.regulation_title') }}</th>
                                             <th style="width:6rem">{{ trans('project.regulation_status') }}</th>
                                             <th style="width:12rem">{{ trans('project.regulation_updated_by') }}</th>
-                                            <th style="width:12rem" class="text-end">{{ trans('station.field_action') }}</th>
+                                            {{-- 三顆帶文字的按鈕，12rem 放不下（`.row-actions` 是 nowrap，
+                                                 放不下時會把其他欄擠窄）。寬度照實寫，讓標題欄去分剩下的。 --}}
+                                            <th style="width:20rem" class="text-end">{{ trans('station.field_action') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -136,18 +138,48 @@
                                                     @endif
                                                 </small>
                                             </td>
+                                            {{--
+                                                列操作照全站的 `.row-actions` 慣例寫
+                                                （見 features/admin-table-layout.md）。
+                                                第一版沒照慣例，踩到三件已經有定論的事：
+
+                                                ⚠ **沒有 `.row-actions` 外框 → 深色模式整個沒套用**。
+                                                custom.css 的淺／深兩套按鈕樣式都掛在
+                                                `.row-actions` 底下，不包就只拿得到 Bootstrap 預設。
+
+                                                ⚠ **刪除不可以用 `btn-outline-danger`**：custom.css
+                                                只替 `outline-secondary` 補齊了淺／深兩種模式的 hover，
+                                                換色系的 outline 變體在淺色模式滑過去不會變色、
+                                                深色模式則完全沒有規則。危險動作改成
+                                                **把圖示染成 `text-danger`**（帳號管理的「解除綁定」同一個寫法）。
+
+                                                ⚠ **不可以只有圖示**：2026-10-10 需求方退過
+                                                「純圖示鈕 + title」那一版 ——「每個按鈕旁邊還是要有說明，
+                                                不能隱藏」。所以每顆都帶文字。
+
+                                                ⚠ `role="group"` 與 `aria-label` 每段都要：
+                                                視覺上的分段對讀螢幕的人不存在。
+                                            --}}
                                             <td class="text-end">
-                                                <button class="btn btn-sm btn-outline-secondary js-regulation-view" data-id="{{ $item->id }}">
-                                                    <i class="fas fa-eye"></i>
-                                                </button>
-                                                @if(Auth::user()->hasPermission('project.edit'))
-                                                <button class="btn btn-sm btn-outline-secondary js-regulation-edit" data-id="{{ $item->id }}">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-outline-danger js-regulation-delete" data-id="{{ $item->id }}">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                                @endif
+                                                <div class="row-actions">
+                                                    <div class="btn-group btn-group-sm" role="group" aria-label="{{ trans('common.row_actions.view') }}">
+                                                        <button class="btn btn-outline-secondary btn-icon btn-transition js-regulation-view" data-id="{{ $item->id }}">
+                                                            <i class="fas fa-eye btn-icon-wrapper"></i>{{ trans('project.regulation_view') }}
+                                                        </button>
+                                                    </div>
+                                                    @if(Auth::user()->hasPermission('project.edit'))
+                                                    <div class="btn-group btn-group-sm" role="group" aria-label="{{ trans('common.row_actions.manage') }}">
+                                                        <button class="btn btn-outline-secondary btn-icon btn-transition js-regulation-edit" data-id="{{ $item->id }}">
+                                                            <i class="fas fa-edit btn-icon-wrapper"></i>{{ trans('project.regulation_edit') }}
+                                                        </button>
+                                                    </div>
+                                                    <div class="btn-group btn-group-sm" role="group" aria-label="{{ trans('common.row_actions.danger') }}">
+                                                        <button class="btn btn-outline-secondary btn-icon btn-transition js-regulation-delete" data-id="{{ $item->id }}">
+                                                            <i class="fas fa-trash btn-icon-wrapper text-danger"></i>{{ trans('project.regulation_delete') }}
+                                                        </button>
+                                                    </div>
+                                                    @endif
+                                                </div>
                                             </td>
                                         </tr>
                                         @endforeach

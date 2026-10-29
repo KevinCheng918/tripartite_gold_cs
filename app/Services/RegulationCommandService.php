@@ -160,7 +160,11 @@ class RegulationCommandService
      */
     private function sendContent($regulation, $threadId, array $config)
     {
-        $chunks = $this->split((string) $regulation->content, (int) Arr::get($config, 'CHUNK_SIZE'));
+        $chunks = $this->split(
+            (string) $regulation->content,
+            (int) Arr::get($config, 'MAX_LENGTH'),
+            (int) Arr::get($config, 'PAGE_RESERVE')
+        );
         $total = count($chunks);
 
         foreach ($chunks as $index => $chunk) {
@@ -190,27 +194,45 @@ class RegulationCommandService
      * ⚠ 用 `mb_substr` 不是 `substr`：中文一個字三個位元組，用位元組切
      * 會把字切成亂碼。
      *
+     * ⚠ **長度一律用 UTF-16 單位量（`utf16Length()`），不是 `mb_strlen()`**：
+     * Telegram 的 4096 是 UTF-16 code unit，BMP 外的 emoji 一個算兩單位。
+     * 用 code point 數去比對會低估 —— emoji 很多的規章會「算起來沒超過但
+     * 實際整則送不出去」。
+     *
+     * ⚠ **放得下就一則發完，那時候不要扣頁碼的位置**（bugfix 2026-10-30）：
+     * 原本固定抓 3500「留餘裕」，結果一份 4,046 單位、明明放得下的規章被切
+     * 成兩則。只有真的要分段時，每則才扣掉 `$reserve` 給頁碼。
+     *
      * @param string $content
-     * @param int    $size 每段最多幾個字
+     * @param int    $max     單則硬上限（UTF-16 單位）
+     * @param int    $reserve 要分段時每則留給頁碼的長度
      * @return array<string>
      */
-    private function split($content, $size)
+    private function split($content, $max, $reserve)
     {
         $content = trim($content);
 
-        // 短路：放得下就不必切
-        if ($size < 1 || mb_strlen($content) <= $size) {
+        // 短路：整份放得下就一則，連頁碼都不會掛上去，所以用完整的 $max 判斷
+        if ($max < 1 || $this->utf16Length($content) <= $max) {
+            return [$content];
+        }
+
+        // 到這裡確定要分段 → 每一則都會掛頁碼，可用長度要先扣掉
+        $size = $max - $reserve;
+
+        if ($size < 1) {
             return [$content];
         }
 
         $chunks = [];
 
-        while (mb_strlen($content) > $size) {
-            $slice = mb_substr($content, 0, $size);
+        while ($this->utf16Length($content) > $size) {
+            $slice = $this->sliceToUtf16Limit($content, $size);
+            $sliceLength = mb_strlen($slice);
             $breakAt = mb_strrpos($slice, "\n");
 
             // 整段都沒有換行（或換行太前面）就硬切，不然會切出一則很短的
-            $cut = ($breakAt !== false && $breakAt > (int) ($size / 2)) ? $breakAt : $size;
+            $cut = ($breakAt !== false && $breakAt > (int) ($sliceLength / 2)) ? $breakAt : $sliceLength;
 
             $chunks[] = trim(mb_substr($content, 0, $cut));
             $content = ltrim(mb_substr($content, $cut));
@@ -221,6 +243,65 @@ class RegulationCommandService
         }
 
         return $chunks;
+    }
+
+    /**
+     * 取「UTF-16 長度不超過 $limit」的最長前綴
+     *
+     * ⚠ 不能直接 `mb_substr($content, 0, $limit)`：那是 $limit 個 **code
+     * point**，UTF-16 長度會 ≥ $limit（emoji 一個算兩單位），有可能超過。
+     *
+     * ⚠ **用二分搜尋找最長的那個前綴，不要「量出超出量就往回砍」**：
+     * 那種回退法在 emoji 很多時會砍過頭 —— 4,000 個 emoji（8,000 單位）
+     * 第一刀會從 4,000 退到 80 個字，結果一份規章被切成一堆一兩百單位的
+     * 碎訊息（實測 6 則、長度 166／326／646⋯⋯）。每則都沒超過上限、也沒掉字，
+     * 但群組裡會被刷一排短訊息。
+     *
+     * ⚠ 上界取 `min($limit, 字數)`：超過 $limit 個 code point 的前綴，
+     * UTF-16 長度一定超過 $limit（每個 code point 至少一單位），不必試。
+     *
+     * ⚠ `mb_substr` 以 code point 為單位，**不會把 surrogate pair 切壞**。
+     * 但由多個 code point 組成的組合字（例如 👨🏻‍💻 是 ZWJ 序列）硬切時
+     * 可能被拆成好幾個圖案 —— 優先從換行切就是為了讓這種情況少發生。
+     *
+     * @param string $content
+     * @param int    $limit UTF-16 單位
+     * @return string
+     */
+    private function sliceToUtf16Limit($content, $limit)
+    {
+        $low = 0;
+        $high = min($limit, mb_strlen($content));
+
+        while ($low < $high) {
+            // ceil：取中點時要往上取，不然 $low 停在 $high - 1 會無限迴圈
+            $mid = (int) ceil(($low + $high) / 2);
+
+            if ($this->utf16Length(mb_substr($content, 0, $mid)) <= $limit) {
+                $low = $mid;
+
+                continue;
+            }
+
+            $high = $mid - 1;
+        }
+
+        return mb_substr($content, 0, $low);
+    }
+
+    /**
+     * 字串的 UTF-16 code unit 長度（Telegram 算長度與 entity offset 的單位）
+     *
+     * ⚠ `TelegramChatService` 也有一支同名的私有方法，用途是算 entity
+     * offset。兩邊都只是同一個換算式（UTF-16LE 的位元組數除以 2），
+     * 沒有任何判斷，所以各自留一份不會分岔。
+     *
+     * @param string $text
+     * @return int
+     */
+    private function utf16Length($text)
+    {
+        return (int) (strlen(mb_convert_encoding($text, 'UTF-16LE', 'UTF-8')) / 2);
     }
 
     /**

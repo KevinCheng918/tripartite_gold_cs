@@ -479,8 +479,8 @@
         &copy; {{ date('Y') }} {{ config('app.name') }}. All rights reserved.
     </div>
 
-    <script src="{{ asset('js/login.js') }}"></script>
-    <script src="{{ asset('js/auth/login-token.js') }}"></script>
+    <script src="{{ asset('js/login.js') }}?v={{ filemtime(public_path('js/login.js')) }}"></script>
+    <script src="{{ asset('js/auth/login-token.js') }}?v={{ filemtime(public_path('js/auth/login-token.js')) }}"></script>
 
 </body>
 </html>

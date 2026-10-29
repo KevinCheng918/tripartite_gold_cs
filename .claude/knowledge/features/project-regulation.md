@@ -121,11 +121,22 @@ Telegram，20 萬字會變成 50 則訊息。
 
 不是截斷，是**整則發不出去**。所以：
 
-- `CHUNK_SIZE` 抓 **3500**，留餘裕給頁碼那一行以及 HTML 標籤
+- `MAX_LENGTH` 就是 **4096**（Telegram 硬上限），不要「為了保險」調小 ——
+  2026-10-30 原本抓 3500，結果一份 4,046 單位、明明放得下的規章被切成兩則
+  （見 [[2026-10-30-telegram-chunk-utf16]]）
+- ⚠ **4096 的單位是 UTF-16 code unit，不是「幾個字」**：BMP 外的 emoji
+  一個算兩單位。用 `mb_strlen()`（code point）比對會**低估** ——
+  emoji 多的規章會「算起來沒超過但整則送不出去」。一律走 `utf16Length()`
+- ⚠ **先用完整的 4096 判斷整份放不放得下**，放得下就一則發完、不掛頁碼；
+  真的要分段時每則才扣 `PAGE_RESERVE`。先扣再判斷的話，長度落在
+  4081～4096 的規章會白白被切成兩則
+- ⚠ 取前綴走 `sliceToUtf16Limit()` 的**二分搜尋**，不要「超出多少就往回砍多少」
+  —— 那在 emoji 多時會砍過頭，4,000 個 emoji 會被切成 6 則碎訊息
 - **盡量從換行處切**，不要切在句子中間（規章是條列式的，從行尾切幾乎都乾淨）
 - 切點太靠前（不到一半）就硬切，不然會切出一則很短的
 - 用 **`mb_substr` 不是 `substr`** —— 中文一個字三個位元組，
-  用位元組切會把字切成亂碼
+  用位元組切會把字切成亂碼。它以 code point 為單位，不會切壞 surrogate pair，
+  但 ZWJ 組合字（👨🏻‍💻）硬切時可能被拆開
 - 每則標 `（1/3）`，**只有一則時不標**（那是噪音）
 
 ### ⚠ 回覆不掛抬頭（2026-10-30 改）
@@ -138,6 +149,30 @@ Telegram，20 萬字會變成 50 則訊息。
 
 `config/constants.php` 的 `REGULATION_COMMAND.HEADER` 整個移除（連同註解
 說明為什麼沒有），頁碼留著（那是「還有沒有下文」，不是歸檔資訊）。
+
+### ⚠ 列操作按鈕照全站的 `.row-actions` 慣例（2026-10-30 修）
+
+需求方：「專案管理的規章的按鈕深色模式沒有套用到。」
+
+第一版的三顆按鈕是自己寫的（`btn-sm` 直接放在 `<td>` 裡），踩到三件
+**這個專案早就有定論**的事（見 [[admin-table-layout]]）：
+
+1. **沒有 `.row-actions` 外框 → 深色模式整個沒套用。**
+   custom.css 的淺／深兩套按鈕樣式都掛在 `.row-actions` 底下，
+   不包就只拿得到 Bootstrap 預設。
+2. **刪除不可以用 `btn-outline-danger`。** custom.css 只替
+   `outline-secondary` 補齊了淺／深兩種模式的 hover —— 換色系的 outline
+   變體在淺色模式滑過去不會變色、深色模式則完全沒有規則。
+   危險動作的寫法是**把圖示染成 `text-danger`**，按鈕本身維持
+   `outline-secondary`（帳號管理的「解除綁定」就是這樣，那裡的註解寫了原因）。
+3. **不可以只有圖示。** 2026-10-10 需求方退過「純圖示鈕 + title」那一版
+   ——「每個按鈕旁邊還是要有說明，不能隱藏」。
+
+⚠ 動作欄寬度也從 12rem 加到 20rem：`.row-actions` 是 `nowrap`，
+三顆帶文字的按鈕放不下時不會自己換行，而是把標題那幾欄擠窄。
+
+⚠ 教訓：**新功能做表格時不要重寫列操作**，照 `.row-actions` 抄 ——
+那一欄的樣式被需求方退過兩次，慣例裡每一條都是結論。
 
 ## 新增/修改的檔案
 
@@ -156,7 +191,7 @@ Telegram，20 萬字會變成 50 則訊息。
 | `app/Repositories/ProjectRepository.php` | **新增 `getVisibleTo()`**（參與專案過濾）|
 | `app/Models/User.php` | **新增 `canAccessProject()` / `projectIdList()`**（唯一判準）|
 | `config/permissionMap.php` | `telegram_chat.regulation` |
-| `config/constants.php`／`config/rules.php` | 文案、字數上限、`CHUNK_SIZE` |
+| `config/constants.php`／`config/rules.php` | 文案、字數上限、`MAX_LENGTH`／`PAGE_RESERVE` |
 | `resources/views/admin/project/index.blade.php` | 規章區塊 ＋ 兩個 modal |
 | `resources/lang/{tw,cn,en}/project.php` | **新增**（這個頁面原本沒有語系檔）|
 | `resources/lang/{tw,cn,en}/permission.php` | 新權限的說明 |
