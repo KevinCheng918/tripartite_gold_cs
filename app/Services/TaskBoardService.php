@@ -37,6 +37,8 @@ class TaskBoardService
         'priority'     => '優先順序',
         'status'       => '狀態',
         'assignee_ids' => '指派人員',
+        // 參與人（需求方 2026-10-30）—— 跟指派人員一樣是 id 陣列，翻譯共用同一支
+        'participant_ids' => '參與人',
         'station_id'   => '站台',
         'project_id'   => '專案',
         'due_date'     => '到期日',
@@ -112,6 +114,14 @@ class TaskBoardService
             'status'      => (int) ($params['status'] ?? config('constants.TASK.STATUS.PENDING')),
             'priority'    => (int) ($params['priority'] ?? config('constants.TASK.PRIORITY.MEDIUM')),
             'assignee_ids' => array_map('intval', $params['assignee_ids'] ?? []),
+            /*
+             * 參與人（需求方 2026-10-30）—— 新增時就可以填。
+             *
+             * ⚠ `intval` 不可以省：前端的勾選框送上來是字串（`["3"]`），
+             * 存成字串的話 `whereJsonContains(..., 3)` 就比不到，
+             * 而且**不會報錯、只會搜不到**（篩選那邊因此要同時比兩種型別）。
+             */
+            'participant_ids' => array_map('intval', Arr::get($params, 'participant_ids', [])),
             'creator_id'  => $creatorId,
             'due_date'    => $params['due_date'] ?? null,
             'images'      => $params['images'] ?? [],
@@ -132,8 +142,16 @@ class TaskBoardService
      */
     public function updateTask(Task $task, $params, $userId = null)
     {
-        if (filled(Arr::get($params, 'assignee_ids'))) {
-            $params['assignee_ids'] = array_map('intval', $params['assignee_ids']);
+        /*
+         * ⚠ 兩個人員欄位都要 `intval`，理由見 `storeTask()` ——
+         * 存成字串的話篩選比不到，而且不會報錯。
+         */
+        foreach (['assignee_ids', 'participant_ids'] as $peopleField) {
+            if (blank(Arr::get($params, $peopleField))) {
+                continue;
+            }
+
+            $params[$peopleField] = array_map('intval', $params[$peopleField]);
         }
 
         // 記錄變更差異
@@ -331,6 +349,23 @@ class TaskBoardService
     }
 
     /**
+     * 活動紀錄裡「值是人員清單」的那幾個欄位標籤
+     *
+     * ⚠ 指派人員與參與人在紀錄裡的形狀一樣（名字陣列，舊紀錄是 id 陣列），
+     * 所以翻譯與批次查名字都共用同一條路 —— 兩邊各寫一份的話，
+     * 改了其中一個的處理方式另一個就會分岔。
+     *
+     * @return array<string>
+     */
+    private static function peopleLabels()
+    {
+        return [
+            self::FIELD_LABELS['assignee_ids'],
+            self::FIELD_LABELS['participant_ids'],
+        ];
+    }
+
+    /**
      * 把欄位值轉成活動紀錄要顯示的樣子
      *
      * ⚠ **在寫入時就換成人看得懂的值**，不是在畫面上才翻譯 ——
@@ -351,7 +386,12 @@ class TaskBoardService
             return blank($value) ? null : Carbon::parse($value)->format('Y-m-d');
         }
 
-        if ($key === 'assignee_ids') {
+        /*
+         * ⚠ 指派人員與參與人**共用同一支翻譯**：兩者的形狀一模一樣
+         * （id 陣列 → 名字陣列）。為參與人另寫一份的話，哪天改了排序或
+         * 「查不到名字怎麼辦」的處理方式，就會只改到一邊。
+         */
+        if ($key === 'assignee_ids' || $key === 'participant_ids') {
             return $this->assigneeNames($value);
         }
 
@@ -476,12 +516,16 @@ class TaskBoardService
                 continue;
             }
 
-            $assigneeLabel = self::FIELD_LABELS['assignee_ids'];
             $dueLabel = self::FIELD_LABELS['due_date'];
 
-            if (filled(Arr::get($changes, $assigneeLabel))) {
-                $changes[$assigneeLabel] = $this->mapBothSides(
-                    $changes[$assigneeLabel],
+            // 兩個人員欄位同一種處理（id 陣列 → 名字），不要只做一邊
+            foreach (self::peopleLabels() as $label) {
+                if (blank(Arr::get($changes, $label))) {
+                    continue;
+                }
+
+                $changes[$label] = $this->mapBothSides(
+                    $changes[$label],
                     function ($value) use ($nameMap) {
                         return $this->legacyAssigneeSide($value, $nameMap);
                     }
@@ -529,20 +573,21 @@ class TaskBoardService
     private function legacyAssigneeNameMap($activities)
     {
         $ids = [];
-        $assigneeLabel = self::FIELD_LABELS['assignee_ids'];
 
         foreach ($activities as $activity) {
-            $change = Arr::get($activity->changes, $assigneeLabel);
+            foreach (self::peopleLabels() as $label) {
+                $change = Arr::get($activity->changes, $label);
 
-            if (blank($change)) {
-                continue;
-            }
+                if (blank($change)) {
+                    continue;
+                }
 
-            foreach (['from', 'to'] as $side) {
-                foreach ((array) Arr::get($change, $side) as $one) {
-                    // 新紀錄存的是名字（字串），只有舊紀錄是數字 id
-                    if (is_numeric($one)) {
-                        $ids[] = (int) $one;
+                foreach (['from', 'to'] as $side) {
+                    foreach ((array) Arr::get($change, $side) as $one) {
+                        // 新紀錄存的是名字（字串），只有舊紀錄是數字 id
+                        if (is_numeric($one)) {
+                            $ids[] = (int) $one;
+                        }
                     }
                 }
             }

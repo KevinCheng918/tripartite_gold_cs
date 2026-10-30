@@ -17,6 +17,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property int         $status      1=待處理, 2=進行中, 3=審核中, 4=已解決
  * @property int         $priority    1=低, 2=中, 3=高, 4=緊急
  * @property int|null    $assignee_id
+ * @property array|null  $assignee_ids     指派人員（負責把這件事做完的人）
+ * @property array|null  $participant_ids  參與人（一起處理或需要知道，但不負責結案）
  * @property int         $creator_id
  * @property string|null $due_date
  * @property int         $sort_order
@@ -34,6 +36,13 @@ class Task extends Model
         'sort_order'   => 'integer',
         'images'       => 'array',
         'assignee_ids' => 'array',
+        /*
+         * 參與人（需求方 2026-10-30）。
+         *
+         * ⚠ 跟 `assignee_ids` 是兩回事：指派人員負責把事做完，
+         * 參與人只是一起處理或需要知道 —— 不要互換使用。
+         */
+        'participant_ids' => 'array',
     ];
 
     /**
@@ -45,12 +54,11 @@ class Task extends Model
     }
 
     /**
-     * @return BelongsTo
-     */
-    /**
      * ⚠ `reactivated_at` 一定要 select：封存清單的「剩餘天數」要靠它算
      * （專案重新啟用後 30 天內不清理，見 TaskResource::purgeAt()）。
      * 少了它那一欄永遠是 null，畫面會寫「剩 0 天」但其實不會被刪。
+     *
+     * @return BelongsTo
      */
     public function project(): BelongsTo
     {

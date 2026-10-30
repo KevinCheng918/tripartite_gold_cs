@@ -30,6 +30,9 @@ class UpdateTaskRequest extends FormRequest
             'priority'    => 'sometimes|integer|in:1,2,3,4',
             'assignee_ids'   => 'nullable|array',
             'assignee_ids.*' => 'integer',
+            // 參與人（理由與 `exists` 的取捨見 StoreTaskRequest）
+            'participant_ids'   => 'nullable|array',
+            'participant_ids.*' => 'integer',
             'due_date'    => 'nullable|date',
             'images'      => 'nullable|array',
             'images.*'    => $this->attachmentRules(),

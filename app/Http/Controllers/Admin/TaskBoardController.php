@@ -83,12 +83,18 @@ class TaskBoardController extends Controller
         $params['user_project_ids'] = $isAdmin ? [] : ($user->project_ids ?? [-1]);
         $board = $this->taskBoardService->getBoard($params);
 
-        // 預載所有 assignee 使用者（避免 N+1）
+        /*
+         * 預載所有人員（避免 N+1）。
+         *
+         * ⚠ **指派人員與參與人都要收進來**：少收一邊的話，那一邊在畫面上會
+         * 安靜地變成空的（`TaskResource::namesOf()` 快取沒命中就跳過），
+         * 而且不會有任何錯誤 —— 2026-10-06 就是為同一類問題修過一次。
+         */
         $allIds = [];
 
         foreach ($board as $tasks) {
             foreach ($tasks as $task) {
-                $ids = $task->assignee_ids ?? [];
+                $ids = array_merge((array) $task->assignee_ids, (array) $task->participant_ids);
 
                 foreach ($ids as $id) {
                     $allIds[] = (int) $id;
@@ -115,7 +121,18 @@ class TaskBoardController extends Controller
      */
     public function ajaxBoard(Request $request)
     {
-        $params = $request->only(['project_id', 'assignee_id', 'priority', 'keyword', 'sort']);
+        $params = $request->only([
+            'project_id', 'assignee_id', 'priority', 'keyword', 'sort',
+            // 「與我相關」的兩個勾選（需求方 2026-10-30）
+            'me_participating', 'me_assigned',
+        ]);
+
+        /*
+         * ⚠ **「我」是誰由後端決定，不要從前端收 user id**：
+         * 收的話任何人都能改網址去看別人的卡片。前端只送「要不要篩」，
+         * 是誰永遠是 `Auth::id()`。
+         */
+        $params['me_id'] = Auth::id();
 
         return response()->json($this->buildBoard($params));
     }

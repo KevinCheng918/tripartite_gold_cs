@@ -37,6 +37,33 @@ class TaskResource extends JsonResource
     }
 
     /**
+     * 把 id 陣列換成 `[['id' => …, 'nickname' => …], …]`
+     *
+     * ⚠ **快取沒命中就跳過那一筆**（這是原本的行為，刻意保留）：
+     * 帳號被硬刪除時，那個 id 就不會出現在清單裡。前端照著畫是
+     * 「少一個人」而不是炸掉。
+     *
+     * ⚠ 呼叫前一定要先 `preloadUsers()`，否則會全部跳過而安靜地回空陣列。
+     *
+     * @param array $ids
+     * @return array<int, array>
+     */
+    private static function namesOf($ids)
+    {
+        $people = [];
+
+        foreach ($ids as $id) {
+            if (!array_key_exists($id, self::$userCache)) {
+                continue;
+            }
+
+            $people[] = ['id' => $id, 'nickname' => self::$userCache[$id]];
+        }
+
+        return $people;
+    }
+
+    /**
      * @param \Illuminate\Http\Request $request
      * @return array
      */
@@ -58,14 +85,17 @@ class TaskResource extends JsonResource
          * `preloadUsers()` 會 `array_diff` 掉已經在快取裡的，所以列表那條
          * 路徑不會多查一次。
          */
-        self::preloadUsers($assigneeIds);
+        $participantIds = (array) $this->participant_ids;
 
-        $assignees = [];
-        foreach ($assigneeIds as $id) {
-            if (isset(self::$userCache[$id])) {
-                $assignees[] = ['id' => $id, 'nickname' => self::$userCache[$id]];
-            }
-        }
+        /*
+         * ⚠ **兩個人員欄位的 id 一起 preload**，不要各叫一次：
+         * `preloadUsers()` 每次呼叫就是一趟查詢，分開叫等於一頁幾十張卡片
+         * 多出幾十趟。合起來一次問，`array_diff` 會自己濾掉已在快取裡的。
+         */
+        self::preloadUsers(array_merge($assigneeIds, $participantIds));
+
+        $assignees = self::namesOf($assigneeIds);
+        $participants = self::namesOf($participantIds);
 
         return [
             'id'           => $this->id,
@@ -83,6 +113,18 @@ class TaskResource extends JsonResource
             'priority'     => $this->priority,
             'assignee_ids' => $assigneeIds,
             'assignees'    => $assignees,
+            /*
+             * 參與人（需求方 2026-10-30）—— 一起處理或需要知道，但不負責結案。
+             *
+             * ⚠ `participant_ids` 要跟 `participants` 一起回：面板的勾選清單
+             * 要靠 id 把人選回來，只給名字的話同名同姓就勾錯了。
+             *
+             * ⚠ **總覽卡片刻意不顯示這個**（需求明講）—— 卡片上已經有專案、
+             * 站台、指派人員、到期日、優先順序，再塞一排人名會變兩倍高。
+             * 但 Resource 照樣要回，因為詳細面板是用同一份資料畫的。
+             */
+            'participant_ids' => $participantIds,
+            'participants'    => $participants,
             'creator'      => $this->creator ? $this->creator->nickname : '-',
             'due_date'     => $this->due_date ? $this->due_date->format('Y-m-d') : null,
             'sort_order'   => $this->sort_order,

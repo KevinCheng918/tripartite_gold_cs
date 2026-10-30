@@ -4,7 +4,16 @@
 > 但點進去卡片詳細內容時要能夠看到跟編輯。上面的搜尋列，我要能搜尋有參與的
 > 卡片或是指派人是我的卡片。目前上方搜尋列有點醜，可以參考內勤管理做重新排版。」
 
-**狀態：規劃中，尚未實作。待裁示四題（見文末）。**
+**狀態：已實作（v3.52，2026-10-31）。四題全部採用建議選項。**
+**⚠ migration 尚未執行** —— 跑之前看板會因為 `LIST_COLUMNS` 裡的
+`participant_ids` 而直接報 Unknown column。
+
+| 題目 | 裁示 |
+|---|---|
+| 「與我相關」的呈現 | **兩個獨立勾選框**，可同時勾，兩個都勾取聯集（OR）|
+| 搜尋列收合 | **可收合，而且用 localStorage 記住狀態** |
+| 參與人的位置 | **指派人員的下一行，佔半排** |
+| 新增視窗 | **要**，一併可以填 |
 
 ## 先把語意定下來，不然這個欄位會沒有人知道該填誰
 
@@ -175,7 +184,61 @@ $query->where(function ($q) use ($userId, $mine, $participating) { ... });
 - **不通知被加為參與人的人**（沒有這個需求；真要的話接 `StaffDmService`）
 - **不順手把這一頁的 JS 搬到 `public/js`** —— 2000 多行，獨立重構
 
-## 待裁示
+## 實作後補記（2026-10-31）
+
+### ⚠ 這次改動**必須先跑 migration**，不會優雅降級
+
+`TaskRepository` 的 `LIST_COLUMNS`／`DETAIL_COLUMNS` 已經含 `participant_ids`
+—— 欄位還不存在的環境，看板那支查詢會直接丟
+`Unknown column 'participant_ids'`，整頁打不開。
+
+> 部署順序：**先 migrate，再放 code**。或者至少兩件事要同時到。
+
+### 前端有三處「寫死欄位名」的坑，全部改成吃變數
+
+指派人員與參與人長得一樣，所以共用程式碼 —— 但共用時最容易留下
+「名字還是寫死 assignee_ids」的地方，而且**錯了不會報錯，只會覆蓋錯的欄位**：
+
+| 位置 | 原本 | 改成 |
+|---|---|---|
+| `js-prop-edit` 的勾選清單 | `t.assignee_ids` | `t[propEditField]` |
+| `#btn-prop-save` 的取值判斷 | 只認 `assignee_ids` | 兩個都認 |
+| `side-field` 的 multiselect 分支 | `saveField('assignee_ids', …)` | `saveField(fieldName, …)` |
+
+⚠ 第二項漏掉的後果最隱晦：存檔會掉到最後的 `$('#prop-val').val()`，
+而那個元素在勾選清單模式下**不存在** → 送出 `undefined` → 參與人被清空。
+
+### 後端
+
+⚠ **`me_id` 由後端填**（`Auth::id()`），前端只送「要不要篩」。
+從前端收 user id 的話，任何人改一下網址就能看別人的卡片。
+
+⚠ `filterRelatedToMe()` 裡**指派人員那三個條件要再包一層 `orWhere(function…)`**：
+它們之間是 OR，但整組跟「我參與的」之間也是 OR —— 不包的話
+`assignee_id = ?` 會跟外層混在一起（Laravel 的 `orWhere` 不會自己分組）。
+
+⚠ `TaskResource` 的兩個人員欄位**一起 preload**
+（`preloadUsers(array_merge(...))`），不要各叫一次 —— 每次呼叫就是一趟查詢。
+`buildBoard()` 收集 id 時也要 `array_merge` 兩個欄位，少收一邊的話那一邊
+會安靜地變成空的（`namesOf()` 快取沒命中就跳過）。
+
+⚠ 異動紀錄沿用 `FIELD_LABELS` ＋ `activityValue()`，另外抽了一支
+`peopleLabels()` 讓「翻譯」與「批次查名字」兩處都涵蓋兩個欄位 ——
+只改一處的話，參與人的舊紀錄（如果有）會翻不出名字。
+
+### 篩選列
+
+⚠ 「重設」**刻意不重設排序**：排序存在 localStorage，是使用者長期的偏好，
+不是這一次的篩選條件。一起清掉的話他下次進來排序也變了。
+
+⚠ 收合狀態用 `removeClass('show')` 還原而不是呼叫 Bootstrap 的 `hide()`：
+後者會播收合動畫，一進頁面就看到篩選列自己縮起來很突兀。
+
+⚠ 「與我相關」兩個勾選**勾了就直接 `loadBoard()`**，不等「搜尋」鈕 ——
+它們是切換視角，不是要湊齊條件。但關鍵字仍然要按搜尋
+（每打一個字送一次請求等於把 `ajax-board` 當搜尋建議用）。
+
+## 裁示紀錄（2026-10-31，四題皆採 (a)）
 
 ### 1. 「與我相關」的呈現
 

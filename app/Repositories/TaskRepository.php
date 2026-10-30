@@ -6,6 +6,7 @@ use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\TaskComment;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -16,13 +17,13 @@ class TaskRepository
     /** @var array 列表欄位 */
     private const LIST_COLUMNS = [
         'id', 'project_id', 'station_id', 'title', 'status', 'priority',
-        'assignee_id', 'assignee_ids', 'creator_id', 'due_date', 'sort_order', 'created_at', 'updated_at',
+        'assignee_id', 'assignee_ids', 'participant_ids', 'creator_id', 'due_date', 'sort_order', 'created_at', 'updated_at',
     ];
 
     /** @var array 詳細欄位 */
     private const DETAIL_COLUMNS = [
         'id', 'project_id', 'station_id', 'title', 'description', 'images', 'status', 'priority',
-        'assignee_id', 'assignee_ids', 'creator_id', 'due_date', 'sort_order', 'created_at', 'updated_at',
+        'assignee_id', 'assignee_ids', 'participant_ids', 'creator_id', 'due_date', 'sort_order', 'created_at', 'updated_at',
     ];
 
     /**
@@ -77,6 +78,8 @@ class TaskRepository
             });
         }
 
+        $this->filterRelatedToMe($query, $criteria);
+
         if (filled($criteria['priority'] ?? null)) {
             $query->where('priority', (int) $criteria['priority']);
         }
@@ -124,6 +127,67 @@ class TaskRepository
         $this->onlyActiveProject($query);
 
         return $query->get();
+    }
+
+    /**
+     * 「與我相關」的兩個篩選（需求方 2026-10-30）
+     *
+     * 需求：「我要能搜尋有參與的卡片**或**指派人是我的卡片。」
+     *
+     * | 勾選 | 條件 |
+     * |---|---|
+     * | 我參與的 | `participant_ids` 含我 |
+     * | 指派給我的 | `assignee_id` 是我 **或** `assignee_ids` 含我 |
+     * | 兩個都勾 | 上面兩者**取聯集**（OR）|
+     *
+     * ⚠ **兩個都勾一定要 OR 不是 AND**：需求的原文是「或」。做成 AND 的話
+     * 只會列出「既是參與人又是指派人」的卡片 —— 那是極少數，
+     * 使用者會以為篩選壞了。
+     *
+     * ⚠ 所以兩個條件**必須包在同一個 `where(function ...)` 裡**。
+     * 分開加兩個 `where` 會變成
+     * `AND participant… AND assignee…`，兩個都勾就什麼都搜不到。
+     *
+     * ⚠ `whereJsonContains` **要同時比整數與字串**：前端送上來的可能是
+     * `["3"]`，只用整數比會全部對不上 —— 而且**不會報錯，只會搜不到**。
+     * `assignee_id` 那邊已經踩過同一個坑。
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param array                                 $criteria
+     * @return void
+     */
+    private function filterRelatedToMe($query, $criteria)
+    {
+        $userId = (int) Arr::get($criteria, 'me_id');
+        $participating = (bool) Arr::get($criteria, 'me_participating');
+        $assigned = (bool) Arr::get($criteria, 'me_assigned');
+
+        // 短路：沒勾任何一個就不要動查詢
+        if ($userId < 1 || (!$participating && !$assigned)) {
+            return;
+        }
+
+        $query->where(function ($outer) use ($userId, $participating, $assigned) {
+            if ($participating) {
+                $outer->orWhereJsonContains('participant_ids', $userId)
+                    ->orWhereJsonContains('participant_ids', (string) $userId);
+            }
+
+            if (!$assigned) {
+                return;
+            }
+
+            /*
+             * ⚠ 指派人員那三個條件要再包一層：它們之間是 OR，但整組跟
+             * 「我參與的」之間也是 OR —— 不包的話 `assignee_id = ?` 那一條
+             * 會跟外層的其他條件混在一起（Laravel 的 orWhere 不會自己分組）。
+             */
+            $outer->orWhere(function ($inner) use ($userId) {
+                $inner->where('assignee_id', $userId)
+                    ->orWhereJsonContains('assignee_ids', $userId)
+                    ->orWhereJsonContains('assignee_ids', (string) $userId);
+            });
+        });
     }
 
     /**
@@ -350,12 +414,6 @@ class TaskRepository
     }
 
     /**
-     * 新增任務活動紀錄
-     *
-     * @param array $attributes
-     * @return TaskActivity
-     */
-    /**
      * 取得封存任務
      *
      * @return \Illuminate\Database\Eloquent\Collection
@@ -424,6 +482,12 @@ class TaskRepository
         $query->delete();
     }
 
+    /**
+     * 新增任務活動紀錄
+     *
+     * @param array $attributes
+     * @return TaskActivity
+     */
     public function createActivity($attributes)
     {
         return TaskActivity::query()->create($attributes);

@@ -20,9 +20,9 @@
         window.__boardData = @json($board);
     </script>
 
-    {{-- 篩選列 --}}
+    {{-- 操作列（篩選已經搬到下面那張卡片，2026-10-30 改版）--}}
     <div class="mb-3 p-3 rounded shadow-sm taskboard-toolbar">
-        <div class="d-flex gap-2 align-items-center mb-2">
+        <div class="d-flex gap-2 align-items-center flex-wrap">
             @if(Auth::user()->hasPermission('task_board.create'))
             <button class="btn btn-primary btn-sm" id="btn-open-create-task">
                 <i class="fas fa-plus me-1"></i>{{ trans('task_board.action_create_task') }}
@@ -39,48 +39,110 @@
             </button>
             <small class="text-muted" id="board-refresh-status" style="font-size:0.75rem"></small>
         </div>
-        <div class="d-flex align-items-center flex-wrap gap-2" style="font-size:0.8125rem">
-            <span class="text-muted">篩選</span>
-            <select id="filter-project" class="form-select form-select-sm" style="width:auto">
-                <option value="">全部專案</option>
-                @foreach($projects as $p)
-                    <option value="{{ $p->id }}">{{ $p->name }}</option>
-                @endforeach
-            </select>
-            <select id="filter-assignee" class="form-select form-select-sm" style="width:auto">
-                <option value="">全部人員</option>
-                @foreach($assignees as $u)
-                    <option value="{{ $u->id }}">{{ $u->nickname }}</option>
-                @endforeach
-            </select>
-            <select id="filter-priority" class="form-select form-select-sm" style="width:auto">
-                <option value="">全部優先</option>
-                <option value="1">{{ trans('task_board.priority_low') }}</option>
-                <option value="2">{{ trans('task_board.priority_medium') }}</option>
-                <option value="3">{{ trans('task_board.priority_high') }}</option>
-                <option value="4">{{ trans('task_board.priority_urgent') }}</option>
-            </select>
-            <span class="text-muted">|</span>
-            <span class="text-muted">排序</span>
-            <select id="filter-sort-field" class="form-select form-select-sm" style="width:auto">
-                <option value="created">建立時間</option>
-                <option value="updated">更新時間</option>
-                <option value="priority">優先順序</option>
-                <option value="due_date">到期日</option>
-            </select>
-            <select id="filter-sort-dir" class="form-select form-select-sm" style="width:auto">
-                <option value="desc">新→舊</option>
-                <option value="asc">舊→新</option>
-            </select>
-            <span class="text-muted">|</span>
-            <input type="text" id="filter-keyword" class="form-control form-control-sm" style="width:130px" placeholder="搜尋標題...">
-            <button class="btn btn-sm btn-outline-secondary" id="btn-filter">
-                <i class="fas fa-search me-1"></i>搜尋
-            </button>
-            <span class="text-muted">|</span>
-            <div class="form-check mb-0">
-                <input class="form-check-input" type="checkbox" id="filter-overdue">
-                <label class="form-check-label" for="filter-overdue" style="font-size:0.8125rem">僅顯示已過期</label>
+    </div>
+
+    {{-- ============ 篩選（2026-10-30 改版）============ --}}
+    {{-- ⚠ 原本是七個控制項用 `|` 擠成一排。難看的原因不是樣式，是**沒有分組
+         也沒有標籤** —— 每一個都要點開才知道是什麼。改成內勤管理
+         （staff-manage）那一套：可收合的卡片 ＋ row g-3 網格 ＋ 每格一個粗體
+         標籤 ＋ 右下角重設／搜尋。 --}}
+    <div class="main-card mb-3 card">
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <span class="fw-bold" style="font-size:0.9375rem">
+                <i class="fas fa-filter me-1"></i>{{ trans('task_board.filter_section') }}
+            </span>
+            <a href="javascript:void(0)" class="text-muted text-decoration-none"
+               data-bs-toggle="collapse" data-bs-target="#board-filter-collapse"
+               aria-expanded="true" id="board-filter-toggle">{{ trans('task_board.action_collapse') }}</a>
+        </div>
+        <div class="collapse show" id="board-filter-collapse">
+            <div class="card-body pt-3">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3 col-6">
+                        <label class="form-label fw-bold" for="filter-project">{{ trans('task_board.field_project') }}：</label>
+                        <select id="filter-project" class="form-select">
+                            <option value="">{{ trans('task_board.filter_all_projects') }}</option>
+                            @foreach($projects as $p)
+                                <option value="{{ $p->id }}">{{ $p->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        {{-- ⚠ 這一格刻意**只篩指派人員**，不要順手讓它也比對參與人：
+                             它的語意是「這個人負責哪些卡片」，混進參與人之後
+                             「某人手上有幾張卡」就算不準了。「與我相關」是另一個控制項 --}}
+                        <label class="form-label fw-bold" for="filter-assignee">{{ trans('task_board.field_assignee') }}：</label>
+                        <select id="filter-assignee" class="form-select">
+                            <option value="">{{ trans('task_board.filter_all_people') }}</option>
+                            @foreach($assignees as $u)
+                                <option value="{{ $u->id }}">{{ $u->nickname }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label fw-bold" for="filter-priority">{{ trans('task_board.field_priority') }}：</label>
+                        <select id="filter-priority" class="form-select">
+                            <option value="">{{ trans('task_board.filter_all_priority') }}</option>
+                            <option value="1">{{ trans('task_board.priority_low') }}</option>
+                            <option value="2">{{ trans('task_board.priority_medium') }}</option>
+                            <option value="3">{{ trans('task_board.priority_high') }}</option>
+                            <option value="4">{{ trans('task_board.priority_urgent') }}</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <label class="form-label fw-bold" for="filter-keyword">{{ trans('task_board.filter_keyword') }}：</label>
+                        <input type="text" id="filter-keyword" class="form-control" placeholder="{{ trans('task_board.filter_keyword_placeholder') }}">
+                    </div>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3 col-12">
+                        <label class="form-label fw-bold">{{ trans('task_board.label_sort') }}：</label>
+                        <div class="input-group flex-nowrap">
+                            <select id="filter-sort-field" class="form-select">
+                                <option value="created">{{ trans('task_board.sort_created') }}</option>
+                                <option value="updated">{{ trans('task_board.sort_updated') }}</option>
+                                <option value="priority">{{ trans('task_board.field_priority') }}</option>
+                                <option value="due_date">{{ trans('task_board.field_due_date') }}</option>
+                            </select>
+                            <select id="filter-sort-dir" class="form-select">
+                                <option value="desc">{{ trans('task_board.sort_desc') }}</option>
+                                <option value="asc">{{ trans('task_board.sort_asc') }}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-5 col-12">
+                        {{-- 「與我相關」：兩個獨立勾選框，可以同時勾。
+                             ⚠ 兩個都勾是**聯集（OR）**不是交集 —— 需求原文是
+                             「有參與的卡片**或**指派人是我的卡片」。做成交集只會
+                             列出極少數卡片，使用者會以為篩選壞了 --}}
+                        <label class="form-label fw-bold">{{ trans('task_board.filter_mine') }}：</label>
+                        <div class="d-flex align-items-center gap-3" style="height:calc(1.5em + 0.75rem + 2px)">
+                            <div class="form-check mb-0">
+                                <input class="form-check-input" type="checkbox" id="filter-me-participating">
+                                <label class="form-check-label" for="filter-me-participating">{{ trans('task_board.filter_me_participating') }}</label>
+                            </div>
+                            <div class="form-check mb-0">
+                                <input class="form-check-input" type="checkbox" id="filter-me-assigned">
+                                <label class="form-check-label" for="filter-me-assigned">{{ trans('task_board.filter_me_assigned') }}</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-12">
+                        <label class="form-label fw-bold d-block">&nbsp;</label>
+                        <div class="d-flex align-items-center" style="height:calc(1.5em + 0.75rem + 2px)">
+                            <div class="form-check mb-0">
+                                <input class="form-check-input" type="checkbox" id="filter-overdue">
+                                <label class="form-check-label" for="filter-overdue">{{ trans('task_board.filter_overdue') }}</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-outline-secondary" id="btn-filter-reset">{{ trans('task_board.action_reset') }}</button>
+                    <button type="button" class="btn btn-primary" id="btn-filter">
+                        <i class="fas fa-search me-1"></i>{{ trans('task_board.action_search') }}
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -225,6 +287,22 @@
                                     </div>
                                 @endforeach
                             </div>
+                            <small class="form-text text-muted">{{ trans('task_board.assignee_hint') }}</small>
+                        </div>
+                        {{-- 參與人（需求方 2026-10-30）—— 新增時就可以填。
+                             ⚠ 兩個欄位長得一樣，底下那句說明差別**不能省**，
+                             不然沒有人知道該把誰填進哪一個 --}}
+                        <div class="mb-3">
+                            <label class="form-label">{{ trans('task_board.field_participant') }}</label>
+                            <div id="task-participant-list" style="max-height:150px;overflow-y:auto;border:1px solid #dee2e6;border-radius:0.25rem;padding:0.5rem">
+                                @foreach($assignees as $u)
+                                    <div class="form-check">
+                                        <input class="form-check-input js-participant-check" type="checkbox" value="{{ $u->id }}" id="participant-{{ $u->id }}">
+                                        <label class="form-check-label" for="participant-{{ $u->id }}">{{ $u->nickname }}</label>
+                                    </div>
+                                @endforeach
+                            </div>
+                            <small class="form-text text-muted">{{ trans('task_board.participant_hint') }}</small>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('task_board.field_due_date') }}</label>
@@ -521,6 +599,26 @@ $(function () {
      * 首次進頁面的骨架是 blade 直接渲染的（不必等 JS）；這支是給「換篩選條件、
      * 拖完重載」用的 —— 不換的話畫面會停在舊資料，使用者不知道新的還在路上。
      */
+    /**
+     * 人員清單的顯示字串（指派人員與參與人共用）
+     *
+     * ⚠ 用 `text()` 轉義再取 `html()`：暱稱是使用者自己填的，
+     * 直接串進 HTML 就是 XSS。
+     *
+     * @param {Array}  people 來自 Resource 的 [{id, nickname}]
+     * @param {string} emptyText 沒有人時顯示的字（指派與參與用語不同）
+     * @returns {string}
+     */
+    function peopleDisplay(people, emptyText) {
+        if (!people || !people.length) {
+            return '<span class="text-muted">' + emptyText + '</span>';
+        }
+
+        var names = people.map(function (p) { return $('<span>').text(p.nickname).html(); });
+
+        return names.join(', ');
+    }
+
     function showBoardSkeleton() {
         Object.keys(statusListMap).forEach(function (status) {
             $('#' + statusListMap[status]).html(SKELETON_HTML);
@@ -625,6 +723,15 @@ $(function () {
         if (priority) params.priority = priority;
         if (sortBy && sortBy !== 'sort_order') params.sort = sortBy;
         if (keyword) params.keyword = keyword;
+
+        /*
+         * 「與我相關」（需求方 2026-10-30）。
+         *
+         * ⚠ **只送「要不要篩」，不送「我是誰」** —— user id 由後端的
+         * `Auth::id()` 決定。從前端收的話，任何人改一下網址就能看別人的卡片。
+         */
+        if ($('#filter-me-participating').is(':checked')) { params.me_participating = 1; }
+        if ($('#filter-me-assigned').is(':checked')) { params.me_assigned = 1; }
 
         $.ajax({
             url: '/admin/task-board/ajax-board',
@@ -734,14 +841,8 @@ $(function () {
                 var pColor = getProjectColor(t.project);
 
                 // 頂部：狀態 + 優先順序 + 按鈕列
-                var assigneeDisplay = '';
-                if (t.assignees && t.assignees.length > 0) {
-                    var aNames = [];
-                    t.assignees.forEach(function (a) { aNames.push(a.nickname); });
-                    assigneeDisplay = aNames.join(', ');
-                } else {
-                    assigneeDisplay = '<span class="text-muted">未指派</span>';
-                }
+                var assigneeDisplay = peopleDisplay(t.assignees, '{{ trans("task_board.assignee_empty") }}');
+                var participantDisplay = peopleDisplay(t.participants, '{{ trans("task_board.participant_empty") }}');
 
                 $('#side-panel-project-badge').html(
                     '<span class="badge" style="background:' + pColor + ';color:#fff;border-radius:9999px;padding:0.3em 0.8em">' + t.project + '</span> ' +
@@ -771,6 +872,14 @@ $(function () {
                 html += '<div class="col-3"><div class="side-prop js-prop-edit" data-field="project_id"><label style="font-size:0.75rem;color:#6c757d">專案</label><div style="font-size:0.9375rem"><i class="fas fa-folder me-1 text-muted"></i>' + t.project + '</div></div></div>';
                 html += '<div class="col-3"><div class="side-prop js-prop-edit" data-field="station_id"><label style="font-size:0.75rem;color:#6c757d">站台</label><div style="font-size:0.9375rem"><i class="fas fa-server me-1 text-muted"></i>' + stationDisplay + '</div></div></div>';
                 html += '<div class="col-6"><div class="side-prop js-prop-edit" data-field="assignee_ids"><label style="font-size:0.75rem;color:#6c757d">{{ trans("task_board.field_assignee") }}</label><div style="font-size:0.9375rem"><i class="fas fa-users me-1 text-muted"></i>' + assigneeDisplay + '</div></div></div>';
+                /*
+                 * 參與人（需求方 2026-10-30）—— 刻意放在指派人員的**下一行**
+                 * 且佔半排：兩個人員欄位上下相鄰才看得出差別，各佔 3 的話
+                 * 三個人以上名字就會被截斷成「王小明, 李…」。
+                 *
+                 * ⚠ 總覽卡片一行都不加（需求明講），只有這裡看得到。
+                 */
+                html += '<div class="col-6"><div class="side-prop js-prop-edit" data-field="participant_ids"><label style="font-size:0.75rem;color:#6c757d">{{ trans("task_board.field_participant") }}</label><div style="font-size:0.9375rem"><i class="fas fa-user-group me-1 text-muted"></i>' + participantDisplay + '</div></div></div>';
                 html += '<div class="col-3"><div class="side-field" data-field="status" data-type="select"><label style="font-size:0.75rem;color:#6c757d">{{ trans("task_board.field_status") }}</label><div class="field-value" style="font-size:0.9375rem">' + (statusLabels[t.status] || '-') + '</div></div></div>';
                 html += '<div class="col-3"><div class="side-field" data-field="priority" data-type="select"><label style="font-size:0.75rem;color:#6c757d">{{ trans("task_board.field_priority") }}</label><div class="field-value" style="font-size:0.9375rem">' + (priorityLabel[t.priority] || '-') + '</div></div></div>';
                 html += '<div class="col-6"><div class="side-field" data-field="due_date" data-type="date"><label style="font-size:0.75rem;color:#6c757d">{{ trans("task_board.field_due_date") }}</label><div class="field-value" style="font-size:0.9375rem"><i class="fas fa-calendar me-1 text-muted"></i>' + (t.due_date || '<span class="text-muted">未設定</span>') + '</div></div></div>';
@@ -1151,8 +1260,17 @@ $(function () {
                 inputEl += '<option value="{{ $st->id }}"' + (t.station_id === {{ $st->id }} ? ' selected' : '') + '>{{ $st->name }}</option>';
                 @endforeach
                 inputEl += '</select>';
-            } else if (fieldType === 'multiselect' && fieldName === 'assignee_ids') {
-                    var currentIds = t.assignee_ids || [];
+            } else if (fieldType === 'multiselect' && (fieldName === 'assignee_ids' || fieldName === 'participant_ids')) {
+                    /*
+                     * 指派人員與參與人**共用這一段**（需求方 2026-10-30）。
+                     *
+                     * ⚠ 不要為參與人另做一個 modal —— 同一種操作兩種介面，
+                     * 使用者會以為它們是不同性質的東西。
+                     *
+                     * ⚠ `fieldName` 要帶進 `saveField()`，寫死 'assignee_ids'
+                     * 的話改參與人會把指派人員覆蓋掉（而且畫面上看起來像成功）。
+                     */
+                    var currentIds = t[fieldName] || [];
                     var checkHtml = '<div style="max-height:150px;overflow-y:auto;border:1px solid #dee2e6;border-radius:0.25rem;padding:0.5rem">';
                     @foreach($assignees as $u)
                     checkHtml += '<div class="form-check"><input class="form-check-input js-panel-assignee" type="checkbox" value="{{ $u->id }}"' + (currentIds.indexOf({{ $u->id }}) !== -1 ? ' checked' : '') + '><label class="form-check-label">{{ $u->nickname }}</label></div>';
@@ -1164,7 +1282,7 @@ $(function () {
                         e.stopPropagation();
                         var selected = [];
                         $valueDiv.find('.js-panel-assignee:checked').each(function () { selected.push(parseInt($(this).val(), 10)); });
-                        saveField('assignee_ids', selected);
+                        saveField(fieldName, selected);
                     });
                     $valueDiv.find('.js-edit-cancel').on('click', function (e) {
                         e.stopPropagation();
@@ -1345,7 +1463,7 @@ $(function () {
 
     // 屬性 Modal 編輯
     var propEditField = null;
-    var propFieldLabels = { project_id: '專案', station_id: '站台', assignee_ids: '{{ trans("task_board.field_assignee") }}', status: '{{ trans("task_board.field_status") }}', priority: '{{ trans("task_board.field_priority") }}', due_date: '{{ trans("task_board.field_due_date") }}' };
+    var propFieldLabels = { project_id: '專案', station_id: '站台', assignee_ids: '{{ trans("task_board.field_assignee") }}', participant_ids: '{{ trans("task_board.field_participant") }}', status: '{{ trans("task_board.field_status") }}', priority: '{{ trans("task_board.field_priority") }}', due_date: '{{ trans("task_board.field_due_date") }}' };
     var priorityNames = { 1: '{{ trans("task_board.priority_low") }}', 2: '{{ trans("task_board.priority_medium") }}', 3: '{{ trans("task_board.priority_high") }}', 4: '{{ trans("task_board.priority_urgent") }}' };
 
     function bindPropEdit(t) {
@@ -1387,13 +1505,26 @@ $(function () {
                 html += '</select>';
             } else if (propEditField === 'due_date') {
                 html = '<input type="date" class="form-control" id="prop-val" value="' + (t.due_date || '') + '">';
-            } else if (propEditField === 'assignee_ids') {
-                var currentIds = t.assignee_ids || [];
+            } else if (propEditField === 'assignee_ids' || propEditField === 'participant_ids') {
+                /*
+                 * 指派人員與參與人共用這個分支（需求方 2026-10-30）。
+                 *
+                 * ⚠ `t[propEditField]` 不要寫死 `t.assignee_ids` ——
+                 * 寫死的話開啟「參與人」會勾出指派人員的名單，
+                 * 存檔就把參與人覆蓋成指派人員（而且畫面看起來像成功）。
+                 */
+                var currentIds = t[propEditField] || [];
                 html = '<div style="max-height:200px;overflow-y:auto;border:1px solid #dee2e6;border-radius:0.25rem;padding:0.5rem">';
                 @foreach($assignees as $u)
                 html += '<div class="form-check"><input class="form-check-input js-prop-assignee" type="checkbox" value="{{ $u->id }}"' + (currentIds.indexOf({{ $u->id }}) !== -1 ? ' checked' : '') + '><label class="form-check-label">{{ $u->nickname }}</label></div>';
                 @endforeach
                 html += '</div>';
+                // 兩個欄位長得一樣，標題之外再加一句說明差別
+                html += '<small class="form-text text-muted d-block mt-1">'
+                    + (propEditField === 'participant_ids'
+                        ? '{{ trans("task_board.participant_hint") }}'
+                        : '{{ trans("task_board.assignee_hint") }}')
+                    + '</small>';
             }
 
             $('#prop-edit-body').html(html);
@@ -1429,7 +1560,9 @@ $(function () {
         if (!propEditField || !currentTaskId) return;
         var val;
 
-        if (propEditField === 'assignee_ids') {
+        // ⚠ 參與人要一起判斷，少了它存檔會走到最下面的 `$('#prop-val').val()`，
+        // 那個元素不存在 → 送出 undefined，參與人被清空
+        if (propEditField === 'assignee_ids' || propEditField === 'participant_ids') {
             val = [];
             $('.js-prop-assignee:checked').each(function () { val.push(parseInt($(this).val(), 10)); });
         } else if (propEditField === 'status' || propEditField === 'priority' || propEditField === 'project_id') {
@@ -2193,6 +2326,7 @@ $(function () {
         if (descContent) formData.append('description', descContent);
         formData.append('priority', $('input[name="task_priority"]:checked').val());
         $('.js-assignee-check:checked').each(function () { formData.append('assignee_ids[]', $(this).val()); });
+        $('.js-participant-check:checked').each(function () { formData.append('participant_ids[]', $(this).val()); });
         if ($('#task-due-date').val()) formData.append('due_date', $('#task-due-date').val());
         // 附件不再從這裡送 —— 它們已經在 description 的 HTML 裡（內嵌在游標那一行）
         if (id) formData.append('_method', 'PUT');
@@ -2241,6 +2375,36 @@ $(function () {
     $('#btn-filter').on('click', function () { loadBoard(); });
     $('#filter-keyword').on('keypress', function (e) { if (e.which === 13) loadBoard(); });
     $('#filter-overdue').on('change', function () { loadBoard(); });
+    // 這兩個勾選要即時生效 —— 它們是「切換視角」，不是要湊齊條件再按搜尋
+    $('#filter-me-participating, #filter-me-assigned').on('change', function () { loadBoard(); });
+
+    $('#btn-filter-reset').on('click', function () {
+        /*
+         * ⚠ **排序不重設**：它存在 localStorage，是使用者長期的偏好，
+         * 不是這一次的篩選條件。一起清掉的話他下次進來排序也變了。
+         */
+        $('#filter-project, #filter-assignee, #filter-priority').val('');
+        $('#filter-keyword').val('');
+        $('#filter-overdue, #filter-me-participating, #filter-me-assigned').prop('checked', false);
+        loadBoard();
+    });
+
+    /*
+     * 篩選卡片的收合狀態要記住（需求方裁示）——
+     * 看板是每天盯著的頁面，每次進來都要再收一次會很煩。
+     */
+    var FILTER_COLLAPSE_KEY = 'taskBoardFilterCollapsed';
+
+    if (localStorage.getItem(FILTER_COLLAPSE_KEY) === '1') {
+        // ⚠ 直接拔 class 而不是呼叫 Bootstrap 的 hide()：
+        // 後者會播收合動畫，一進頁面就看到篩選列自己縮起來很突兀
+        $('#board-filter-collapse').removeClass('show');
+        $('#board-filter-toggle').attr('aria-expanded', 'false');
+    }
+
+    $('#board-filter-collapse')
+        .on('hidden.bs.collapse', function () { localStorage.setItem(FILTER_COLLAPSE_KEY, '1'); })
+        .on('shown.bs.collapse', function () { localStorage.setItem(FILTER_COLLAPSE_KEY, '0'); });
 
     // ===============================================================
     //  刷新（需求方 2026-10-30）
