@@ -40,6 +40,12 @@ return [
     'action_edit_comment'   => '編輯留言',
     'action_save'           => '儲存',
     'action_cancel'         => '取消',
+    'action_refresh'        => '刷新',
+    /*
+     * ⚠ 這一句要標出「自動」：看板本來就每隔一段時間自己刷新，
+     * 只放一顆按鈕的話使用者會以為非按不可，反而比原本更焦慮。
+     */
+    'refresh_last'          => '自動刷新中，上次 :time',
     'comment_edited'        => '已編輯',
     'description_empty'     => '尚無描述，點右上角「編輯」新增',
     'checklist_tooltip'     => '勾選清單',

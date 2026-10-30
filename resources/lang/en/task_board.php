@@ -40,6 +40,8 @@ return [
     'action_edit_comment'   => 'Edit comment',
     'action_save'           => 'Save',
     'action_cancel'         => 'Cancel',
+    'action_refresh'        => 'Refresh',
+    'refresh_last'          => 'Auto-refreshing — last at :time',
     'comment_edited'        => 'edited',
     'description_empty'     => 'No description yet — click Edit above',
     'checklist_tooltip'     => 'Checklist',

@@ -31,6 +31,13 @@
             <button class="btn btn-outline-secondary btn-sm" id="btn-open-archived">
                 <i class="fas fa-archive me-1"></i>查看封存
             </button>
+            {{-- 刷新（需求方 2026-10-30：「不用每次有人更新就要重新整理一次網頁」）。
+                 旁邊那行小字是告訴使用者「它自己也會刷」，不然看到按鈕會以為
+                 非按不可 --}}
+            <button class="btn btn-outline-secondary btn-sm" id="btn-refresh-board">
+                <i class="fas fa-rotate me-1"></i>{{ trans('task_board.action_refresh') }}
+            </button>
+            <small class="text-muted" id="board-refresh-status" style="font-size:0.75rem"></small>
         </div>
         <div class="d-flex align-items-center flex-wrap gap-2" style="font-size:0.8125rem">
             <span class="text-muted">篩選</span>
@@ -587,7 +594,14 @@ $(function () {
         return (isDefaultSort && !hasFilter) ? data : null;
     }
 
-    function loadBoard() {
+    /**
+     * 重新載入看板
+     *
+     * @param {boolean} quiet 安靜模式：不顯示骨架、失敗也不覆蓋畫面。
+     *                        自動刷新一定要用它 —— 每 30 秒閃一次骨架，
+     *                        看板會像壞掉一樣，而且正在看的那一欄會跳掉。
+     */
+    function loadBoard(quiet) {
         var inline = takeInlineBoard();
 
         if (inline) {
@@ -596,7 +610,9 @@ $(function () {
             return;
         }
 
-        showBoardSkeleton();
+        if (!quiet) {
+            showBoardSkeleton();
+        }
 
         var params = {};
         var projectId = $('#filter-project').val();
@@ -621,6 +637,16 @@ $(function () {
             // session 過期（401／419）由 common.js 的全域 ajaxError 接手提示，
             // 這裡只負責把畫面收乾淨
             error: function () {
+                /*
+                 * ⚠ 安靜模式下**不要覆蓋畫面**：自動刷新失敗（網路斷一下、
+                 * session 過期）就把使用者正在看的看板清成「載入失敗」，
+                 * 比不刷新糟得多 —— 他什麼都沒做，資料卻不見了。
+                 * 原本的資料還留著是對的，下一輪再試。
+                 */
+                if (quiet) {
+                    return;
+                }
+
                 Object.keys(statusListMap).forEach(function (status) {
                     $('#' + statusListMap[status])
                         .html('<p class="text-muted text-center py-3" style="font-size:0.8125rem">載入失敗</p>');
@@ -1732,6 +1758,16 @@ $(function () {
     var dropColumn = null;
 
     /**
+     * 正在拖曳嗎 —— 自動刷新要看它
+     *
+     * ⚠ 不能用 `dropColumn !== null` 代替：游標拖到欄位外面時那個會被清成 null，
+     * 但手上還抓著卡片。
+     *
+     * @type {boolean}
+     */
+    var boardDragging = false;
+
+    /**
      * 清掉目標欄位的高亮
      */
     function clearDropTarget() {
@@ -1782,6 +1818,8 @@ $(function () {
                 },
                 // 拖曳取消（放回原處、按 ESC）也會走到 onEnd，高亮在那裡清
                 onStart: function (evt) {
+                    // 自動刷新要知道「現在不能換 HTML」，否則手上那張卡會消失
+                    boardDragging = true;
                     markDropTarget(evt.from);
                 },
                 // 強制使用 SortableJS 自己的拖曳實作，不走原生 HTML5 drag and drop。
@@ -1794,6 +1832,9 @@ $(function () {
                 delayOnTouchOnly: true,
                 touchStartThreshold: 5,
                 onEnd: function (evt) {
+                    // ⚠ 要在最前面放掉：下面任何一個 return 都會讓旗標卡在 true，
+                    // 自動刷新就從此永久停擺（而且完全不會報錯）
+                    boardDragging = false;
                     clearDropTarget();
 
                     var taskId = $(evt.item).data('task-id');
@@ -2201,8 +2242,77 @@ $(function () {
     $('#filter-keyword').on('keypress', function (e) { if (e.which === 13) loadBoard(); });
     $('#filter-overdue').on('change', function () { loadBoard(); });
 
+    // ===============================================================
+    //  刷新（需求方 2026-10-30）
+    // ===============================================================
+
+    /** @type {number} 自動刷新間隔（毫秒），走 config 不要寫死在這裡 */
+    var BOARD_REFRESH_MS = {{ (int) config('constants.TASK.BOARD_REFRESH_SECONDS') }} * 1000;
+
+    /**
+     * 現在可以自動刷新嗎
+     *
+     * ⚠ 這一串判斷是整個功能的重點。自動刷新會把五欄的 HTML 整個換掉，
+     * 在使用者正在操作的時候做這件事，等於把他做到一半的事情弄掉 ——
+     * 「幫他省一次重新整理」的好處遠小於這個壞處。
+     *
+     * @returns {boolean}
+     */
+    function canAutoRefresh() {
+        // 分頁在背景：沒人在看，刷了只是白打一趟 API（而且會一直累積）
+        if (document.hidden) { return false; }
+
+        // 任何視窗開著：新增／編輯任務、異動紀錄、封存清單、各種確認框
+        if ($('.modal.show').length) { return false; }
+
+        // 拖曳中：換掉 HTML 會讓拖曳的那張卡片消失在手上
+        if (boardDragging) { return false; }
+
+        /*
+         * 側邊面板的描述正在編輯：那是 TinyMCE，而且內容還沒存。
+         * ⚠ 面板本身開著**不算**正在操作 —— 面板內容不是 renderBoard()
+         * 畫的，刷新不會動到它，為此停掉自動刷新太嚴格了。
+         */
+        if ($('#side-panel-body').find('.tox-tinymce').length) { return false; }
+
+        // 正在打字（關鍵字、留言、inline 編輯）
+        var tag = (document.activeElement && document.activeElement.tagName) || '';
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') { return false; }
+
+        return true;
+    }
+
+    /** 上次刷新時間的提示文字 */
+    function markRefreshed() {
+        var now = new Date();
+        var hh = ('0' + now.getHours()).slice(-2);
+        var mm = ('0' + now.getMinutes()).slice(-2);
+
+        $('#board-refresh-status').text('{{ trans("task_board.refresh_last") }}'.replace(':time', hh + ':' + mm));
+    }
+
+    $('#btn-refresh-board').on('click', function () {
+        var $btn = $(this);
+
+        // 轉一下圖示：不給回饋的話，資料沒變就看不出按了有沒有用
+        $btn.find('.fa-rotate').addClass('fa-spin');
+        loadBoard();
+        markRefreshed();
+
+        setTimeout(function () { $btn.find('.fa-rotate').removeClass('fa-spin'); }, 600);
+    });
+
+    setInterval(function () {
+        if (!canAutoRefresh()) { return; }
+
+        // ⚠ 一定要走安靜模式，理由見 loadBoard() 的 docblock
+        loadBoard(true);
+        markRefreshed();
+    }, BOARD_REFRESH_MS);
+
     // 初始載入
     loadBoard();
+    markRefreshed();
 });
 </script>
 

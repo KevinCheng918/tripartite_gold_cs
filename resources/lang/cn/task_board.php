@@ -40,6 +40,8 @@ return [
     'action_edit_comment'   => '编辑留言',
     'action_save'           => '储存',
     'action_cancel'         => '取消',
+    'action_refresh'        => '刷新',
+    'refresh_last'          => '自动刷新中，上次 :time',
     'comment_edited'        => '已编辑',
     'description_empty'     => '尚无描述，点右上角「编辑」新增',
     'checklist_tooltip'     => '勾选清单',
