@@ -44,6 +44,11 @@ return [
     'description_empty'     => '尚无描述，点右上角「编辑」新增',
     'checklist_tooltip'     => '勾选清单',
     'file_tooltip'          => '上传档案',
+    'file_button'           => '档案',
+    'description_drop_hint' => '图片与档案直接拖进描述，就会插在您放的那一行。',
+
+    'attachment_legacy_title' => '先前上传的附件',
+    'attachment_legacy_hint'  => '这些是改版前上传的附件。新的图片与档案请直接放进描述。',
     'checklist_placeholder' => '待办事项',
     'checklist_progress'    => '已完成 :done / :total',
     'comment_image_locked'  => '附件无法编辑',

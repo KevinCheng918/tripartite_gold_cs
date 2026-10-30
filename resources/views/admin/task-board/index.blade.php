@@ -187,6 +187,13 @@
                         <div class="mb-3">
                             <label class="form-label">{{ trans('task_board.field_description') }}</label>
                             <textarea id="task-description" class="tinymce-editor"></textarea>
+                            {{-- ⚠ 這一行取代了原本的「附件」欄位（需求方 2026-10-30）：
+                                 檔案要插在游標那一行，不要集中在底下。
+                                 提示一定要留著 —— 拔掉一個看得見的欄位卻不說新的放法，
+                                 使用者只會以為功能不見了 --}}
+                            <small class="form-text text-muted">
+                                <i class="fas fa-paperclip me-1"></i>{{ trans('task_board.description_drop_hint') }}
+                            </small>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ trans('task_board.field_priority') }}</label>
@@ -215,11 +222,6 @@
                         <div class="mb-3">
                             <label class="form-label">{{ trans('task_board.field_due_date') }}</label>
                             <input type="date" id="task-due-date" class="form-control">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">{{ trans('task_board.field_attachment') }}</label>
-                            <input type="file" class="form-control" id="task-images" multiple>
-                            <div id="task-image-previews" class="d-flex flex-wrap gap-2 mt-2"></div>
                         </div>
                         <div class="text-end">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
@@ -764,19 +766,29 @@ $(function () {
                     + (t.description || '<span class="text-muted">{{ trans("task_board.description_empty") }}</span>')
                     + '</div></div>';
 
-                // 附件（不限圖片；欄位仍沿用 images 這個舊名）
-                if ((t.images && t.images.length > 0) || canUpdate) {
+                /*
+                 * 附件（不限圖片；欄位仍沿用 images 這個舊名）。
+                 *
+                 * ⚠ 這一格已經**降級成唯讀彙總**（需求方 2026-10-30）：
+                 * 新的圖片與檔案要放進描述、插在游標那一行，所以上傳入口
+                 * （原本的 `#panel-upload-images`）拔掉了，只留顯示與刪除。
+                 *
+                 * ⚠ 條件從「有附件 **或** 有編輯權限」改成「**有附件**」——
+                 * 留著 `|| canUpdate` 的話，沒有舊附件的任務會多一格空白區塊。
+                 *
+                 * ⚠ 標題要講明「先前上傳的」，不然看的人會以為新附件還是會
+                 * 跑到這裡來。
+                 */
+                if (t.images && t.images.length > 0) {
                     html += '<div class="mb-3">';
-                    if (t.images && t.images.length > 0) {
-                        html += '<div class="d-flex flex-wrap gap-2 mb-2 align-items-start">';
-                        t.images.forEach(function (url) {
-                            html += isImageUrl(url) ? attachmentThumbHtml(url, canUpdate) : attachmentFileHtml(url, canUpdate);
-                        });
-                        html += '</div>';
-                    }
-                    if (canUpdate) {
-                        html += '<input type="file" class="form-control form-control-sm" id="panel-upload-images" multiple>';
-                    }
+                    html += '<label class="fw-bold mb-1 d-block" style="font-size:0.875rem">'
+                        + '<i class="fas fa-paperclip me-1"></i>{{ trans("task_board.attachment_legacy_title") }}</label>';
+                    html += '<p class="text-muted mb-2" style="font-size:0.8125rem">{{ trans("task_board.attachment_legacy_hint") }}</p>';
+                    html += '<div class="d-flex flex-wrap gap-2 align-items-start">';
+                    t.images.forEach(function (url) {
+                        html += isImageUrl(url) ? attachmentThumbHtml(url, canUpdate) : attachmentFileHtml(url, canUpdate);
+                    });
+                    html += '</div>';
                     html += '</div>';
                 }
 
@@ -830,33 +842,11 @@ $(function () {
                     showBsModal('modal-delete-attachment-confirm');
                 });
 
-                $('#panel-upload-images').on('change', function () {
-                    if (!this.files.length) return;
-                    var formData = new FormData();
-                    formData.append('_method', 'PUT');
-                    for (var i = 0; i < this.files.length; i++) {
-                        formData.append('images[]', this.files[i]);
-                    }
-                    $.ajax({
-                        url: '/admin/task-board/ajax-update-task/' + taskId,
-                        method: 'POST',
-                        headers: { 'X-CSRF-TOKEN': csrfToken },
-                        processData: false,
-                        contentType: false,
-                        data: formData,
-                        // 上傳期間一樣鎖住面板，理由同 saveField
-                        beforeSend: function () { lockPanel(true); },
-                        // 同 saveField：用回傳的任務就地換卡片，不必再撈一次整個看板
-                        success: function (body) {
-                            updateCardInPlace(body.task && body.task.data ? body.task.data : body.task);
-                            loadPanel(taskId, true, function () { lockPanel(false); });
-                        },
-                        error: function (xhr) {
-                            showMsg((xhr.responseJSON && xhr.responseJSON.message) || '上傳失敗');
-                            lockPanel(false);
-                        }
-                    });
-                });
+                /*
+                 * `#panel-upload-images` 的上傳處理已經拔掉 ——
+                 * 附件改成放進描述、插在游標那一行（需求方 2026-10-30）。
+                 * 上面那一格只剩「先前上傳的附件」的顯示與刪除。
+                 */
 
                 // Emoji picker
                 var emojis = ['👍','❤️','😂','😮','😢','🙏','❤️‍🔥','👌','😁','🤗','🔥','🤔','👎','🥰','👏','🤯','🎉','🤩','🤮','💩','🕊️','🤡','🫣','😌','😍','🐳','🌚','🌭','💯','🤣','⚡','🍌','🏆','💔','🤨','🙂','🍓','🍾','💋','🖕','😈','😴','😭','🤓','👻','🤷','👀','🎃','🙈','😇','😱','🤝','✍️','🫡','🎅','🎄','☃️','🎆','🤪','🗿','🆒','💘','🙉','🦄','🥴','🙊','👾','🤷‍♂️'];
@@ -2063,55 +2053,14 @@ $(function () {
         });
     });
 
-    // 新增任務
-    // 圖片上傳（新增 Modal）
-    var taskImageFiles = [];
-
-    function renderTaskImagePreviews() {
-        var $container = $('#task-image-previews');
-        $container.empty();
-
-        taskImageFiles.forEach(function (file, idx) {
-            var removeBtn = '<button type="button" class="btn-close position-absolute top-0 end-0 bg-white rounded-circle"'
-                + ' style="font-size:0.5rem;padding:0.25rem" data-remove="' + idx + '"></button>';
-
-            // 非圖片沒有縮圖可看，改顯示檔名卡片
-            if (file.type.indexOf('image/') !== 0) {
-                $container.append(
-                    '<div class="position-relative border rounded d-flex align-items-center gap-1 px-2 py-1"'
-                    + ' style="max-width:180px;height:80px;font-size:0.8125rem">'
-                    + '<i class="fas fa-paperclip text-muted"></i>'
-                    + '<span class="text-truncate">' + $('<span>').text(file.name).html() + '</span>'
-                    + removeBtn + '</div>'
-                );
-
-                return;
-            }
-
-            var reader = new FileReader();
-            reader.onload = function (e) {
-                $container.append(
-                    '<div class="position-relative" style="width:80px;height:80px">'
-                    + '<img src="' + e.target.result + '" style="width:80px;height:80px;object-fit:cover;border-radius:0.375rem;border:1px solid #dee2e6">'
-                    + removeBtn + '</div>'
-                );
-            };
-            reader.readAsDataURL(file);
-        });
-    }
-
-    $('#task-images').on('change', function () {
-        for (var i = 0; i < this.files.length; i++) {
-            taskImageFiles.push(this.files[i]);
-        }
-        this.value = '';
-        renderTaskImagePreviews();
-    });
-
-    $(document).on('click', '#task-image-previews .btn-close', function () {
-        taskImageFiles.splice(parseInt($(this).data('remove'), 10), 1);
-        renderTaskImagePreviews();
-    });
+    /*
+     * 新增任務的「附件」欄位（`#task-images` ＋ 預覽）已經拔掉 ——
+     * 圖片與檔案直接放進描述，插在游標那一行（需求方 2026-10-30：
+     * 「不要都集中在底下，反而不好閱讀」）。
+     *
+     * 描述編輯器那條路本來就會上傳並內嵌，見 getTinyConfig() 的
+     * images_upload_handler 與 tbfile 按鈕。
+     */
 
     // 站台清單：系統篩選 + 關鍵字搜尋（form reset 不會清掉這些，開啟時要自己重設）
     function filterTaskStations() {
@@ -2183,8 +2132,6 @@ $(function () {
         $('#form-task')[0].reset();
         $('#pri-medium').prop('checked', true);
         $('#modal-task-title').text('{{ trans("task_board.action_create_task") }}');
-        taskImageFiles = [];
-        $('#task-image-previews').empty();
         resetTaskStationPicker();
         showBsModal('modal-task');
     });
@@ -2206,7 +2153,7 @@ $(function () {
         formData.append('priority', $('input[name="task_priority"]:checked').val());
         $('.js-assignee-check:checked').each(function () { formData.append('assignee_ids[]', $(this).val()); });
         if ($('#task-due-date').val()) formData.append('due_date', $('#task-due-date').val());
-        taskImageFiles.forEach(function (file) { formData.append('images[]', file); });
+        // 附件不再從這裡送 —— 它們已經在 description 的 HTML 裡（內嵌在游標那一行）
         if (id) formData.append('_method', 'PUT');
 
         $.ajax({
@@ -2284,6 +2231,7 @@ var TASK_CONTENT_CSS_URL = '{{ asset('css/task-content.css') }}?v={{ filemtime(p
 var CHECKLIST_TOOLTIP = @json(trans('task_board.checklist_tooltip'));
 var CHECKLIST_PLACEHOLDER = @json(trans('task_board.checklist_placeholder'));
 var FILE_TOOLTIP = @json(trans('task_board.file_tooltip'));
+var FILE_BUTTON = @json(trans('task_board.file_button'));
 var FILE_UPLOAD_FAILED = @json(trans('task_board.msg.file_upload_failed'));
 
 /**
@@ -2399,7 +2347,13 @@ function getTinyConfig(overrides) {
         height: 300,
         menubar: false,
         plugins: ['autolink', 'link', 'lists', 'image', 'table', 'code'],
-        toolbar: 'undo redo | fontfamily fontsize | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright | bullist numlist tbchecklist | link image tbfile table | code',
+        /*
+         * ⚠ `image` 與 `tbfile` 刻意排在**前段**（需求方 2026-10-30）：
+         * `toolbar_mode: 'sliding'` 在窄面板會把後段收進「更多」裡，
+         * 而這兩顆正是放檔案的入口 —— 收起來使用者就找不到，
+         * 於是會去找那個把檔案排在底下的「附件」欄位（已經拔掉了）。
+         */
+        toolbar: 'undo redo | image tbfile | bold italic underline strikethrough | bullist numlist tbchecklist | link table | fontfamily fontsize | forecolor backcolor | alignleft aligncenter alignright | code',
         font_family_formats:
             '系統預設=inherit;' +
             '微軟正黑體=Microsoft JhengHei,PingFang TC,Heiti TC,sans-serif;' +
@@ -2466,9 +2420,17 @@ function getTinyConfig(overrides) {
                 }
             });
 
-            // 圖片走 TinyMCE 內建的 image 上傳，這顆負責圖片以外的附件
+            /*
+             * 圖片走 TinyMCE 內建的 image 上傳，這顆負責圖片以外的附件。
+             *
+             * ⚠ **要有文字不能只有圖示**（需求方 2026-10-30）：原本只有 icon
+             * ＋ tooltip，又排在 `toolbar_mode: 'sliding'` 在窄面板會收起來的
+             * 後段 —— 使用者找不到它，就會回去用那個會把檔案排在底下的
+             * 「附件」欄位（已經拔掉了）。
+             */
             editor.ui.registry.addButton('tbfile', {
                 icon: 'upload',
+                text: FILE_BUTTON,
                 tooltip: FILE_TOOLTIP,
                 onAction: function () {
                     var input = document.createElement('input');
@@ -2478,6 +2440,32 @@ function getTinyConfig(overrides) {
                     };
                     input.click();
                 }
+            });
+
+            /*
+             * 拖放**非圖片**檔案進描述（需求方 2026-10-30）。
+             *
+             * ⚠ TinyMCE 的 `automatic_uploads` 只處理圖片 blob —— 拖一個 PDF
+             * 進來原本完全沒有反應，使用者試一次沒用就不會再試。
+             *
+             * ⚠ **圖片一定要讓 TinyMCE 自己處理**，不要一起搶過來：
+             * 搶了會上傳兩次，而且 `images_upload_handler` 那一套的進度列與
+             * 失敗復原都會失效。所以這裡只挑出非圖片的，而且只有真的有東西
+             * 要處理時才 `preventDefault()`。
+             */
+            editor.on('drop', function (e) {
+                var dropped = e.dataTransfer ? e.dataTransfer.files : null;
+
+                if (!dropped || !dropped.length) { return; }
+
+                var others = Array.prototype.filter.call(dropped, function (file) {
+                    return file.type.indexOf('image/') !== 0;
+                });
+
+                if (!others.length) { return; }
+
+                e.preventDefault();
+                others.forEach(function (file) { uploadEditorFile(file, editor); });
             });
         },
         content_css: [dark ? 'dark' : 'default', TASK_CONTENT_CSS_URL],

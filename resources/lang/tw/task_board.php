@@ -44,6 +44,28 @@ return [
     'description_empty'     => '尚無描述，點右上角「編輯」新增',
     'checklist_tooltip'     => '勾選清單',
     'file_tooltip'          => '上傳檔案',
+    /*
+     * ⚠ 工具列那顆上傳鈕要有**文字**不只圖示：它原本只有 icon ＋ tooltip，
+     * 又排在 `toolbar_mode: 'sliding'` 在窄面板會收起來的後段 ——
+     * 使用者找不到它，就會回去用「附件」那個欄位，而那會排在描述底下。
+     */
+    'file_button'           => '檔案',
+    /*
+     * 描述欄位底下的提示（取代原本的「附件」上傳欄位）。
+     *
+     * ⚠ 一定要說「插在您放的那一行」—— 使用者原本的抱怨就是附件都集中在
+     * 底下，不講清楚新的放法有什麼不同，他還是會去找那個已經被拔掉的欄位。
+     */
+    'description_drop_hint' => '圖片與檔案直接拖進描述，就會插在您放的那一行。',
+
+    /*
+     * 描述底下那一格降級成唯讀彙總之後的標題與說明。
+     *
+     * ⚠ 只有舊任務（`images` 已經有資料）才會出現這一格 ——
+     * 標題要講明「先前上傳的」，不然看的人會以為新的附件還是會跑到這裡。
+     */
+    'attachment_legacy_title' => '先前上傳的附件',
+    'attachment_legacy_hint'  => '這些是改版前上傳的附件。新的圖片與檔案請直接放進描述。',
     'checklist_placeholder' => '待辦事項',
     'checklist_progress'    => '已完成 :done / :total',
     'comment_image_locked'  => '附件無法編輯',

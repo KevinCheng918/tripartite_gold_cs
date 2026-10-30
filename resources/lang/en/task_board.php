@@ -44,6 +44,11 @@ return [
     'description_empty'     => 'No description yet — click Edit above',
     'checklist_tooltip'     => 'Checklist',
     'file_tooltip'          => 'Upload file',
+    'file_button'           => 'File',
+    'description_drop_hint' => 'Drag images and files straight into the description — they land on the line where you drop them.',
+
+    'attachment_legacy_title' => 'Previously uploaded attachments',
+    'attachment_legacy_hint'  => 'These were uploaded before the change. Put new images and files directly into the description.',
     'checklist_placeholder' => 'To-do item',
     'checklist_progress'    => ':done / :total done',
     'comment_image_locked'  => 'Attachments cannot be edited',

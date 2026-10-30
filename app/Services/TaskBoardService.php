@@ -7,6 +7,8 @@ use App\Repositories\ProjectRepository;
 use App\Repositories\StationRepository;
 use App\Repositories\TaskRepository;
 use App\Repositories\UserRepository;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -16,6 +18,30 @@ use Illuminate\Support\Facades\Storage;
  */
 class TaskBoardService
 {
+    /**
+     * 活動紀錄裡「欄位名稱」的對照
+     *
+     * ⚠ **寫入與讀取共用這一份**（`updateTask()` 產生 `changes`、
+     * `translateLegacyChanges()` 回頭找舊紀錄）—— 各寫一份的話，哪天改了
+     * 其中一個標籤，舊紀錄的翻譯就會安靜地失效。
+     *
+     * ⚠ key 是欄位名、value 是**存進資料庫的中文標籤**。改 value 等於改
+     * 資料格式：既有紀錄的 key 還是舊標籤，`translateLegacyChanges()` 會
+     * 對不上。真要改就得連既有資料一起處理。
+     *
+     * @var array<string, string>
+     */
+    private const FIELD_LABELS = [
+        'title'        => '標題',
+        'description'  => '描述',
+        'priority'     => '優先順序',
+        'status'       => '狀態',
+        'assignee_ids' => '指派人員',
+        'station_id'   => '站台',
+        'project_id'   => '專案',
+        'due_date'     => '到期日',
+    ];
+
     private $taskRepository;
     private $projectRepository;
     private $userRepository;
@@ -106,21 +132,39 @@ class TaskBoardService
      */
     public function updateTask(Task $task, $params, $userId = null)
     {
-        if (isset($params['assignee_ids'])) {
+        if (filled(Arr::get($params, 'assignee_ids'))) {
             $params['assignee_ids'] = array_map('intval', $params['assignee_ids']);
         }
 
         // 記錄變更差異
         $changes = [];
-        $labelMap = [
-            'title' => '標題', 'description' => '描述', 'priority' => '優先順序',
-            'status' => '狀態', 'assignee_ids' => '指派人員', 'station_id' => '站台',
-            'project_id' => '專案', 'due_date' => '到期日',
-        ];
+
+        /*
+         * ⚠ **比對與儲存都要用 `activityValue()` 正規化過的值**，不要直接拿
+         * `$task->{$key}`（需求方 2026-10-30 回報了兩個症狀，同一個原因）：
+         *
+         *   - 到期日顯示成「2026-10-29T16:00:00.000000Z」—— `due_date` 的 cast
+         *     是 `date`，取出來是 Carbon，寫進 JSON 欄位就變成 ISO-8601 **UTC**
+         *   - 指派人員只有數字 —— `assignee_ids` 存的是 id 陣列
+         *
+         * ⚠ 而且不正規化還有第三個看不出來的問題：`$task->due_date != $value`
+         * 是拿 Carbon 跟 '2026-10-30' 這種字串比，Carbon 轉字串是
+         * 'Y-m-d H:i:s'，**永遠不相等** —— 所以每次編輯任務都會多記一筆
+         * 「到期日沒有變但被改過」的假異動。
+         */
         foreach ($params as $key => $value) {
-            if (isset($labelMap[$key]) && $task->{$key} != $value) {
-                $changes[$labelMap[$key]] = ['from' => $task->{$key}, 'to' => $value];
+            if (!Arr::has(self::FIELD_LABELS, $key)) {
+                continue;
             }
+
+            $before = $this->activityValue($key, $task->{$key});
+            $after = $this->activityValue($key, $value);
+
+            if ($before == $after) {
+                continue;
+            }
+
+            $changes[self::FIELD_LABELS[$key]] = ['from' => $before, 'to' => $after];
         }
 
         $result = $this->taskRepository->update($task, $params);
@@ -237,12 +281,6 @@ class TaskBoardService
     }
 
     /**
-     * 刪除任務
-     *
-     * @param Task $task
-     * @return void
-     */
-    /**
      * 取得封存任務（30 天內）
      *
      * @return \Illuminate\Database\Eloquent\Collection
@@ -273,6 +311,13 @@ class TaskBoardService
         ]);
     }
 
+    /**
+     * 封存任務
+     *
+     * @param Task     $task
+     * @param int|null $userId
+     * @return Task
+     */
     public function archiveTask(Task $task, $userId = null)
     {
         $this->logActivity($task->id, $userId, 'archived', [
@@ -286,17 +331,97 @@ class TaskBoardService
     }
 
     /**
-     * 取得所有啟用專案
+     * 把欄位值轉成活動紀錄要顯示的樣子
      *
-     * @return \Illuminate\Database\Eloquent\Collection
+     * ⚠ **在寫入時就換成人看得懂的值**，不是在畫面上才翻譯 ——
+     * 這是一份異動紀錄：「當時指派給誰」不應該因為那個人後來改了暱稱、
+     * 停用或離職就跟著變。站台與專案同理。
+     *
+     * ⚠ 這一支同時是**比對的基準**（見 `updateTask()` 的註解）：正規化之後
+     * 兩邊才比得出「到底有沒有變」，不然 Carbon 跟字串永遠不相等。
+     *
+     * @param string $key   欄位名稱
+     * @param mixed  $value 原始值
+     * @return mixed 顯示用的值（字串、字串陣列，或原值）
      */
+    private function activityValue($key, $value)
+    {
+        if ($key === 'due_date') {
+            // ⚠ 只留日期：到期日沒有時間的意義，而 Carbon 進 JSON 會變 ISO UTC
+            return blank($value) ? null : Carbon::parse($value)->format('Y-m-d');
+        }
+
+        if ($key === 'assignee_ids') {
+            return $this->assigneeNames($value);
+        }
+
+        if ($key === 'station_id') {
+            return $this->relatedName($this->stationRepository, $value);
+        }
+
+        if ($key === 'project_id') {
+            return $this->relatedName($this->projectRepository, $value);
+        }
+
+        // 標題、描述、優先順序、狀態：原值就夠（狀態與優先由前端對照表翻譯）
+        return $value;
+    }
+
+    /**
+     * 指派人員的暱稱清單
+     *
+     * ⚠ 用 `getNamesByIds()`：它**不加任何狀態條件**，所以已經停用或離職的人
+     * 留下的紀錄仍然顯示得出是誰 —— 異動紀錄要的正是這個。
+     *
+     * ⚠ **要排序**：不排的話，同一批人只因為勾選順序不同就會被判成「有變更」，
+     * 多記一筆假的異動。
+     *
+     * @param mixed $ids
+     * @return array<string>
+     */
+    private function assigneeNames($ids)
+    {
+        $ids = array_filter((array) $ids);
+
+        if (blank($ids)) {
+            return [];
+        }
+
+        $names = $this->userRepository->getNamesByIds($ids)->pluck('nickname')->all();
+
+        sort($names);
+
+        return $names;
+    }
+
+    /**
+     * 關聯資料的名稱（站台／專案）
+     *
+     * ⚠ 查不到就回原本的 id，不要回 null —— 站台或專案被刪掉時，
+     * 留一個 id 至少還查得出是哪一筆，回 null 會變成「從空的改成空的」。
+     *
+     * @param mixed $repository 有 `find($id)` 且撈得到 `name` 的 Repository
+     * @param mixed $value
+     * @return string|int|null
+     */
+    private function relatedName($repository, $value)
+    {
+        if (blank($value)) {
+            return null;
+        }
+
+        $model = $repository->find($value);
+
+        return filled($model) ? $model->name : $value;
+    }
+
     /**
      * 記錄任務活動
      *
-     * @param int         $taskId
-     * @param int|null    $userId
-     * @param string      $action
-     * @param array|null  $changes
+     * @param int        $taskId
+     * @param int|null   $userId
+     * @param string     $action
+     * @param array|null $changes
      * @return void
      */
     private function logActivity($taskId, $userId, $action, $changes = null)
@@ -317,9 +442,167 @@ class TaskBoardService
      */
     public function getActivities($taskId)
     {
-        return $this->taskRepository->getActivities($taskId);
+        return $this->translateLegacyChanges($this->taskRepository->getActivities($taskId));
     }
 
+    /**
+     * 把**舊**紀錄裡的原始值翻成人看得懂的樣子
+     *
+     * 2026-10-30 起 `updateTask()` 寫進去的就已經是顯示用的值了，但在那之前
+     * 存的是原始值 —— 到期日是 ISO-8601 的 UTC 字串、指派人員是 id 陣列。
+     * 不翻的話，使用者打開任何一個舊任務，看到的還是
+     * 「2026-10-29T16:00:00.000000Z」與「3, 5」。
+     *
+     * ⚠ **只改記憶體裡的值，不寫回資料庫**：這是一份異動紀錄，
+     * 為了好看去改寫歷史資料是另一回事（而且不可逆）。
+     *
+     * ⚠ **要能重複套用**：新紀錄已經是 'Y-m-d' 與名字陣列了，
+     * 這一支碰到它們必須原樣放過。
+     *
+     * ⚠ 名字**一次批次查完**再分配：逐筆查就是 N+1，而活動紀錄是一次撈全部的。
+     *
+     * @param \Illuminate\Database\Eloquent\Collection $activities
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    private function translateLegacyChanges($activities)
+    {
+        $nameMap = $this->legacyAssigneeNameMap($activities);
+
+        foreach ($activities as $activity) {
+            $changes = $activity->changes;
+
+            // 短路：建立／封存／還原這些沒有 changes
+            if (blank($changes)) {
+                continue;
+            }
+
+            $assigneeLabel = self::FIELD_LABELS['assignee_ids'];
+            $dueLabel = self::FIELD_LABELS['due_date'];
+
+            if (filled(Arr::get($changes, $assigneeLabel))) {
+                $changes[$assigneeLabel] = $this->mapBothSides(
+                    $changes[$assigneeLabel],
+                    function ($value) use ($nameMap) {
+                        return $this->legacyAssigneeSide($value, $nameMap);
+                    }
+                );
+            }
+
+            if (filled(Arr::get($changes, $dueLabel))) {
+                $changes[$dueLabel] = $this->mapBothSides($changes[$dueLabel], function ($value) {
+                    return $this->legacyDate($value);
+                });
+            }
+
+            $activity->changes = $changes;
+        }
+
+        return $activities;
+    }
+
+    /**
+     * 對 `['from' => …, 'to' => …]` 的兩邊各跑一次
+     *
+     * @param array    $change
+     * @param callable $callback
+     * @return array
+     */
+    private function mapBothSides($change, callable $callback)
+    {
+        foreach (['from', 'to'] as $side) {
+            if (!Arr::has($change, $side)) {
+                continue;
+            }
+
+            $change[$side] = $callback($change[$side]);
+        }
+
+        return $change;
+    }
+
+    /**
+     * 舊紀錄裡出現過的指派人員 id → 暱稱
+     *
+     * @param \Illuminate\Database\Eloquent\Collection $activities
+     * @return \Illuminate\Support\Collection
+     */
+    private function legacyAssigneeNameMap($activities)
+    {
+        $ids = [];
+        $assigneeLabel = self::FIELD_LABELS['assignee_ids'];
+
+        foreach ($activities as $activity) {
+            $change = Arr::get($activity->changes, $assigneeLabel);
+
+            if (blank($change)) {
+                continue;
+            }
+
+            foreach (['from', 'to'] as $side) {
+                foreach ((array) Arr::get($change, $side) as $one) {
+                    // 新紀錄存的是名字（字串），只有舊紀錄是數字 id
+                    if (is_numeric($one)) {
+                        $ids[] = (int) $one;
+                    }
+                }
+            }
+        }
+
+        // 短路：沒有舊紀錄就不必查
+        if (blank($ids)) {
+            return collect();
+        }
+
+        return $this->userRepository->getNamesByIds(array_unique($ids))->pluck('nickname', 'id');
+    }
+
+    /**
+     * 把一邊的指派人員換成名字
+     *
+     * ⚠ 查不到名字就留原本的 id：那個帳號可能已經被硬刪除了，
+     * 留 id 至少還看得出「換過人」，變成空的會讓那一筆紀錄失去意義。
+     *
+     * @param mixed                            $value
+     * @param \Illuminate\Support\Collection   $nameMap
+     * @return array<string>
+     */
+    private function legacyAssigneeSide($value, $nameMap)
+    {
+        $names = [];
+
+        foreach ((array) $value as $one) {
+            $names[] = is_numeric($one) ? (string) $nameMap->get((int) $one, $one) : $one;
+        }
+
+        sort($names);
+
+        return $names;
+    }
+
+    /**
+     * 把舊紀錄的日期值換成 `Y-m-d`
+     *
+     * ⚠ **一定要先轉成本地時區再取日期**：舊紀錄存的是 Carbon 序列化出來的
+     * ISO-8601 **UTC**，例如 `2026-10-29T16:00:00.000000Z` —— 那其實是
+     * 台北時間的 2026-10-30。直接取前 10 個字會**少一天**。
+     *
+     * @param mixed $value
+     * @return string|null
+     */
+    private function legacyDate($value)
+    {
+        if (blank($value)) {
+            return null;
+        }
+
+        return Carbon::parse($value)->setTimezone(config('app.timezone'))->format('Y-m-d');
+    }
+
+    /**
+     * 取得所有啟用專案
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
     public function getProjects()
     {
         return $this->projectRepository->getActive();
@@ -342,11 +625,6 @@ class TaskBoardService
     }
 
     /**
-     * 取得可指派人員列表
-     *
-     * @return \Illuminate\Database\Eloquent\Collection
-     */
-    /**
      * 刪除留言
      *
      * @param int $commentId
@@ -360,6 +638,11 @@ class TaskBoardService
         }
     }
 
+    /**
+     * 取得可指派人員列表
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
     public function getAssignees()
     {
         return $this->userRepository->getActiveForDropdown();

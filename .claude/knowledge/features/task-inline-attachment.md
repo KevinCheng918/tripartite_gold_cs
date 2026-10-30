@@ -3,7 +3,15 @@
 > 需求（2026-10-30）：「任務看板這邊的任務描述，我要像 Notion 一樣，
 > 我圖片、檔案插入就是在那一行，不要都集中在底下，反而不好閱讀。」
 
-**狀態：規劃中，尚未實作。待裁示五題（見文末）。**
+**狀態：已實作（v3.50，2026-10-30）。五題全部採用建議選項 (a)。**
+
+| 題目 | 裁示 |
+|---|---|
+| 附件區 | **保留為唯讀彙總**，只拔上傳入口 —— 舊任務的檔案還看得到、還能刪 |
+| 新增視窗 | **也拔掉「附件」欄位**，一律走描述 |
+| 孤兒檔案 | **不管它**（Notion 也是這樣）|
+| 留言 | **這次不動**（還是排在留言底下）|
+| 貼上 | **只做拖放**，貼上只保證圖片 |
 
 ## ⚠ 關鍵發現：想要的功能**已經有了**，只是被另一個入口蓋住
 
@@ -140,7 +148,36 @@ editor.on('drop', function (e) {
 「JS 分 `public/js`」—— 但**這次不要順手整頁搬**：那是一個獨立的重構，
 混進來的話這次的改動會完全看不出來。要做應該是另一個 commit。
 
-## 待裁示
+## 實作後補記（2026-10-30）
+
+### 實際改的東西
+
+| 檔案 | 說明 |
+|---|---|
+| `resources/views/admin/task-board/index.blade.php` | `setup` 加 `editor.on('drop')`；`tbfile` 加 `text`；toolbar 把 `image tbfile` 移到前段；拔掉 `#task-images`／`#task-image-previews`／`taskImageFiles` 與 `#panel-upload-images` 的上傳處理；附件區加標題與說明、條件改成「有附件才顯示」 |
+| `resources/lang/{tw,cn,en}/task_board.php` | `file_button`／`description_drop_hint`／`attachment_legacy_title`／`attachment_legacy_hint`（各 47 個 key）|
+| `config/changelog.php` | v3.50 |
+
+後端**完全沒有動** —— 兩支 editor 上傳端點與 `HasAttachmentRules` 本來就到位。
+`config/rules.php` 也沒有要加的東西。
+
+### 實作時才確認的幾件事
+
+⚠ **附件區的顯示條件要從「有附件 `||` 有編輯權限」改成「有附件」**：
+留著 `|| canUpdate` 的話，沒有舊附件的任務會多出一格空白區塊
+（原本那一格一定有東西，因為裡面有上傳欄位）。
+
+⚠ **`drop` 事件只有在真的有非圖片檔案時才 `preventDefault()`**：
+無條件擋掉的話，拖圖片進來就不會進 TinyMCE 內建的
+`automatic_uploads`，等於把本來就會動的那一半弄壞。
+
+⚠ **CSS 一行都沒加**：彙總區用 `fw-bold`／`text-muted` 這些既有的
+Bootstrap class 就夠，`task-board.css` 的 `.attachment-*` 原封不動。
+
+⚠ 這一頁的 JS 仍然內嵌在 Blade，**照計畫沒有順手整頁搬**（那是獨立重構）。
+驗證方式是把 `<script>` 抽出來、把 Blade 運算式換成字面值再 `node --check`。
+
+## 裁示紀錄（2026-10-30，五題皆採 (a)）
 
 ### 1. 附件區（描述底下那一格）怎麼處理？
 
