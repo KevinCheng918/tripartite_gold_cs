@@ -726,7 +726,16 @@ class UserRepository
         }
 
         return User::query()
-            ->select(['id', 'account', 'nickname', 'level'])
+            /*
+             * ⚠ `telegram_username` 是 2026-11-01 加的：任務卡異動通知要把
+             * 指派人員與專案負責人變成 `@mention`，而**沒有 username 的人要
+             * 退回顯示暱稱**，所以必須撈這一欄自己判斷。
+             *
+             * ⚠ 不要改用 `getMentionableByIds()` —— 那支會濾掉工程、
+             * 非正常狀態、以及沒有 username 的人，用在這裡會讓那些人
+             * 從通知上整個消失（這一支的 docblock 上方已經寫過這個警告）。
+             */
+            ->select(['id', 'account', 'nickname', 'level', 'telegram_username'])
             ->whereIn('id', $ids)
             ->orderBy('nickname')
             ->get();

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Presenters\TelegramUsernamePresenter;
 use App\Repositories\TaskRepository;
 use App\Repositories\UserRepository;
 use Illuminate\Support\Arr;
@@ -280,28 +281,41 @@ class TaskChangeNoticeService
          */
         $out[] = $this->titleLink($task);
 
-        // 第二行：該找誰
+        /*
+         * 第二行：該找誰。
+         *
+         * ⚠ 這兩個是 **`@mention`**（需求方 2026-11-01：「我要用標注的，
+         * 這樣 Telegram 才會 @ 到」）—— 所以 Telegram 會真的推播給他們，
+         * 不只是顯示名字。
+         */
         $out[] = $this->joinInline([
-            '指派：' . $this->assigneeNames($task),
-            '負責人：' . $this->projectOwnerName($task),
+            "指派：{$this->assigneeNames($task)}",
+            "負責人：{$this->projectOwnerName($task)}",
         ]);
 
-        // 第二行：歸屬與時程
+        // 第三行：歸屬與時程
         $out[] = $this->joinInline([
-            '專案：' . (filled($task->project) ? $task->project->name : '-'),
-            '優先：' . $this->readable(TaskBoardService::FIELD_LABELS['priority'], $task->priority),
-            '到期：' . (filled($task->due_date) ? $task->due_date->format('Y-m-d') : '未設定'),
+            "專案：{$this->projectName($task)}",
+            "到期：{$this->dueDateText($task)}",
         ]);
 
-        // 第三段：這次改了什麼（封存／還原、以及新留言也算在這裡）
+        /*
+         * 第四行：優先序，自己一行而且**擺在狀態的前面**（需求方 2026-11-01）。
+         *
+         * 燈號在文字之前（`優先序：🟡 中`）—— 滑過去的時候先看到顏色，
+         * 不必讀完字才知道急不急。
+         */
+        $out[] = "優先序：{$this->priorityWithLight($task->priority)}";
+
+        // 第五段：這次改了什麼（封存／還原、以及新留言也算在這裡）
         $out = array_merge($out, $states, $lines);
 
         if (filled($commentLine)) {
             $out[] = $commentLine;
         }
 
-        // 第四行：這次是誰動的
-        $out[] = '觸發者：' . $this->actorNames($activities, $comments);
+        // 最後一行：這次是誰動的
+        $out[] = "觸發者：{$this->actorNames($activities, $comments)}";
 
         return implode("\n", $out);
     }
@@ -395,6 +409,55 @@ class TaskChangeNoticeService
     }
 
     /**
+     * 卡片所屬專案的名稱
+     *
+     * ⚠ 抽成一支是為了讓 `buildMessage()` 那幾行都能用插值
+     * （`"專案：{$this->projectName($task)}"`）—— 三元運算式塞不進
+     * `{...}` 裡面，而這個專案的慣例是插值不是字串串接。
+     *
+     * @param \App\Models\Task $task
+     * @return string
+     */
+    private function projectName($task)
+    {
+        return filled($task->project) ? (string) $task->project->name : '-';
+    }
+
+    /**
+     * 到期日（沒設定就說沒設定，不要留空）
+     *
+     * @param \App\Models\Task $task
+     * @return string
+     */
+    private function dueDateText($task)
+    {
+        return filled($task->due_date) ? $task->due_date->format('Y-m-d') : '未設定';
+    }
+
+    /**
+     * 優先序：燈號 ＋ 文字
+     *
+     * ⚠ 燈號在**文字之前**（`優先序：🟡 中`，需求方 2026-11-01 指定的格式）。
+     *
+     * ⚠ 燈號在 `constants.TASK.CHANGE_NOTICE.PRIORITY_LIGHTS`，
+     * **不要寫死在這裡** —— 需求方日後要換顏色就不必動程式。
+     * 查不到燈號時只顯示文字，不要印一個空白佔位。
+     *
+     * @param mixed $priority
+     * @return string
+     */
+    private function priorityWithLight($priority)
+    {
+        $text = $this->readable(TaskBoardService::FIELD_LABELS['priority'], $priority);
+        $light = Arr::get(
+            (array) config('constants.TASK.CHANGE_NOTICE.PRIORITY_LIGHTS'),
+            strtoupper($this->priorityKey((int) $priority))
+        );
+
+        return filled($light) ? "{$light} {$text}" : $text;
+    }
+
+    /**
      * 這張卡所屬專案的負責人
      *
      * ⚠ `loadMissing` 而不是在 `Task::project()` 上 eager load：
@@ -416,7 +479,40 @@ class TaskChangeNoticeService
 
         $task->loadMissing('project.owner');
 
-        return filled($task->project->owner) ? $task->project->owner->nickname : '未指派';
+        if (blank($task->project->owner)) {
+            return '未指派';
+        }
+
+        return $this->mentionOrName($task->project->owner);
+    }
+
+    /**
+     * 一個人在訊息裡怎麼稱呼：有 Telegram username 就 `@mention`，沒有就暱稱
+     *
+     * 需求方 2026-11-01：「指派人跟負責人，我要用標注的，這樣 Telegram
+     * 才會 @ 到。」
+     *
+     * ⚠ **沒有 username 的人一定要退回暱稱，不能跳過** —— 跳過的話那個人
+     * 就從通知上消失了，而看訊息的人會以為「這張卡沒有指派人」。
+     *
+     * ⚠ 不要用 `UserRepository::getMentionableByIds()` 來拿人：那支會濾掉
+     * 工程、非正常狀態、以及沒有 username 的人 —— 用在這裡會讓那些人整個
+     * 不見（它自己的 docblock 就寫著這個警告）。
+     *
+     * ⚠ `mentionLine()` 會保留使用者填的大小寫（`normalize()` 是給比對用的，
+     * 會轉小寫）。
+     *
+     * ⚠ **`@` 只有在那個人也在這個群組裡才會真的推播。** 不在群組的話
+     * Telegram 只會把它畫成藍字 —— 這不是程式能補的，要請那個人加入群組。
+     *
+     * @param \App\Models\User $user
+     * @return string
+     */
+    private function mentionOrName($user)
+    {
+        $mention = TelegramUsernamePresenter::mentionLine([$user->telegram_username]);
+
+        return filled($mention) ? $mention : (string) $user->nickname;
     }
 
     /**
@@ -436,11 +532,21 @@ class TaskChangeNoticeService
             return '未指派';
         }
 
-        $names = $this->userRepository->getNamesByIds($ids)->pluck('nickname')->all();
+        $names = [];
+
+        foreach ($this->userRepository->getNamesByIds($ids) as $user) {
+            $names[] = $this->mentionOrName($user);
+        }
 
         sort($names);
 
-        return blank($names) ? '未指派' : implode('、', $names);
+        /*
+         * ⚠ 分隔符號用**空白**不要用「、」：`@mary、@john` 這樣寫的話
+         * Telegram 會把「、」當成 username 的一部分，兩個 @ 都解析失敗。
+         * 空白分隔是 Telegram mention 的唯一安全寫法
+         * （`TelegramUsernamePresenter::mentionLine()` 多人時也是用空白）。
+         */
+        return blank($names) ? '未指派' : implode(' ', $names);
     }
 
     /**

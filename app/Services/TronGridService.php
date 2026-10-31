@@ -20,6 +20,25 @@ class TronGridService
 {
     private $client;
 
+    /**
+     * 上一次打 TronGrid 的時刻（microtime，浮點秒）
+     *
+     * ⚠ 存在的理由是 **429**：沒有 API key 時 TronGrid 的限制是
+     * `allowed_rps(1)`，而 `WalletNoticeService::run()` 是背對背跑每個錢包的
+     * —— 清單裡**第一個錢包永遠成功、第二個永遠被擋**。
+     *
+     * ⚠ 節流做在這一層而不是那個迴圈裡，因為**翻頁也會連發**
+     * （`max_pages` 預設 5），兩邊都要擋。
+     *
+     * ⚠ 這是 instance 狀態，所以同一次排程裡的所有呼叫才共用得到。
+     * 唯一的呼叫端是 `WalletNoticeService`，而它只有排程在跑
+     * （設定頁的「測試」只發私訊、不打 TronGrid），所以在這裡 sleep 不會
+     * 卡住任何網頁請求。
+     *
+     * @var float|null
+     */
+    private $lastRequestAt = null;
+
     public function __construct()
     {
         $this->client = new Client(['timeout' => (int) config('tron.timeout')]);
@@ -155,6 +174,9 @@ class TronGridService
         $base = rtrim((string) config('tron.api_base'), '/');
         $url = "{$base}/v1/accounts/{$address}/transactions/trc20";
 
+        // ⚠ 一定要在真的送出之前等 —— 理由見 `$lastRequestAt`
+        $this->throttle();
+
         try {
             $response = $this->client->get($url, ['query' => $query, 'headers' => $headers]);
             $body = json_decode($response->getBody()->getContents(), true);
@@ -162,6 +184,14 @@ class TronGridService
             Log::error('TronGrid 查詢失敗', [
                 'address' => $address,
                 'error'   => $e->getMessage(),
+                /*
+                 * ⚠ 429 要給下一步的提示。這個錯最容易被誤判成「某個地址有
+                 * 問題」—— 實際上跟地址無關，是連發撞到 `allowed_rps(1)`。
+                 */
+                'hint'    => strpos($e->getMessage(), '429') === false
+                    ? null
+                    : '撞到 TronGrid 的速率限制。已有節流（tron.min_interval_ms），'
+                        . '還是會撞的話請設 TRON_API_KEY（免費額度低）',
             ]);
 
             return null;
@@ -178,6 +208,43 @@ class TronGridService
         }
 
         return $body;
+    }
+
+    /**
+     * 距離上一次呼叫不夠久就等一下
+     *
+     * ⚠ **第一次呼叫不會等**：`$lastRequestAt` 是 null 就直接走。
+     * 所以單一錢包的情況完全沒有額外延遲，只有連發才會被拉開。
+     *
+     * ⚠ 用 `microtime(true)` 而不是 `time()`：要擋的是「同一秒內的第二次」，
+     * 秒級精度根本看不到那個間隔。
+     *
+     * @return void
+     */
+    private function throttle()
+    {
+        $intervalMs = (int) config('tron.min_interval_ms');
+
+        if ($intervalMs < 1) {
+            return;
+        }
+
+        if (filled($this->lastRequestAt)) {
+            $elapsedMs = (microtime(true) - $this->lastRequestAt) * 1000;
+            $waitMs = $intervalMs - $elapsedMs;
+
+            if ($waitMs > 0) {
+                usleep((int) round($waitMs * 1000));
+            }
+        }
+
+        /*
+         * ⚠ **在這裡就記時間，不要等請求回來才記。** 記在回來之後的話，
+         * 間隔會變成「上一次結束到這一次開始」—— 而 TronGrid 算的是
+         * 「送達的時間點」，一次查詢本身花掉的那一秒也要算進去，
+         * 不然慢的那次回來後又立刻連發。
+         */
+        $this->lastRequestAt = microtime(true);
     }
 
     /**

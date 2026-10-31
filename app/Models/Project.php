@@ -63,9 +63,14 @@ class Project extends Model
      */
     public function owner(): BelongsTo
     {
+        /*
+         * ⚠ `telegram_username` 是 2026-11-01 加的：任務卡異動通知要把專案
+         * 負責人寫成 `@mention` —— **少了這一欄 `mentionOrName()` 會永遠
+         * 退回暱稱，而且不會報錯**，看起來就像「這個人沒設 Telegram」。
+         */
         return $this->belongsTo(User::class, 'owner_id')
             ->withTrashed()
-            ->select(['id', 'nickname', 'status', 'level', 'project_ids', 'deleted_at']);
+            ->select(['id', 'nickname', 'status', 'level', 'project_ids', 'telegram_username', 'deleted_at']);
     }
 
     /**

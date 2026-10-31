@@ -67,4 +67,24 @@ return [
     // HTTP 逾時（秒）。排程每分鐘跑一次，不能卡太久
     'timeout' => 15,
 
+    /*
+     * 兩次 TronGrid 呼叫之間至少間隔幾毫秒。
+     *
+     * ⚠ **這是為了不要撞 429。** 沒有 API key 時 TronGrid 的限制是
+     * `allowed_rps(1)` —— 每秒只准一次，超過就回
+     * 「request rate of (getTrc20TransactionsByAccount) exceeded the
+     * allowed_rps(1), and the query server is suspended」。
+     *
+     * ⚠ 這個問題的症狀**很容易被誤判**：`WalletNoticeService::run()` 是
+     * 背對背跑每個錢包的，所以**清單裡第一個錢包永遠成功、第二個永遠 429**
+     * —— 看起來像「某個地址有問題」，實際上跟地址無關，只跟它排第幾有關。
+     * （2026-11-01 從 production log 查出來的。）
+     *
+     * 1100 是 1 秒多一點的安全邊際。20 個錢包 ≈ 22 秒，排程一分鐘跑得完。
+     *
+     * ⚠ 設了 `TRON_API_KEY` 之後限制會高很多，這個值可以調小 ——
+     * 但**不要調成 0**：節流是「沒有 key 也不會壞」的保險。
+     */
+    'min_interval_ms' => env('TRON_MIN_INTERVAL_MS', 1100),
+
 ];
