@@ -199,16 +199,21 @@ class VmController extends Controller
         ]);
 
         try {
-            $this->vmService->uploadProof($billing, $params['proof']);
+            /*
+             * ⚠ 上傳者由**後端的 `Auth::id()`** 決定，不從 request 收 ——
+             * 收的話任何人都能把別人的名字填進財務紀錄。
+             *
+             * ⚠ 2026-11-01 起**真的記進 `vm_billing`**（`proof_uploaded_by`
+             * 與 `proof_uploaded_at`），帳務紀錄那一頁看得到。
+             * 在那之前是 2026-10-27 裁示「不加欄位」，所以人名只出現在
+             * 通知訊息裡、帳單資料本身不記 —— 需求方 2026-11-01 推翻了。
+             */
+            $this->vmService->uploadProof($billing, $params['proof'], Auth::id());
 
             /*
              * ⚠ 擺在上傳**成功之後**，而且 FinanceNoticeService 自己整段
              * try/catch —— 通知沒送到頂多主管晚點才看到，但上傳被例外中斷的話
              * 同仁會以為沒傳成功而重複傳。
-             *
-             * ⚠ 上傳者是從這裡的 `Auth::id()` 傳進去的：`vm_billing` 沒有
-             * 「誰上傳的」這個欄位（需求方 2026-10-27 決定不加），所以這個人名
-             * 只會出現在通知裡，帳單資料本身不會記。
              */
             $this->financeNotice->proofUploaded($billing, Auth::id());
 

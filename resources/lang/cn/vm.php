@@ -37,6 +37,7 @@ return [
     'field_amount'       => '金额',
     'field_due_date'     => '应收日',
     'field_paid'         => '收款状态',
+    'field_proof_uploader' => '上传者',
     'field_overdue_days' => '逾期天数',
 
     'power_on'       => '开机',

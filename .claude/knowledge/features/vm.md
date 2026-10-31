@@ -321,3 +321,70 @@ Controller 改成呼叫它之後 `PaymentConfigService` 在那裡已經沒有使
 - 產生帳單只能選本月或之後的月份，不能補產生過去的月份
 - 帳單日可填到 31，編輯時的驗證上限要與新增一致（曾經新增可填 31、編輯只准 28）
 - 這頁的 JS 全部寫在 blade 的 `@section('scripts')` 內，與專案其他 admin 頁面一致
+
+## 繳款證明記錄上傳者與時間（2026-11-01）
+
+> 需求方：「虛擬機的上傳繳款證明要紀錄是誰在什麼時候上傳的，
+> 在虛擬機管理的帳務紀錄這個頁面要看得到。」
+
+⚠ **這是推翻 2026-10-27 的決定。** 當時裁示「不加這個欄位」，所以
+`VmController::ajaxUploadProof()` 只把 `Auth::id()` 傳給通知服務 ——
+人名只出現在 Telegram 訊息裡，帳單資料本身不記。那段註解已經更新。
+
+`vm_billing` 加兩欄：`proof_uploaded_by`（FK → user，nullOnDelete）、
+`proof_uploaded_at`。
+
+### ⚠ 之前是用 `updated_at` 近似「上傳時間」
+
+`VmRepository::getPendingBillingsForReminder()` 原本的註解就寫著
+「沒有專門記上傳時刻的欄位，`uploadProof()` 寫入 `proof_image` 時
+`updated_at` 會跟著更新，審核前通常不會有別的更新，所以是夠準的近似值」。
+
+現在有真欄位了，但 **`updated_at` 的 fallback 必須留著**
+（`VmPaymentNoticeService::uploadedAtText()`）：這兩欄加上來之前就上傳好的
+帳單 `proof_uploaded_at` 是 null，只看新欄位的話那些待審核帳單會顯示
+「上傳時間：—」。等舊的都審完才能拔。
+
+### ⚠ 刻意不回填舊資料
+
+「誰上傳的」舊資料裡根本沒有，補不出來。「什麼時候」可以用 `updated_at`
+近似，但**把近似值寫進一個讀起來像事實的欄位，日後沒有人分得出哪一筆是真的**。
+
+所以舊帳單在畫面上顯示「—」。
+
+### ⚠ 時間用 `now()` 不要靠 `updated_at`
+
+審核、改備註都會動 `updated_at`，那之後它就不再是上傳時刻了。
+而 `proof_uploaded_by`／`_at` 跟 `proof_image` 在同一個 `update()` 裡，
+所以**重新上傳會自然一起更新**（紀錄該反映現在那張證明是誰傳的）。
+
+### ⚠ 關聯要 `withTrashed()`
+
+帳號是軟刪除的，FK 的 `nullOnDelete` 只在真的 `DELETE` 時觸發 ——
+上傳者離職之後 `proof_uploaded_by` 還指著他。不加 `withTrashed()` 的話關聯
+被 global scope 濾成 null，畫面變成「—」，跟「這筆根本沒記上傳者」混在一起。
+
+這是財務紀錄，「當時是誰上傳的」不該因為那個人離職就消失。
+
+### ⚠ 兩個「漏欄位」的坑
+
+- `BILLING_COLUMNS` 要加這兩欄 —— 少了它們那兩格永遠顯示「—」而且不報錯，
+  而 `proofUploader` 關聯也會因為撈不到 `proof_uploaded_by` 而永遠是 null
+- `paginateBillings()` 要 eager load `proofUploader` —— 不載就是一頁二十筆
+  各查一次（N+1）
+
+## 帳務紀錄的文字置中（2026-11-01）
+
+> 需求方：「帳務紀錄，文字都讓他在欄位置中，不要偏左或偏右。」
+
+加了一個修飾 class `.data-table--center`（`public/css/custom.css`）。
+
+⚠ **不要併進 `.data-table`**：其他頁的表格（站台、帳號、任務）靠的是
+「數字右、操作右、文字左」那一套預設，全站改成置中會把每一張表都動到。
+
+⚠ selector 要寫得比 `.data-table .col-num`／`.col-actions` **更具體**
+（多一層 `> tbody > tr >`）—— 那兩個是 `text-align: right`，權重不夠的話
+置中會被它們蓋掉，結果是「大部分置中、金額和操作欄沒有」。
+
+⚠ `.row-actions` 本身是 **flex**，`text-align` 管不到它 —— 要另外把
+`justify-content` 改成 center，不然按鈕群組還是黏在右邊。

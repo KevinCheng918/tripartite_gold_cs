@@ -22,10 +22,21 @@ class VmRepository
         'power_status', 'powered_off_at', 'note', 'created_at',
     ];
 
-    /** @var array 帳單列表欄位 */
+    /**
+     * 帳單列表欄位
+     *
+     * ⚠ `proof_uploaded_by` 與 `proof_uploaded_at` 是 2026-11-01 加的
+     * （帳務紀錄要顯示「誰在什麼時候上傳繳款證明」）——
+     * **少了它們那兩欄永遠顯示「—」而且不會報錯**，而 `proofUploader`
+     * 關聯也會因為撈不到 `proof_uploaded_by` 而永遠是 null。
+     * 這個專案為「select 漏欄位」修過好幾次。
+     *
+     * @var array<string>
+     */
     private const BILLING_COLUMNS = [
         'id', 'vm_server_id', 'billing_month', 'amount',
-        'paid', 'paid_at', 'proof_image', 'due_date', 'note', 'created_at',
+        'paid', 'paid_at', 'proof_image', 'proof_uploaded_by', 'proof_uploaded_at',
+        'due_date', 'note', 'created_at', 'updated_at',
     ];
 
     // ---------------------------------------------------------------
@@ -284,7 +295,12 @@ class VmRepository
     {
         $query = VmBilling::query()
             ->select(self::BILLING_COLUMNS)
-            ->with(['vmServer.station.system'])
+            /*
+             * ⚠ `proofUploader` 一定要 eager load：帳務紀錄每一列都要顯示
+             * 「誰上傳的」，不載就是一頁二十筆各查一次（N+1）。
+             * 而且那個關聯是 `withTrashed()` 的 —— 離職的同仁也顯示得出名字。
+             */
+            ->with(['vmServer.station.system', 'proofUploader'])
             ->orderBy('due_date')
             ->orderBy('id');
 
@@ -424,15 +440,18 @@ class VmRepository
     {
         return VmBilling::query()
             /*
-             * 這裡多撈 `updated_at` —— 催審核訊息要顯示「上傳時間」，而
-             * `BILLING_COLUMNS` 沒有這一欄。沒 select 的欄位讀出來是 null
-             * 且**不會報錯**，訊息就會默默變成「上傳時間：—」。
+             * 催審核訊息要顯示「上傳時間」。
              *
-             * 沒有專門記上傳時刻的欄位，`uploadProof()` 寫入 proof_image 時
-             * `updated_at` 會跟著更新，審核前通常不會有別的更新，
-             * 所以它是夠準的近似值。
+             * ⚠ 2026-11-01 起有了真正的 `proof_uploaded_at`，而它跟
+             * `updated_at` 都在 `BILLING_COLUMNS` 裡，所以這裡不必再
+             * `array_merge` 補欄位。
+             *
+             * ⚠ **`updated_at` 的 fallback 要留著**：那個欄位加上來之前就
+             * 上傳好的帳單 `proof_uploaded_at` 是 null（migration 刻意沒回填
+             * 近似值）—— 只看新欄位的話，舊的待審核帳單會顯示「上傳時間：—」。
+             * fallback 在 `VmPaymentNoticeService` 那邊。
              */
-            ->select(array_merge(self::BILLING_COLUMNS, ['updated_at']))
+            ->select(self::BILLING_COLUMNS)
             ->with(['vmServer.station'])
             ->where(function ($query) {
                 $query->where('paid', config('constants.VM.BILLING.PENDING'))
@@ -462,13 +481,6 @@ class VmRepository
     }
 
     /**
-     * 檢查帳單是否已存在
-     *
-     * @param int    $vmServerId
-     * @param string $billingMonth
-     * @return bool
-     */
-    /**
      * 查詢某 VM 某月的帳單
      *
      * @param int    $vmServerId
@@ -484,6 +496,13 @@ class VmRepository
             ->first();
     }
 
+    /**
+     * 檢查帳單是否已存在
+     *
+     * @param int    $vmServerId
+     * @param string $billingMonth
+     * @return bool
+     */
     public function billingExists($vmServerId, $billingMonth)
     {
         return VmBilling::query()

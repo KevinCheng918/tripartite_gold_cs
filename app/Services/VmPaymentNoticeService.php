@@ -447,17 +447,46 @@ class VmPaymentNoticeService
             '{month}'       => (string) $billing->billing_month,
             '{amount}'      => $this->noticeAmount($billing),
             /*
-             * 用 updated_at 當「上傳時間」—— 沒有專門記上傳時刻的欄位，
-             * 而 uploadProof() 寫入 proof_image 時這個欄位就會更新。
-             * 審核前通常不會有別的更新，所以是夠準的近似值
-             * （paid_at 不能用：那是審核通過才設的收款時間）。
+             * 上傳時間。
+             *
+             * ⚠ 2026-11-01 起有真正的 `proof_uploaded_at` 了，但
+             * **`updated_at` 的 fallback 必須留著**：那個欄位加上來之前就
+             * 上傳好的帳單是 null（migration 刻意沒回填近似值），
+             * 只看新欄位的話那些待審核帳單會變成「上傳時間：—」。
+             *
+             * ⚠ `paid_at` 不能用：那是審核通過才設的收款時間。
              */
-            '{uploaded_at}' => filled($billing->updated_at) ? $billing->updated_at->format('n/j H:i') : '—',
+            '{uploaded_at}' => $this->uploadedAtText($billing),
             // 這則是要人去後台審核的，不點名容易變成「大家都看到、沒人動手」
             '{mentions}'    => $this->managerMentions(),
         ]);
 
         return $this->sendInternalOnly($billing, 'pending', null, $text, $dryRun);
+    }
+
+    /**
+     * 繳款證明的上傳時間（舊帳單退回 `updated_at` 的近似值）
+     *
+     * ⚠ 兩段都要留：
+     *
+     *   - `proof_uploaded_at` 是 2026-11-01 加的真值
+     *   - 在那之前上傳的帳單只有 `updated_at` 這個近似值可用
+     *     （`uploadProof()` 寫 `proof_image` 時它會跟著更新，
+     *     而審核前通常不會有別的更新）
+     *
+     * ⚠ 等舊的待審核帳單都審完之後這支可以簡化，但**不要現在拔** ——
+     * 拔掉的那一刻，手上還沒審的舊帳單就會顯示「—」。
+     *
+     * @param \App\Models\VmBilling $billing
+     * @return string
+     */
+    private function uploadedAtText($billing)
+    {
+        if (filled($billing->proof_uploaded_at)) {
+            return $billing->proof_uploaded_at->format('n/j H:i');
+        }
+
+        return filled($billing->updated_at) ? $billing->updated_at->format('n/j H:i') : '—';
     }
 
     /**

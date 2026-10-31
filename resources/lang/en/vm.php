@@ -38,6 +38,7 @@ return [
     'field_amount'       => 'Amount',
     'field_due_date'     => 'Due Date',
     'field_paid'         => 'Payment',
+    'field_proof_uploader' => 'Uploaded by',
     'field_overdue_days' => 'Overdue Days',
 
     'power_on'       => 'On',

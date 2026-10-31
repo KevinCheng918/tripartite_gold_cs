@@ -50,6 +50,21 @@ class VmBillingResource extends JsonResource
             'paid'          => $this->paid,
             'paid_at'       => $this->paid_at ? Carbon::parse($this->paid_at)->toDateTimeString() : null,
             'proof_image'   => $this->proof_image ? asset("storage/{$this->proof_image}") : null,
+            /*
+             * 繳款證明是誰在什麼時候上傳的（需求方 2026-11-01）。
+             *
+             * ⚠ **舊帳單這兩個會是 null**：欄位是 2026-11-01 才加的，
+             * 而 migration 刻意沒有回填（「誰上傳的」補不出來，
+             * 「什麼時候」只能用 `updated_at` 近似，而把近似值寫進一個讀起來
+             * 像事實的欄位，日後沒有人分得出哪一筆是真的）。
+             * 前端顯示「—」。
+             *
+             * ⚠ `proofUploader` 關聯是 `withTrashed()` 的，所以上傳者離職了
+             * 名字照樣出得來 —— 這是財務紀錄，「當時是誰上傳的」不該消失。
+             */
+            'proof_uploader'    => filled($this->proofUploader) ? $this->proofUploader->nickname : null,
+            'proof_uploaded_at' => filled($this->proof_uploaded_at)
+                ? Carbon::parse($this->proof_uploaded_at)->toDateTimeString() : null,
             'due_date'      => $this->due_date ? Carbon::parse($this->due_date)->toDateString() : null,
             'overdue_days'  => $overdueDays,
             'prorated_fee'  => $this->calcProratedFee(),

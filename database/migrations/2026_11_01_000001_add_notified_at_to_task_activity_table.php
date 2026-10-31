@@ -64,6 +64,15 @@ class AddNotifiedAtToTaskActivityTable extends Migration
     /**
      * 留言也要一份「通知發過了沒」
      *
+     * ⚠ **這一段在既有環境不會執行。** 這支 migration 在它被加進來之前就已經
+     * 跑過了（batch 37），而 migration 跑過就不會再跑 —— 所以
+     * `task_comment.notified_at` 是由
+     * `2026_11_01_000003_add_notified_at_to_task_comment_table` 補的。
+     *
+     * 留在這裡是為了**全新環境**：那時候這一支會建好兩張表的欄位，
+     * 000003 偵測到已存在就什麼都不做。兩邊都有 `hasColumn` 守衛，
+     * 任何一邊先跑都不會出錯。
+     *
      * ⚠ **留言不走 `logActivity()`**（這個專案刻意不把留言寫進活動紀錄，
      * 見 features/task-board.md），所以沒辦法共用上面那一欄 ——
      * 必須在 `task_comment` 自己加一個。

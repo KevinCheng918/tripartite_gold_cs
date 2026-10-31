@@ -175,7 +175,7 @@ class VmService
      * @param \Illuminate\Http\UploadedFile $file
      * @return \App\Models\VmBilling
      */
-    public function uploadProof($billing, $file)
+    public function uploadProof($billing, $file, $uploaderId = null)
     {
         $path = $file->store('vm-proof', 'public');
 
@@ -187,6 +187,21 @@ class VmService
             'proof_image'   => $path,
             'paid'          => 2, // 待審核
             'exchange_rate' => $avgRate > 0 ? $avgRate : null,
+            /*
+             * 誰在什麼時候上傳的（需求方 2026-11-01，帳務紀錄要看得到）。
+             *
+             * ⚠ **重新上傳時這兩欄要跟著更新**，不要只在第一次寫 ——
+             * 「重新上傳」是既有功能（待審核時那顆 `js-upload-proof`），
+             * 而紀錄該反映現在那張證明是誰傳的，不是第一版是誰傳的。
+             * 因為它們跟 `proof_image` 在同一個 update 裡，所以天生就會一起換。
+             *
+             * ⚠ **時間用 `now()` 不要靠 `updated_at`**：審核、改備註都會動
+             * `updated_at`，那之後它就不再是上傳時刻了。
+             * （這個欄位加上來之前就是用 `updated_at` 近似的，見
+             * `VmRepository::getPendingBillingsForReminder()` 的註解。）
+             */
+            'proof_uploaded_by' => $uploaderId,
+            'proof_uploaded_at' => now(),
         ]);
     }
 

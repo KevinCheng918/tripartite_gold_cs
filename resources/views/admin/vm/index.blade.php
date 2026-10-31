@@ -948,6 +948,43 @@ $(function () {
     // ---------------------------------------------------------------
 
     /**
+     * 繳款證明的「誰／什麼時候上傳」那一格（需求方 2026-11-01）
+     *
+     * 上面是人名、下面是時間（`cell-stack` 是這個專案表格裡「主＋次」兩行
+     * 的既有樣式，站台那一欄也是用它）。
+     *
+     * ⚠ **舊帳單這兩個值會是 null**：欄位是 2026-11-01 才加的，而 migration
+     * 刻意沒有回填（「誰上傳的」補不出來，「什麼時候」只能用 `updated_at`
+     * 近似 —— 把近似值寫進讀起來像事實的欄位，日後分不出哪筆是真的）。
+     * 所以那些顯示「—」，**不要為了好看去填 `updated_at`**。
+     *
+     * ⚠ 人名要轉義：暱稱是使用者自己填的，直接串進 HTML 是 XSS。
+     * 這一頁沒有 `escapeHtml()` 這支 helper，用的是
+     * `$('<div>').text(…).html()`（見站台下拉那邊）—— 照既有做法，
+     * 不要憑記憶叫一個不存在的函式。
+     *
+     * @param {Object} b 帳單
+     * @returns {string}
+     */
+    function proofUploadCell(b) {
+        if (!b.proof_uploader && !b.proof_uploaded_at) {
+            return '<span class="text-muted">—</span>';
+        }
+
+        var escape = function (value) { return $('<div>').text(String(value)).html(); };
+
+        var html = '<div class="cell-stack__main">'
+            + (b.proof_uploader ? escape(b.proof_uploader) : '<span class="text-muted">—</span>')
+            + '</div>';
+
+        if (b.proof_uploaded_at) {
+            html += '<div class="cell-stack__sub">' + escape(b.proof_uploaded_at) + '</div>';
+        }
+
+        return html;
+    }
+
+    /**
      * 「查看憑證」按鈕
      *
      * 已收款與待審核兩種狀態都要，所以抽出來 —— 兩邊各寫一次的話，
@@ -1015,13 +1052,16 @@ $(function () {
              * 逾期天數併進收款狀態那一格 —— 逾期時 badge 本來就會變成「逾期」，
              * 天數再獨立一欄等於同一件事講兩遍。九欄變七欄。
              */
-            '<table class="table table-hover align-middle data-table"><thead class="thead-gold"><tr>' +
+            // data-table--center：整張表的文字置中（需求方 2026-11-01）
+            '<table class="table table-hover align-middle data-table data-table--center"><thead class="thead-gold"><tr>' +
             '<th class="col-idx">#</th>' +
             '<th>{{ trans("vm.field_station") }}</th>' +
             '<th class="col-tight">{{ trans("vm.field_month") }}</th>' +
             '<th class="col-num">{{ trans("vm.field_amount") }}</th>' +
             '<th class="col-tight">{{ trans("vm.field_due_date") }}</th>' +
             '<th>{{ trans("vm.field_paid") }}</th>' +
+            // 繳款證明是誰在什麼時候上傳的（需求方 2026-11-01）
+            '<th class="col-tight">{{ trans("vm.field_proof_uploader") }}</th>' +
             '<th class="col-actions">' + i18n.field_action + '</th>' +
             '</tr></thead><tbody>';
 
@@ -1137,6 +1177,7 @@ $(function () {
                 '<td class="col-num">' + b.amount + '</td>' +
                 '<td class="col-tight">' + (b.due_date || '-') + '</td>' +
                 '<td class="text-nowrap">' + paidBadge + overdueText + '</td>' +
+                '<td class="col-tight">' + proofUploadCell(b) + '</td>' +
                 '<td class="col-actions"><div class="row-actions">' + actions + '</div></td>' +
                 '</tr>';
 
@@ -1150,6 +1191,10 @@ $(function () {
                 '<div class="data-card__row"><span>' + i18n.field_amount + '</span><strong>' + b.amount + '</strong></div>' +
                 '<div class="data-card__row mb-2"><span>' + i18n.field_due_date + '</span><span>' + (b.due_date || '-') + '</span></div>' +
                 (b.paid === 0 && b.overdue_days > 0 ? '<div class="data-card__row mb-2"><span>' + i18n.overdue + '</span><span class="text-danger fw-bold">' + transReplace(i18n.days_unit, { days: b.overdue_days }) + '</span></div>' : '') +
+                // 有上傳者才列這一行 —— 沒上傳過的帳單多一行「—」只是雜訊
+                (b.proof_uploader || b.proof_uploaded_at
+                    ? '<div class="data-card__row mb-2"><span>' + i18n.field_proof_uploader + '</span><span>' + proofUploadCell(b) + '</span></div>'
+                    : '') +
                 '<div class="row-actions">' + actions + '</div>' +
                 '</div></div>';
         });
