@@ -62,7 +62,16 @@ class Task extends Model
      */
     public function project(): BelongsTo
     {
-        return $this->belongsTo(Project::class)->select(['id', 'name', 'reactivated_at']);
+        /*
+         * ⚠ `owner_id` 是給任務卡異動通知用的（要顯示專案負責人）——
+         * **少了它 `$task->project->owner` 會永遠是 null，而且不會報錯**，
+         * 訊息上就安靜地變成「未指派」。這個專案為「select 漏欄位」修過好幾次。
+         *
+         * ⚠ 只多撈一欄，`owner` 關聯本身**不在這裡 eager load** ——
+         * 看板每張卡都走這個關聯，而看板不顯示負責人，載了是白撈。
+         * 要用的那一支自己 `loadMissing('project.owner')`。
+         */
+        return $this->belongsTo(Project::class)->select(['id', 'name', 'reactivated_at', 'owner_id']);
     }
 
     /**

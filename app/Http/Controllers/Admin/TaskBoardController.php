@@ -21,6 +21,7 @@ use App\Models\TaskComment;
 use App\Services\ImageUploadService;
 use App\Services\TaskBoardService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
@@ -46,12 +47,19 @@ class TaskBoardController extends Controller
     public function index()
     {
         $user = Auth::user();
-        $isAdmin = (int) $user->level === config('constants.USER.LEVEL.ADMIN');
-        $userProjectIds = $user->project_ids ?? [];
         $allProjects = $this->taskBoardService->getProjects();
-        $projects = ($isAdmin || empty($userProjectIds))
-            ? ($isAdmin ? $allProjects : collect([]))
-            : $allProjects->filter(function ($p) use ($userProjectIds) { return in_array($p->id, $userProjectIds); })->values();
+
+        /*
+         * 篩選下拉只列得出這個人參與的專案。
+         *
+         * ⚠ 判準用 `canAccessProject()`（它對管理者一律回 true），
+         * **不要自己比 `level` 或 `in_array(project_ids)`** —— 原本這裡是
+         * 自己寫的一份，而 `buildBoard()` 又是另一份，兩邊的空陣列處理
+         * 還不一樣（見那邊的註解：看板那份有漏洞）。
+         */
+        $projects = $allProjects->filter(function ($project) use ($user) {
+            return $user->canAccessProject($project->id);
+        })->values();
         $assignees = $this->taskBoardService->getAssignees();
         $stations = $this->taskBoardService->getStations();
         $systems = $this->taskBoardService->getSystems();
@@ -68,6 +76,86 @@ class TaskBoardController extends Controller
     }
 
     /**
+     * 這個人碰得到這張卡嗎
+     *
+     * ⚠ **只擋畫面擋不住。** 看板列表會依「參與專案」過濾
+     * （`buildBoard()` 的 `user_project_ids`），但**吃單筆的 API 網址上
+     * 只有一個 id** —— 沒參與那個專案的人只要改一下數字就打得到。
+     *
+     * 2026-11-01 補上這一關之前，十幾支單筆端點（看詳細、移動、封存、
+     * 留言、刪附件⋯⋯）全部沒有判斷。系統規章那次的結論就是這一句：
+     * **每一支都要再過一次，連唯讀的也要**（見 features/project-regulation）。
+     *
+     * ⚠ 判準用 `User::canAccessProject()`，**不要在這裡自己比
+     * `project_ids`** —— 那是同一條規則的第二份實作，分岔的那一邊就是漏洞。
+     * 它對管理者一律回 true。
+     *
+     * @param Task $task
+     * @return bool
+     */
+    private function canTouchTask(Task $task)
+    {
+        return Auth::user()->canAccessProject((int) $task->project_id);
+    }
+
+    /**
+     * 這一整批卡片都碰得到嗎
+     *
+     * ⚠ **一張碰不到就回 false**（整批拒絕）：正常的前端不會送出看不到的
+     * 卡片 id，會送就代表有問題 —— 悄悄濾掉一半只會讓那個問題更難發現。
+     *
+     * ⚠ 先去查每一張卡的 `project_id` 再判斷，**不要相信前端送來的任何
+     * 專案資訊** —— 那是使用者送的，改得動。
+     *
+     * @param array<int> $taskIds
+     * @return bool
+     */
+    private function canTouchAllTasks(array $taskIds)
+    {
+        $user = Auth::user();
+
+        foreach ($this->taskBoardService->projectIdsOfTasks($taskIds) as $projectId) {
+            if (!$user->canAccessProject($projectId)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * 這個人碰得到這則留言所屬的卡片嗎
+     *
+     * ⚠ 留言的網址上只有 `comment` 的 id，所以要繞一層回卡片才知道專案。
+     *
+     * ⚠ 卡片查不到時**回 false 不是 true**：那代表資料不一致
+     * （FK 是 cascadeOnDelete，正常不會發生），而「判斷不出來」的時候
+     * 要擋住而不是放行。
+     *
+     * @param TaskComment $comment
+     * @return bool
+     */
+    private function canTouchComment(TaskComment $comment)
+    {
+        $task = $comment->task;
+
+        return filled($task) && $this->canTouchTask($task);
+    }
+
+    /**
+     * 擋下來時回的 403
+     *
+     * ⚠ 訊息是「沒參與這個專案」不是「沒有權限」—— 兩者的下一步不同：
+     * 前者去找管理者加參與專案，後者去要權限。
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    private function noAccessResponse()
+    {
+        return response()->json(['message' => trans('task_board.msg.no_access')], 403);
+    }
+
+    /**
      * 組五欄的看板資料
      *
      * 頁面首屏與 ajax 共用同一份，格式必須一致 ——
@@ -79,8 +167,30 @@ class TaskBoardController extends Controller
     private function buildBoard(array $params)
     {
         $user = Auth::user();
-        $isAdmin = (int) $user->level === config('constants.USER.LEVEL.ADMIN');
-        $params['user_project_ids'] = $isAdmin ? [] : ($user->project_ids ?? [-1]);
+
+        /*
+         * ⚠⚠ **`?: [-1]` 的 `?:` 不可以寫回 `??`。**
+         *
+         * 原本是 `$user->project_ids ?? [-1]` —— 而 `??` 只擋 null，
+         * **擋不住空陣列**。一個專案都沒勾的帳號 `project_ids` 是 `[]`，
+         * 於是傳給 Repository 的是 `[]`，而那邊的判斷是
+         * `if (!empty($criteria['user_project_ids']))` ——
+         * 空陣列直接跳過過濾，**那個人就看得到全部卡片**。
+         *
+         * 文件寫的規則正好相反：「沒勾任何參與專案＝**一個都看不到**，
+         * 不是『不限制』」。2026-11-01 補單筆 API 的權限時實測發現的
+         * （那之前畫面上的篩選下拉說「沒有專案」、看板卻列出全部，
+         * 兩邊自相矛盾也沒有人注意到）。
+         *
+         * ⚠ `[]` 這個值在 Repository 的語意是「**不限制**」，所以它只能給
+         * 管理者用。非管理者沒勾任何專案時要給 `[-1]`（一個不存在的 id），
+         * 才會真的篩成空的。
+         *
+         * ⚠ 判準用 `isAdmin()` 與 `projectIdList()` 這兩支 helper，
+         * **不要自己比 `level` 或讀 `project_ids`** —— 同一條規則的第二份
+         * 實作遲早會分岔，而分岔的那一邊就是資料外洩。
+         */
+        $params['user_project_ids'] = $user->isAdmin() ? [] : ($user->projectIdList() ?: [-1]);
         $board = $this->taskBoardService->getBoard($params);
 
         /*
@@ -145,6 +255,11 @@ class TaskBoardController extends Controller
      */
     public function ajaxTaskDetail(Task $task)
     {
+        // ⚠ 連唯讀的也要擋：網址上只有一個 id（理由見 `canTouchTask()`）
+        if (!$this->canTouchTask($task)) {
+            return $this->noAccessResponse();
+        }
+
         $task = $this->taskBoardService->getTask($task->id);
         TaskResource::preloadUsers($task->assignee_ids ?? []);
 
@@ -188,6 +303,10 @@ class TaskBoardController extends Controller
      */
     public function ajaxUpdateTask(UpdateTaskRequest $request, Task $task)
     {
+        if (!$this->canTouchTask($task)) {
+            return $this->noAccessResponse();
+        }
+
         $params = $request->validated();
         if ($request->hasFile('images')) {
             $existing = $task->images ?? [];
@@ -218,6 +337,10 @@ class TaskBoardController extends Controller
      */
     public function ajaxDeleteAttachment(DeleteAttachmentRequest $request, Task $task)
     {
+        if (!$this->canTouchTask($task)) {
+            return $this->noAccessResponse();
+        }
+
         $params = $request->validated();
 
         try {
@@ -243,6 +366,10 @@ class TaskBoardController extends Controller
      */
     public function ajaxArchiveTask(Task $task)
     {
+        if (!$this->canTouchTask($task)) {
+            return $this->noAccessResponse();
+        }
+
         try {
             $this->taskBoardService->archiveTask($task, Auth::id());
 
@@ -280,6 +407,10 @@ class TaskBoardController extends Controller
      */
     public function ajaxRestoreTask(Task $task)
     {
+        if (!$this->canTouchTask($task)) {
+            return $this->noAccessResponse();
+        }
+
         try {
             $this->taskBoardService->restoreTask($task, Auth::id());
 
@@ -300,6 +431,10 @@ class TaskBoardController extends Controller
      */
     public function ajaxMoveTask(MoveTaskRequest $request, Task $task)
     {
+        if (!$this->canTouchTask($task)) {
+            return $this->noAccessResponse();
+        }
+
         $params = $request->validated();
 
         $task = $this->taskBoardService->moveTask($task, $params, Auth::id());
@@ -316,6 +451,18 @@ class TaskBoardController extends Controller
     public function ajaxReorder(ReorderTaskRequest $request)
     {
         $params = $request->validated();
+
+        /*
+         * ⚠ 批次操作也要擋。這一支一次收一整欄的 id，而排序雖然只是
+         * `sort_order`，仍然是「改別人專案的資料」。
+         *
+         * ⚠ **有一張碰不到就整批拒絕**，不要只把碰不到的濾掉 ——
+         * 正常的前端不會送出看不到的卡片 id，會送就代表有問題，
+         * 悄悄做掉一半只會讓那個問題更難發現。
+         */
+        if (!$this->canTouchAllTasks(Arr::pluck($params['orders'], 'id'))) {
+            return $this->noAccessResponse();
+        }
 
         $this->taskBoardService->reorder($params['orders']);
 
@@ -391,6 +538,10 @@ class TaskBoardController extends Controller
      */
     public function ajaxUpdateChecklist(UpdateChecklistRequest $request, Task $task)
     {
+        if (!$this->canTouchTask($task)) {
+            return $this->noAccessResponse();
+        }
+
         $params = $request->validated();
 
         try {
@@ -412,6 +563,11 @@ class TaskBoardController extends Controller
      */
     public function ajaxComments(Task $task)
     {
+        // ⚠ 唯讀也要擋：留言裡常常有客戶資訊與處理細節
+        if (!$this->canTouchTask($task)) {
+            return $this->noAccessResponse();
+        }
+
         $comments = $this->taskBoardService->getComments($task->id);
 
         return TaskCommentResource::collection($comments);
@@ -426,6 +582,10 @@ class TaskBoardController extends Controller
      */
     public function ajaxStoreComment(StoreCommentRequest $request, Task $task)
     {
+        if (!$this->canTouchTask($task)) {
+            return $this->noAccessResponse();
+        }
+
         $params = $request->validated();
         // 用 KeepName 而非 uploadMultiple：留言附件不限圖片，
         // uniqid 命名會讓下載下來的檔案完全看不出是什麼
@@ -447,6 +607,15 @@ class TaskBoardController extends Controller
      */
     public function ajaxUpdateComment(UpdateCommentRequest $request, TaskComment $comment)
     {
+        /*
+         * ⚠ 這一關**不能靠下面的「只有本人能編輯」代替**：補上
+         * `ajaxStoreComment()` 的檢查之前，沒參與專案的人留得了言 ——
+         * 那些舊留言的作者就是本人，照樣改得動。
+         */
+        if (!$this->canTouchComment($comment)) {
+            return $this->noAccessResponse();
+        }
+
         if ($comment->user_id !== Auth::id()) {
             return response()->json(['message' => trans('task_board.msg.comment_not_owner')], 403);
         }
@@ -472,6 +641,15 @@ class TaskBoardController extends Controller
      */
     public function ajaxDeleteComment(TaskComment $comment)
     {
+        /*
+         * ⚠ 這一支原本**完全沒有判斷** —— 有 `task_board.delete_comment`
+         * 權限的人，只要改一下網址上的 id 就刪得掉任何一則留言，
+         * 包含他沒參與的專案裡的。
+         */
+        if (!$this->canTouchComment($comment)) {
+            return $this->noAccessResponse();
+        }
+
         $this->taskBoardService->deleteComment($comment->id);
 
         return response()->json(['message' => '留言已刪除']);
@@ -485,6 +663,11 @@ class TaskBoardController extends Controller
      */
     public function ajaxActivities(Task $task)
     {
+        // ⚠ 唯讀也要擋：異動紀錄看得出這張卡的標題、經手人與時間軸
+        if (!$this->canTouchTask($task)) {
+            return $this->noAccessResponse();
+        }
+
         $activities = $this->taskBoardService->getActivities($task->id);
 
         return TaskActivityResource::collection($activities);

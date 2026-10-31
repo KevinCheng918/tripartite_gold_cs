@@ -118,6 +118,13 @@ return [
     'comment_image_locked'  => '附件無法編輯',
 
     'msg' => [
+        /*
+         * ⚠ 這句是「沒參與這個專案」時回的，**不是「沒有權限」** ——
+         * 兩者對使用者來說要分得開：前者去找管理者加參與專案，後者去要權限。
+         * （同 `project.regulation_no_access` 的理由。）
+         */
+        'no_access'           => '您沒有參與這張卡片所屬的專案，看不到它的內容',
+
         'task_created'        => '任務已新增',
         'task_create_failed'  => '任務新增失敗',
         'task_updated'        => '任務已更新',

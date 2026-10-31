@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Repositories\TaskRepository;
+use App\Repositories\UserRepository;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
@@ -38,13 +39,17 @@ class TaskChangeNoticeService
     const NOTICE_TYPE = 'task_change';
 
     private $taskRepository;
+    private $userRepository;
     private $supportGroup;
 
     public function __construct(
         TaskRepository $taskRepository,
+        UserRepository $userRepository,
         SupportGroupService $supportGroup
     ) {
         $this->taskRepository = $taskRepository;
+        // 指派人員存的是 id 陣列，要換成名字才看得懂
+        $this->userRepository = $userRepository;
         $this->supportGroup = $supportGroup;
     }
 
@@ -69,17 +74,27 @@ class TaskChangeNoticeService
             return $result;
         }
 
-        $byTask = $this->taskRepository->getUnnotifiedActivities()->groupBy('task_id');
+        $activitiesByTask = $this->taskRepository->getUnnotifiedActivities()->groupBy('task_id');
+        $commentsByTask = $this->taskRepository->getUnnotifiedComments()->groupBy('task_id');
+
+        /*
+         * ⚠ 兩個來源要**聯集**成同一份卡片清單：狀態變更在 `task_activity`、
+         * 新留言在 `task_comment`，而同一張卡可能只有其中一邊有東西。
+         * 只看一邊的話另一邊永遠不會被通知。
+         */
+        $taskIds = $activitiesByTask->keys()->merge($commentsByTask->keys())->unique();
 
         // 短路：沒有待處理的就不要再往下（絕大多數分鐘都走這條）
-        if ($byTask->isEmpty()) {
+        if ($taskIds->isEmpty()) {
             return $result;
         }
 
         $quietUntil = now()->subMinutes((int) config('constants.TASK.CHANGE_NOTICE.QUIET_MINUTES'));
         $maxPerRun = (int) config('constants.TASK.CHANGE_NOTICE.MAX_PER_RUN');
 
-        foreach ($byTask as $taskId => $activities) {
+        foreach ($taskIds as $taskId) {
+            $activities = $activitiesByTask->get($taskId, collect());
+            $comments = $commentsByTask->get($taskId, collect());
             /*
              * ⚠ 一次只處理這麼多張卡。排程停過一陣子（主機重開、指令掛掉）
              * 之後累積的卡片會一次湧出來，沒有上限就是幾百則訊息同時打進
@@ -94,18 +109,39 @@ class TaskChangeNoticeService
             /*
              * ⚠ **還在被改就繼續等**：這是「合併窗口」不是「延遲下限」——
              * 只要最後一筆異動還在窗口內，就讓它繼續累積。
-             * 用 `last()` 是因為 Repository 已經照 `created_at` 由舊到新排。
+             *
+             * ⚠ **兩個來源都要看，取最晚的那一筆**：只看活動紀錄的話，
+             * 一張卡「改完狀態、兩分鐘後又留言」會在留言還熱的時候就把通知
+             * 發出去，然後那則留言又要等下一輪 —— 等於沒合併。
              */
-            if ($activities->last()->created_at->gt($quietUntil)) {
+            if ($this->lastTouchedAt($activities, $comments)->gt($quietUntil)) {
                 $result['pending']++;
 
                 continue;
             }
 
-            $this->flushTask((int) $taskId, $activities, $dryRun, $result);
+            $this->flushTask((int) $taskId, $activities, $comments, $dryRun, $result);
         }
 
         return $result;
+    }
+
+    /**
+     * 這張卡最後被動到是什麼時候（兩個來源取較晚的）
+     *
+     * @param \Illuminate\Support\Collection $activities
+     * @param \Illuminate\Support\Collection $comments
+     * @return \Illuminate\Support\Carbon
+     */
+    private function lastTouchedAt($activities, $comments)
+    {
+        // Repository 兩支都照 `created_at` 由舊到新排，所以 `last()` 就是最晚的
+        $times = collect([
+            filled($activities) ? $activities->last()->created_at : null,
+            filled($comments) ? $comments->last()->created_at : null,
+        ])->filter();
+
+        return $times->sortDesc()->first();
     }
 
     /**
@@ -117,18 +153,21 @@ class TaskChangeNoticeService
      * @param array                                    $result 以參考傳入，直接累加
      * @return void
      */
-    private function flushTask($taskId, $activities, $dryRun, array &$result)
+    private function flushTask($taskId, $activities, $comments, $dryRun, array &$result)
     {
-        $ids = $activities->pluck('id')->all();
-        $text = $this->buildMessage($taskId, $activities);
+        $activityIds = $activities->pluck('id')->all();
+        $commentIds = $comments->pluck('id')->all();
+        $text = $this->buildMessage($taskId, $activities, $comments);
 
         /*
-         * ⚠ 沒有要通知的內容時**照樣要標記**（只改了描述、標題的那些）——
-         * 不標的話排程每分鐘都會再撈到同一批，永遠掃不完。
+         * ⚠ 沒有要通知的內容時**照樣要標記**（只改了描述、標題、優先順序
+         * 那些不在通知名單裡的欄位）—— 不標的話排程每分鐘都會再撈到同一批，
+         * 永遠掃不完。
          */
         if (blank($text)) {
             if (!$dryRun) {
-                $this->taskRepository->markActivitiesNotified($ids);
+                $this->taskRepository->markActivitiesNotified($activityIds);
+                $this->taskRepository->markCommentsNotified($commentIds);
             }
 
             $result['skipped']++;
@@ -163,29 +202,48 @@ class TaskChangeNoticeService
             $result['skipped']++;
         }
 
-        $this->taskRepository->markActivitiesNotified($ids);
+        $this->taskRepository->markActivitiesNotified($activityIds);
+        $this->taskRepository->markCommentsNotified($commentIds);
     }
 
     /**
      * 組一張卡的合併訊息
      *
-     * ```
-     * 🗂 任務卡異動
+     * 版面是需求方 2026-11-01 看過實際範例後指定的四段：
      *
-     * 「主系統登入異常」
-     * 專案：三方金流 ／ 站台：LV
-     * 狀態：進行中 → 審核中
-     * 到期日：2026-11-05 → 2026-11-03
-     * 異動人：王小明
+     * ```
+     * 🔔 任務狀態更新通知
+     *
+     * #12 主系統登入異常        ← 編號＋標題整串都是連結，點下去直接開那張卡
+     * 指派：李小華、張三 ｜ 負責人：王小明
+     * 專案：三方金流 ｜ 優先：緊急 ｜ 到期：2026-11-05
+     * 狀態：進行中 → 測試中
+     * 觸發者：李小華
      * ```
      *
-     * ⚠ **要帶卡片標題與專案／站台**：只說「有一張卡片被改了」等於沒通知。
+     * 編號同時也顯示在看板卡片與側邊面板上 —— 群組裡講「第 12 號卡」時
+     * 對得起來。
+     *
+     * ⚠ **這是固定版面，不要改成「有變更的欄位才出現」**：
+     * 前兩行是「這張卡現在長什麼樣」，第三段才是「這次改了什麼」。
+     * 固定下來才掃得快 —— 每則訊息的第一行永遠是標題與該找誰。
+     *
+     * ⚠ **刻意不帶站台**（需求方指定）：任務卡的站台常常是空的，
+     * 而且看通知的人要的是「這張卡是誰的事」，不是它掛在哪個站台。
+     *
+     * ⚠ **指派人員與專案負責人每則都帶**：看到通知的第一個問題是
+     * 「這要找誰」—— 只有狀態變更的那種通知如果不帶，就得自己回看板查。
+     *
+     * ⚠ 到期日與優先順序**同時出現在第二行（現狀）與第三段（變更）**
+     * 是刻意的：第二行回答「現在幾號到期」，第三段回答「剛剛被改成幾號」。
+     * 為了省一行而把現狀拿掉的話，版面就不固定了。
      *
      * @param int                            $taskId
      * @param \Illuminate\Support\Collection $activities
+     * @param \Illuminate\Support\Collection $comments
      * @return string 沒有任何該通知的內容時回空字串
      */
-    private function buildMessage($taskId, $activities)
+    private function buildMessage($taskId, $activities, $comments)
     {
         $task = $this->taskRepository->find($taskId);
 
@@ -194,29 +252,195 @@ class TaskChangeNoticeService
             return '';
         }
 
-        $created = $activities->firstWhere('action', 'created');
         $lines = $this->changeLines($activities);
         $states = $this->stateLines($activities);
+        $commentLine = $this->commentLine($comments);
 
         /*
-         * ⚠ 三種都沒有就不發：新建卡片一定有 `created`；
-         * 只改描述／標題的那些，`changeLines()` 會是空的。
+         * ⚠ 三種都沒有就不發。會走到這裡的是「只改了不在通知名單裡的欄位」
+         * （描述、標題、優先順序⋯⋯）—— 那些照樣會進活動紀錄，
+         * 所以撈得到，但不該通知。
+         *
+         * ⚠ **建立卡片不通知**（需求方 2026-11-01 收斂：「只有任務卡狀態更改、
+         * 新留言，才會需要通知到話題」）。`created` 的 `changes` 是 null，
+         * 所以它自然會落在這個 return —— 不必特別排除，但也**不要**為它
+         * 加回「新任務卡」的抬頭。
          */
-        if (blank($created) && blank($lines) && blank($states)) {
+        if (blank($lines) && blank($states) && blank($commentLine)) {
             return '';
         }
 
-        $out = [filled($created) ? '🗂 新任務卡' : '🗂 任務卡異動', ''];
-        $out[] = "「{$task->title}」";
+        $out = ['🔔 任務狀態更新通知', ''];
 
-        $station = filled($task->station) ? $task->station->name : null;
-        $place = '專案：' . (filled($task->project) ? $task->project->name : '-');
-        $out[] = filled($station) ? "{$place} ／ 站台：{$station}" : $place;
+        /*
+         * 第一行：標題，自己獨佔一行（需求方 2026-11-01）。
+         *
+         * ⚠ 標題是連結，**不要跟其他欄位擠在同一行** —— 可點的範圍只有標題
+         * 那幾個字，旁邊再接「指派：…」的話，使用者會以為整行都能點。
+         */
+        $out[] = $this->titleLink($task);
 
+        // 第二行：該找誰
+        $out[] = $this->joinInline([
+            '指派：' . $this->assigneeNames($task),
+            '負責人：' . $this->projectOwnerName($task),
+        ]);
+
+        // 第二行：歸屬與時程
+        $out[] = $this->joinInline([
+            '專案：' . (filled($task->project) ? $task->project->name : '-'),
+            '優先：' . $this->readable(TaskBoardService::FIELD_LABELS['priority'], $task->priority),
+            '到期：' . (filled($task->due_date) ? $task->due_date->format('Y-m-d') : '未設定'),
+        ]);
+
+        // 第三段：這次改了什麼（封存／還原、以及新留言也算在這裡）
         $out = array_merge($out, $states, $lines);
-        $out[] = '異動人：' . $this->actorNames($activities);
+
+        if (filled($commentLine)) {
+            $out[] = $commentLine;
+        }
+
+        // 第四行：這次是誰動的
+        $out[] = '觸發者：' . $this->actorNames($activities, $comments);
 
         return implode("\n", $out);
+    }
+
+    /**
+     * 標題，而且**標題本身就是連結**（需求方 2026-11-01）
+     *
+     * 點下去會開看板並自動展開這張卡的側邊面板
+     * （看板讀 `?task=`，見 `resources/views/admin/task-board/index.blade.php`）。
+     *
+     * ⚠ **`<a>` 標籤可以直接送出去**：`TelegramBotService::sendMessage()` 用的是
+     * `parse_mode: HTML`，而它的 `escapeHtml()` 轉義之後會把白名單內的標籤
+     * （含 `a`）還原回來。所以**不要自己先 escape 標題** —— 那會變成
+     * 雙重轉義，`&` 會顯示成 `&amp;`。
+     *
+     * ⚠⚠ **網址裡絕對不能出現 `&`。**
+     * `escapeHtml()` 還原標籤的 regex 是
+     * `/&lt;(a)((?:\s[^&]*?)?)&gt;/` —— 屬性部分不吃 `&`。
+     * 所以 `?task=3&from=tg` 這種網址會讓整個 `<a>` **還原失敗**，
+     * 群組裡收到的是 `&lt;a href="..."&gt;標題</a>` 這樣的可見亂碼。
+     * （2026-11-01 實測確認過：單一參數正常、加第二個參數就壞。）
+     *
+     * 要加第二個參數的話，得先改 `escapeHtml()` 的 regex —— 不要在這裡硬塞。
+     *
+     * ⚠ **`APP_URL` 一定要是對外的網址**：排程在 console 跑，`route()` 只能
+     * 靠 `config('app.url')`，沒有「目前的網域」可以推斷。設成 localhost 的話
+     * 群組裡的連結點了打不開。
+     *
+     * @param \App\Models\Task $task
+     * @return string
+     */
+    private function titleLink($task)
+    {
+        $url = route('admin.task-board.index') . "?task={$task->id}";
+
+        /*
+         * ⚠ 標題**不加「」框**（需求方 2026-11-01）：它已經是藍色帶底線的
+         * 連結、而且自己獨佔一行，一眼就看得出是標題 —— 再加括號只是雜訊。
+         *
+         * ⚠ **編號放進連結裡面**，不要擺在 `<a>` 外面：整串
+         * 「#3 主系統登入異常」都可以點，點擊範圍大得多。擺外面的話
+         * 使用者很容易點在編號上而沒反應。
+         */
+        return "<a href=\"{$url}\">#{$task->id} {$task->title}</a>";
+    }
+
+    /**
+     * 新留言那一行
+     *
+     * ```
+     * 新留言：2 則（王小明、李小華）
+     * ```
+     *
+     * ⚠ **不帶留言內容**：留言可能很長、而且帶圖片的 HTML 貼進 Telegram 是
+     * 亂碼。通知的任務是「讓你知道有人留言了」，內容回卡片裡看 ——
+     * 所以 `getUnnotifiedComments()` 的 select 連 `content` 都沒撈。
+     *
+     * ⚠ **只算新增的留言**：編輯與刪除留言不在這裡，需求方要的是「新留言」。
+     * 編輯既有留言不會新增一筆 `task_comment`，所以天生就不會被算到。
+     *
+     * @param \Illuminate\Support\Collection $comments
+     * @return string 沒有新留言時回空字串
+     */
+    private function commentLine($comments)
+    {
+        if (blank($comments)) {
+            return '';
+        }
+
+        $names = [];
+
+        foreach ($comments as $comment) {
+            $names[filled($comment->user) ? $comment->user->nickname : '系統'] = true;
+        }
+
+        return sprintf('新留言：%d 則（%s）', $comments->count(), implode('、', array_keys($names)));
+    }
+
+    /**
+     * 把同一行的幾個欄位接起來
+     *
+     * ⚠ 分隔符號用 `｜`（全角）而不是 `|`：中文之間用半角豎線會黏在字上，
+     * 在 Telegram 的字體下幾乎看不出是分隔。
+     *
+     * @param array<string> $parts
+     * @return string
+     */
+    private function joinInline(array $parts)
+    {
+        return implode(' ｜ ', $parts);
+    }
+
+    /**
+     * 這張卡所屬專案的負責人
+     *
+     * ⚠ `loadMissing` 而不是在 `Task::project()` 上 eager load：
+     * 看板每張卡都走那個關聯，而看板不顯示負責人 —— 在那裡載是白撈。
+     * 這一支一輪最多跑 `MAX_PER_RUN` 次，多一趟查詢可以接受。
+     *
+     * ⚠ `Project::owner()` 是 `withTrashed()` 的，所以負責人已離職時
+     * **仍然查得到名字** —— 這裡刻意不標「已離職」：那是專案管理頁的事，
+     * 群組通知只要回答「這個專案歸誰」。
+     *
+     * @param \App\Models\Task $task
+     * @return string
+     */
+    private function projectOwnerName($task)
+    {
+        if (blank($task->project)) {
+            return '-';
+        }
+
+        $task->loadMissing('project.owner');
+
+        return filled($task->project->owner) ? $task->project->owner->nickname : '未指派';
+    }
+
+    /**
+     * 這張卡目前指派給誰
+     *
+     * ⚠ 用 `getNamesByIds()`：它**不加任何狀態條件**，所以已停用或離職的人
+     * 也顯示得出名字 —— 卡片還掛在他身上，通知上寫「無」會更難追。
+     *
+     * @param \App\Models\Task $task
+     * @return string
+     */
+    private function assigneeNames($task)
+    {
+        $ids = array_filter((array) $task->assignee_ids);
+
+        if (blank($ids)) {
+            return '未指派';
+        }
+
+        $names = $this->userRepository->getNamesByIds($ids)->pluck('nickname')->all();
+
+        sort($names);
+
+        return blank($names) ? '未指派' : implode('、', $names);
     }
 
     /**
@@ -400,24 +624,29 @@ class TaskChangeNoticeService
     }
 
     /**
-     * 這段窗口內動過這張卡的人
+     * 觸發者 —— 這段窗口內動過這張卡的人
      *
      * ⚠ 可能是好幾個人（合併窗口內誰都能改），所以去重之後全部列出來。
      *
+     * ⚠ 跟「指派人員」是兩回事，不要混：指派人員是**這張卡該由誰做**，
+     * 觸發者是**這次是誰動的**。同一則訊息裡兩者都有，而且常常不一樣。
+     *
+     * ⚠ **留言者也算觸發者**：一則通知可能只因為有人留言而發出去，
+     * 那時候 `$activities` 是空的 —— 只看活動紀錄的話觸發者會變成空白。
+     *
      * @param \Illuminate\Support\Collection $activities
+     * @param \Illuminate\Support\Collection $comments
      * @return string
      */
-    private function actorNames($activities)
+    private function actorNames($activities, $comments)
     {
         $names = [];
 
-        foreach ($activities as $activity) {
+        foreach ($activities->concat($comments) as $row) {
             // 排程或指令造成的異動沒有 user_id
-            $name = filled($activity->user) ? $activity->user->nickname : '系統';
-
-            $names[$name] = true;
+            $names[filled($row->user) ? $row->user->nickname : '系統'] = true;
         }
 
-        return implode('、', array_keys($names));
+        return blank($names) ? '系統' : implode('、', array_keys($names));
     }
 }

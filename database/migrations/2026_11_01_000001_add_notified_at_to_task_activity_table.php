@@ -57,6 +57,39 @@ class AddNotifiedAtToTaskActivityTable extends Migration
         DB::table('task_activity')
             ->whereNull('notified_at')
             ->update(['notified_at' => DB::raw('`created_at`')]);
+
+        $this->addToComments();
+    }
+
+    /**
+     * 留言也要一份「通知發過了沒」
+     *
+     * ⚠ **留言不走 `logActivity()`**（這個專案刻意不把留言寫進活動紀錄，
+     * 見 features/task-board.md），所以沒辦法共用上面那一欄 ——
+     * 必須在 `task_comment` 自己加一個。
+     *
+     * ⚠ 不改成「讓留言開始寫活動紀錄」：那會讓異動紀錄那個視窗的內容跟著變，
+     * 而需求方要的只是「通知」。改一個頁面的顯示內容是另一回事。
+     *
+     * @return void
+     */
+    private function addToComments()
+    {
+        if (!Schema::hasTable('task_comment') || Schema::hasColumn('task_comment', 'notified_at')) {
+            return;
+        }
+
+        Schema::table('task_comment', function (Blueprint $table) {
+            $table->timestamp('notified_at')->nullable()->after('updated_at')
+                ->comment('新留言通知發過了沒；null = 還沒處理');
+
+            $table->index(['notified_at', 'task_id'], 'task_comment_notified_idx');
+        });
+
+        // 理由同上面那一段：既有留言一律標成已處理，不然第一次跑會全部重發
+        DB::table('task_comment')
+            ->whereNull('notified_at')
+            ->update(['notified_at' => DB::raw('`created_at`')]);
     }
 
     /**
@@ -64,6 +97,13 @@ class AddNotifiedAtToTaskActivityTable extends Migration
      */
     public function down()
     {
+        if (Schema::hasTable('task_comment') && Schema::hasColumn('task_comment', 'notified_at')) {
+            Schema::table('task_comment', function (Blueprint $table) {
+                $table->dropIndex('task_comment_notified_idx');
+                $table->dropColumn('notified_at');
+            });
+        }
+
         if (!Schema::hasTable('task_activity') || !Schema::hasColumn('task_activity', 'notified_at')) {
             return;
         }

@@ -68,6 +68,20 @@ class TaskRepository
         }
 
         // 只顯示用戶參與的專案
+        /*
+         * ⚠⚠ **這一行的語意是 fail-open：空的就不過濾。**
+         *
+         * 那是給管理者用的（他本來就看得到全部），但也因此
+         * **呼叫端一旦不小心傳了空陣列，過濾就整個消失**。
+         * 2026-11-01 就踩過：`$user->project_ids ?? [-1]` 的 `??` 擋不住
+         * 空陣列，於是一個專案都沒勾的帳號看得到全部卡片。
+         *
+         * 所以非管理者「一個都沒勾」時，呼叫端必須傳 `[-1]`（一個不存在的
+         * id）而不是 `[]` —— 見 `TaskBoardController::buildBoard()`。
+         *
+         * ⚠ 要改這裡的語意（例如改成 null 才是不限制）**得把所有呼叫端
+         * 一起改**，而漏掉的那一個就是下一個漏洞。
+         */
         if (!empty($criteria['user_project_ids'])) {
             $query->whereIn('project_id', $criteria['user_project_ids']);
         }
@@ -278,6 +292,33 @@ class TaskRepository
     }
 
     /**
+     * 這幾張卡分別屬於哪些專案（去重）
+     *
+     * 給「批次操作前先確認每一張都碰得到」用的 —— 例如拖曳排序一次送
+     * 一整欄的 id。
+     *
+     * ⚠ 只撈 `project_id` 一欄：這是權限判斷，不需要卡片的其他內容。
+     *
+     * @param array<int> $taskIds
+     * @return array<int>
+     */
+    public function getProjectIdsByTaskIds(array $taskIds)
+    {
+        if (blank($taskIds)) {
+            return [];
+        }
+
+        return Task::query()
+            ->whereIn('id', $taskIds)
+            ->distinct()
+            ->pluck('project_id')
+            ->map(function ($projectId) {
+                return (int) $projectId;
+            })
+            ->all();
+    }
+
+    /**
      * 還沒處理過通知的活動紀錄
      *
      * ⚠ **只撈 `notified_at` 是 null 的**，而且 `created_at` 由舊到新 ——
@@ -320,6 +361,42 @@ class TaskRepository
         }
 
         TaskActivity::query()->whereIn('id', $ids)->update(['notified_at' => now()]);
+    }
+
+    /**
+     * 還沒處理過通知的留言
+     *
+     * ⚠ **留言不走 `logActivity()`**（這個專案刻意不把留言寫進活動紀錄），
+     * 所以它有自己的 `notified_at`，查詢也是獨立一支。
+     *
+     * ⚠ `select` **不含 `content`**：這一支每分鐘跑一次，而留言內容可能很長
+     * 又帶圖片的 HTML。通知只需要「誰留了幾則」—— 內容要看就回卡片裡看。
+     *
+     * @return Collection
+     */
+    public function getUnnotifiedComments()
+    {
+        return TaskComment::query()
+            ->select(['id', 'task_id', 'user_id', 'created_at'])
+            ->with('user')
+            ->whereNull('notified_at')
+            ->orderBy('created_at')
+            ->get();
+    }
+
+    /**
+     * 把這幾則留言標記成「通知處理過了」
+     *
+     * @param array<int> $ids
+     * @return void
+     */
+    public function markCommentsNotified(array $ids)
+    {
+        if (blank($ids)) {
+            return;
+        }
+
+        TaskComment::query()->whereIn('id', $ids)->update(['notified_at' => now()]);
     }
 
     /**

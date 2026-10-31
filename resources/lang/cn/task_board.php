@@ -84,6 +84,8 @@ return [
     'comment_image_locked'  => '附件无法编辑',
 
     'msg' => [
+        'no_access'           => '您没有参与这张卡片所属的专案，看不到它的内容',
+
         'task_created'        => '任务已新增',
         'task_create_failed'  => '任务新增失败',
         'task_updated'        => '任务已更新',

@@ -537,9 +537,18 @@ $(function () {
         var pColor = getProjectColor(task.project);
 
         var html = '<div class="kanban-card ' + (priorityClass[task.priority] || '') + '" data-task-id="' + task.id + '">';
-        // 頂部：專案 badge + 優先順序
+        /*
+         * 頂部：專案 badge ＋ 卡片編號 ＋ 優先順序。
+         *
+         * ⚠ 編號是 2026-11-01 加的（需求方：「卡片應該要有編號」）——
+         * 群組通知裡會寫 `#12`，看板上沒有的話收到通知的人對不起來。
+         * 擺在專案 badge 旁邊、用灰色小字，不跟標題搶注意力。
+         */
         html += '<div class="d-flex justify-content-between align-items-center mb-2">';
+        html += '<span>';
         html += '<span class="badge" style="background:' + pColor + ';color:#fff;border-radius:9999px;padding:0.25em 0.6em;font-size:0.75rem">' + task.project + '</span>';
+        html += '<span class="text-muted ms-1" style="font-size:0.75rem">#' + task.id + '</span>';
+        html += '</span>';
         html += (priorityLabel[task.priority] || '');
         html += '</div>';
         // 標題
@@ -862,6 +871,15 @@ $(function () {
                 var html = '';
 
                 // 標題
+                /*
+                 * 卡片編號（2026-11-01 需求方：「卡片應該要有編號」）。
+                 *
+                 * ⚠ **擺在標題外面**，不要塞進 `.field-value` ——
+                 * 那一格的 innerHTML 會被原樣存回 `title`，編號會被寫進
+                 * 卡片名稱裡（描述的進度文字當初就是為同一個原因擺在標題旁邊，
+                 * 見 features/task-board.md）。
+                 */
+                html += '<div class="text-muted" style="font-size:0.8125rem;padding-top:0.5rem">#' + t.id + '</div>';
                 html += '<div class="side-field" data-field="title" data-type="text"><div class="field-value" style="font-size:1.375rem;font-weight:bold;padding:0.5rem 0">' + t.title + '</div></div>';
 
                 // 屬性區（集中在上面，虛線邊框）
@@ -2477,6 +2495,24 @@ $(function () {
     // 初始載入
     loadBoard();
     markRefreshed();
+
+    /*
+     * 深連結：`?task=3` 直接把那張卡的側邊面板打開（2026-11-01）。
+     *
+     * 群組通知裡的連結就是這個格式 —— 沒有這一段的話，點進來只會看到看板，
+     * 還得自己在五欄裡找那張卡。
+     *
+     * ⚠ **不必等 `loadBoard()` 回來**：面板的內容是另一支 API
+     * （`ajax-task/{id}`），跟看板那一趟互不相干。等它反而讓開卡變慢。
+     *
+     * ⚠ 用 `URLSearchParams` 而不是自己切字串：`?a=1&task=3` 這種順序
+     * 也要能解得出來。
+     */
+    var deepLinkTask = parseInt(new URLSearchParams(window.location.search).get('task'), 10);
+
+    if (deepLinkTask > 0) {
+        loadPanel(deepLinkTask);
+    }
 });
 </script>
 

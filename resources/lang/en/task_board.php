@@ -84,6 +84,8 @@ return [
     'comment_image_locked'  => 'Attachments cannot be edited',
 
     'msg' => [
+        'no_access'           => 'You are not a member of the project this card belongs to, so its contents are not visible to you',
+
         'task_created'        => 'Task created',
         'task_create_failed'  => 'Failed to create task',
         'task_updated'        => 'Task updated',

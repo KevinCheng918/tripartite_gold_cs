@@ -303,6 +303,19 @@ class TaskBoardService
     }
 
     /**
+     * 這幾張卡分別屬於哪些專案（去重）
+     *
+     * 給 Controller 在批次操作前確認「每一張都碰得到」用的。
+     *
+     * @param array<int> $taskIds
+     * @return array<int>
+     */
+    public function projectIdsOfTasks(array $taskIds)
+    {
+        return $this->taskRepository->getProjectIdsByTaskIds($taskIds);
+    }
+
+    /**
      * 取得封存任務（30 天內）
      *
      * @return \Illuminate\Database\Eloquent\Collection
