@@ -601,7 +601,10 @@
                         </div>
                         <div class="text-end">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                            <button type="submit" class="btn btn-primary">送出申請</button>
+                            {{-- ⚠ 這顆一定要有 id：防連點要鎖它（需求方 2026-10-31 回報
+                                 「點兩次就變成申請兩筆」）。補點／扣點會動到客戶的點數，
+                                 重複申請被誤審的代價很高 --}}
+                            <button type="submit" class="btn btn-primary" id="btn-topup-submit">{{ trans('station.topup_submit') }}</button>
                         </div>
                     </form>
                 </div>
@@ -1731,6 +1734,12 @@ $(function () {
         switchTopupInputType();
         topupImageFiles = [];
         $('#topup-image-previews').empty();
+        /*
+         * ⚠ 保險解鎖：`complete` 已經會解，但萬一有哪條路徑讓它沒跑到
+         * （例如請求還在路上使用者就關掉 modal、之後再開），
+         * 這裡再清一次，不然那顆鈕會一直是轉圈的狀態。
+         */
+        lockTopupSubmit(false);
         fetchUsdtRate();
         showBsModal('modal-topup-apply');
     });
@@ -1793,9 +1802,49 @@ $(function () {
     $('#topup-credit-type').on('change', function () { switchTopupCreditType(); });
     switchTopupCreditType();
 
+    /**
+     * 補點／扣點申請正在送出中嗎
+     *
+     * ⚠ 存在的理由：需求方 2026-10-31 回報「點兩次就變成申請兩筆」——
+     * 原本完全沒有鎖，從按下去到伺服器回應之間那顆鈕一直是可以按的。
+     *
+     * ⚠ **不能只靠把按鈕 `disabled`**：在輸入框裡按 Enter 也會觸發 submit，
+     * 那條路不經過按鈕。這個旗標才是真正守門的那一道。
+     *
+     * @type {boolean}
+     */
+    var topupSubmitting = false;
+
+    /**
+     * 切換送出鈕的鎖定狀態
+     *
+     * ⚠ **一定要能解鎖**：這個 modal 是重複使用的（下次申請還是開同一個），
+     * 只在失敗時解鎖的話，成功送出一次之後那顆鈕就永遠按不下去 ——
+     * 使用者得重新整理整頁才能申請第二筆。所以 `complete` 一定要呼叫它，
+     * 開啟 modal 時也再保險一次。
+     *
+     * @param {boolean} locked
+     */
+    function lockTopupSubmit(locked) {
+        topupSubmitting = locked;
+
+        // 轉圈 ＋ 改字：使用者會連點正是因為按下去沒有任何反應
+        $('#btn-topup-submit')
+            .prop('disabled', locked)
+            .html(locked
+                ? '<span class="spinner-border spinner-border-sm me-1"></span>{{ trans("station.topup_submitting") }}'
+                : '{{ trans("station.topup_submit") }}');
+    }
+
     // 送出申請
     $('#form-topup-apply').on('submit', function (e) {
         e.preventDefault();
+
+        // 防連點：上一筆還在路上就不要再送（理由見 topupSubmitting 的註解）
+        if (topupSubmitting) {
+            return;
+        }
+
         var stationId = $('#topup-station').val();
         if (!stationId) {
             showMessage('請選擇站台');
@@ -1841,6 +1890,13 @@ $(function () {
             formData.append('images[]', file);
         });
 
+        /*
+         * ⚠ 上鎖要擺在**所有驗證都過了之後**、真正要送出的這一刻。
+         * 擺在 handler 開頭的話，欄位沒填好被擋下來（上面那幾個
+         * `showMessage` ＋ `return`）就會把按鈕鎖死，使用者改完也送不出去。
+         */
+        lockTopupSubmit(true);
+
         $.ajax({
             url: '/admin/stations/ajax-topup-store',
             method: 'POST',
@@ -1848,6 +1904,8 @@ $(function () {
             processData: false,
             contentType: false,
             data: formData,
+            // 不論成功失敗都要解鎖，否則下一筆申請永遠送不出去
+            complete: function () { lockTopupSubmit(false); },
             success: function (body) {
                 hideBsModal(document.getElementById('modal-topup-apply'));
                 setTimeout(function () {

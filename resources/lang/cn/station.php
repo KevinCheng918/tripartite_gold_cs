@@ -49,6 +49,8 @@ return [
      * 操作栏只留会改资料的通过／拒绝。
      */
     'topup_field_attachment' => '附件',
+    'topup_submit'           => '送出申请',
+    'topup_submitting'       => '送出中⋯',
     'topup_image_count'      => ':count 张',
 
     // 详细信息 Modal（四格：站台信息 / 功能 / 代收 / 代付）

@@ -51,6 +51,8 @@ return [
      * chips), leaving only approve/reject — the actions that change data.
      */
     'topup_field_attachment' => 'Attachments',
+    'topup_submit'           => 'Submit request',
+    'topup_submitting'       => 'Submitting…',
     'topup_image_count'      => ':count image(s)',
 
     // Detail modal (4 cards: station / features / deposit / withdraw)
