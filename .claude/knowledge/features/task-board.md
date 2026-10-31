@@ -406,3 +406,28 @@ blade 內嵌成 `window.__boardData`，`loadBoard()` 首次就拿它來畫。
   展開時不能把底下欄位往下擠；詳情面板那組仍是常駐清單，兩者程式碼是分開的
 - 詳情面板動態產生的站台清單（blade 約 1174 行）還有硬編中文「未選擇／系統：／站台：」，
   語系 key 都已存在（`station_unset`、`field_system`、`field_station`），待換掉
+
+### 拔掉沒人用的 `assignee` eager load（2026-10-31）
+
+驗證參與人那次改動時，在查詢記錄裡看到一筆
+`select id, nickname from user where 0 = 1`。
+
+追下去是 **舊的單人 `assignee` 關聯**被 eager load，但
+**全專案沒有一處讀它** —— 指派人員早就改成多人（`assignee_ids`），
+`TaskResource` 只用 `assignee_ids`／`assignees`，Blade 也沒用到。
+
+出現在 **5 處**（兩處 Repository、三處 Controller 的 `$task->load(...)`），
+每一次都白跑一趟查詢；而 `assignee_id` 是 null 時，Laravel 把
+`whereIn('id', [])` 渲染成 `where 0 = 1` —— 一筆必然沒有結果的查詢。
+
+拔掉後看板的查詢數 7 → 6，空查詢歸零，卡片資料完全不變。
+
+⚠ **`Task::assignee()` 這個關聯刻意留著**，只是不再 eager load：
+`assignee_id` 這個欄位還活著（`TaskRepository::filterRelatedToMe()` 的
+「指派給我的」要比對它，因為早期的卡片只有單人欄位有值）。
+關聯上加了註解說明「沒人讀、不要 eager load、先想清楚你要的是不是
+`assignee_ids`」，免得又被加回去。
+
+⚠ 這類「欄位升級成多筆之後，舊的單筆關聯還掛在 eager load 裡」的浪費
+**不會有任何症狀** —— 不報錯、畫面也對，只有看查詢記錄才會發現。
+日後把單筆欄位改成多筆時，記得回頭掃一遍 `with()`。

@@ -36,7 +36,14 @@ class TaskRepository
     {
         $query = Task::query()
             ->select(self::LIST_COLUMNS)
-            ->with(['project', 'station.system', 'assignee', 'creator'])
+            /*
+             * ⚠ **不要再把 `assignee` 加回來**：那是舊的單人 `assignee_id`
+             * 關聯，自從改成多人指派（`assignee_ids`）之後**全專案沒有一處
+             * 讀它** —— `TaskResource` 只用 `assignee_ids`／`assignees`。
+             * 留著等於每次載看板都白跑一趟查詢，而 `assignee_id` 是 null 時
+             * 那一趟還會是 `select … from user where 0 = 1`。
+             */
+            ->with(['project', 'station.system', 'creator'])
             ->where('status', '!=', config('constants.TASK.STATUS.ARCHIVED'));
 
         $this->onlyActiveProject($query);
@@ -280,7 +287,14 @@ class TaskRepository
     {
         return Task::query()
             ->select(self::DETAIL_COLUMNS)
-            ->with(['project', 'station.system', 'assignee', 'creator'])
+            /*
+             * ⚠ **不要再把 `assignee` 加回來**：那是舊的單人 `assignee_id`
+             * 關聯，自從改成多人指派（`assignee_ids`）之後**全專案沒有一處
+             * 讀它** —— `TaskResource` 只用 `assignee_ids`／`assignees`。
+             * 留著等於每次載看板都白跑一趟查詢，而 `assignee_id` 是 null 時
+             * 那一趟還會是 `select … from user where 0 = 1`。
+             */
+            ->with(['project', 'station.system', 'creator'])
             ->find($id);
     }
 

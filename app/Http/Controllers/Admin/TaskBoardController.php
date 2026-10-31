@@ -170,7 +170,7 @@ class TaskBoardController extends Controller
 
             return response()->json([
                 'message' => trans('task_board.msg.task_created'),
-                'task'    => new TaskResource($task->load(['project', 'assignee', 'creator'])),
+                'task'    => new TaskResource($task->load(['project', 'creator'])),
             ]);
         } catch (\Exception $e) {
             Log::error('任務新增失敗', ['error' => $e->getMessage()]);
@@ -200,7 +200,7 @@ class TaskBoardController extends Controller
 
             return response()->json([
                 'message' => trans('task_board.msg.task_updated'),
-                'task'    => new TaskResource($task->load(['project', 'assignee', 'creator'])),
+                'task'    => new TaskResource($task->load(['project', 'creator'])),
             ]);
         } catch (\Exception $e) {
             Log::error('任務更新失敗', ['error' => $e->getMessage(), 'task_id' => $task->id]);
@@ -304,7 +304,7 @@ class TaskBoardController extends Controller
 
         $task = $this->taskBoardService->moveTask($task, $params, Auth::id());
 
-        return new TaskResource($task->load(['project', 'assignee', 'creator']));
+        return new TaskResource($task->load(['project', 'creator']));
     }
 
     /**

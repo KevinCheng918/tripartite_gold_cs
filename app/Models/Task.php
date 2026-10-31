@@ -66,6 +66,19 @@ class Task extends Model
     }
 
     /**
+     * 舊的單人指派（`assignee_id`）
+     *
+     * ⚠ **目前沒有任何地方讀這個關聯，而且不要 eager load 它。**
+     * 指派人員早就改成多人（`assignee_ids`），畫面與 `TaskResource` 一律走
+     * 那一邊 —— 2026-10-31 把五處 `with('assignee')` 拔掉了，
+     * 它們每次都白跑一趟查詢（`assignee_id` 是 null 時還是
+     * `select … from user where 0 = 1`）。
+     *
+     * ⚠ 關聯本身**刻意留著**：`assignee_id` 這個欄位還活著
+     * （`TaskRepository::filterRelatedToMe()` 的「指派給我的」要比對它，
+     * 因為早期的卡片只有單人欄位有值）。真的要取那個人的名字時用它，
+     * 但先想清楚你要的是不是 `assignee_ids`。
+     *
      * @return BelongsTo
      */
     public function assignee(): BelongsTo
