@@ -245,3 +245,31 @@ Model 跟驗證不會各改各的。
 - `2026_08_17_000001_create_credit_topup_table.php` — 建表
 - `2026_08_17_000002_add_images_to_credit_topup_table.php` — 上傳憑證圖片
 - `2026_09_07_000007_add_input_type_to_credit_topup_table.php` — 直接輸入點數
+
+## 列表的「附件」欄：附件與備註上下排（2026-10-31）
+
+> 需求方：「補點紀錄的附件跟備註，放在上下，不要放同一行。」
+
+那一格是 `topupAttachmentCell()` 畫的兩顆 `.cell-chip`（圖片數量、備註），
+而 `.cell-chip` 是 `display: inline-flex`，所以兩顆並排。
+
+**做法：外層包一個 `.cell-chip-stack`（`flex-direction: column`）。**
+
+⚠ **不要去改 `.cell-chip` 本身**：那個 class 是「儲存格裡的唯讀小圖示鈕」的
+通用樣式，改成 block 會影響日後任何用它的地方。
+**排列方式是這一格的事，交給外層的容器。**
+
+⚠ `align-items: stretch` 是刻意的：兩顆的文字長度不一樣（「2 張」vs「備註」），
+不拉齊的話上下寬度不一，看起來像兩個散落的標籤而不是一組。
+
+⚠ 垂直間距用 `gap` 不要用 `margin-top`：`.cell-chip` 自己帶
+`margin: 0 0.125rem`（左右），動它會連帶影響別處。
+
+⚠ 包的位置在 `return` 之前、而且**只在真的有 chip 時才包** ——
+沒有附件也沒有備註時回的是 `-`，包起來只會多一層沒意義的 div。
+
+💡 桌機表格那一格是 `<td class="text-center">`，外層是 `inline-flex`
+所以會自己居中；手機版的卡片列也走同一支函式，一併變成上下排。
+
+💡 `custom.css` 在 layout 裡已經帶 `?v={{ filemtime(...) }}`，
+改 CSS 不必自己處理版本號。

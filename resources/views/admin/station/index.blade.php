@@ -1354,7 +1354,18 @@ $(function () {
                 + '<i class="fas fa-sticky-note"></i>{{ trans("station.topup_field_note") }}</button>';
         }
 
-        return html || '<span class="text-muted">-</span>';
+        if (!html) {
+            return '<span class="text-muted">-</span>';
+        }
+
+        /*
+         * 附件與備註**上下排**（需求方 2026-10-31：「放在上下，不要放同一行」）。
+         *
+         * ⚠ 包起來而不是改 `.cell-chip` 本身：那個 class 是「儲存格裡的唯讀
+         * 小圖示鈕」的通用樣式，改成 block 會影響到日後任何用它的地方。
+         * 排列方式是這一格的事，交給外層的 `.cell-chip-stack`。
+         */
+        return '<div class="cell-chip-stack">' + html + '</div>';
     }
 
     /**

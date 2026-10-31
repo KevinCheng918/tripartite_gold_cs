@@ -1206,6 +1206,22 @@ a:hover { color: #85640a; }
     white-space: nowrap;
 }
 
+/* 同一格裡有兩顆以上的 chip 時改成上下排（需求方 2026-10-31：
+   「補點紀錄的附件跟備註，放在上下，不要放同一行」）。
+
+   ⚠ `align-items: stretch` 是刻意的：兩顆的文字長度不一樣
+   （「2 張」vs「備註」），不拉齊的話上下寬度不一，看起來像兩個散落的標籤
+   而不是一組。拉齊之後左右邊緣對齊，才讀得出它們是同一格的東西。
+
+   ⚠ 垂直間距用 `gap` 而不是 `margin-top`：`.cell-chip` 自己帶
+   `margin: 0 0.125rem`（左右），動它會連帶影響別的地方。 */
+.cell-chip-stack {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25rem;
+}
+
 .cell-chip:hover {
     border-color: #a67c00;
     color: #a67c00;
