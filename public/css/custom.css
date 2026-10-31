@@ -1080,6 +1080,11 @@ a:hover { color: #85640a; }
    `.table > :not(:last-child) > :last-child > * { border-bottom-color: currentColor }`
    特異性比這條高（三個 class 層級對兩個），寫了也會被蓋掉 ——
    實際顏色就是欄名本身的金棕色，剛好是想要的。 */
+/* ⚠ **標題與內容一律置中**（需求方 2026-11-01：「表格一律都是標題跟文字
+   都置中，按鈕都是靠左對齊」）。
+
+   這是全站規則，不是某一頁的修飾 —— 14 個後台頁面的表格都吃這一套。
+   例外只有操作欄（靠左，見下方 `.col-actions`）。 */
 .table.data-table > thead > tr > th {
     padding: 0.5625rem 1rem;
     font-size: 0.75rem;
@@ -1087,12 +1092,14 @@ a:hover { color: #85640a; }
     letter-spacing: 0.06em;
     white-space: nowrap;
     border-bottom-width: 1px;
+    text-align: center;
 }
 
 .table.data-table > tbody > tr > td {
     padding: 0.6875rem 1rem;
     border-bottom: 1px solid #eceff3;
     vertical-align: middle;
+    text-align: center;
 }
 
 /* 最後一列不要那條比較粗的收邊 —— 卡片本身已經有邊界了，
@@ -1155,16 +1162,23 @@ a:hover { color: #85640a; }
     font-variant-numeric: tabular-nums;
 }
 
-/* 數字欄右對齊 + 等寬數字，上下列的位數才對得齊 */
+/* 數字欄：等寬數字。
+
+   ⚠ **2026-11-01 拔掉了原本的 `text-align: right`** —— 需求方要求表格
+   一律置中。`tabular-nums` 要留著：它讓每個數字佔一樣寬，置中之後同一欄的
+   位數至少還是上下對齊的（少了它，1 和 8 寬度不同，整欄會參差）。
+
+   ⚠ 不要把 `text-align: right` 加回來：它的權重（兩個 class）比
+   `.table.data-table > tbody > tr > td` 的置中（兩個 class ＋ 三個元素）
+   **還低**，但同為兩個 class 時後寫的贏 —— 加回來會變成金額欄沒跟著置中，
+   而那是這次要修掉的狀況。 */
 .data-table .col-num {
-    text-align: right;
     font-variant-numeric: tabular-nums;
 }
 
-/* 操作欄：靠右、不換行、不被內容撐寬 */
+/* 操作欄：不換行、不被內容撐寬。對齊見下方（靠左） */
 .data-table .col-actions {
     width: 1%;
-    text-align: right;
     white-space: nowrap;
 }
 
@@ -1175,24 +1189,26 @@ a:hover { color: #85640a; }
     white-space: nowrap;
 }
 
-/* 整張表的文字一律置中（需求方 2026-11-01，用在虛擬機的帳務紀錄）。
+/* 操作欄**不置中，靠左對齊**（需求方 2026-11-01）。
 
-   ⚠ 這是**修飾用的 class，不要併進 `.data-table`** —— 其他頁的表格
-   （站台、帳號、任務）靠的是「數字右、操作右、文字左」那一套預設，
-   全站改成置中會把每一張表都動到。
+   置中的是資料欄位 —— 那些是要上下對齊著掃的。按鈕不是資料：每一列的按鈕
+   數量不一樣（有的三顆、關機的主機一顆都沒有），置中會讓每一列的按鈕起點
+   都落在不同位置，眼睛要重新找一次。靠左，起點就固定了。
 
-   ⚠ selector 刻意寫得比 `.data-table .col-num`／`.col-actions` 更具體
-   （多一層 `> tbody > tr >`）—— 那兩個是 `text-align: right`，
-   權重不夠的話置中會被它們蓋掉，而結果是「大部分置中、金額和操作欄沒有」。 */
-.table.data-table--center > thead > tr > th,
-.table.data-table--center > tbody > tr > td {
-    text-align: center;
+   ⚠ 這一段**必須排在 `.col-actions` 的 `text-align: right` 之後**：
+   兩邊都是兩個 class 的權重，平手時後面的贏。搬到前面去就失效了。
+
+   ⚠ `.row-actions` 本身是 **flex**，`text-align` 管不到它 —— 主軸要明確設
+   `flex-start`。只改 `text-align` 的話按鈕還是會停在原來的位置。
+
+   ⚠ `th` 與 `td` 都要改：那一格裡不一定只有 `.row-actions`（沒有任何按鈕時
+   是空的，或日後塞一段說明文字），不改的話那些會跟著置中、跟按鈕對不齊。 */
+.data-table .col-actions {
+    text-align: left;
 }
 
-/* ⚠ 列操作本身是 flex，`text-align` 管不到它 —— 要另外把主軸改成置中，
-   不然按鈕群組還是會黏在右邊 */
-.table.data-table--center > tbody > tr > td > .row-actions {
-    justify-content: center;
+.data-table .col-actions > .row-actions {
+    justify-content: flex-start;
 }
 
 /* 主要資訊 + 次要資訊疊兩行的身分格 */

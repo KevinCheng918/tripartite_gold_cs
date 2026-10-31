@@ -210,16 +210,19 @@ class TaskChangeNoticeService
     /**
      * 組一張卡的合併訊息
      *
-     * 版面是需求方 2026-11-01 看過實際範例後指定的四段：
+     * 版面是需求方 2026-11-01 看過實際範例後逐行指定的：
      *
      * ```
      * 🔔 任務狀態更新通知
      *
      * #12 主系統登入異常        ← 編號＋標題整串都是連結，點下去直接開那張卡
-     * 指派：李小華、張三 ｜ 負責人：王小明
-     * 專案：三方金流 ｜ 優先：緊急 ｜ 到期：2026-11-05
+     * 指派：@mary @john        ← mention，各自一行
+     * 負責人：@ming
+     * 專案：三方金流 ｜ 到期：2026-11-05
+     * 優先序：🔴 高
      * 狀態：進行中 → 測試中
-     * 觸發者：李小華
+     * 新留言：2 則（王小明、李小華）
+     * 觸發者：@mary Admin      ← 也是 mention，但管理者只顯示暱稱
      * ```
      *
      * 編號同時也顯示在看板卡片與側邊面板上 —— 群組裡講「第 12 號卡」時
@@ -282,16 +285,18 @@ class TaskChangeNoticeService
         $out[] = $this->titleLink($task);
 
         /*
-         * 第二行：該找誰。
+         * 第二、三行：該找誰。
          *
          * ⚠ 這兩個是 **`@mention`**（需求方 2026-11-01：「我要用標注的，
          * 這樣 Telegram 才會 @ 到」）—— 所以 Telegram 會真的推播給他們，
          * 不只是顯示名字。
+         *
+         * ⚠ **各自一行，不要併成一行**（需求方 2026-11-01 追加）：
+         * 指派可能有好幾個人，跟負責人擠在同一行時 Telegram 會自己折行，
+         * 折的位置又不固定 —— 看起來像亂掉而不是排版。
          */
-        $out[] = $this->joinInline([
-            "指派：{$this->assigneeNames($task)}",
-            "負責人：{$this->projectOwnerName($task)}",
-        ]);
+        $out[] = "指派：{$this->assigneeNames($task)}";
+        $out[] = "負責人：{$this->projectOwnerName($task)}";
 
         // 第三行：歸屬與時程
         $out[] = $this->joinInline([
@@ -375,6 +380,11 @@ class TaskChangeNoticeService
      *
      * ⚠ **只算新增的留言**：編輯與刪除留言不在這裡，需求方要的是「新留言」。
      * 編輯既有留言不會新增一筆 `task_comment`，所以天生就不會被算到。
+     *
+     * ⚠ 括號裡的人**刻意只放暱稱、不 mention**：留言者一定也會出現在
+     * 「觸發者」那一行（那裡才是 mention），同一個人被 @ 兩次只是重複推播。
+     * 而且括號加「、」的寫法會讓 Telegram 的 mention 解析失敗
+     * （見 `actorNames()`）。
      *
      * @param \Illuminate\Support\Collection $comments
      * @return string 沒有新留言時回空字串
@@ -490,7 +500,22 @@ class TaskChangeNoticeService
      * 一個人在訊息裡怎麼稱呼：有 Telegram username 就 `@mention`，沒有就暱稱
      *
      * 需求方 2026-11-01：「指派人跟負責人，我要用標注的，這樣 Telegram
-     * 才會 @ 到。」
+     * 才會 @ 到。」後來追加：「觸發者也是要標注，然後管理者的話就不用標注了。」
+     *
+     * ⚠ **管理者只顯示暱稱，不標注**（需求方 2026-11-01 追加）：管理者會動到
+     * 幾乎每一張卡，每則通知都 @ 他一次的話，他的 Telegram 會被自己的操作
+     * 洗掉 —— 而他本來就知道自己剛改了什麼。
+     *
+     * ⚠ 管理者判斷靠 `isAdmin()`，而它要 `level`。**關聯的 select 少撈
+     * `level` 時 `isAdmin()` 會回 false**（`blank($this->level)` 那條），
+     * 結果是管理者照樣被標注、而且不會報錯。三個呼叫路徑的 select 都已經
+     * 帶上 `level`：`Project::owner()`、`UserRepository::getNamesByIds()`、
+     * `TaskActivity::user()` 與 `TaskComment::user()`。
+     *
+     * ⚠ 實際上只有「觸發者」會遇到管理者 —— 指派人員與專案負責人的候選
+     * 名單本來就排除管理者了（需求方 2026-11-01：「指派人不能有 admin」）。
+     * 但判斷寫在這裡而不是只寫在 `actorNames()`：日後候選名單改了，
+     * 這條規則不會跟著漏掉。
      *
      * ⚠ **沒有 username 的人一定要退回暱稱，不能跳過** —— 跳過的話那個人
      * 就從通知上消失了，而看訊息的人會以為「這張卡沒有指派人」。
@@ -510,6 +535,11 @@ class TaskChangeNoticeService
      */
     private function mentionOrName($user)
     {
+        // 短路：管理者不標注，連 username 都不必查
+        if ($user->isAdmin()) {
+            return (string) $user->nickname;
+        }
+
         $mention = TelegramUsernamePresenter::mentionLine([$user->telegram_username]);
 
         return filled($mention) ? $mention : (string) $user->nickname;
@@ -740,19 +770,34 @@ class TaskChangeNoticeService
      * ⚠ **留言者也算觸發者**：一則通知可能只因為有人留言而發出去，
      * 那時候 `$activities` 是空的 —— 只看活動紀錄的話觸發者會變成空白。
      *
+     * ⚠ 這一行也是 **`@mention`**（需求方 2026-11-01 追加：「觸發者也是要
+     * 標注」）—— 改卡片的人常常不是指派人（例如主管幫忙調優先序），
+     * 不標注的話被影響到的人要自己回來看才知道是誰動的。
+     * 管理者例外，見 `mentionOrName()`。
+     *
+     * ⚠ 分隔符號跟著改成**空白**，不能留「、」：`@mary、@john` 會讓 Telegram
+     * 把「、」當成 username 的一部分，兩個 @ 都解析失敗
+     * （跟 `assigneeNames()` 同一個理由）。
+     *
      * @param \Illuminate\Support\Collection $activities
      * @param \Illuminate\Support\Collection $comments
      * @return string
      */
     private function actorNames($activities, $comments)
     {
-        $names = [];
+        $labels = [];
 
         foreach ($activities->concat($comments) as $row) {
-            // 排程或指令造成的異動沒有 user_id
-            $names[filled($row->user) ? $row->user->nickname : '系統'] = true;
+            /*
+             * 排程或指令造成的異動沒有 user_id。
+             *
+             * ⚠ 用稱呼本身當 key 去重：同一個人在窗口內改了五次只會列一次，
+             * 而同一個人算出來的稱呼一定相同（mention 或暱稱二選一）。
+             */
+            $label = filled($row->user) ? $this->mentionOrName($row->user) : '系統';
+            $labels[$label] = true;
         }
 
-        return blank($names) ? '系統' : implode('、', array_keys($names));
+        return blank($labels) ? '系統' : implode(' ', array_keys($labels));
     }
 }

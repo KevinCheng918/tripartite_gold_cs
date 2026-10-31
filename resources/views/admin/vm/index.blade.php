@@ -1052,8 +1052,12 @@ $(function () {
              * 逾期天數併進收款狀態那一格 —— 逾期時 badge 本來就會變成「逾期」，
              * 天數再獨立一欄等於同一件事講兩遍。九欄變七欄。
              */
-            // data-table--center：整張表的文字置中（需求方 2026-11-01）
-            '<table class="table table-hover align-middle data-table data-table--center"><thead class="thead-gold"><tr>' +
+            /*
+             * ⚠ **不必加對齊用的 class**：2026-11-01 起「標題與文字置中、
+             * 操作欄靠左」是 `.data-table` 的全站規則（見 custom.css），
+             * 不再是某一頁的修飾。原本這裡掛的 `data-table--center` 已經移除。
+             */
+            '<table class="table table-hover align-middle data-table"><thead class="thead-gold"><tr>' +
             '<th class="col-idx">#</th>' +
             '<th>{{ trans("vm.field_station") }}</th>' +
             '<th class="col-tight">{{ trans("vm.field_month") }}</th>' +

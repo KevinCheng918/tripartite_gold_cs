@@ -90,20 +90,47 @@
 🔔 任務狀態更新通知
 
 #12 主系統登入異常          ← 編號＋標題整串都是連結
-指派：@MaryLee @JohnChang ｜ 負責人：@AmyWang
+指派：@MaryLee @JohnChang    ← 各自一行
+負責人：@AmyWang
 專案：三方金流 ｜ 到期：2026-11-05
 優先序：🔴 緊急
 狀態：進行中 → 測試中
 新留言：1 則（張三）
-觸發者：李小華
+觸發者：@MaryLee Admin       ← 管理者只顯示暱稱
 ```
 
-### ⚠ 指派人與負責人是 `@mention`
+⚠ **指派與負責人各自一行**（需求方 2026-11-01 追加）：指派可能有好幾個人，
+跟負責人擠在同一行時 Telegram 會自己折行，而折的位置不固定 ——
+看起來像亂掉而不是排版。
+
+### ⚠ 指派人、負責人、觸發者都是 `@mention`
 
 需求方 2026-11-01：「我要用標注的，這樣 Telegram 才會 @ 到。」
+後來追加：「觸發者也是要標注，然後管理者的話就不用標注了。」
+
+觸發者也標注的理由：改卡片的人常常**不是**指派人（例如主管幫忙調優先序），
+不標注的話被影響到的人要自己回看板才知道是誰動的。
 
 用 `TelegramUsernamePresenter::mentionLine()`，而人員資料走
-`UserRepository::getNamesByIds()`。
+`UserRepository::getNamesByIds()`（指派）、`Project::owner()`（負責人）、
+`TaskActivity::user()` 與 `TaskComment::user()`（觸發者）。
+
+### ⚠ 管理者不標注
+
+管理者會動到幾乎每一張卡，每則通知都 @ 他一次的話，他的 Telegram 會被
+**自己的操作**洗掉 —— 而他本來就知道自己剛改了什麼。
+
+判斷寫在 `mentionOrName()` 一處（不是只寫在 `actorNames()`）：實際上只有
+觸發者會遇到管理者 —— 指派與負責人的候選名單本來就排除管理者了
+（需求方：「指派人不能有 admin」）—— 但規則放在共用那一支，
+日後候選名單改了也不會漏掉。
+
+⚠ **只排除管理者（`isAdmin()`，即 `level === ADMIN`）**，
+主管與組長**仍然會**被標注。
+
+⚠ **`isAdmin()` 要 `level`，而少撈 `level` 時它回 `false`**
+（`blank($this->level)` 那條）—— 結果是管理者照樣被標注，**而且不會報錯**。
+2026-11-01 實測確認過：`level` 沒撈到或是 null，兩種都輸出 `@bossman`。
 
 ⚠ **不要改用 `getMentionableByIds()`**：那支會濾掉工程、非正常狀態、
 以及沒有 username 的人 —— 用在這裡會讓那些人從通知上**整個消失**，
@@ -111,12 +138,21 @@
 再由 `mentionOrName()` 自己判斷：有 username 就 `@`，沒有就退回暱稱。
 
 ⚠ **多人之間用空白分隔，不要用「、」**：`@mary、@john` 會讓 Telegram 把
-「、」當成 username 的一部分，兩個 `@` 都解析失敗。
+「、」當成 username 的一部分，兩個 `@` 都解析失敗。觸發者那一行也因為改成
+mention 而跟著把「、」換成空白。
 
-⚠ **兩處 `select` 都要撈 `telegram_username`**
-（`getNamesByIds()` 與 `Project::owner()`）——
-少了它 `mentionOrName()` 會永遠退回暱稱，**而且不會報錯**，
-看起來就像「這些人都沒設 Telegram」。
+⚠ 「新留言：1 則（張三）」括號裡的人**刻意只放暱稱**：留言者一定也會出現在
+觸發者那一行（那裡才 mention），同一個人被 @ 兩次只是重複推播；
+而且括號加「、」的寫法本來就會讓解析失敗。
+
+⚠ **四處 `select` 都要撈 `telegram_username` 與 `level`**
+（`getNamesByIds()`、`Project::owner()`、`TaskActivity::user()`、
+`TaskComment::user()`）—— 少 `telegram_username` 會永遠退回暱稱、
+少 `level` 會把管理者也標注，**兩種都不會報錯**。
+
+⚠ `TaskActivity::user()` 與 `TaskComment::user()` 多撈這兩欄**不會外洩到
+前端**：`TaskActivityResource` 與 `TaskCommentResource` 都只取 `nickname`，
+沒有把整個 user 丟出去。要是哪天改成整包輸出，這裡要重新檢查。
 
 ⚠ **`@` 只有在那個人也在這個群組裡才會真的推播。** 不在群組的話 Telegram
 只會畫成藍字 —— 這不是程式能補的，要請那個人加入群組。

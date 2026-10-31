@@ -228,3 +228,55 @@ Bootstrap 的 `.btn.disabled` 會關掉 pointer-events，
 
 - [[station]]、[[station-topup]]、[[vm]]、[[broadcast]]、[[shared-file]]、[[rbac]]
 - [[telegram-bind-code]] — 帳號管理那兩顆 Telegram 綁定按鈕的來源
+
+## 對齊：標題與文字置中、操作欄靠左（2026-11-01）
+
+需求方分三次收斂到這個結論：
+
+1. 「帳務紀錄，文字都讓他在欄位置中，不要偏左或偏右。」
+2. 「操作按鈕不用置中，讓他靠左對齊就好。」
+3. 「表格**一律**都是標題跟文字都置中，按鈕都是靠左對齊。」
+
+所以最後是**全站規則**，寫在 `.data-table` 本身，不是某一頁的修飾 class。
+
+| 位置 | 對齊 |
+|---|---|
+| `thead th` | 置中 |
+| `tbody td` | 置中 |
+| `.col-actions`（th 與 td）| **靠左** |
+
+### ⚠ 操作欄為什麼不跟著置中
+
+置中的是**資料欄位** —— 那些是要上下對齊著掃的。
+
+按鈕不是資料：每一列的按鈕數量不一樣（有的三顆、關機的主機一顆都沒有），
+置中會讓每一列的按鈕起點都落在不同位置，眼睛要重新找一次。
+靠左，起點就固定了。
+
+### ⚠ 三個會讓它悄悄失效的細節
+
+**1. `.row-actions` 是 flex，`text-align` 管不到它。**
+主軸要明確設 `justify-content: flex-start`，只改 `text-align` 的話按鈕
+還是會停在原來的位置。
+
+**2. `.col-actions` 的靠左規則必須排在它自己的 `text-align: right` 之後。**
+兩邊都是兩個 class 的權重，平手時後面的贏 —— 搬到前面去就失效了。
+（原本那條 `text-align: right` 已經拿掉，但 `width`／`white-space` 還在，
+所以兩條規則仍然並存。）
+
+**3. `.col-num` 原本的 `text-align: right` 要拿掉**，不是加一條置中去蓋它。
+`tabular-nums` 要留著：它讓每個數字佔一樣寬，置中之後同一欄的位數至少
+還是對齊的（少了它，1 和 8 寬度不同，整欄會參差）。
+
+### ⚠ 範圍：14 個頁面
+
+`data-table` 用在 attendance／staff-manage／followup／telegram-broadcast／
+dashboard／vm／accounts／daily-rate／station／task-board／finance／
+shared-file／setting 與 layout。**全部都會變。**
+
+金額欄（`col-num`，用在 6 個頁面）原本靠右，現在也置中了。
+
+⚠ **Blade 裡用 `text-start`／`text-end`／`text-center` 工具類的地方不受影響**
+—— Bootstrap 那幾個是 `!important`，權重贏過這裡的全站規則。
+全專案約 45 處（不全在表格裡）。要讓那些也跟著置中的話得逐一清掉，
+這次沒做 —— 它們多半是刻意指定的。

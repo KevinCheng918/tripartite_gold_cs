@@ -375,16 +375,14 @@ Controller 改成呼叫它之後 `PaymentConfigService` 在那裡已經沒有使
 
 ## 帳務紀錄的文字置中（2026-11-01）
 
-> 需求方：「帳務紀錄，文字都讓他在欄位置中，不要偏左或偏右。」
+> 需求方第一次：「帳務紀錄，文字都讓他在欄位置中，不要偏左或偏右。」
+> 接著：「操作按鈕不用置中，讓他靠左對齊就好。」
+> 最後：「表格**一律**都是標題跟文字都置中，按鈕都是靠左對齊。」
 
-加了一個修飾 class `.data-table--center`（`public/css/custom.css`）。
+**所以最後不是這一頁的事，而是全站規則** —— 細節寫在
+[[admin-table-layout]]，這裡只留一句指路。
 
-⚠ **不要併進 `.data-table`**：其他頁的表格（站台、帳號、任務）靠的是
-「數字右、操作右、文字左」那一套預設，全站改成置中會把每一張表都動到。
-
-⚠ selector 要寫得比 `.data-table .col-num`／`.col-actions` **更具體**
-（多一層 `> tbody > tr >`）—— 那兩個是 `text-align: right`，權重不夠的話
-置中會被它們蓋掉，結果是「大部分置中、金額和操作欄沒有」。
-
-⚠ `.row-actions` 本身是 **flex**，`text-align` 管不到它 —— 要另外把
-`justify-content` 改成 center，不然按鈕群組還是黏在右邊。
+⚠ 中間為這一頁加過一個修飾 class `.data-table--center`，
+**第三次需求之後已經移除**（併進 `.data-table` 了）。
+這份文件原本寫著「不要併進 `.data-table`」—— 那是當時只改一頁的判斷，
+需求範圍改變之後就不再適用。看到舊註解請以 `admin-table-layout` 為準。

@@ -18,6 +18,21 @@ use Illuminate\Support\Facades\Log;
  */
 class TronGridService
 {
+    /**
+     * 兩次呼叫之間的預設間隔（毫秒）
+     *
+     * ⚠ **存在的理由是「config 讀不到也要有保護」**：`tron.min_interval_ms`
+     * 是後來才加的 key，正式環境的 config 又是快取的 —— 部署後沒跑
+     * `artisan optimize` 時那個 key 會是 null，而節流就靜默失效了
+     * （2026-11-01 真的發生過）。
+     *
+     * ⚠ 這個值要跟 `config/tron.php` 的預設一致；真正要調整請改 config
+     * 或 `.env` 的 `TRON_MIN_INTERVAL_MS`，不要改這裡。
+     *
+     * @var int
+     */
+    private const DEFAULT_MIN_INTERVAL_MS = 1100;
+
     private $client;
 
     /**
@@ -223,7 +238,27 @@ class TronGridService
      */
     private function throttle()
     {
-        $intervalMs = (int) config('tron.min_interval_ms');
+        /*
+         * ⚠⚠ **一定要給預設值，不要只讀 config。**
+         *
+         * 2026-11-01 踩過：節流上線之後 429 還是照來。原因是
+         * `tron.min_interval_ms` 是**新增的 config key**，而正式環境的 config
+         * 是快取的（`config:cache`）—— 部署後沒跑 `artisan optimize` 的話
+         * 這個 key 讀出來是 `null`，`(int) null` 是 0，下面那個 `< 1` 直接
+         * return，**節流整個沒作用而且完全看不出來**
+         * （log 裡我加的 `hint` 出得來，因為那是程式不是 config）。
+         *
+         * ⚠ **不能只靠 `config($key, $default)` 的第二個參數**：那個預設值
+         * 只在「key 不存在」時生效，**key 存在但值是 null 就不會**
+         * （`Arr::get()` 的語意）。所以要自己用 `filled()` 判斷 ——
+         * 兩種情況都要退回常數。
+         *
+         * ⚠ 只有**明確設成 0** 才會關掉節流（那是刻意的，例如已經設了
+         * API key、想拿回速度）。`filled(0)` 在 Laravel 是 **true**
+         * （數字一律 filled），所以 0 會被保留下來，不會被當成「讀不到」。
+         */
+        $configured = config('tron.min_interval_ms');
+        $intervalMs = filled($configured) ? (int) $configured : self::DEFAULT_MIN_INTERVAL_MS;
 
         if ($intervalMs < 1) {
             return;
