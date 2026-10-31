@@ -29,9 +29,13 @@ class TaskBoardService
      * 資料格式：既有紀錄的 key 還是舊標籤，`translateLegacyChanges()` 會
      * 對不上。真要改就得連既有資料一起處理。
      *
+     * ⚠ **public**：`TaskChangeNoticeService` 要靠它把
+     * `constants.TASK.CHANGE_NOTICE.FIELDS` 那幾個欄位名換成 `changes` 裡的
+     * 中文 key。那邊自己抄一份的話，改了標籤就會對不上而安靜地不通知。
+     *
      * @var array<string, string>
      */
-    private const FIELD_LABELS = [
+    public const FIELD_LABELS = [
         'title'        => '標題',
         'description'  => '描述',
         'priority'     => '優先順序',
@@ -403,7 +407,19 @@ class TaskBoardService
             return $this->relatedName($this->projectRepository, $value);
         }
 
-        // 標題、描述、優先順序、狀態：原值就夠（狀態與優先由前端對照表翻譯）
+        /*
+         * 標題、描述、優先順序、狀態：原值就夠。
+         *
+         * ⚠ **狀態千萬不要翻成文字。**
+         * `TaskQueryCommandService::recentlyResolvedTaskIds()` 會拿
+         * `Arr::get($activity->changes, '狀態.to')` 去跟
+         * `constants.TASK.STATUS.RESOLVED` 比對 —— 一旦這裡翻成「已解決」，
+         * 那支比對永遠不成立，「查卡片進度」就**安靜地**再也查不到近期完成的
+         * 卡片，而且不會報任何錯。
+         *
+         * 要給人看的文字在顯示端才翻：前端有 `statusLabels` 對照表，
+         * 群組通知有 `TaskChangeNoticeService::readable()`。
+         */
         return $value;
     }
 

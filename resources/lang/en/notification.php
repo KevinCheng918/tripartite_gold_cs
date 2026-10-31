@@ -201,6 +201,11 @@ return [
          * where a notice is *sent*; this one picks where reminders may be *set*.
          */
         // key stays scheduled_reminder; only the label changed (see tw for why)
+        'task_change'             => 'Task card changes',
+        'task_change_hint'        => 'Notifies when a task card is created, or its status, assignees, participants, due date, priority, project/station, or archive state changes. '
+            . '⚠ Consecutive changes to the same card are **merged into one message** (sent after a few quiet minutes), not one per edit. '
+            . 'Description, title and checklist ticks are **not** notified (too frequent)',
+
         'scheduled_reminder'      => 'Assistant',
         'scheduled_reminder_hint' => '⚠ This picks which topics may USE the assistant commands, not where replies go — '
             . 'the assistant always replies in the topic you spoke in. None ticked = every topic may use it',

@@ -278,6 +278,51 @@ class TaskRepository
     }
 
     /**
+     * 還沒處理過通知的活動紀錄
+     *
+     * ⚠ **只撈 `notified_at` 是 null 的**，而且 `created_at` 由舊到新 ——
+     * 組訊息時要照時間順序講「從什麼改成什麼」。
+     *
+     * ⚠ **不在這裡篩「安靜夠久了沒」**：那是商業判斷（窗口幾分鐘、
+     * 卡片還在被改就要繼續等），放 Service。Repository 只負責把
+     * 「還沒處理的」撈出來。
+     *
+     * ⚠ 要 `user` 關聯：訊息裡要寫異動人是誰。
+     * `select` 不含 `description` 之類的大欄位 —— 這支會被每分鐘呼叫。
+     *
+     * @return Collection
+     */
+    public function getUnnotifiedActivities()
+    {
+        return TaskActivity::query()
+            ->select(['id', 'task_id', 'user_id', 'action', 'changes', 'created_at'])
+            ->with('user')
+            ->whereNull('notified_at')
+            ->orderBy('created_at')
+            ->get();
+    }
+
+    /**
+     * 把這幾筆活動紀錄標記成「通知處理過了」
+     *
+     * ⚠ **不論有沒有真的發出去都要標**：只有非通知欄位的異動（例如只改了
+     * 描述）也必須標掉，否則排程每分鐘都會再撈到它一次，永遠掃不完。
+     *
+     * ⚠ 用 `whereIn` 一次更新，不要逐筆 save —— 一次合併可能涵蓋十幾筆。
+     *
+     * @param array<int> $ids
+     * @return void
+     */
+    public function markActivitiesNotified(array $ids)
+    {
+        if (blank($ids)) {
+            return;
+        }
+
+        TaskActivity::query()->whereIn('id', $ids)->update(['notified_at' => now()]);
+    }
+
+    /**
      * 依 ID 查詢（含詳細描述）
      *
      * @param int $id

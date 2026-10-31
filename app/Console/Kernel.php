@@ -137,6 +137,22 @@ class Kernel extends ConsoleKernel
         $schedule->command('reminder:send')->everyMinute()->withoutOverlapping();
 
         /*
+         * 每分鐘把安靜滿一段時間的任務卡異動合併通知到「任務卡專區」話題
+         * （需求方 2026-11-01）。
+         *
+         * ⚠ **一定要每分鐘**：它是「合併窗口到了就發」的輪詢 —— 排程間隔
+         * 等於通知的額外延遲。設成每五分鐘的話，3 分鐘的窗口實際會變成
+         * 最多 8 分鐘才發得出去。
+         *
+         * ⚠ `withoutOverlapping`：上一輪還在發就再跑一次的話，同一批活動
+         * 紀錄會被撈到兩次（`notified_at` 是發完才標的），群組會收到兩則。
+         *
+         * 沒有任何待通知的異動時 Service 自己短路，所以每分鐘跑不等於
+         * 每分鐘都在查一堆東西。
+         */
+        $schedule->command('task:notify-changes')->everyMinute()->withoutOverlapping();
+
+        /*
          * 每分鐘查監聽中的錢包有沒有新的 TRC20 轉帳（2026-10-27）。
          *
          * ⚠ `withoutOverlapping` 一定要：有要通知的那幾輪會跑一次 headless
