@@ -152,6 +152,34 @@ class ShiftAssignmentRepository
     }
 
     /**
+     * 這段期間有排班的人（只回 user_id，去重）
+     *
+     * 打卡報表用來補人：有排班卻整段期間沒打卡、也沒請假的人，
+     * 原本整列都不會出現（見 `AttendanceReportService::collect()`）。
+     *
+     * ⚠ **不要改用 `getByDateRange()` 再自己 pluck**：那一支會 eager load
+     * `user` 與 `shift`、撈回整批 model —— 一個月的排班是幾百筆，
+     * 而這裡只需要一串 id。`distinct` 讓資料庫去重，回來的是純量陣列。
+     *
+     * ⚠ **不濾離職／停用**：查歷史區間時，當時在職、現在已離職的人
+     * 本來就該出現在那一期的報表裡。要不要排除是呼叫端的事。
+     *
+     * @param string $dateFrom Y-m-d
+     * @param string $dateTo   Y-m-d（含當天）
+     * @return array<int>
+     */
+    public function getUserIdsByDateRange($dateFrom, $dateTo)
+    {
+        $ids = ShiftAssignment::query()
+            ->distinct()
+            ->whereBetween('date', [$dateFrom, $dateTo])
+            ->pluck('user_id')
+            ->all();
+
+        return array_map('intval', $ids);
+    }
+
+    /**
      * 依員工和日期範圍查詢排班紀錄
      *
      * @param int    $userId

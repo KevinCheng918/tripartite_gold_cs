@@ -428,6 +428,47 @@ class UserRepository
     }
 
     /**
+     * 這段期間「照設定本來就該上班」的固定班同仁（只回 id）
+     *
+     * 固定班的人（工程、或設了固定時間的客服）**沒有排班紀錄** ——
+     * 排班表上的色塊是依帳號設定合成出來的。所以打卡報表要補人時，
+     * 光看 `shift_assignment` 會漏掉他們。
+     *
+     * ⚠ **這一支是「區間版」，不要拿 `getFixedWorkModeUsers()` 代替。**
+     * 那一支是給曠工掃描用的「今天誰該上班」，條件是 `resigned_at IS NULL`
+     * ——查歷史區間時會有兩個方向的錯：**當時在職、現在已離職**的人會被
+     * 整個漏掉，而**當期之後才到職**的人會被憑空加進去（一整列 0）。
+     *
+     * 所以這裡改成跟區間比對：到職日在區間結束前、離職日在區間開始後。
+     * 兩個日期都允許 null（沒填到職日的舊帳號不該因此消失）。
+     *
+     * ⚠ 其餘條件照 `getFixedWorkModeUsers()`：停用的排掉、
+     * 固定班卻沒填起訖時間的也排掉（算不出標準時間）。
+     *
+     * @param string $dateFrom Y-m-d
+     * @param string $dateTo   Y-m-d（含當天）
+     * @return array<int>
+     */
+    public function getFixedWorkModeUserIdsInRange($dateFrom, $dateTo)
+    {
+        $ids = User::query()
+            ->where('work_mode', config('constants.USER.WORK_MODE.FIXED'))
+            ->where('status', '!=', config('constants.USER.STATUS.DEACTIVATE'))
+            ->whereNotNull('work_start_time')
+            ->whereNotNull('work_end_time')
+            ->where(function ($query) use ($dateTo) {
+                $query->whereNull('hired_at')->orWhere('hired_at', '<=', $dateTo);
+            })
+            ->where(function ($query) use ($dateFrom) {
+                $query->whereNull('resigned_at')->orWhere('resigned_at', '>=', $dateFrom);
+            })
+            ->pluck('id')
+            ->all();
+
+        return array_map('intval', $ids);
+    }
+
+    /**
      * 要檢查打卡提醒的在職同仁
      *
      * ⚠ **不分輪班／固定班一次全撈**：打卡提醒每分鐘跑一次，逐人查是

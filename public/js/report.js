@@ -425,11 +425,18 @@ $(function () {
     // ===== 啟動 =====
 
     /*
-     * 預設期間刻意跟 Telegram 那兩則對齊：打卡報表的通知報的是「上週」、
-     * 超時統計的日報報的是「昨天」。一進來看到的就是同仁剛收到的那一份。
+     * 打卡報表預設「這個月」（需求方 2026-11-01）。
+     *
+     * ⚠ 原本是「上週」，為了跟 Telegram 的週報對齊 —— 一進來看到的就是同仁
+     * 剛收到的那一份。需求方決定改掉：**看報表的人是來看當期狀況的**，
+     * 不是來複習已經發出去的通知。超時統計維持「昨天」（跟日報對齊）。
+     *
+     * ⚠ **刻意不記住上次選的期間**（需求方指定不要 localStorage）：
+     * 記住的話，某次查了去年某個月之後，下次進來還是停在那裡，
+     * 而畫面上不會有任何東西告訴你「這不是本月」。每次都回到本月比較安全。
      */
     if (canAttendance) {
-        bindPeriod('att', loadAttendance, window.DateRange.lastWeek());
+        bindPeriod('att', loadAttendance, window.DateRange.thisMonth());
     }
 
     if (canRemind) {

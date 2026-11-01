@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Repositories\LeaveRequestRepository;
+use App\Repositories\ShiftAssignmentRepository;
 use App\Repositories\UserRepository;
 use App\Services\Notify\EncouragementWriter;
 use Illuminate\Support\Arr;
@@ -24,10 +25,17 @@ use Illuminate\Support\Carbon;
  * ⚠ **統計本體不在這裡**。`AttendanceService::getReport()` 早就算好了
  * （打卡出勤頁用的就是那一支），這裡只負責挑收件人、組文案、發送。
  *
- * ⚠ **`getReport()` 只回「期間內有打卡紀錄的人」**。整段期間都在請假、
- * 或根本沒排班的人不會出現 —— 所以這裡從同仁名單出發，查不到就當全部是 0，
- * 請假資料另外從 `LeaveRequestRepository` 撈（否則「整週都請假」的人
- * 會收到一則空白報表）。
+ * ⚠ **`getReport()` 只回「期間內有打卡紀錄的人」**，所以 `collect()` 要自己
+ * 補人。三個來源缺一不可：
+ *
+ * | 來源 | 補的是誰 |
+ * |---|---|
+ * | `AttendanceService::getReport()` | 有打卡紀錄的人 |
+ * | `LeaveRequestRepository` | 整段期間都在請假的人（否則收到一則空白報表）|
+ * | `scheduledUserIds()` | **有排班卻完全沒打卡、也沒請假的人**（2026-11-01 補） |
+ *
+ * 前兩個來源都是「有留下東西的人」—— 第三個補的正好是最該被看到的那種：
+ * 排了班但整段期間一筆打卡都沒有。
  */
 class AttendanceReportService
 {
@@ -40,6 +48,8 @@ class AttendanceReportService
     private $attendanceService;
     private $leaveRepository;
     private $userRepository;
+    // 補「有排班卻沒打卡」的人，見 collect()
+    private $shiftAssignmentRepository;
     private $staffDm;
     private $appSettingService;
     private $encouragement;
@@ -48,6 +58,7 @@ class AttendanceReportService
         AttendanceService $attendanceService,
         LeaveRequestRepository $leaveRepository,
         UserRepository $userRepository,
+        ShiftAssignmentRepository $shiftAssignmentRepository,
         StaffDmService $staffDm,
         AppSettingService $appSettingService,
         EncouragementWriter $encouragement
@@ -55,6 +66,7 @@ class AttendanceReportService
         $this->attendanceService = $attendanceService;
         $this->leaveRepository = $leaveRepository;
         $this->userRepository = $userRepository;
+        $this->shiftAssignmentRepository = $shiftAssignmentRepository;
         $this->staffDm = $staffDm;
         $this->appSettingService = $appSettingService;
         $this->encouragement = $encouragement;
@@ -238,7 +250,52 @@ class AttendanceReportService
             $byUser[$userId]['leave_ranges'] = Arr::get($summary, 'ranges');
         }
 
+        /*
+         * ⚠ 第三個來源：**該上班卻整段期間沒打卡、也沒請假的人**
+         * （需求方 2026-11-01：「應該要出現每個人，怎麼會有缺人，
+         * 有排班就應該要出現」）。
+         *
+         * 前兩個來源都是「有留下東西的人」—— 有打卡紀錄、或有請假單。
+         * 一個排了班但完全沒打卡的人兩邊都查不到，於是整列從報表上消失，
+         * 而那恰好是最該被看到的一種人。
+         *
+         * ⚠ 補進來的是 `emptyStat()`（全部 0），**不是曠工**：
+         * 曠工要由曠工掃描判定並寫進打卡紀錄，這裡只負責「讓他出現」。
+         * 在這裡自己算曠工的話，會跟掃描的結果各算各的。
+         */
+        foreach ($this->scheduledUserIds($range) as $userId) {
+            if (Arr::has($byUser, $userId)) {
+                continue;
+            }
+
+            $byUser[$userId] = $this->emptyStat();
+        }
+
         return $this->withoutLeaderUp($byUser);
+    }
+
+    /**
+     * 這段期間「本來就該上班」的人
+     *
+     * ⚠ **兩個來源都要**，只看其中一邊都會漏人：
+     *
+     * | 來源 | 漏掉誰 |
+     * |---|---|
+     * | 只看 `shift_assignment` | 固定班的人（工程、設了固定時間的客服）—— 他們**沒有排班紀錄**，排班表上的色塊是依帳號設定合成的 |
+     * | 只看固定班設定 | 所有輪班的客服 |
+     *
+     * @param array $range start / end（都是 Y-m-d）
+     * @return array<int> 去重後的 user_id
+     */
+    private function scheduledUserIds(array $range)
+    {
+        $start = Arr::get($range, 'start');
+        $end = Arr::get($range, 'end');
+
+        return array_unique(array_merge(
+            $this->shiftAssignmentRepository->getUserIdsByDateRange($start, $end),
+            $this->userRepository->getFixedWorkModeUserIdsInRange($start, $end)
+        ));
     }
 
     /**

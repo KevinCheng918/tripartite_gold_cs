@@ -35,8 +35,15 @@
 兩個分頁都是「開始日期 ＋ 結束日期 ＋ 六顆快捷鈕（今日／昨日／本週／上週／
 本月／上月）」，版面與操作比照補點紀錄。快捷鈕按下去直接查，不必再按「查詢」。
 
-預設期間刻意跟 Telegram 對齊：打卡報表是**上週**、超時統計是**昨天** ——
-一打開就是同仁剛收到的那一份，對得上。
+預設期間：打卡報表是**這個月**、超時統計是**昨天**。
+
+⚠ 打卡報表原本也是跟 Telegram 對齊的「上週」（一打開就是同仁剛收到的那一份），
+**2026-11-01 需求方改成本月**：看報表的人是來看當期狀況的，不是來複習已經
+發出去的通知。超時統計維持「昨天」（跟日報對齊）。
+
+⚠ **刻意不記住上次選的期間**（需求方指定不要 localStorage，而這一頁本來也
+沒用過）：記住的話，某次查了去年某個月之後下次進來還停在那裡，
+而畫面上沒有任何東西告訴你「這不是本月」。
 
 > 原本（v2.71）是「日／週／月切換 ＋ 上一期／下一期」，v2.73 換掉。
 > 需求方要能自己選時間段，而快捷鈕已經完全涵蓋原本那三種期間 ——
@@ -65,6 +72,35 @@ Telegram 收到的那份會對不起來 —— 那種不一致最難查，因為
 `getReport()` 只回「這段期間有打卡紀錄的人」—— 整期都請假的人會整列消失。
 `AttendanceReportService::collect()` 另外撈了一次核准的假來補這些人，
 所以 `forPage()` 走 `collect()` 而不是 `getReport()`。
+
+⚠ **2026-11-01 補第三個來源：有排班卻完全沒打卡、也沒請假的人**
+（需求方：「應該要出現每個人，怎麼會有缺人，有排班就應該要出現」）。
+前兩個來源都是「有留下東西的人」—— 排了班但一筆打卡都沒有的人兩邊都查不到，
+整列從報表上消失，而那恰好是最該被看到的一種。
+
+| 來源 | 補的是誰 |
+|---|---|
+| `getReport()` | 有打卡紀錄的人 |
+| `LeaveRequestRepository` | 整期都在請假的人 |
+| `scheduledUserIds()` | 有排班卻沒打卡也沒請假的人 |
+
+⚠ **「有排班」要兩個來源一起算**，只看其中一邊都會漏人：
+`ShiftAssignmentRepository::getUserIdsByDateRange()` 漏掉**固定班的人**
+（工程、設了固定時間的客服 —— 他們**沒有排班紀錄**，排班表上的色塊是依帳號
+設定合成的）；只看固定班設定則漏掉所有輪班的客服。
+
+⚠ **固定班那一支要用區間版** `UserRepository::getFixedWorkModeUserIdsInRange()`，
+不能拿曠工掃描用的 `getFixedWorkModeUsers()` 代替 —— 那一支是「今天誰該上班」，
+條件是 `resigned_at IS NULL`，查歷史區間時會有**兩個方向**的錯：
+當時在職、現在已離職的人會被整個漏掉，而當期之後才到職的人會被憑空加進去
+（一整列 0）。
+
+⚠ 補進來的是 `emptyStat()`（全部 0）**不是曠工**：曠工要由曠工掃描判定並寫進
+打卡紀錄，這一層只負責「讓他出現」。在這裡自己算會跟掃描各算各的。
+
+⚠ 這是改在 `collect()`，所以**三個出口一起生效**（報表頁、Telegram 完整版、
+個人版）—— Telegram 完整版從此也會列出這些人。這是刻意的：讓出口分歧才是
+這支服務一直在避免的事。
 
 ⚠ 2026-10-11 之後 `collect()` 還多做一件事：**濾掉主管以上**（含主管本人，
 需求方指定）。所以**兩個分頁都不列主管以上**，跟 Telegram 那兩份一致 ——
@@ -187,6 +223,10 @@ public/js/report.js
 ```
 app/Services/RemindReportService.php        拆出 collect() / forPage()
 app/Services/AttendanceReportService.php    新增 forPage()；emptyStat() 補兩個 key
+                                            2026-11-01 collect() 補第三個來源 scheduledUserIds()
+app/Repositories/ShiftAssignmentRepository.php  2026-11-01 新增 getUserIdsByDateRange()
+app/Repositories/UserRepository.php             2026-11-01 新增 getFixedWorkModeUserIdsInRange()
+public/js/report.js                             2026-11-01 預設期間 lastWeek → thisMonth
 app/Services/AttendanceService.php          移除 getMonthlyReport()（已無人呼叫）
 app/Http/Controllers/Admin/AttendanceController.php   移除 ajaxMonthlyReport()
 routes/web.php                              移除 attendance/ajax-monthly-report；新增 report 三條
