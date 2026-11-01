@@ -218,8 +218,7 @@ class TaskChangeNoticeService
      * #12 主系統登入異常        ← 編號＋標題整串都是連結，點下去直接開那張卡
      * 指派：@mary @john        ← mention，各自一行
      * 負責人：@ming
-     * 專案：三方金流 ｜ 到期：2026-11-05
-     * 優先序：🔴 高
+     * 專案：三方金流 ｜ 優先序：🔴 高
      * 狀態：進行中 → 測試中
      * 新留言：2 則（王小明、李小華）
      * 觸發者：@mary Admin      ← 也是 mention，但管理者只顯示暱稱
@@ -238,9 +237,13 @@ class TaskChangeNoticeService
      * ⚠ **指派人員與專案負責人每則都帶**：看到通知的第一個問題是
      * 「這要找誰」—— 只有狀態變更的那種通知如果不帶，就得自己回看板查。
      *
-     * ⚠ 到期日與優先順序**同時出現在第二行（現狀）與第三段（變更）**
-     * 是刻意的：第二行回答「現在幾號到期」，第三段回答「剛剛被改成幾號」。
-     * 為了省一行而把現狀拿掉的話，版面就不固定了。
+     * ⚠ **到期日拿掉之後，整則通知都不會再出現它**（需求方 2026-11-01：
+     * 「不用顯示到期日，把原本到期日的位置放優先序」）。
+     *
+     * 別誤以為「改到期日時還是會在變更段落看到」——
+     * `constants.TASK.CHANGE_NOTICE.FIELDS` **只有 `status`**，所以變更段落
+     * 永遠只講狀態（加上封存／還原與新留言）。優先序同理，只出現在上面
+     * 這一行的現狀裡。要讓某個欄位的變更也被通知，得先加進 `FIELDS`。
      *
      * @param int                            $taskId
      * @param \Illuminate\Support\Collection $activities
@@ -298,19 +301,20 @@ class TaskChangeNoticeService
         $out[] = "指派：{$this->assigneeNames($task)}";
         $out[] = "負責人：{$this->projectOwnerName($task)}";
 
-        // 第三行：歸屬與時程
-        $out[] = $this->joinInline([
-            "專案：{$this->projectName($task)}",
-            "到期：{$this->dueDateText($task)}",
-        ]);
-
         /*
-         * 第四行：優先序，自己一行而且**擺在狀態的前面**（需求方 2026-11-01）。
+         * 第四行：專案 ＋ 優先序。
+         *
+         * ⚠ **刻意不帶到期日**（需求方 2026-11-01 收斂：「不用顯示到期日，
+         * 把原本到期日的位置放優先序」）。到期日只在真的被改動時才會出現在
+         * 下面的變更段落裡 —— 現狀那一行不再重複它。
          *
          * 燈號在文字之前（`優先序：🟡 中`）—— 滑過去的時候先看到顏色，
          * 不必讀完字才知道急不急。
          */
-        $out[] = "優先序：{$this->priorityWithLight($task->priority)}";
+        $out[] = $this->joinInline([
+            "專案：{$this->projectName($task)}",
+            "優先序：{$this->priorityWithLight($task->priority)}",
+        ]);
 
         // 第五段：這次改了什麼（封存／還原、以及新留言也算在這裡）
         $out = array_merge($out, $states, $lines);
@@ -431,17 +435,6 @@ class TaskChangeNoticeService
     private function projectName($task)
     {
         return filled($task->project) ? (string) $task->project->name : '-';
-    }
-
-    /**
-     * 到期日（沒設定就說沒設定，不要留空）
-     *
-     * @param \App\Models\Task $task
-     * @return string
-     */
-    private function dueDateText($task)
-    {
-        return filled($task->due_date) ? $task->due_date->format('Y-m-d') : '未設定';
     }
 
     /**

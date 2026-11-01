@@ -104,7 +104,7 @@
             <div class="main-card mb-3 card">
                 <div class="card-body p-0">
                     <div class="table-responsive d-none d-md-block">
-                        <table class="table table-hover align-middle data-table">
+                        <table class="table table-hover align-middle data-table data-table--fit">
                             <thead class="thead-gold">
                                 <tr>
                                     <th class="col-idx">#</th>
@@ -214,7 +214,7 @@
             <div class="main-card mb-3 card">
                 <div class="card-body p-0">
                     <div class="table-responsive d-none d-md-block">
-                        <table class="table table-hover align-middle data-table">
+                        <table class="table table-hover align-middle data-table data-table--fit">
                             <thead class="thead-gold">
                                 <tr>
                                     <th class="col-idx">#</th>
