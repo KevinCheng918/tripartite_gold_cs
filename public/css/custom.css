@@ -766,8 +766,36 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .tt-date { color: rgba(255,255,255,0.5) !important; }
 [data-theme="dark"] .tt-today .tt-date { color: #d4af37 !important; }
 [data-theme="dark"] .tt-cell { background: transparent !important; }
-[data-theme="dark"] .tt-block-name { color: inherit; }
-[data-theme="dark"] .tt-block-user { color: rgba(255,255,255,0.6) !important; }
+/* 排班色塊的深色版（需求方 2026-11-01：「亮度太高，然後早班中班晚班的字
+   變成白色了」）。
+
+   淺色的粉彩底是為白底設計的，整片放在近黑頁面上會發亮；而原本那條
+   `.tt-block-user { color: rgba(255,255,255,0.6) }` 更糟 ——
+   **白字壓在亮粉彩底上等於看不見**，早／午／晚班三個字就這樣消失了。
+
+   ⚠ 值來自 `.tt-block` 上的兩個 CSS 變數（`public/js/shifts.js` 掛的，
+   每個人一組）：`--tt-bg-dark` 是同色低透明度底、`--tt-fg-dark` 是同色系
+   淺色字。**用變數而不是在 JS 裡判斷主題**，因為主題可以隨時切換，
+   而換主題不會觸發重繪 —— 寫死的話要等下次渲染才會跟上。
+
+   ⚠ 三條都要 `!important`：底色與人名的顏色是 JS 寫在 inline style 上的
+   （inline 贏過一般選擇器），不加蓋不掉。
+
+   ⚠ 變數有 fallback：萬一哪天 JS 沒掛上（舊快取、或新增的渲染路徑漏掉），
+   退回中性灰底與淺灰字 —— 至少讀得到，不會又變成白字配亮底。 */
+[data-theme="dark"] .tt-block {
+    background: var(--tt-bg-dark, rgba(255,255,255,0.08)) !important;
+}
+[data-theme="dark"] .tt-block-name { color: var(--tt-fg-dark, #e0e0e0) !important; }
+/* 班別名（早班／午班／晚班）比人名低一階，但同色系 —— 不要再用白色 */
+[data-theme="dark"] .tt-block-user { color: var(--tt-fg-dark, #e0e0e0) !important; opacity: 0.78; }
+/* hover 的方向在深色下要反過來：`.tt-block:hover` 是 `brightness(0.93)`
+   —— 那是為白底寫的（壓暗＝有反應），在近黑底上等於「滑過去就更看不見」。 */
+[data-theme="dark"] .tt-block:hover { filter: brightness(1.45); }
+/* 固定班不可點，所以維持沒有 hover 回饋（跟淺色一致）。
+   ⚠ 這條要留著：上面那條的權重跟 `.tt-block.tt-shift-fixed:hover` 平手，
+   靠「誰寫在後面」決勝太脆弱。 */
+[data-theme="dark"] .tt-block.tt-shift-fixed:hover { filter: none; }
 [data-theme="dark"] .tt-week-nav { background: #1a1a1a !important; }
 [data-theme="dark"] .tt-week-label { color: #f0e6c8 !important; }
 [data-theme="dark"] .tt-week-label:hover { background: rgba(212,175,55,0.1) !important; }

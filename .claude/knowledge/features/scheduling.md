@@ -123,3 +123,78 @@ resources/views/components/modal.blade.php
 resources/js/admin/shifts.js
 resources/lang/{tw,cn,en}/shift.php
 ```
+
+## 排班色塊的深色模式（2026-11-01，v3.61）
+
+需求方截圖回報：「亮度太高，然後早班中班晚班的字變成白色了。」
+
+### 兩個問題其實是同一個根因
+
+人員色盤（`public/js/shifts.js` 的 `userPalette`，十組循環分配）是為**白底**
+設計的粉彩：`bg` 很亮、`text` 很深。整片攤在近黑的頁面上就是一面光牆。
+
+而原本只有一條深色規則在管色塊裡的字：
+
+```css
+[data-theme="dark"] .tt-block-user { color: rgba(255,255,255,0.6) !important; }
+```
+
+> **白字壓在亮粉彩底上 —— 早／午／晚班三個字直接消失。**
+
+人名沒事是因為它有 inline `color`（深色），在亮底上讀得到；
+班別名沒有 inline color，才被這條規則吃掉。
+
+### 修法：色盤補一套深色值，用 CSS 變數掛上去
+
+每組顏色多兩個欄位：
+
+| 欄位 | 內容 |
+|---|---|
+| `bgDark` | `border` 的同色低透明度（例如 `rgba(245,158,11,0.16)`）|
+| `textDark` | 同色系淺色調（例如 `#fcd34d`）|
+
+⚠ **做法照既有的 `.tt-shift-cover` 深色規則**（`rgba(5,150,105,0.15)`）——
+同色低透明度底，保留色彩識別但不刺眼。這個專案已經有這個慣例了。
+
+⚠ **用 CSS 變數，不要在 JS 裡判斷主題直接套色。** 主題可以隨時切換
+（右上角那顆按鈕），而**換主題不會觸發重繪** —— 在 JS 決定顏色的話，
+切了主題之後色塊要等下次渲染才會跟上。
+
+變數掛在 `.tt-block` 上，`.tt-block-name` 與 `.tt-block-user` 會繼承，
+所以 JS 只有**一個**產生點要改（組 `style` 屬性那一行）。
+
+⚠ **三條深色規則都要 `!important`**：底色與人名顏色是 JS 寫在 inline style
+上的，inline 贏過一般選擇器。
+
+⚠ **變數要給 fallback**（`var(--tt-fg-dark, #e0e0e0)`）：萬一哪天 JS 沒掛上
+（舊快取、或新增的渲染路徑漏掉），退回中性灰 —— 至少讀得到，
+不會又變成白字配亮底。
+
+⚠ 兩套顏色都**明確列出來**，不要用運算從 hex 推（轉 rgba 再調亮度）：
+十組各自的對比要能一眼看出來、也要能單獨微調。
+
+### 順手修掉同源的 hover
+
+`.tt-block:hover { filter: brightness(0.93) }` 也是為白底寫的（壓暗＝有反應），
+在近黑底上等於「滑過去就更看不見」。深色模式改成 `brightness(1.45)`。
+
+⚠ 固定班不可點，所以 `[data-theme="dark"] .tt-block.tt-shift-fixed:hover`
+要再寫一條 `filter: none` —— 它跟上面那條權重平手，靠「誰寫在後面」決勝
+太脆弱。
+
+### ⚠ 查這類問題時繞過的路
+
+一開始我把 `shifts.js` 產生的 25 個 class 全掃過，比對「有淺色樣式卻沒有
+深色覆寫」的 —— 查出 11 個，但**全都只設排版（flex／gap／width）**，
+沒有一個設顏色。從程式碼掃不出東西，因為**問題出在 inline style**，
+而那是 JS 用資料組出來的，不在 CSS 檔裡。
+
+> 這類「深色模式沒套到」的問題，先問**顏色是從哪裡來的** ——
+> 是 CSS 檔、還是 JS 寫進 inline style。後者沒有截圖幾乎查不出來。
+
+### 順帶發現：三個死 CSS class
+
+`.tt-shift-cover`、`.tt-shift-morning`、`.tt-shift-afternoon`、
+`.tt-shift-night` 在 `public/css/app.css` 裡有樣式（含 `.tt-shift-cover`
+的深色規則），但 **`shifts.js` 從來沒有產生過這些 class** ——
+色塊的顏色全部走 inline style。這次沒清，但要知道改它們不會有任何效果。

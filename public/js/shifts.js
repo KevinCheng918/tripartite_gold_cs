@@ -29,18 +29,32 @@
     /** 星期名稱 */
     var weekdayNames = ['週一', '週二', '週三', '週四', '週五', '週六', '週日'];
 
-    /** 人員色盤（柔和色系，自動循環分配） */
+    /**
+     * 人員色盤（柔和色系，自動循環分配）
+     *
+     * ⚠ 每一組都有**淺色與深色兩套**。深色模式不能沿用 `bg`／`text`：
+     * 那些粉彩底是為白底設計的，放在近黑的頁面上會整片發亮（需求方
+     * 2026-11-01：「亮度太高」），而深色的 `text` 在上面也等於看不見。
+     *
+     * 深色版的規則：
+     *   - `bgDark`  ＝ `border` 的同色低透明度（跟 `.tt-shift-cover` 的
+     *                 深色規則同一套做法）—— 保留色彩識別但不刺眼
+     *   - `textDark`＝ 同色系的淺色調，在近黑底上讀得清楚
+     *
+     * ⚠ 兩套都要**明確列出來**，不要在 JS 裡用運算推（例如把 hex 轉 rgba
+     * 再調亮度）：十組顏色各自的對比要能一眼看出來、也要能單獨微調。
+     */
     var userPalette = [
-        { bg: '#fef3c7', border: '#f59e0b', text: '#92400e' },
-        { bg: '#dbeafe', border: '#3b82f6', text: '#1e40af' },
-        { bg: '#ede9fe', border: '#8b5cf6', text: '#5b21b6' },
-        { bg: '#dcfce7', border: '#22c55e', text: '#166534' },
-        { bg: '#ffe4e6', border: '#f43f5e', text: '#9f1239' },
-        { bg: '#e0f2fe', border: '#0ea5e9', text: '#0c4a6e' },
-        { bg: '#fce7f3', border: '#ec4899', text: '#9d174d' },
-        { bg: '#f0fdf4', border: '#4ade80', text: '#15803d' },
-        { bg: '#fef9c3', border: '#eab308', text: '#854d0e' },
-        { bg: '#e0e7ff', border: '#6366f1', text: '#3730a3' }
+        { bg: '#fef3c7', border: '#f59e0b', text: '#92400e', bgDark: 'rgba(245,158,11,0.16)', textDark: '#fcd34d' },
+        { bg: '#dbeafe', border: '#3b82f6', text: '#1e40af', bgDark: 'rgba(59,130,246,0.16)', textDark: '#93c5fd' },
+        { bg: '#ede9fe', border: '#8b5cf6', text: '#5b21b6', bgDark: 'rgba(139,92,246,0.16)', textDark: '#c4b5fd' },
+        { bg: '#dcfce7', border: '#22c55e', text: '#166534', bgDark: 'rgba(34,197,94,0.16)', textDark: '#86efac' },
+        { bg: '#ffe4e6', border: '#f43f5e', text: '#9f1239', bgDark: 'rgba(244,63,94,0.16)', textDark: '#fda4af' },
+        { bg: '#e0f2fe', border: '#0ea5e9', text: '#0c4a6e', bgDark: 'rgba(14,165,233,0.16)', textDark: '#7dd3fc' },
+        { bg: '#fce7f3', border: '#ec4899', text: '#9d174d', bgDark: 'rgba(236,72,153,0.16)', textDark: '#f9a8d4' },
+        { bg: '#f0fdf4', border: '#4ade80', text: '#15803d', bgDark: 'rgba(74,222,128,0.16)', textDark: '#bbf7d0' },
+        { bg: '#fef9c3', border: '#eab308', text: '#854d0e', bgDark: 'rgba(234,179,8,0.16)', textDark: '#fde047' },
+        { bg: '#e0e7ff', border: '#6366f1', text: '#3730a3', bgDark: 'rgba(99,102,241,0.16)', textDark: '#a5b4fc' }
     ];
     var userColorMap = {};
     var userColorIndex = 0;
@@ -49,7 +63,7 @@
      * 依 user_id 取得專屬顏色（同一人永遠同色）
      *
      * @param {number} userId
-     * @return {{ bg: string, border: string, text: string }}
+     * @return {{ bg: string, border: string, text: string, bgDark: string, textDark: string }}
      */
     function getUserColor(userId) {
         if (!userColorMap[userId]) {
@@ -59,8 +73,14 @@
         return userColorMap[userId];
     }
 
-    /** 預設色塊 */
-    var defaultColor = { bg: '#f3f4f6', border: '#9ca3af', text: '#374151' };
+    /** 預設色塊（色盤分配不到時用；深色版規則同 `userPalette`） */
+    var defaultColor = {
+        bg: '#f3f4f6',
+        border: '#9ca3af',
+        text: '#374151',
+        bgDark: 'rgba(156,163,175,0.16)',
+        textDark: '#d1d5db'
+    };
 
     // ---------------------------------------------------------------
     //  共用工具
@@ -549,7 +569,20 @@
                     } else {
                         var style = '';
                         if (b.color) {
-                            style = ' style="background:' + b.color.bg + ';border-left:3px solid ' + b.color.border + '"';
+                            /*
+                             * ⚠ 深色版的值是用 **CSS 變數**掛上去的，不是在這裡
+                             * 判斷主題直接套色。理由是**主題可以隨時切換**（右上角
+                             * 那顆按鈕）—— 在這裡決定顏色的話，切了主題之後色塊
+                             * 要等到下次重新渲染才會跟上，而換主題不會觸發重繪。
+                             *
+                             * 變數掛在 `.tt-block` 上，子元素（`.tt-block-name`、
+                             * `.tt-block-user`）會繼承，所以只要改這一處。
+                             * 深色模式怎麼用這些變數見 public/css/custom.css。
+                             */
+                            style = ' style="background:' + b.color.bg +
+                                ';border-left:3px solid ' + b.color.border +
+                                ';--tt-bg-dark:' + b.color.bgDark +
+                                ';--tt-fg-dark:' + b.color.textDark + '"';
                         }
                         innerHtml += '<div class="tt-block ' + b.cls + ' js-assignment-cell" data-assignment-id="' + b.dataId + '"' + style + '>' + b.label + '</div>';
                     }
