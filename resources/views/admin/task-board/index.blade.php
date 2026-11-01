@@ -2540,6 +2540,7 @@ var TASK_CONTENT_CSS_URL = '{{ asset('css/task-content.css') }}?v={{ filemtime(p
 
 var CHECKLIST_TOOLTIP = @json(trans('task_board.checklist_tooltip'));
 var CHECKLIST_PLACEHOLDER = @json(trans('task_board.checklist_placeholder'));
+var IMAGE_TOOLTIP = @json(trans('task_board.image_tooltip'));
 var FILE_TOOLTIP = @json(trans('task_board.file_tooltip'));
 var FILE_BUTTON = @json(trans('task_board.file_button'));
 var FILE_UPLOAD_FAILED = @json(trans('task_board.msg.file_upload_failed'));
@@ -2608,7 +2609,34 @@ function notifyEditorError(message) {
 }
 
 /**
- * 上傳附件並在游標處插入下載連結
+ * 這次上傳的是不是圖片
+ *
+ * ⚠ **兩個依據都要看。** 瀏覽器給的 `file.type` 最準，但從某些來源拖進來的
+ * 檔案（少數情況下）會是空字串 —— 那時退回看副檔名，不然一張圖會變成
+ * 一條要點開的連結，而使用者不會知道為什麼只有那一次不一樣。
+ *
+ * ⚠ 副檔名清單要含 `svg`：它沒有被 `UPLOAD_BLOCKED_EXTENSIONS` 擋下來，
+ * 而用 `<img>` 顯示反而比原本那條 `target="_blank"` 的連結安全
+ * （SVG 裡的 script 在 `<img>` 情境不會執行，直接開分頁則會）。
+ *
+ * @param {File}   file 原始檔案物件
+ * @param {Object} body 後端回應（取 name 當退路）
+ * @returns {boolean}
+ */
+function isImageUpload(file, body) {
+    if (file && file.type && file.type.indexOf('image/') === 0) {
+        return true;
+    }
+
+    var name = (body && body.name) || (file && file.name) || '';
+
+    return /\.(jpe?g|png|gif|webp|bmp|svg|avif)$/i.test(name);
+}
+
+/**
+ * 上傳附件並在游標處插入內容
+ *
+ * 圖片直接內嵌顯示，其餘插一條下載連結。
  *
  * @param {File}   file
  * @param {Object} editor TinyMCE 實例
@@ -2629,6 +2657,29 @@ function uploadEditorFile(file, editor) {
         if (xhr.status < 200 || xhr.status >= 300) {
             // 驗證錯誤（檔案過大、類型不允許）要讓使用者看到原因
             editor.notificationManager.open({ text: uploadErrorMessage(body), type: 'error' });
+
+            return;
+        }
+
+        /*
+         * 圖片直接顯示出來，不要插一條要點開才看得到的連結
+         * （需求方 2026-11-01：「上傳檔案的部分，如果是圖片，要顯示圖片，
+         * 不要點擊後用彈窗顯示」）。
+         *
+         * ⚠ 這條路跟工具列的圖片鈕是**兩個不同的端點**（檔案走
+         * `ajax-upload-editor-file`、圖片走 `ajax-upload-editor-image`），
+         * 但檔案端點本來就不限類型（只擋可執行與腳本副檔名），
+         * 所以從「檔案」鈕挑一張圖是合法的 —— 差別只在**插進去的 HTML**。
+         *
+         * ⚠ 不改成「偵測到圖片就改打圖片端點」：那會讓同一顆按鈕有兩種
+         * 行為與兩種失敗訊息，而兩邊的大小上限也不一樣（圖片 5MB、
+         * 檔案 20MB）—— 使用者挑了一張 8MB 的圖會突然被擋，說不出為什麼。
+         */
+        if (isImageUpload(file, body)) {
+            editor.insertContent(
+                '<img src="' + editor.dom.encode(body.location) + '" alt="'
+                + editor.dom.encode(body.name || '') + '">'
+            );
 
             return;
         }
@@ -2658,12 +2709,17 @@ function getTinyConfig(overrides) {
         menubar: false,
         plugins: ['autolink', 'link', 'lists', 'image', 'table', 'code'],
         /*
-         * ⚠ `image` 與 `tbfile` 刻意排在**前段**（需求方 2026-10-30）：
+         * ⚠ `tbimage` 與 `tbfile` 刻意排在**前段**（需求方 2026-10-30）：
          * `toolbar_mode: 'sliding'` 在窄面板會把後段收進「更多」裡，
          * 而這兩顆正是放檔案的入口 —— 收起來使用者就找不到，
          * 於是會去找那個把檔案排在底下的「附件」欄位（已經拔掉了）。
+         *
+         * ⚠ 圖片那顆是**自訂的 `tbimage`，不是內建的 `image`**（需求方
+         * 2026-11-01）：內建那顆點下去會先開「Insert/Edit Image」對話框
+         * （網址、替代文字、寬高），而這裡要的是「點了就選檔上傳」。
+         * 把 `image` 換回來的話對話框就會回來。
          */
-        toolbar: 'undo redo | image tbfile | bold italic underline strikethrough | bullist numlist tbchecklist | link table | fontfamily fontsize | forecolor backcolor | alignleft aligncenter alignright | code',
+        toolbar: 'undo redo | tbimage tbfile | bold italic underline strikethrough | bullist numlist tbchecklist | link table | fontfamily fontsize | forecolor backcolor | alignleft aligncenter alignright | code',
         font_family_formats:
             '系統預設=inherit;' +
             '微軟正黑體=Microsoft JhengHei,PingFang TC,Heiti TC,sans-serif;' +
@@ -2731,7 +2787,53 @@ function getTinyConfig(overrides) {
             });
 
             /*
-             * 圖片走 TinyMCE 內建的 image 上傳，這顆負責圖片以外的附件。
+             * 圖片：點了**直接開選檔視窗**，不經過對話框（需求方 2026-11-01）。
+             *
+             * ⚠ 這是刻意取代內建 `image` 按鈕的。內建那顆一定會先開
+             * 「Insert/Edit Image」—— 對話框裡主要是網址輸入框，上傳要再點
+             * 右邊那個小圖示切到 Upload 分頁，等於多兩步才碰得到檔案。
+             *
+             * ⚠ **`image` plugin 仍然留在 `plugins` 裡**，拔掉的話既有圖片
+             * 連「雙擊開對話框改寬高／替代文字」都沒了。要的只是不要讓它
+             * 擋在「插入一張圖」的路上。
+             *
+             * ⚠ 貼上與拖曳走的是另一條路（`images_upload_handler`），
+             * 跟這顆無關，不要以為改這裡會影響那邊。
+             */
+            editor.ui.registry.addButton('tbimage', {
+                icon: 'image',
+                tooltip: IMAGE_TOOLTIP,
+                onAction: function () {
+                    var input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.onchange = function () {
+                        if (!this.files.length) { return; }
+
+                        /*
+                         * 沿用 `uploadEditorImage()` —— 它的回呼簽章本來就是
+                         * TinyMCE file_picker 的 `(url, meta)`，這裡只是把
+                         * 「回填給對話框」換成「直接插進內容」。
+                         */
+                        uploadEditorImage(this.files[0], function (url, meta) {
+                            /*
+                             * ⚠ 兩個屬性都要 `dom.encode()`。`alt` 直接來自
+                             * 使用者的檔名，而 `src` 雖然是後端回的、檔名也
+                             * 已經被 `ImageUploadService::safeFileName()` 洗過，
+                             * 但那支的規則日後若放寬，這裡會是第一個破口。
+                             */
+                            editor.insertContent(
+                                '<img src="' + editor.dom.encode(url) + '" alt="'
+                                + editor.dom.encode(meta && meta.alt ? meta.alt : '') + '">'
+                            );
+                        });
+                    };
+                    input.click();
+                }
+            });
+
+            /*
+             * 這顆負責圖片以外的附件。
              *
              * ⚠ **要有文字不能只有圖示**（需求方 2026-10-30）：原本只有 icon
              * ＋ tooltip，又排在 `toolbar_mode: 'sliding'` 在窄面板會收起來的

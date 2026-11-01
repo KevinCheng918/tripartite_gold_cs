@@ -73,6 +73,7 @@ return [
     'comment_edited'        => 'edited',
     'description_empty'     => 'No description yet — click Edit above',
     'checklist_tooltip'     => 'Checklist',
+    'image_tooltip'         => 'Upload image',
     'file_tooltip'          => 'Upload file',
     'file_button'           => 'File',
     'description_drop_hint' => 'Drag images and files straight into the description — they land on the line where you drop them.',

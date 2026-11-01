@@ -90,6 +90,12 @@ return [
     'comment_edited'        => '已編輯',
     'description_empty'     => '尚無描述，點右上角「編輯」新增',
     'checklist_tooltip'     => '勾選清單',
+    /*
+     * ⚠ 這顆是**自訂的** `tbimage`，不是 TinyMCE 內建的 `image`。
+     * 內建那顆點下去會先開「Insert/Edit Image」對話框（網址、替代文字、
+     * 寬高），需求方 2026-11-01 指定不要 —— 現在點了直接開選檔視窗。
+     */
+    'image_tooltip'         => '上傳圖片',
     'file_tooltip'          => '上傳檔案',
     /*
      * ⚠ 工具列那顆上傳鈕要有**文字**不只圖示：它原本只有 icon ＋ tooltip，
