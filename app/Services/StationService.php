@@ -9,6 +9,7 @@ use App\Repositories\StationRepository;
 use App\Repositories\TelegramRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -214,7 +215,15 @@ class StationService
     }
 
     /**
-     * 補點審核通過時記一筆餘點紀錄
+     * 補點審核通過之後，把結果反映到本地
+     *
+     * 兩件事：在點數報表上留一個點，並把站台列表上的**餘額與最後同步時間
+     * 一起更新**（需求方 2026-11-01：「我補完點，會馬上有現在點數，所以該
+     * 站台的最後同步時間和點數應該要是最新的」）。
+     *
+     * ⚠ 原本只記紀錄、不動 `station` —— 所以補完點之後列表上還是舊餘額、
+     * 舊的同步時間，要等下一次同步才會對。補點回應裡的 `data.credit` 就是
+     * 權威的新餘額，手上有卻不用，等於讓畫面故意落後一輪。
      *
      * ⚠ **這一支刻意不走 `syncInfo()`**：那會再打一次主系統 API，而補點
      * 回應裡的 `data.credit` 已經是權威的新餘額了 —— 再查一次只是多一次
@@ -224,15 +233,70 @@ class StationService
      * `data.credit` 是「被補的那一種」的餘額，商城補點回的是商城餘額 ——
      * 傳錯的話那個數字會掉到另一條曲線上，變成一個憑空的大跳。
      *
+     * ⚠ **整支不能往外丟例外。** 呼叫點在 `CreditTopupService::approve()`
+     * 的交易**之外**，而且主系統那邊的點數**已經加扣完成**了 ——
+     * 這裡丟例外會讓審核的人看到一個紅色錯誤，然後以為補點失敗而再補一次。
+     *
      * @param Station     $station
      * @param string|null $credits      補完之後的餘額
      * @param string|null $changeAmount 這次的異動金額（帶正負號）
      * @param string      $creditType   見 StationCreditLog::CREDIT_TYPE_*
      * @return void
      */
-    public function recordTopupCredit(Station $station, $credits, $changeAmount, $creditType)
+    public function applyTopupCredit(Station $station, $credits, $changeAmount, $creditType)
     {
-        $this->logCredit($station, $credits, StationCreditLog::SOURCE_TOPUP, $changeAmount, $creditType);
+        try {
+            /*
+             * 兩張表（`station_credit_log` 與 `station`）包在同一個交易裡。
+             *
+             * ⚠ 這不是形式上的：`logCredit()` 自己會吞掉寫入失敗（報表少一個
+             * 點不該影響別的），所以**能讓這個交易回滾的只有站台更新失敗** ——
+             * 那時候紀錄也一起退掉，不會留下「圖上有這個點，但列表沒更新」
+             * 的半套狀態。
+             */
+            DB::transaction(function () use ($station, $credits, $changeAmount, $creditType) {
+                $this->logCredit($station, $credits, StationCreditLog::SOURCE_TOPUP, $changeAmount, $creditType);
+                $this->refreshCreditsFromTopup($station, $credits, $creditType);
+            });
+        } catch (\Exception $e) {
+            Log::error('補點後更新站台餘額失敗', [
+                'station_id'  => $station->id,
+                'credit_type' => $creditType,
+                'error'       => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * 把補點後的餘額寫回站台（只有系統點數那一種）
+     *
+     * ⚠⚠ **商城補點不能寫進 `station.credits`。** 那一欄存的是**系統點數**
+     * （`syncInfo()` 取的是 `admin_credit`），而商城補點回的是商城餘額 ——
+     * 寫進去的話列表上的點數會突然變成另一個數字，而且下一次同步又會變回來，
+     * 看起來像系統在亂跳。
+     *
+     * ⚠ 同理，商城補點**也不要動 `synced_at`**：那一欄的意思是「列表上這個
+     * 餘額是什麼時候拿到的」。餘額沒更新卻把時間推到現在，等於謊稱資料是新的。
+     *
+     * ⚠ 沒拿到餘額（`blank($credits)`）時什麼都不做 —— 呼叫端已經為了同樣的
+     * 理由略過紀錄了（填 0 或填舊值都比缺一筆難查）。
+     *
+     * @param Station     $station
+     * @param string|null $credits
+     * @param string      $creditType
+     * @return void
+     */
+    private function refreshCreditsFromTopup(Station $station, $credits, $creditType)
+    {
+        // 短路：商城點數與拿不到餘額的情況都不該碰站台那一列
+        if ($creditType !== StationCreditLog::CREDIT_TYPE_CREDIT || blank($credits)) {
+            return;
+        }
+
+        $this->stationRepository->update($station, [
+            'credits'   => $credits,
+            'synced_at' => now(),
+        ]);
     }
 
     /**

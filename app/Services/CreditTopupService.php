@@ -28,7 +28,7 @@ class CreditTopupService
         $this->topupRepository = $topupRepository;
         $this->mainSystemApi = $mainSystemApi;
         $this->telegramChatService = $telegramChatService;
-        // 補點通過要在點數報表上留一個點，見 recordCreditLog()
+        // 補點通過要留一個報表的點，並更新站台餘額／同步時間，見 recordCreditLog()
         $this->stationService = $stationService;
     }
 
@@ -179,8 +179,15 @@ class CreditTopupService
      * ⚠ 「其他」不會走到這裡 —— `approve()` 一開頭就轉去 `approveOther()`，
      * 那一類主系統的點數根本沒動，記進曲線會變成假的異動。
      *
-     * ⚠ 整段的失敗處理在 `StationService::logCredit()`：寫報表用的紀錄失敗
-     * 不能影響補點本身，點數已經加扣完成了。
+     * ⚠ **除了記紀錄，也會把站台列表上的餘額與最後同步時間一起更新**
+     * （需求方 2026-11-01，見 `StationService::applyTopupCredit()`）——
+     * 補點回應裡的 `data.credit` 就是權威的新餘額，不用的話畫面會故意
+     * 落後到下一次同步。只有系統點數那一種會寫回，商城補點不動站台那一列。
+     *
+     * ⚠ 整段的失敗處理在 `StationService::applyTopupCredit()`：那一支整個
+     * 包在 try/catch 裡，**不會往外丟例外** —— 這裡在 `approve()` 的交易
+     * 之外，而主系統的點數已經加扣完成了，丟例外會讓審核的人以為補點失敗
+     * 而再補一次。
      *
      * @param \App\Models\Station $station
      * @param CreditTopup         $topup
@@ -213,7 +220,7 @@ class CreditTopupService
         $amount = ltrim((string) $topup->credit_amount, '-');
         $isDeduct = (int) $topup->action_type === CreditTopup::ACTION_DEDUCT;
 
-        $this->stationService->recordTopupCredit(
+        $this->stationService->applyTopupCredit(
             $station,
             (string) $credits,
             $isDeduct ? "-{$amount}" : $amount,
