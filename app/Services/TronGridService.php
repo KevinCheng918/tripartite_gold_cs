@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\RequestException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -33,7 +34,47 @@ class TronGridService
      */
     private const DEFAULT_MIN_INTERVAL_MS = 1100;
 
+    /**
+     * 撞到 429 時，同一次查詢最多再試幾次
+     *
+     * ⚠ 預設值與 `config/tron.php` 的 `rate_limit_retries` 要一致，
+     * 理由同 `DEFAULT_MIN_INTERVAL_MS`（config 讀不到也要有保護）。
+     *
+     * @var int
+     */
+    private const DEFAULT_RATE_LIMIT_RETRIES = 2;
+
+    /**
+     * 重試前額外多等的毫秒數（會再乘上第幾次重試，並加上抖動）
+     *
+     * @var int
+     */
+    private const DEFAULT_RATE_LIMIT_BACKOFF_MS = 700;
+
+    /**
+     * 一輪排程總共最多重試幾次
+     *
+     * @var int
+     */
+    private const DEFAULT_RATE_LIMIT_RETRY_BUDGET = 10;
+
     private $client;
+
+    /**
+     * 這一輪還剩幾次重試額度（null = 還沒從 config 初始化）
+     *
+     * ⚠ **存在的理由是「不要讓重試把一輪拖垮」**：如果速率限制是被
+     * 別的東西吃掉的（同一個出口 IP 上還有其他服務），那會是**每一次**
+     * 查詢都撞 —— 每個錢包都重試兩次的話，20 個錢包會從 22 秒變成
+     * 兩三分鐘，排程被 `withoutOverlapping` 卡著跳過好幾分鐘，
+     * 通知反而更慢。額度用完就快速失敗，讓 log 去講真話。
+     *
+     * ⚠ 跟 `$lastRequestAt` 一樣是 instance 狀態，所以生命週期是
+     * 「一次排程」—— `WalletNoticeService` 建構子注入，一輪只有一個實例。
+     *
+     * @var int|null
+     */
+    private $rateLimitRetriesLeft = null;
 
     /**
      * 上一次打 TronGrid 的時刻（microtime，浮點秒）
@@ -150,7 +191,16 @@ class TronGridService
     }
 
     /**
-     * 打一次 TronGrid
+     * 打一次 TronGrid（撞到 429 會退避重試）
+     *
+     * ⚠ **只有 429 會重試，其他錯誤一律當場放棄。** 逾時重試會讓一次查詢
+     * 吃掉兩倍的時間預算（`tron.timeout` 15 秒 × 2），而排程只有一分鐘；
+     * 而且逾時多半不是等一下就會好的事。
+     *
+     * ⚠ **重試前的等待由 `rateLimitBackoff()` 一次等滿**，不是「節流 ＋ 退避」
+     * 相加。迴圈下一輪雖然還會跑 `throttle()`，但那時候間隔早就夠了，
+     * 它不會再等 —— 兩者是 `max()` 不是 `+`（2026-11-01 實測踩到：
+     * 原本以為會相加，結果重試間隔只有 1.33 秒而不是預期的 1.8 秒以上）。
      *
      * @param string      $address
      * @param Carbon|null $since
@@ -189,40 +239,197 @@ class TronGridService
         $base = rtrim((string) config('tron.api_base'), '/');
         $url = "{$base}/v1/accounts/{$address}/transactions/trc20";
 
-        // ⚠ 一定要在真的送出之前等 —— 理由見 `$lastRequestAt`
-        $this->throttle();
+        $maxAttempts = $this->configInt('tron.rate_limit_retries', self::DEFAULT_RATE_LIMIT_RETRIES) + 1;
 
-        try {
-            $response = $this->client->get($url, ['query' => $query, 'headers' => $headers]);
-            $body = json_decode($response->getBody()->getContents(), true);
-        } catch (\Exception $e) {
-            Log::error('TronGrid 查詢失敗', [
-                'address' => $address,
-                'error'   => $e->getMessage(),
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            // ⚠ 一定要在真的送出之前等 —— 理由見 `$lastRequestAt`
+            $this->throttle();
+
+            try {
+                $response = $this->client->get($url, ['query' => $query, 'headers' => $headers]);
+                $body = json_decode($response->getBody()->getContents(), true);
+            } catch (\Exception $e) {
                 /*
-                 * ⚠ 429 要給下一步的提示。這個錯最容易被誤判成「某個地址有
-                 * 問題」—— 實際上跟地址無關，是連發撞到 `allowed_rps(1)`。
+                 * 還有重試機會、而且這次真的是 429 —— 退避之後再送一次。
+                 * 成功的話整件事不會留下任何 log（本來就不是異常，
+                 * 是跟別人搶同一秒的額度）。
                  */
-                'hint'    => strpos($e->getMessage(), '429') === false
-                    ? null
-                    : '撞到 TronGrid 的速率限制。已有節流（tron.min_interval_ms），'
-                        . '還是會撞的話請設 TRON_API_KEY（免費額度低）',
-            ]);
+                if ($attempt < $maxAttempts && $this->canRetryRateLimit($e)) {
+                    $this->rateLimitBackoff($attempt);
 
-            return null;
+                    continue;
+                }
+
+                $isRateLimited = $this->isRateLimited($e);
+
+                Log::error('TronGrid 查詢失敗', [
+                    'address'  => $address,
+                    'error'    => $e->getMessage(),
+                    'attempts' => $attempt,
+                    /*
+                     * ⚠ 429 要給下一步的提示。這個錯最容易被誤判成「某個
+                     * 地址有問題」—— 實際上跟地址無關，是撞到 `allowed_rps(1)`。
+                     */
+                    'hint'     => $isRateLimited
+                        ? '撞到 TronGrid 的速率限制，重試後仍然失敗。已有節流'
+                            . '（tron.min_interval_ms）＋退避重試，還是會撞的話'
+                            . '代表額度被這個出口 IP 上的其他東西吃掉了，請設 TRON_API_KEY'
+                        : null,
+                ]);
+
+                return null;
+            }
+
+            // success=false 時 data 會是空的，照回去會被當成「沒有轉帳」
+            if (blank($body) || Arr::get($body, 'success') !== true) {
+                Log::error('TronGrid 回應不正常', [
+                    'address' => $address,
+                    'body'    => mb_substr(json_encode($body, JSON_UNESCAPED_UNICODE), 0, 300),
+                ]);
+
+                return null;
+            }
+
+            return $body;
         }
 
-        // success=false 時 data 會是空的，照回去會被當成「沒有轉帳」
-        if (blank($body) || Arr::get($body, 'success') !== true) {
-            Log::error('TronGrid 回應不正常', [
-                'address' => $address,
-                'body'    => mb_substr(json_encode($body, JSON_UNESCAPED_UNICODE), 0, 300),
-            ]);
+        /*
+         * 到不了這裡：最後一輪的 `$attempt < $maxAttempts` 是 false，
+         * 所以一定會走上面那個 `return null`。放一個出口是因為 PHP
+         * 看不出迴圈必然返回。
+         */
+        return null;
+    }
 
-            return null;
+    /**
+     * 這個錯誤是不是 429，而且這一輪還有重試額度
+     *
+     * ⚠ 額度在這裡就扣掉（回 true 的那一刻），不要等重試真的送出去才扣 ——
+     * 那會讓「判斷」與「扣款」分開，日後多一個呼叫點就會漏扣。
+     *
+     * @param \Exception $e
+     * @return bool
+     */
+    private function canRetryRateLimit($e)
+    {
+        // 短路：不是 429 就不必動額度
+        if (!$this->isRateLimited($e)) {
+            return false;
         }
 
-        return $body;
+        if (blank($this->rateLimitRetriesLeft)) {
+            $this->rateLimitRetriesLeft = $this->configInt(
+                'tron.rate_limit_retry_budget',
+                self::DEFAULT_RATE_LIMIT_RETRY_BUDGET
+            );
+        }
+
+        if ($this->rateLimitRetriesLeft < 1) {
+            return false;
+        }
+
+        $this->rateLimitRetriesLeft--;
+
+        return true;
+    }
+
+    /**
+     * 這個例外是不是 TronGrid 的速率限制（HTTP 429）
+     *
+     * ⚠ **看 HTTP 狀態碼，不要在訊息裡找「429」字串。** Guzzle 的錯誤訊息
+     * 會把整個網址包進去，而網址裡有錢包地址 —— TRON 地址是 base58，
+     * **數字 1-9 都可能出現**，所以「429」真的有機會出現在地址裡。
+     * 用字串比對的話，那種地址只要逾時一次就會被貼上「撞到速率限制」的
+     * 提示，把下一個看 log 的人帶往完全錯誤的方向。
+     *
+     * ⚠ 連線層的錯誤（逾時、DNS）沒有 response，`getResponse()` 會是 null ——
+     * 那些不是 429，回 false。
+     *
+     * @param \Exception $e
+     * @return bool
+     */
+    private function isRateLimited($e)
+    {
+        if (!$e instanceof RequestException) {
+            return false;
+        }
+
+        $response = $e->getResponse();
+
+        if (blank($response)) {
+            return false;
+        }
+
+        return $response->getStatusCode() === 429;
+    }
+
+    /**
+     * 重試前等一段（正常間隔 ＋ 遞增的退避 ＋ 抖動）
+     *
+     * ⚠ **這一支要把整個間隔等滿，所以自己也要把 `min_interval_ms` 算進去。**
+     *
+     * 一開始我以為「退避」會疊在 `throttle()` 的 1100ms 之上，但 `throttle()`
+     * 是**從上一次送出的時刻**起算的 —— 退避睡掉的時間它照樣算進 elapsed，
+     * 所以兩者是 `max()` 不是 `+`。只睡 700ms 的話，下一輪 `throttle()` 補到
+     * 1100ms 就送出去了，退避等於沒做。
+     * （2026-11-01 實測：間隔只有 1.33 秒，而不是預期的 1.8 秒以上。）
+     *
+     * 所以這裡睡的是「整個間隔」。等滿之後下一輪的 `throttle()` 看到時間
+     * 已經夠，自然不會再等 —— 不必、也不應該去動 `$lastRequestAt`
+     * （那個欄位的語意是「上次真的送出的時刻」，塞一個非送出時間進去，
+     * 下一個讀的人會被騙）。
+     *
+     * ⚠ **一定要有抖動**：撞 429 代表有別人也在用這個額度。固定等一樣久的話
+     * 兩邊會維持同樣的相位差 —— 每一次重試都剛好又撞在一起，重試就白做了。
+     * 隨機散開才有機會錯開。
+     *
+     * 預設值下的實際間隔：第一次重試約 1.8～2.5 秒，第二次約 2.5～3.2 秒。
+     *
+     * @param int $attempt 這是第幾次重試（1 起算）
+     * @return void
+     */
+    private function rateLimitBackoff($attempt)
+    {
+        $backoffMs = $this->configInt('tron.rate_limit_backoff_ms', self::DEFAULT_RATE_LIMIT_BACKOFF_MS);
+
+        // 退避關掉時仍然要讓下一輪的 throttle 去擋，所以這裡直接走
+        if ($backoffMs < 1) {
+            return;
+        }
+
+        $intervalMs = $this->configInt('tron.min_interval_ms', self::DEFAULT_MIN_INTERVAL_MS);
+        $waitMs = $intervalMs + ($backoffMs * $attempt) + random_int(0, $backoffMs);
+
+        usleep($waitMs * 1000);
+    }
+
+    /**
+     * 讀一個整數設定，而且**讀不到時退回程式裡的預設值**
+     *
+     * ⚠⚠ **不要直接用 `config($key, $default)` 代替這一支。**
+     *
+     * 2026-11-01 踩過整整一輪：節流上線之後 429 還是照來。原因是
+     * `tron.min_interval_ms` 是**新增的 config key**，而正式環境的 config
+     * 是快取的（`config:cache`）—— 部署後沒跑 `artisan optimize` 的話那個 key
+     * 讀出來是 `null`，`(int) null` 是 0，保護機制就**靜默失效**了。
+     *
+     * ⚠ 而 `config($key, $default)` 的第二個參數**救不了這件事**：那個預設值
+     * 只在「key 不存在」時生效，**key 存在但值是 null 就不會**
+     * （`Arr::get()` 的語意）。第一版修法就是這樣寫錯的。
+     *
+     * ⚠ **明確設成 0 會被保留**（那是刻意關閉，例如已經設了 API key 想拿回
+     * 速度）：`filled(0)` 在 Laravel 是 **true**，數字一律 filled。
+     * 「讀不到」與「設成 0」是兩件事。
+     *
+     * @param string $key
+     * @param int    $default
+     * @return int
+     */
+    private function configInt($key, $default)
+    {
+        $configured = config($key);
+
+        return filled($configured) ? (int) $configured : (int) $default;
     }
 
     /**
@@ -239,26 +446,10 @@ class TronGridService
     private function throttle()
     {
         /*
-         * ⚠⚠ **一定要給預設值，不要只讀 config。**
-         *
-         * 2026-11-01 踩過：節流上線之後 429 還是照來。原因是
-         * `tron.min_interval_ms` 是**新增的 config key**，而正式環境的 config
-         * 是快取的（`config:cache`）—— 部署後沒跑 `artisan optimize` 的話
-         * 這個 key 讀出來是 `null`，`(int) null` 是 0，下面那個 `< 1` 直接
-         * return，**節流整個沒作用而且完全看不出來**
-         * （log 裡我加的 `hint` 出得來，因為那是程式不是 config）。
-         *
-         * ⚠ **不能只靠 `config($key, $default)` 的第二個參數**：那個預設值
-         * 只在「key 不存在」時生效，**key 存在但值是 null 就不會**
-         * （`Arr::get()` 的語意）。所以要自己用 `filled()` 判斷 ——
-         * 兩種情況都要退回常數。
-         *
-         * ⚠ 只有**明確設成 0** 才會關掉節流（那是刻意的，例如已經設了
-         * API key、想拿回速度）。`filled(0)` 在 Laravel 是 **true**
-         * （數字一律 filled），所以 0 會被保留下來，不會被當成「讀不到」。
+         * ⚠ 走 `configInt()` 而不是直接 `config()` —— 那一支的 docblock 寫著
+         * 2026-11-01 的事故：這個 key 在正式環境讀出 null，節流靜默失效。
          */
-        $configured = config('tron.min_interval_ms');
-        $intervalMs = filled($configured) ? (int) $configured : self::DEFAULT_MIN_INTERVAL_MS;
+        $intervalMs = $this->configInt('tron.min_interval_ms', self::DEFAULT_MIN_INTERVAL_MS);
 
         if ($intervalMs < 1) {
             return;

@@ -148,9 +148,92 @@ $intervalMs = filled($configured) ? (int) $configured : self::DEFAULT_MIN_INTERV
 ⚠ 也要記得 `allowed_rps(1)` 是**匿名**額度，而一輪可能有
 「錢包數 × 最多 5 頁」次請求 —— 匿名額度本來就很緊。
 
+## ⚠ 補記二：清了快取之後「還是會撞，但頻率沒那麼高」（同日）
+
+需求方回報的原話。這句話本身就把範圍縮掉了一半：
+
+> **節流有效（頻率下降），但剩下的撞擊不是我們自己造成的。**
+
+確認過節流的狀態是跨整輪保留的 —— `TronGridService` 是建構子注入
+`WalletNoticeService`，一次排程只有一個實例，所以 `$lastRequestAt` 整輪共用。
+
+而且間隔 1100ms > 1000ms，所以**我們自己的兩次請求不可能落在同一個
+一秒窗口裡**（無論 TronGrid 用固定窗口還是滑動窗口都一樣）。
+
+結論：`allowed_rps(1)` 是**按對外 IP** 算的，額度被同一個出口上的其他東西
+吃掉了。這種情況**把自己的間隔再拉長也治不了** —— 碰撞取決於對方的時機，
+不是我們的頻率。
+
+⚠ 想查「是誰在吃額度」的話要去看那台機器上還有什麼在打 TronGrid，
+但客服系統不在 team-ops MCP 的 inventory 裡（那邊只有 king/slh/triu 等
+專案），這次沒查到。
+
+### 修法：撞到 429 就退避重試
+
+| 設定（`config/tron.php`）| 預設 | 作用 |
+|---|---|---|
+| `rate_limit_retries` | 2 | 同一次查詢最多再試幾次 |
+| `rate_limit_backoff_ms` | 700 | 退避基數（× 第幾次 ＋ 抖動）|
+| `rate_limit_retry_budget` | 10 | **一輪總共**最多重試幾次 |
+
+⚠ **只有 429 重試**，逾時與其他錯誤當場放棄 —— 逾時重試會吃掉兩倍的
+`timeout`（15 秒 × 2），而排程只有一分鐘。
+
+⚠ **一定要有抖動**：撞 429 代表有別人也在用這個額度。固定等一樣久的話
+兩邊維持同樣的相位差，每次重試又剛好撞在一起。
+
+⚠ **退避要自己把 `min_interval_ms` 算進去，兩者是 `max()` 不是 `+`。**
+我一開始以為「下一輪的 `throttle()` 會再加 1100ms」—— 錯了，`throttle()`
+是從**上次送出的時刻**起算的，退避睡掉的時間它照樣算進 elapsed。
+實測間隔只有 **1.33 秒**（預期 1.8 秒以上），退避幾乎等於沒做。
+修正後 1.99～2.39 秒。
+
+⚠ 修正方式是讓退避睡滿整個間隔，**不要去改 `$lastRequestAt`** ——
+那個欄位的語意是「上次真的送出的時刻」，塞一個非送出時間進去，
+下一個讀的人會被騙。
+
+⚠ **一輪的重試額度是「不要讓重試把一輪拖垮」的保險。** 如果額度被整個
+吃掉，那會是每一次查詢都撞 —— 每個錢包各重試兩次的話，20 個錢包會從
+22 秒變成兩三分鐘，排程被 `withoutOverlapping` 卡著跳過好幾分鐘，
+通知反而更慢。額度用完就快速失敗，讓 log 去講真話。
+
+⚠ 額度在 `canRetryRateLimit()` 回 true 的那一刻就扣掉，不要等重試真的送出
+才扣 —— 那會讓「判斷」與「扣款」分開，日後多一個呼叫點就會漏扣。
+
+### 順手修掉的誤導：用字串找「429」
+
+原本是 `strpos($e->getMessage(), '429')`。Guzzle 的錯誤訊息會把整個網址包
+進去，而網址裡有錢包地址 —— **TRON 地址是 base58，數字 1-9 都可能出現**，
+所以「429」真的有機會出現在地址裡。那種地址只要逾時一次就會被貼上
+「撞到速率限制」的 hint，把下一個看 log 的人帶往完全錯誤的方向。
+
+改成看 HTTP 狀態碼（`RequestException::getResponse()`）。連線層的錯誤
+（逾時、DNS）沒有 response，回 false。
+
+### 實測八項
+
+| 情況 | 結果 |
+|---|---|
+| 429 / 500 / 逾時 / 普通例外 / 訊息含 429 但是逾時 | 只有第一個判定為 429 |
+| 第一次 429、第二次成功 | 送 2 次、回陣列、間隔 1.99s |
+| 一直 429 | 送 3 次（retries=2）後放棄，5.63s |
+| 逾時 | 送 1 次，不重試 |
+| 額度設 3，連續四次查詢 | 送 3→2→1→1 次（額度歸零後不再重試）|
+| 四個 config key 都設成 null | 退避與重試照樣生效（吃程式預設）|
+| **重試成功** | log 增加 **0 bytes** |
+| 重試用盡 | log 有 `"attempts":3` 與指向 `TRON_API_KEY` 的 hint |
+
+⚠ `blank(0)` 在 Laravel 是 **false**，所以額度歸零之後不會被誤判成
+「還沒初始化」而重新填滿（上表第五列就是在驗這件事）。
+
+### ⚠ 還沒驗證的部分
+
+正式環境裝上重試之後 429 的錯誤紀錄會不會消失。預期是**偶發碰撞會消失、
+系統性被搶額度不會** —— 後者在 log 的 hint 裡講明了，看到就去設 API key。
+
 ## 相關檔案
 
 | 檔案 | 說明 |
 |---|---|
-| `config/tron.php` | `min_interval_ms`（含「第一個成功、第二個被擋」的說明）|
-| `app/Services/TronGridService.php` | `$lastRequestAt`、`throttle()`、`DEFAULT_MIN_INTERVAL_MS`；429 的 log hint |
+| `config/tron.php` | `min_interval_ms`（含「第一個成功、第二個被擋」的說明）、`rate_limit_retries`、`rate_limit_backoff_ms`、`rate_limit_retry_budget` |
+| `app/Services/TronGridService.php` | `$lastRequestAt`、`throttle()`、`configInt()`（config 快取事故的集中說明）、`isRateLimited()`、`canRetryRateLimit()`、`rateLimitBackoff()`、`$rateLimitRetriesLeft`；429 的 log hint 與 `attempts` |
