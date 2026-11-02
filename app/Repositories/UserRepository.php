@@ -633,9 +633,19 @@ class UserRepository
          * 包括會發訊息給客戶的公告與餘點告警。
          *
          * `isAdmin()` 那一邊也補了防線，但這一欄本來就該撈。
+         *
+         * ⚠ **`project_ids` 也一定要撈**（2026-11-01 修，同一種坑又踩一次）。
+         *
+         * 小幫手開卡要問「這個人看得到哪幾個專案」，而
+         * `User::projectIdList()` 讀的就是這一欄 —— 沒撈的話它是 null，
+         * `getVisibleTo()` 回空集合，於是**參與專案明明每個都打勾的人，
+         * 也會被告知「你沒有參與任何專案」**。
+         *
+         * 這一類錯**不會報錯也不會留 log**，只會變成一句看起來像資料設定
+         * 問題的訊息 —— 回報的人會先去翻帳號設定，而那邊是對的。
          */
         $query = User::query()
-            ->select(['id', 'nickname', 'account', 'level', 'telegram_user_id'])
+            ->select(['id', 'nickname', 'account', 'level', 'project_ids', 'telegram_user_id'])
             ->where('telegram_user_id', (int) $telegramUserId);
 
         if (filled($exceptUserId)) {

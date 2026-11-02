@@ -141,6 +141,33 @@ service**（Router 的 docblock 就是這麼設計的）。
 ⚠ callback 前綴用 **`tc`**。既有的是 rm／sc／cr／ca／bc／ar／arc／arp／fu，
 加之前先確認沒撞號。
 
+## ⚠ 上線前抓到：參與專案打了勾卻說「你沒有參與任何專案」
+
+需求方回報。原因**不在帳號設定**，而是
+`UserRepository::findByTelegramUserId()` 的 select **沒有撈 `project_ids`**。
+
+```
+User::projectIdList()  讀 $this->project_ids → 欄位沒撈 → null
+  → blank() → ProjectRepository::getVisibleTo() 回空集合
+  → 「你沒有參與任何專案」
+```
+
+⚠ **這是這個專案重複踩過的同一種坑。** 同一支方法的 docblock 上就寫著
+2026-10-30 為了 `level` 補過一次（沒撈 `level` 會讓 `isAdmin()` 誤判成
+管理者而**每一支指令都放行**）。欄位沒撈不會報錯、不會留 log ——
+只會變成一句看起來像資料設定問題的訊息，而回報的人會先去翻帳號設定，
+然後發現那邊是對的。
+
+⚠ 實測對照（同一個人、同一支 Repository，只差 select）：
+
+| select | `projectIdList()` | `getVisibleTo()` |
+|---|---|---|
+| 有 `project_ids` | `[3]` | 1 個專案 |
+| 沒有 | `[]` | **0 個** ← 修之前 |
+
+> 日後在這支 Repository 加任何「依使用者判斷可見範圍」的功能之前，
+> 先確認那個判斷依據的欄位有沒有在 select 裡。
+
 ## 實測十六項（假模型、假 Repository，不碰 DB 也不發 Telegram）
 
 解析器六項：正常句、不是開卡、沒講標題、模型回 `"null"` 字串、
