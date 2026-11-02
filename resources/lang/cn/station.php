@@ -7,6 +7,12 @@ return [
     'section_label'    => '站台管理',
     'field_name'       => '站台名称',
     'field_domain'     => '域名',
+    'field_system'     => '系统',
+    'field_api_url'    => 'API 网址',
+    'field_api_key'    => 'API Key',
+    'field_rate'       => '费率（收/付）',
+    'field_features'   => '功能',
+    'field_settings'   => '站台设定',
     'field_credits'    => '点数',
     'field_telegram'   => 'Telegram 群组',
     'field_status'     => '状态',
@@ -33,6 +39,9 @@ return [
     'no_data'          => '暂无资料',
     'action_create'    => '新增站台',
     'action_edit'      => '编辑',
+    'action_sync'          => '同步',
+    'action_sync_all'      => '一键同步全部',
+    'action_sync_all_done' => '全部站台同步完成',
     'action_detail'    => '详细',
     /*
      * 2026-10-10 重排操作栏时补的两个词。

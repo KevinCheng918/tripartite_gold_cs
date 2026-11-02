@@ -74,6 +74,7 @@ return [
         'user_not_found'       => '员工不存在',
         'select_user'          => '请选择客服人员',
         'delete_failed'        => '删除排班失败',
+        'create_failed'        => '班别新增失败',
         'update_failed'        => '班别更新失败',
         'assign_failed'        => '报班失败',
         'swap_failed'          => '换班请求失败',

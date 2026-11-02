@@ -74,6 +74,7 @@ return [
         'user_not_found'       => 'User not found',
         'select_user'          => 'Please select a CS staff',
         'delete_failed'        => 'Failed to delete assignment',
+        'create_failed'        => 'Failed to create shift',
         'update_failed'        => 'Failed to update shift',
         'assign_failed'        => 'Failed to assign shift',
         'swap_failed'          => 'Failed to request swap',

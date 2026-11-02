@@ -7,6 +7,12 @@ return [
     'section_label'    => 'Station Management',
     'field_name'       => 'Station Name',
     'field_domain'     => 'Domain',
+    'field_system'     => 'System',
+    'field_api_url'    => 'API URL',
+    'field_api_key'    => 'API Key',
+    'field_rate'       => 'Rate (in/out)',
+    'field_features'   => 'Features',
+    'field_settings'   => 'Station Settings',
     'field_credits'    => 'Credits',
     'field_telegram'   => 'Telegram Group',
     'field_status'     => 'Status',
@@ -33,6 +39,9 @@ return [
     'no_data'          => 'No data',
     'action_create'    => 'New Station',
     'action_edit'      => 'Edit',
+    'action_sync'          => 'Sync',
+    'action_sync_all'      => 'Sync All',
+    'action_sync_all_done' => 'All stations synced',
     'action_detail'    => 'Detail',
     /*
      * Added on 2026-10-10 while reworking the action column.
