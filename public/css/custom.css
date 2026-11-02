@@ -1223,15 +1223,27 @@ a:hover { color: #85640a; }
    數量不一樣（有的三顆、關機的主機一顆都沒有），置中會讓每一列的按鈕起點
    都落在不同位置，眼睛要重新找一次。靠左，起點就固定了。
 
-   ⚠ 這一段**必須排在 `.col-actions` 的 `text-align: right` 之後**：
-   兩邊都是兩個 class 的權重，平手時後面的贏。搬到前面去就失效了。
+   ⚠⚠ **選擇器一定要寫到跟置中那條一樣深**，不能只寫 `.data-table .col-actions`。
 
-   ⚠ `.row-actions` 本身是 **flex**，`text-align` 管不到它 —— 主軸要明確設
-   `flex-start`。只改 `text-align` 的話按鈕還是會停在原來的位置。
+   | 選擇器 | 權重 |
+   |---|---|
+   | `.table.data-table > tbody > tr > td`（置中）| (0,2,3) |
+   | `.data-table .col-actions`（靠左）| (0,2,0) ← **輸** |
+
+   2026-11-01 第一版就是寫成 `.data-table .col-actions`，**整條從來沒有
+   生效過**。當時沒發現是因為 `.col-actions` 有 `width: 1%`：欄寬縮到等於
+   最寬那一列的內容，置中與靠左在多數表格上長得一模一樣。
+   帳務紀錄每一列的按鈕數量不同（有的三顆、關機的主機一顆都沒有），
+   窄的那幾列才看得出來是置中的。
+
+   ⚠ `.row-actions` 本身是 **inline-flex**，`text-align` 管得到它的位置
+   （它是 inline 層級），但**主軸也要明確設 `flex-start`** —— 不設的話
+   日後有人把它改成 `flex` 就會再壞一次。
 
    ⚠ `th` 與 `td` 都要改：那一格裡不一定只有 `.row-actions`（沒有任何按鈕時
    是空的，或日後塞一段說明文字），不改的話那些會跟著置中、跟按鈕對不齊。 */
-.data-table .col-actions {
+.table.data-table > thead > tr > th.col-actions,
+.table.data-table > tbody > tr > td.col-actions {
     text-align: left;
 }
 

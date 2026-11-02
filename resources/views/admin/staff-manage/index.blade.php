@@ -809,11 +809,23 @@ $(function () {
             html += '<td class="col-tight">' + calcEqDuration(eq.received_at, eq.returned_at) + '</td>';
             html += '<td>' + eqStatusBadge(eq) + '</td>';
             if (canEdit) {
-                html += '<td class="col-actions">';
+                /*
+                 * ⚠ 「編輯」每一列都有，「歸還」只有在用中的才有（需求方
+                 * 2026-11-01：設備管理的操作要有一個編輯）。
+                 *
+                 * 編輯開的是既有的 `modal-eq-edit` —— 那支 modal 與送出邏輯
+                 * 本來就寫好了，只是**從來沒有任何按鈕打得開它**。
+                 *
+                 * ⚠ 它編的是**那個人的整份設備清單**不是單一台：後端
+                 * `ajax-update` 收的是整個 `equipments` 陣列（欄位存在
+                 * `user.equipments` JSON 裡，沒有獨立的設備資料表）。
+                 */
+                html += '<td class="col-actions"><div class="row-actions">';
+                html += '<button class="btn btn-sm btn-outline-secondary btn-icon btn-transition js-eq-edit" data-user-id="' + item.user.id + '" data-user-name="' + item.user.nickname + '"><i class="fas fa-edit btn-icon-wrapper"></i>' + I18N.action_edit + '</button>';
                 if (eq.received_at && !eq.returned_at) {
-                    html += '<div class="row-actions"><button class="btn btn-sm btn-outline-secondary btn-icon btn-transition js-eq-return" data-user-id="' + item.user.id + '" data-eq-idx="' + item.eqIdx + '" data-eq-name="' + (item.eq.name || I18N.field_equipment) + '" data-user-name="' + item.user.nickname + '"><i class="fas fa-undo btn-icon-wrapper"></i>' + I18N.action_return + '</button></div>';
+                    html += '<button class="btn btn-sm btn-outline-secondary btn-icon btn-transition js-eq-return" data-user-id="' + item.user.id + '" data-eq-idx="' + item.eqIdx + '" data-eq-name="' + (item.eq.name || I18N.field_equipment) + '" data-user-name="' + item.user.nickname + '"><i class="fas fa-undo btn-icon-wrapper"></i>' + I18N.action_return + '</button>';
                 }
-                html += '</td>';
+                html += '</div></td>';
             }
             html += '</tr>';
         });
@@ -840,7 +852,11 @@ $(function () {
             var dur = calcEqDuration(eq.received_at, eq.returned_at);
             if (dur) html += '<div class="data-card__row"><span>' + I18N.field_duration_short + '</span><span>' + dur + '</span></div>';
             if (canEdit && eq.received_at && !eq.returned_at) {
-                html += '<div class="row-actions mt-2"><button class="btn btn-sm btn-outline-secondary btn-icon btn-transition js-eq-return" data-user-id="' + item.user.id + '" data-eq-idx="' + item.eqIdx + '"><i class="fas fa-undo btn-icon-wrapper"></i>' + I18N.action_return + '</button></div>';
+                // 手機卡片跟桌機表格要有一樣的操作，不然同一件事在小螢幕上做不到
+                html += '<div class="row-actions mt-2">';
+                html += '<button class="btn btn-sm btn-outline-secondary btn-icon btn-transition js-eq-edit" data-user-id="' + item.user.id + '" data-user-name="' + item.user.nickname + '"><i class="fas fa-edit btn-icon-wrapper"></i>' + I18N.action_edit + '</button>';
+                html += '<button class="btn btn-sm btn-outline-secondary btn-icon btn-transition js-eq-return" data-user-id="' + item.user.id + '" data-eq-idx="' + item.eqIdx + '"><i class="fas fa-undo btn-icon-wrapper"></i>' + I18N.action_return + '</button>';
+                html += '</div>';
             }
             html += '</div></div>';
         });
@@ -908,6 +924,32 @@ $(function () {
                 $btn.prop('disabled', false);
             }
         });
+    });
+
+    /**
+     * 「編輯」：把那個人的整份設備清單載進 modal
+     *
+     * ⚠ 資料從已經在手上的 `staffData` 取，**不要再打一次 API** ——
+     * 設備是 `user.equipments` 的 JSON 欄位，列表那支已經帶回來了。
+     *
+     * ⚠ 要傳**副本**（`JSON.parse(JSON.stringify(...))`）給 `renderEquipments()`：
+     * 它會被使用者編輯，直接傳原物件的話，按取消也已經改到 `staffData`，
+     * 而畫面上的表格是從那份資料畫出來的 —— 看起來像取消沒有生效。
+     */
+    $(document).on('click', '.js-eq-edit', function () {
+        var userId = parseInt($(this).data('user-id'), 10);
+        var staff = null;
+
+        staffData.forEach(function (s) {
+            if (s.id === userId) { staff = s; }
+        });
+
+        if (!staff) { showMsg(I18N.msg.action_failed); return; }
+
+        $('#eq-edit-id').val(userId);
+        $('#eq-edit-title').text(staff.nickname + ' — ' + I18N.equipment_manage);
+        renderEquipments(JSON.parse(JSON.stringify(staff.equipments || [])));
+        showBsModal('modal-eq-edit');
     });
 
     function renderEquipments(list) {

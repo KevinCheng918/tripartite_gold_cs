@@ -259,10 +259,27 @@ Bootstrap 的 `.btn.disabled` 會關掉 pointer-events，
 主軸要明確設 `justify-content: flex-start`，只改 `text-align` 的話按鈕
 還是會停在原來的位置。
 
-**2. `.col-actions` 的靠左規則必須排在它自己的 `text-align: right` 之後。**
-兩邊都是兩個 class 的權重，平手時後面的贏 —— 搬到前面去就失效了。
-（原本那條 `text-align: right` 已經拿掉，但 `width`／`white-space` 還在，
-所以兩條規則仍然並存。）
+**2. ⚠⚠ 靠左那條的選擇器要寫到跟置中那條一樣深（2026-11-01 修）。**
+
+| 選擇器 | 權重 |
+|---|---|
+| `.table.data-table > tbody > tr > td`（置中）| (0,2,3) |
+| `.data-table .col-actions`（靠左）| (0,2,0) ← **輸** |
+
+v3.57 第一版就是寫成 `.data-table .col-actions`，**整條從來沒有生效過**。
+當時沒發現是因為 `.col-actions` 有 `width: 1%`：欄寬縮到等於最寬那一列的
+內容，置中與靠左在多數表格上長得一模一樣。虛擬機帳務紀錄每一列的按鈕數量
+不同（有的三顆、關機的主機一顆都沒有），窄的那幾列才看得出來是置中的。
+
+正確寫法：
+
+```css
+.table.data-table > thead > tr > th.col-actions,
+.table.data-table > tbody > tr > td.col-actions { text-align: left; }
+```
+
+> 教訓：**改對齊時不要只看「規則有沒有寫」，要找一個欄寬大於內容的表格
+> 去看。** 寬度剛好的表格看不出差別，等於沒驗證。
 
 **3. `.col-num` 原本的 `text-align: right` 要拿掉**，不是加一條置中去蓋它。
 `tabular-nums` 要留著：它讓每個數字佔一樣寬，置中之後同一欄的位數至少
