@@ -1641,6 +1641,78 @@ return [
         'UNAVAILABLE_TEXT' => '抱歉，現在沒辦法解析指令（AI 引擎暫時不可用），麻煩直接到後台的專案管理看規章。',
     ],
 
+    /*
+     * 在內部群組 tag 機器人開一張任務卡（需求方 2026-11-01）。
+     *
+     * ⚠ 一律二次確認：怕的不是誤觸，是模型讀錯 ——
+     * 讀錯會留下一張標題怪怪、指派給錯的人的卡片，而那要等有人翻到才發現。
+     */
+    'TASK_CREATE_COMMAND' => [
+        /*
+         * ⚠ 樸素寫法，不要用 `**` 與 ⚠ ——
+         * 帶排版符號的 prompt 會讓模型把整包 JSON 塞進欄位裡
+         * （見 bugfix/2026-10-12-double-wrapped-json-prompt）。
+         */
+        'PROMPT' => implode("\n", [
+            '你是群組機器人的指令解析器，只負責判斷「這句話是不是要開一張任務卡」。',
+            '',
+            'intent 怎麼填：',
+            '- create：他要開一張新的任務卡',
+            '  （「幫我開一張卡」「開個卡片追這件事」「建一張任務」都算）',
+            '- not_create：這句話不是要開卡',
+            '  （查卡片進度、查餘點、查虛擬機、發告警、發公告、排提醒都是 not_create）',
+            '- unknown：是要開卡，但沒講要開什麼',
+            '',
+            'title 是卡片標題：把那件事濃縮成一句話。',
+            '不要包含「幫我開一張卡」這種指令本身，也不要把指派對象寫進標題。',
+            '',
+            'project 填句子裡提到的專案名稱，原文照抄。沒講就填 null。',
+            'assignee 填句子裡那個 @帳號，原文照抄，不要換成暱稱。沒講就填 null。',
+            'priority 只能是 low / medium / high / urgent，沒講就填 null，不要自己判斷急不急。',
+            'due_date 格式一定要是 YYYY-MM-DD，沒講就填 null。',
+        ]),
+
+        'INPUT' => "今天是 {today}。\n對方說：{text}",
+
+        // 草稿放多久（分鐘）。按確認之前都還在
+        'DRAFT_TTL_MINUTES' => 30,
+
+        'CALLBACK'       => 'tc',
+        'ACTION_CONFIRM' => 'ok',
+        'ACTION_CANCEL'  => 'no',
+
+        'BUTTON_CONFIRM' => '確認建立',
+        'BUTTON_CANCEL'  => '取消',
+
+        'PREVIEW_TEXT' => implode("\n", [
+            '📝 <b>要建立這張卡片嗎？</b>',
+            '',
+            '標題：{title}',
+            '專案：{project}',
+            '指派：{assignee}',
+            '優先序：{priority}',
+            '到期：{due_date}',
+        ]),
+
+        'ASSIGNEE_NONE' => '未指派',
+        'DUE_DATE_NONE' => '未設定',
+
+        'CREATED_TEXT'   => "✅ 已建立 {link}",
+        'CANCELLED_TEXT' => '已取消，沒有建立卡片。',
+        'EXPIRED_TEXT'   => '這張草稿已經過期或處理過了，請重新說一次。',
+        'FAILED_TEXT'    => '建立失敗了，請到後台手動開卡（錯誤已記錄）。',
+
+        'WHICH_PROJECT_TEXT' => "要開在哪個專案？請再說一次並帶上專案名：\n{items}",
+        'PROJECT_ITEM'       => "• {name}\n",
+
+        'NO_PROJECT_TEXT'          => '你沒有參與任何專案，請先請管理者設定參與專案。',
+        'ASSIGNEE_NOT_FOUND_TEXT'  => '找不到 {account} 這個帳號，請確認 Telegram 帳號有沒有打錯。',
+        'NEED_TITLE_TEXT'          => '要開什麼卡片？請把事情講一句給我，例如「幫我開一張卡，登入頁一直 500」。',
+        'NOT_BOUND_TEXT'           => '你的 Telegram 帳號還沒綁定系統帳號，沒辦法用這個功能。',
+        'NO_PERMISSION_TEXT'       => '你沒有用指令開卡的權限。',
+        'UNAVAILABLE_TEXT'         => '我現在看不懂這句話（解析服務暫時不可用），請稍後再試。',
+    ],
+
     'TASK_QUERY_COMMAND' => [
         /*
          * ⚠ 樸素寫法，不要用 `**` 與 ⚠ ——

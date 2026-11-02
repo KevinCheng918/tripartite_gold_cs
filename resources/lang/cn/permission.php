@@ -105,6 +105,7 @@ return [
         'vm_query'        => '用指令查虚拟机',
         'credit_alert'    => '用指令发余点告警给客户',
         'task_query'      => '用指令查卡片进度',
+        'task_create'     => '用指令开任务卡',
         'rate_query'      => '用指令查今日汇率',
         'spider_setting'  => '用指令做 spider_setting',
         'gmail_credential' => '用指令验 Gmail 凭证',

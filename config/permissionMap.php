@@ -203,6 +203,15 @@ return [
             'telegram_chat.task_query' => 'permission.telegram_chat.task_query',
 
             /*
+             * 在內部群組 tag 機器人開一張任務卡。
+             *
+             * ⚠ 不沿用後台的 `task_board.create`，理由同上一項：用講的開卡
+             * **沒有表單擋著** —— 標題與專案全靠模型從句子裡拆出來，
+             * 誰能用應該單獨決定。
+             */
+            'telegram_chat.task_create' => 'permission.telegram_chat.task_create',
+
+            /*
              * 在內部群組 tag 機器人要今天的匯率補點訊息。
              *
              * ⚠ 回的是**客戶實際會收到的那一則**（含匯款資訊與繳款圖），

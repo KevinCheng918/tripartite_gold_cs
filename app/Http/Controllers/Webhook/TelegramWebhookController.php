@@ -9,6 +9,7 @@ use App\Services\DailyRateService;
 use App\Services\CreditAlertCommandService;
 use App\Services\CreditAlertResendService;
 use App\Services\ScheduledBroadcastCommandService;
+use App\Services\TaskCreateCommandService;
 use App\Services\ScheduledReminderService;
 use App\Services\StationCreditCommandService;
 use App\Services\TelegramBotService;
@@ -33,6 +34,7 @@ class TelegramWebhookController extends Controller
     private $commandRouter;
     private $reminderService;
     private $broadcastCommandService;
+    private $taskCreateCommandService;
     private $creditCommandService;
     private $alertCommandService;
     private $alertResendService;
@@ -46,6 +48,7 @@ class TelegramWebhookController extends Controller
         TelegramCommandRouter $commandRouter,
         ScheduledReminderService $reminderService,
         ScheduledBroadcastCommandService $broadcastCommandService,
+        TaskCreateCommandService $taskCreateCommandService,
         StationCreditCommandService $creditCommandService,
         CreditAlertCommandService $alertCommandService,
         CreditAlertResendService $alertResendService,
@@ -67,6 +70,8 @@ class TelegramWebhookController extends Controller
          */
         $this->reminderService = $reminderService;
         $this->broadcastCommandService = $broadcastCommandService;
+        // 指令開卡的【確認建立】【取消】
+        $this->taskCreateCommandService = $taskCreateCommandService;
         $this->creditCommandService = $creditCommandService;
         $this->alertCommandService = $alertCommandService;
         // 匯率被改掉時問「要不要用新匯率重發告警」的那兩顆按鈕（前綴 cr:）
@@ -209,6 +214,18 @@ class TelegramWebhookController extends Controller
             $this->botService->answerCallbackQuery(Arr::get($callback, 'id'));
 
             $this->broadcastCommandService->handleCallback(
+                array_slice(explode(':', $data), 1),
+                Arr::get($callback, 'message.message_id')
+            );
+
+            return;
+        }
+
+        // 指令開卡的【確認建立】【取消】
+        if ($prefix === (string) config('constants.TASK_CREATE_COMMAND.CALLBACK')) {
+            $this->botService->answerCallbackQuery(Arr::get($callback, 'id'));
+
+            $this->taskCreateCommandService->handleCallback(
                 array_slice(explode(':', $data), 1),
                 Arr::get($callback, 'message.message_id')
             );

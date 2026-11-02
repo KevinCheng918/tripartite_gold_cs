@@ -13,6 +13,7 @@ use Illuminate\Support\Arr;
  *   ├─ 發餘點告警（要權限、要先確認、**會發給客戶**）
  *   ├─ 同步站台餘點（要權限、要先確認）
  *   ├─ 查站台虛擬機（要權限，純讀不必確認）
+ *   ├─ 開一張任務卡（要權限、要先確認；擺在查卡片之前）
  *   ├─ 查某人的卡片進度（要權限，純讀不必確認）
  *   ├─ 查今日匯率補點訊息（要權限，純讀不必確認）
  *   ├─ 驗 Gmail 憑證（要權限，會打 Google；擺在通用 spider_setting 之前）
@@ -43,6 +44,7 @@ class TelegramCommandRouter
     private $alertCommand;
     private $creditCommand;
     private $vmCommand;
+    private $taskCreateCommand;
     private $taskCommand;
     private $rateCommand;
     private $gmailCommand;
@@ -57,6 +59,7 @@ class TelegramCommandRouter
         CreditAlertCommandService $alertCommand,
         StationCreditCommandService $creditCommand,
         VmQueryCommandService $vmCommand,
+        TaskCreateCommandService $taskCreateCommand,
         TaskQueryCommandService $taskCommand,
         RateQueryCommandService $rateCommand,
         GmailCredentialCommandService $gmailCommand,
@@ -72,6 +75,12 @@ class TelegramCommandRouter
         $this->alertCommand = $alertCommand;
         $this->creditCommand = $creditCommand;
         $this->vmCommand = $vmCommand;
+        /*
+         * ⚠ 開卡擺在查卡片**之前**：兩支都在講「任務卡片」，而這一支會
+         * 寫入。照既有慣例「會寫入的先問」—— 查詢被誤判成開卡還有二次確認
+         * 擋著；反過來則是使用者想開卡卻只拿到一份查詢結果，會重打好幾次。
+         */
+        $this->taskCreateCommand = $taskCreateCommand;
         $this->taskCommand = $taskCommand;
         $this->rateCommand = $rateCommand;
         /*
@@ -167,6 +176,7 @@ class TelegramCommandRouter
         $alert = $this->alertCommand;
         $credit = $this->creditCommand;
         $vm = $this->vmCommand;
+        $taskCreate = $this->taskCreateCommand;
         $task = $this->taskCommand;
         $rate = $this->rateCommand;
         $gmail = $this->gmailCommand;
@@ -192,6 +202,10 @@ class TelegramCommandRouter
             },
             function ($body, $from, $threadId) use ($vm) {
                 return $vm->handle($body, $from, $threadId);
+            },
+            // ⚠ 開卡要問在查卡片之前，理由見建構子
+            function ($body, $from, $threadId) use ($taskCreate) {
+                return $taskCreate->handle($body, $from, $threadId);
             },
             function ($body, $from, $threadId) use ($task) {
                 return $task->handle($body, $from, $threadId);

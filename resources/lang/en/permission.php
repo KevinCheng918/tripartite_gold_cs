@@ -101,6 +101,7 @@ return [
         'vm_query' => 'Query virtual machines by command',
         'credit_alert' => 'Send credit alert to customers by command',
         'task_query' => 'Query task card progress by command',
+        'task_create' => 'Create a task card by command',
         'rate_query' => "Query today's rate message by command",
         'spider_setting' => 'Build a spider_setting by command',
         'gmail_credential' => 'Verify Gmail credentials by command',
