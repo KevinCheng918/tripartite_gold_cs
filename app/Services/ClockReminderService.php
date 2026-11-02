@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AttendanceReminder;
+use App\Services\Notify\ClockReminderWriter;
 use App\Repositories\AttendanceReminderRepository;
 use App\Repositories\AttendanceRepository;
 use App\Repositories\LeaveRequestRepository;
@@ -54,6 +55,8 @@ class ClockReminderService
     private $leaveRepository;
     private $reminderRepository;
     private $staffDm;
+    // 上班前那四則的語氣（每天一組，見 ClockReminderWriter）
+    private $reminderWriter;
 
     public function __construct(
         AttendanceService $attendanceService,
@@ -61,7 +64,8 @@ class ClockReminderService
         AttendanceRepository $attendanceRepository,
         LeaveRequestRepository $leaveRepository,
         AttendanceReminderRepository $reminderRepository,
-        StaffDmService $staffDm
+        StaffDmService $staffDm,
+        ClockReminderWriter $reminderWriter
     ) {
         // 兩種出勤模式的分岔只在這一支裡，不要自己再寫一次
         $this->attendanceService = $attendanceService;
@@ -70,6 +74,7 @@ class ClockReminderService
         $this->leaveRepository = $leaveRepository;
         $this->reminderRepository = $reminderRepository;
         $this->staffDm = $staffDm;
+        $this->reminderWriter = $reminderWriter;
     }
 
     /**
@@ -220,8 +225,15 @@ class ClockReminderService
     /**
      * 上班前提醒
      *
-     * ⚠ **只發一次**，而且只在「上班前那段」發。過了上班時間再講
-     * 「快上班了」已經不成立 —— 那是遲到，是另一回事。
+     * 需求方 2026-11-01 改成**分四階段**：上班前 15／10／5／1 分鐘各一次，
+     * 中間只要打了卡，後面幾次就不再發。
+     *
+     * ⚠ **過了上班時間就不發**。再講「快上班了」已經不成立 ——
+     * 那是遲到，是另一回事。
+     *
+     * ⚠ **「已經打卡就不再提醒」靠的是每一輪重新讀打卡紀錄**（`$record`
+     * 來自 `loadContext()`），不是記一個旗標 —— 所以他在第二次與第三次
+     * 提醒之間打卡，第三次自然就不會發。
      *
      * @param \App\Models\User $user
      * @param string           $date
@@ -233,18 +245,40 @@ class ClockReminderService
      */
     private function clockInReminder($user, $date, Carbon $now, Carbon $start, $record, array $context)
     {
-        // 已經打了就不必提醒
+        // 已經打了就不必提醒（四個階段共用這一道）
         if (filled($record) && filled($record->clock_in)) {
             return null;
         }
 
-        $fireAt = $start->copy()->subMinutes((int) config('constants.CLOCK_REMINDER.BEFORE_IN_MINUTES'));
-
-        if ($now->lt($fireAt) || $now->gte($start)) {
+        if ($now->gte($start)) {
             return null;
         }
 
-        if (filled($this->stateOf($context, $user->id, $date, AttendanceReminder::TYPE_CLOCK_IN))) {
+        $stage = $this->clockInStage($now, $start);
+
+        // 還沒進到第一個階段
+        if (blank($stage)) {
+            return null;
+        }
+
+        /*
+         * ⚠ **用 `sent_count` 判斷發到第幾階段，不另外開欄位。**
+         *
+         * `attendance_reminder.type` 是 `varchar(10)`，塞不下
+         * `clock_in_15` 這種值（11 字元），而為了四個階段去加欄位或改欄寬
+         * 要多一次 migration —— 用既有的計數器就夠了。
+         *
+         * 判準是「這個階段的訊息發過了沒」：`sent_count` 已經 ≥ 階段序號+1
+         * 就代表發過。
+         *
+         * ⚠ 這樣**漏跑也不會補發一串**：假設排程停到只剩 5 分鐘才恢復，
+         * 階段序號是 2，`sent_count` 0 < 3 成立 → 只發這一則（而且用的是
+         * 第三階段的語氣），不會把前兩則一起補出來。
+         */
+        $state = $this->stateOf($context, $user->id, $date, AttendanceReminder::TYPE_CLOCK_IN);
+        $sentCount = filled($state) ? (int) $state->sent_count : 0;
+
+        if ($sentCount >= $stage + 1) {
             return null;
         }
 
@@ -252,7 +286,51 @@ class ClockReminderService
             '{name}'    => (string) $user->nickname,
             '{start}'   => $start->format('H:i'),
             '{minutes}' => (string) $now->diffInMinutes($start),
-        ]);
+        ], $stage);
+    }
+
+    /**
+     * 現在落在第幾個上班前階段（0 起算）
+     *
+     * 以 `BEFORE_IN_STAGES`（由大到小，例如 15／10／5／1）切出四段窗口：
+     *
+     * ```
+     * [上班前15, 上班前10)  → 0
+     * [上班前10, 上班前5)   → 1
+     * [上班前5,  上班前1)   → 2
+     * [上班前1,  上班)      → 3
+     * ```
+     *
+     * ⚠ 窗口是**左閉右開**且彼此不重疊 —— 重疊的話同一分鐘會算成兩個階段，
+     * 而兩個階段都會想發訊息。
+     *
+     * @param Carbon $now
+     * @param Carbon $start
+     * @return int|null null ＝ 還沒到第一個階段
+     */
+    private function clockInStage(Carbon $now, Carbon $start)
+    {
+        $stages = array_values((array) config('constants.CLOCK_REMINDER.BEFORE_IN_STAGES'));
+        $remaining = $now->diffInSeconds($start) / 60;
+        $stage = null;
+
+        /*
+         * ⚠ 要的是**最後一個**符合的，不是第一個。
+         *
+         * 門檻由大到小（15／10／5／1），剩 10 分鐘時 `10 <= 15` 與
+         * `10 <= 10` 都成立 —— 取第一個會永遠停在第 0 階段，
+         * 於是四則只會發出第一則。（2026-11-01 實測抓到：每一個時間點
+         * 都回「第 0 階段」。）
+         */
+        foreach ($stages as $index => $minutes) {
+            if ($remaining > (float) $minutes) {
+                continue;
+            }
+
+            $stage = (int) $index;
+        }
+
+        return $stage;
     }
 
     /**
@@ -327,17 +405,49 @@ class ClockReminderService
      * @param array<string, string> $replace
      * @return array{user_id: int, user: string, type: string, date: string, text: string}
      */
-    private function buildPending($user, $date, $type, array $replace)
+    private function buildPending($user, $date, $type, array $replace, $stage = null)
     {
-        $key = $type === AttendanceReminder::TYPE_CLOCK_IN ? 'BEFORE_IN' : 'AFTER_OUT';
-
         return [
             'user_id' => (int) $user->id,
             'user'    => (string) $user->nickname,
             'type'    => $type,
             'date'    => $date,
-            'text'    => strtr((string) config("constants.CLOCK_REMINDER.{$key}"), $replace),
+            'text'    => $type === AttendanceReminder::TYPE_CLOCK_IN
+                ? $this->clockInText($date, $stage, $replace)
+                : strtr((string) config('constants.CLOCK_REMINDER.AFTER_OUT'), $replace),
         ];
+    }
+
+    /**
+     * 上班前提醒的內容：AI 寫的那一句 ＋ 固定的事實行
+     *
+     * 需求方 2026-11-01：「這 4 次的說話跟語氣和態度每天都要不一樣，不然會
+     * 產生惰性，話語與語氣這個是自己人看的，所以讓 AI 自由發揮就好。」
+     *
+     * ⚠ **事實（幾點上班、還有幾分鐘）不交給模型寫**：它某天多寫一個數字
+     * 就會變成錯誤資訊，而這是會讓人遲到的那種錯。模型只負責那一句話。
+     *
+     * ⚠ 名字留在開頭：四句都是模型寫的，沒有名字的話會像群發公告。
+     *
+     * @param string   $date
+     * @param int|null $stage
+     * @param array    $replace
+     * @return string
+     */
+    private function clockInText($date, $stage, array $replace)
+    {
+        $lines = $this->reminderWriter->linesFor($date);
+        $line = (string) Arr::get($lines, (int) $stage, '');
+
+        // 階段數比文案多（有人改了 BEFORE_IN_STAGES 卻沒改公版）—— 退回舊公版
+        if (blank($line)) {
+            return strtr((string) config('constants.CLOCK_REMINDER.BEFORE_IN'), $replace);
+        }
+
+        $name = (string) Arr::get($replace, '{name}');
+        $fact = strtr((string) config('constants.CLOCK_REMINDER.BEFORE_IN_FACT'), $replace);
+
+        return "{$name}，{$line}\n{$fact}";
     }
 
     /**
