@@ -1680,6 +1680,16 @@ return [
         'CALLBACK'       => 'tc',
         'ACTION_CONFIRM' => 'ok',
         'ACTION_CANCEL'  => 'no',
+        // 選專案：`tc:pj:{draftKey}:{projectId}`
+        'ACTION_PROJECT' => 'pj',
+
+        /*
+         * 專案超過幾個就不出按鈕，改請他帶上專案名再說一次。
+         *
+         * ⚠ Telegram 的 inline keyboard 塞幾十顆按鈕會長到要捲動，
+         * 比重打一次還難用。
+         */
+        'MAX_PROJECT_BUTTONS' => 12,
 
         'BUTTON_CONFIRM' => '確認建立',
         'BUTTON_CANCEL'  => '取消',
@@ -1702,8 +1712,9 @@ return [
         'EXPIRED_TEXT'   => '這張草稿已經過期或處理過了，請重新說一次。',
         'FAILED_TEXT'    => '建立失敗了，請到後台手動開卡（錯誤已記錄）。',
 
-        'WHICH_PROJECT_TEXT' => "要開在哪個專案？請再說一次並帶上專案名：\n{items}",
-        'PROJECT_ITEM'       => "• {name}\n",
+        'PICK_PROJECT_TEXT'  => '要開在哪個專案？',
+        'TOO_MANY_PROJECTS_TEXT' => '你能開的專案太多了，列不下 —— 請再說一次並帶上專案名。',
+        'NEED_PROJECT_TEXT'  => '還沒選專案，請重新說一次。',
 
         'NO_PROJECT_TEXT'          => '你沒有參與任何專案，請先請管理者設定參與專案。',
         'ASSIGNEE_NOT_FOUND_TEXT'  => '找不到 {account} 這個帳號，請確認 Telegram 帳號有沒有打錯。',

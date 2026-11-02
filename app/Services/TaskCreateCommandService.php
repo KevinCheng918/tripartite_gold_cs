@@ -121,9 +121,12 @@ class TaskCreateCommandService
     }
 
     /**
-     * 按了【確認建立】或【取消】
+     * 按了按鈕
      *
-     * @param array    $parts     callback_data 去掉前綴後的片段：[action, draftKey]
+     * 三種：選專案（`pj`）、確認建立（`ok`）、取消（`no`）。
+     *
+     * @param array    $parts     callback_data 去掉前綴後的片段：
+     *                            `[action, draftKey]`，選專案時多一個 `projectId`
      * @param int|null $messageId
      * @return void
      */
@@ -140,6 +143,12 @@ class TaskCreateCommandService
             return;
         }
 
+        if ($action === (string) Arr::get($config, 'ACTION_PROJECT')) {
+            $this->pickProject($key, (int) Arr::get($parts, 2), $messageId, $config);
+
+            return;
+        }
+
         $draft = Cache::pull(self::DRAFT_PREFIX . $key);
 
         /*
@@ -152,7 +161,70 @@ class TaskCreateCommandService
             return;
         }
 
+        /*
+         * ⚠ 防呆：專案還沒選就按到確認（例如舊訊息上的按鈕）。
+         * 沒有這一道的話 `project_id` 會是 null，寫入時才撞 not null，
+         * 使用者只看到「建立失敗了」。
+         */
+        if (blank(Arr::get($draft, 'project_id'))) {
+            $this->supportGroup->editMessage($messageId, (string) Arr::get($config, 'NEED_PROJECT_TEXT'));
+
+            return;
+        }
+
         $this->createFromDraft($draft, $messageId, $config);
+    }
+
+    /**
+     * 選了專案 —— 把草稿補完，原地換成確認卡
+     *
+     * ⚠ **用 `Cache::get` 不是 `pull`**：選完專案之後還要等他按確認，
+     * 草稿不能在這一步被拿走。
+     *
+     * ⚠ **一定要驗這個 id 在不在 `allowed_project_ids` 裡**：`callback_data`
+     * 是從外面送進來的，不能直接拿來當 `project_id` 寫入 —— 否則任何人
+     * 只要改一個數字就能把卡片開到他看不到的專案裡。
+     *
+     * @param string   $key
+     * @param int      $projectId
+     * @param int|null $messageId
+     * @param array    $config
+     * @return void
+     */
+    private function pickProject($key, $projectId, $messageId, array $config)
+    {
+        $draft = Cache::get(self::DRAFT_PREFIX . $key);
+
+        if (blank($draft)) {
+            $this->supportGroup->editMessage($messageId, (string) Arr::get($config, 'EXPIRED_TEXT'));
+
+            return;
+        }
+
+        $allowed = (array) Arr::get($draft, 'allowed_project_ids', []);
+        $names = (array) Arr::get($draft, 'project_names', []);
+
+        if (!in_array($projectId, $allowed, true)) {
+            Log::warning('指令開卡：選到不在允許清單裡的專案', [
+                'project_id' => $projectId,
+                'creator_id' => Arr::get($draft, 'creator_id'),
+            ]);
+
+            $this->supportGroup->editMessage($messageId, (string) Arr::get($config, 'EXPIRED_TEXT'));
+
+            return;
+        }
+
+        $draft['project_id'] = $projectId;
+        $draft['project_name'] = (string) Arr::get($names, $projectId, '');
+
+        $this->putDraft($key, $draft, $config);
+
+        $this->supportGroup->editMessage(
+            $messageId,
+            $this->previewText($draft, $config),
+            $this->confirmKeyboard($key, $config)
+        );
     }
 
     /**
@@ -205,10 +277,11 @@ class TaskCreateCommandService
      */
     private function askConfirm(array $parsed, $user, $threadId, array $config)
     {
-        $project = $this->resolveProject(Arr::get($parsed, 'project'), $user, $threadId, $config);
+        $projects = $this->projectRepository->getVisibleTo($user);
 
-        // 對不到專案時 `resolveProject()` 已經把要問的話講出去了
-        if (blank($project)) {
+        if (blank($projects)) {
+            $this->reply((string) Arr::get($config, 'NO_PROJECT_TEXT'), $threadId);
+
             return;
         }
 
@@ -231,78 +304,70 @@ class TaskCreateCommandService
             }
         }
 
+        $project = $this->matchOne($projects, Arr::get($parsed, 'project'));
         $priority = $this->priorityValue(Arr::get($parsed, 'priority'));
         // 跟 `ScheduledBroadcastCommandService` 一致：callback_data 有長度上限
         $key = Str::random(16);
 
-        Cache::put(self::DRAFT_PREFIX . $key, [
-            'title'       => (string) Arr::get($parsed, 'title'),
-            'project_id'  => (int) $project->id,
-            'assignee_id' => filled($assignee) ? (int) $assignee->id : null,
-            'priority'    => $priority,
-            'due_date'    => Arr::get($parsed, 'due_date'),
-            'creator_id'  => (int) $user->id,
-        ], now()->addMinutes((int) Arr::get($config, 'DRAFT_TTL_MINUTES')));
+        /*
+         * ⚠ 草稿裡**同時存 id 與顯示名稱**。只存 id 的話，選完專案要重畫
+         * 確認卡時得再查一次人名與專案名 —— 而那時候手上只有 callback，
+         * 沒有原本那句話了。
+         *
+         * ⚠ `allowed_project_ids` 是給選完之後驗證用的：按鈕上的 id 不能
+         * 直接信（callback_data 是外面送進來的）。存在草稿裡就不必再查一次
+         * 這個人看得到哪些專案，也不可能被動手腳 —— 快取在伺服器這邊。
+         */
+        $draft = [
+            'title'         => (string) Arr::get($parsed, 'title'),
+            'project_id'    => filled($project) ? (int) $project->id : null,
+            'project_name'  => filled($project) ? (string) $project->name : null,
+            'assignee_id'   => filled($assignee) ? (int) $assignee->id : null,
+            'assignee_name' => filled($assignee) ? (string) $assignee->nickname : null,
+            'priority'      => $priority,
+            'due_date'      => Arr::get($parsed, 'due_date'),
+            'creator_id'    => (int) $user->id,
+            'allowed_project_ids' => $projects->pluck('id')->map('intval')->all(),
+            // 選完專案要重畫確認卡時得有名字，那時候已經查不到了
+            'project_names'       => $projects->pluck('name', 'id')->all(),
+        ];
 
-        $text = strtr((string) Arr::get($config, 'PREVIEW_TEXT'), [
-            '{title}'    => $this->escape((string) Arr::get($parsed, 'title')),
-            '{project}'  => $this->escape((string) $project->name),
-            '{assignee}' => filled($assignee)
-                ? $this->escape((string) $assignee->nickname)
-                : (string) Arr::get($config, 'ASSIGNEE_NONE'),
-            '{priority}' => $this->priorityLabel($priority),
-            '{due_date}' => filled(Arr::get($parsed, 'due_date'))
-                ? (string) Arr::get($parsed, 'due_date')
-                : (string) Arr::get($config, 'DUE_DATE_NONE'),
-        ]);
+        $this->putDraft($key, $draft, $config);
 
-        $this->supportGroup->sendToThread($text, $threadId, $this->confirmKeyboard($key, $config));
+        // 專案講得清楚 —— 直接進確認
+        if (filled($project)) {
+            $this->supportGroup->sendToThread(
+                $this->previewText($draft, $config),
+                $threadId,
+                $this->confirmKeyboard($key, $config)
+            );
+
+            return;
+        }
+
+        $this->askWhichProject($projects, $key, $threadId, $config);
     }
 
     /**
-     * 把句子裡的專案名對到一個真的專案
+     * 把句子裡的專案名對到唯一一個專案
      *
-     * ⚠ **對不到就回問，不要猜**（需求方裁示）。猜錯會把卡片開到別的專案，
-     * 之後要人工搬 —— 而且搬之前不會有人發現。
-     *
-     * ⚠ 候選只取**發話者看得到的**（`getVisibleTo()`）：開在自己碰不到的
-     * 專案上，他連確認結果都打不開。
-     *
-     * @param string|null      $wanted
-     * @param \App\Models\User $user
-     * @param int|null         $threadId
-     * @param array            $config
-     * @return \App\Models\Project|null null ＝ 已經把要問的話講出去了
+     * @param \Illuminate\Support\Collection $projects
+     * @param string|null                    $wanted
+     * @return \App\Models\Project|null null ＝ 沒講、對不到、或對到兩個以上
      */
-    private function resolveProject($wanted, $user, $threadId, array $config)
+    private function matchOne($projects, $wanted)
     {
-        $projects = $this->projectRepository->getVisibleTo($user);
-
-        if (blank($projects)) {
-            $this->reply((string) Arr::get($config, 'NO_PROJECT_TEXT'), $threadId);
-
-            return null;
-        }
-
         if (blank($wanted)) {
-            $this->askWhichProject($projects, $threadId, $config);
-
             return null;
         }
 
         $matched = $this->matchProjects($projects, $wanted);
 
         /*
-         * ⚠ 兩個以上也要問。「金流」同時對到「三方金流」與「金流測試」時
-         * 隨便挑一個，跟猜沒有兩樣。
+         * ⚠ 兩個以上也當成對不到。「金流」同時對到「三方金流」與「金流測試」
+         * 時隨便挑一個，跟猜沒有兩樣 —— 讓他用按鈕選。
          */
-        if (count($matched) !== 1) {
-            $this->askWhichProject($projects, $threadId, $config);
-
-            return null;
-        }
-
-        return Arr::first($matched);
+        return count($matched) === 1 ? Arr::first($matched) : null;
     }
 
     /**
@@ -354,26 +419,100 @@ class TaskCreateCommandService
     }
 
     /**
-     * 問他要開在哪個專案，並把可選的列出來
+     * 問他要開在哪個專案 —— **用按鈕選，不要叫他重打一次**
+     *
+     * 需求方 2026-11-01：「如果沒有帶入專案的話，讓他用選擇的，不要用再次
+     * 輸入的方式。」叫人重打整句話的代價不只是麻煩 —— 重打一次模型會**重新
+     * 解析一次**，標題可能被拆成不一樣的字，於是他得再看一次確認卡。
+     * 按鈕則是沿用同一份草稿，只補上專案。
+     *
+     * ⚠ 專案太多時退回「請帶上專案名再說一次」：Telegram 的 inline keyboard
+     * 塞幾十顆按鈕會長到要捲動，比重打還難用。上限在
+     * `MAX_PROJECT_BUTTONS`。
+     *
+     * ⚠ 一行一顆。專案名長度不一，兩顆並排時寬度會對不齊而且字被截掉。
      *
      * @param \Illuminate\Support\Collection $projects
+     * @param string                         $key
      * @param int|null                       $threadId
      * @param array                          $config
      * @return void
      */
-    private function askWhichProject($projects, $threadId, array $config)
+    private function askWhichProject($projects, $key, $threadId, array $config)
     {
-        $names = [];
+        $max = (int) Arr::get($config, 'MAX_PROJECT_BUTTONS');
 
-        foreach ($projects as $project) {
-            $names[] = strtr((string) Arr::get($config, 'PROJECT_ITEM'), [
-                '{name}' => $this->escape((string) $project->name),
-            ]);
+        if ($projects->count() > $max) {
+            Cache::forget(self::DRAFT_PREFIX . $key);
+            $this->reply((string) Arr::get($config, 'TOO_MANY_PROJECTS_TEXT'), $threadId);
+
+            return;
         }
 
-        $this->reply(strtr((string) Arr::get($config, 'WHICH_PROJECT_TEXT'), [
-            '{items}' => implode('', $names),
-        ]), $threadId);
+        $prefix = (string) Arr::get($config, 'CALLBACK');
+        $action = (string) Arr::get($config, 'ACTION_PROJECT');
+        $rows = [];
+
+        foreach ($projects as $project) {
+            $rows[] = [[
+                'text'          => (string) $project->name,
+                'callback_data' => "{$prefix}:{$action}:{$key}:{$project->id}",
+            ]];
+        }
+
+        $rows[] = [[
+            'text'          => (string) Arr::get($config, 'BUTTON_CANCEL'),
+            'callback_data' => "{$prefix}:" . Arr::get($config, 'ACTION_CANCEL') . ":{$key}",
+        ]];
+
+        $this->supportGroup->sendToThread(
+            (string) Arr::get($config, 'PICK_PROJECT_TEXT'),
+            $threadId,
+            $rows
+        );
+    }
+
+    /**
+     * 存草稿（TTL 統一在這裡）
+     *
+     * @param string $key
+     * @param array  $draft
+     * @param array  $config
+     * @return void
+     */
+    private function putDraft($key, array $draft, array $config)
+    {
+        Cache::put(
+            self::DRAFT_PREFIX . $key,
+            $draft,
+            now()->addMinutes((int) Arr::get($config, 'DRAFT_TTL_MINUTES'))
+        );
+    }
+
+    /**
+     * 確認卡的內容
+     *
+     * ⚠ **全部從草稿組**，不要從原本那句話組：選完專案之後要重畫這張卡，
+     * 而那時候只有 callback，原句早就不在手上了。
+     *
+     * @param array $draft
+     * @param array $config
+     * @return string
+     */
+    private function previewText(array $draft, array $config)
+    {
+        $assignee = Arr::get($draft, 'assignee_name');
+        $dueDate = Arr::get($draft, 'due_date');
+
+        return strtr((string) Arr::get($config, 'PREVIEW_TEXT'), [
+            '{title}'    => $this->escape((string) Arr::get($draft, 'title')),
+            '{project}'  => $this->escape((string) Arr::get($draft, 'project_name')),
+            '{assignee}' => filled($assignee)
+                ? $this->escape((string) $assignee)
+                : (string) Arr::get($config, 'ASSIGNEE_NONE'),
+            '{priority}' => $this->priorityLabel((int) Arr::get($draft, 'priority')),
+            '{due_date}' => filled($dueDate) ? (string) $dueDate : (string) Arr::get($config, 'DUE_DATE_NONE'),
+        ]);
     }
 
     /**
