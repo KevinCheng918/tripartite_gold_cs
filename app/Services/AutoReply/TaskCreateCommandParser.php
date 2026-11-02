@@ -29,6 +29,23 @@ class TaskCreateCommandParser
     /** @var array<string> 優先序的合法值（對應 constants.TASK.PRIORITY.*） */
     const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
 
+    /**
+     * 標題上限（字元）
+     *
+     * ⚠⚠ **指令這條路沒有經過 `StoreTaskRequest`**（那是後台表單的驗證），
+     * 所以 `max:200` 擋不到這裡 —— 而 `task.title` 是 `varchar(200)`。
+     * 不截的話，使用者貼一整段錯誤訊息進來會直接撞資料庫長度限制，
+     * 而他只會看到一句「建立失敗了」，完全不知道是標題太長。
+     *
+     * ⚠ 截在**解析**這一層，不是寫入前：這樣使用者在確認卡上看到的就是
+     * 真正會被存下來的標題，覺得被截得奇怪可以當場按取消。
+     *
+     * ⚠ 一定要用 `mb_substr` —— `substr` 會把中文從中間切斷成亂碼。
+     *
+     * @var int
+     */
+    const TITLE_MAX = 200;
+
     private $matcher;
 
     public function __construct(ClaudeCodeMatcher $matcher)
@@ -100,7 +117,8 @@ class TaskCreateCommandParser
 
         return [
             'intent'   => self::INTENT_CREATE,
-            'title'    => $title,
+            // 理由見 `TITLE_MAX`
+            'title'    => mb_substr($title, 0, self::TITLE_MAX),
             'project'  => $this->nullableText(Arr::get($result, 'project')),
             // `@` 去掉，跟 `TaskQueryCommandParser` 一致
             'assignee' => ltrim((string) $this->nullableText(Arr::get($result, 'assignee')), '@') ?: null,
