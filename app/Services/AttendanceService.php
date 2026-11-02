@@ -567,7 +567,19 @@ class AttendanceService
             $cursor->addDay();
         }
 
-        return $timeline;
+        /*
+         * ⚠ **由新到舊回傳**（需求方 2026-11-02：「1 號要在下面」）。
+         *
+         * 游標是從月初往後走的，所以這裡組出來一定是升冪 ——
+         * `getByUserAndMonth()` 的 `orderBy('date', 'desc')` **救不到這一頁**，
+         * 那個順序只用來建 `$byDate` 索引，順序根本不影響結果。
+         * 2026-11-02 查這個問題時，就是先看到 Repository 是 desc 而以為頁面
+         * 已經對了，繞了一圈才發現畫面其實是這支的時間軸畫的。
+         *
+         * ⚠ `values()` 不能省：`reverse()` 會保留原本的 key，
+         * Blade 的 `@forelse` 雖然照樣跑得動，但下游若有人用索引取值會錯位。
+         */
+        return $timeline->reverse()->values();
     }
 
     /**

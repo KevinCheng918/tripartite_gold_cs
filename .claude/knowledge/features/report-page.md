@@ -112,6 +112,38 @@ Telegram 收到的那份會對不起來 —— 那種不一致最難查，因為
 
 順手補了 `emptyStat()` 缺的 `total_days` / `normal_days`（通知那邊沒用到所以一直沒發現）。
 
+### ⚠ 出勤明細的日期排序，以及一個查錯地方的陷阱（2026-11-02，v3.68）
+
+需求方：「個人每日出勤狀況這一頁，1 號要在下面。」
+
+排序要改的是 **`AttendanceService::getMonthlyTimeline()`** ——
+它用游標從月初往後走，所以組出來一定是升冪。最後 `reverse()->values()`。
+
+⚠⚠ **不要被 `AttendanceRepository::getByUserAndMonth()` 的
+`orderBy('date', 'desc')` 騙了。** 查這個問題時我先看到那一行，
+以為頁面已經是降冪、回報「程式碼沒問題」—— 實際上那個順序只用來建
+`$byDate` 索引，**順序根本不影響畫面**。
+
+⚠⚠ **也不要去看 `public/js/attendance-detail.js`。** 那支是**死碼** ——
+明細頁早就改成 server-side 渲染（`$timeline` ＋ Blade `@forelse`），
+`detail.blade.php` 的 `@section('scripts')` 只載 flatpickr，沒有載它。
+兩邊的欄位還不一樣（Blade 有「班別」「請假」，那支沒有），所以照著它查
+會得到一個跟畫面對不起來的結論。
+
+> 需求方的截圖裡有「班別」欄，而那支 JS 沒有 —— **那就是「你在看錯檔案」
+> 的訊號**。欄位對不上時先確認畫面到底是誰畫的。
+
+⚠ `values()` 不能省：`reverse()` 會保留原本的 key。
+
+### 頁面位置（2026-11-02 確認過一次）
+
+路徑是 **報表 → 打卡報表 → 點某一列 → 個人每日出勤狀況**，目前是對的：
+唯一入口是 `public/js/report.js` 點列跳轉、返回鍵回 `admin.report.index`、
+在明細頁時側邊選單亮的是「報表」。
+
+⚠ 選單那兩條例外判斷為什麼長那樣、以及路由為什麼沒跟著搬到 `report.`
+前綴，見下面第 4 節 —— 要搬路由的話那兩處一定要一起改。
+
 ### 3. 報表頁本身不能綁 `can:` middleware
 
 兩個分頁各自一個權限，有**其中一個**就該進得來，而 `can:` 是 AND。
