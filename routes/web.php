@@ -119,7 +119,6 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-my-monthly', [AttendanceController::class, 'ajaxMyMonthly'])->name('ajax-my-monthly');
         // 彙總報表已搬到「內務管理 → 報表」（admin.report.*），這裡不再提供
         Route::get('/detail/{userId}', [AttendanceController::class, 'detail'])->middleware('can:attendance.report')->name('detail');
-        Route::get('/ajax-user-monthly', [AttendanceController::class, 'ajaxUserMonthly'])->middleware('can:attendance.report')->name('ajax-user-monthly');
         Route::post('/ajax-request-amend', [AttendanceController::class, 'ajaxRequestAmend'])->middleware('can:attendance.amend')->name('ajax-request-amend');
         Route::get('/ajax-my-amendments', [AttendanceController::class, 'ajaxMyAmendments'])->middleware('can:attendance.amend')->name('ajax-my-amendments');
         Route::get('/ajax-amendments', [AttendanceController::class, 'ajaxAmendments'])->middleware('can:attendance.amend_review')->name('ajax-amendments');

@@ -474,7 +474,8 @@
      * ⚠ 時段假要把時間寫出來 —— 那天他還是有上班，只是缺一段，
      * 只寫「請假」會讓人以為整天都不在。
      *
-     * 出勤明細頁（attendance-detail.js）有一份一樣的，兩邊畫面不同但規則相同。
+     * 出勤明細頁原本有一份一樣的（`attendance-detail.js`），但那一頁已改成
+     * server-side 渲染，那支 2026-11-02 刪掉了。
      *
      * @param {Object} r 一天的出勤紀錄
      * @returns {string}

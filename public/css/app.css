@@ -1312,29 +1312,6 @@ table tbody tr:hover { background: rgba(0, 0, 0, 0.02); }
     border-radius: 0.75rem !important;
 }
 
-.att-month-input {
-    width: 160px;
-    padding: 0.375rem 0.75rem;
-    font-size: 0.9375rem;
-    font-weight: 700;
-    color: #111827;
-    text-align: center;
-    border: 1px solid #ebedf0;
-    border-radius: 0.5rem;
-    background: #fff;
-    cursor: pointer;
-}
-
-.att-month-input:hover {
-    border-color: #a67c00;
-}
-
-[data-theme="dark"] .att-month-input {
-    background: #1a1d27;
-    border-color: #2d3039;
-    color: #f3f4f6;
-}
-
 /* ===== 原生日期／時間輸入框（補打卡申請） =====
  *
  * 這兩種 input 的內部是瀏覽器自己繪的，Bootstrap 的 .form-control 蓋不到，
@@ -1569,23 +1546,6 @@ input[type="time"].form-control {
 
 [data-theme="dark"] .btn-cancel:hover {
     background: #3d4049;
-}
-
-/* 詳細頁 */
-.att-detail-header {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.att-detail-meta {
-    font-size: 0.75rem;
-    color: #374151;
-    max-width: 200px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 /* 月報表可點擊行 hover */

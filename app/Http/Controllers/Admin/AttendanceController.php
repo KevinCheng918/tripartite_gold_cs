@@ -170,22 +170,6 @@ class AttendanceController extends Controller
         ]);
     }
 
-    /**
-     * Ajax 取得指定員工某月的出勤紀錄（管理者用）
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection
-     */
-    public function ajaxUserMonthly(Request $request)
-    {
-        $userId = $request->input('user_id');
-        $yearMonth = $request->input('month', now()->format('Y-m'));
-
-        $records = $this->attendanceService->getMonthlyRecords((int) $userId, $yearMonth);
-
-        return AttendanceResource::collection($records);
-    }
-
     // ---------------------------------------------------------------
     //  補打卡
     // ---------------------------------------------------------------

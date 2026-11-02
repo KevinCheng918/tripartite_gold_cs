@@ -136,7 +136,8 @@ locale 決定，網頁端控制不了，客服會看到「下午 01:05」而跟�
 - Model: `app/Models/AttendanceRecord.php`、`app/Models/ClockAmendment.php`
 - Presenter: `app/Presenters/DatePresenter.php`
 - Views: `resources/views/admin/attendance/index.blade.php`, `detail.blade.php`
-- JS: `public/js/attendance.js`, `public/js/attendance-detail.js`, `public/js/common.js`
+- JS: `public/js/attendance.js`, `public/js/common.js`
+  （`attendance-detail.js` 2026-11-02 刪了 —— 明細頁早就改成 server-side 渲染，那支沒有任何頁面載入，而且它找的 `#attendance-detail-app` 根本不存在）
 
 > 補打卡的兩支端點 2026-09-30 從內聯 `$request->validate()` 抽成 Request 檔。
 > **打卡本身（`ajaxClockIn` / `ajaxClockOut`）沒有輸入要驗證**，仍收

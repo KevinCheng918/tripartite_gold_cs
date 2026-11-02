@@ -124,7 +124,7 @@ Telegram 收到的那份會對不起來 —— 那種不一致最難查，因為
 以為頁面已經是降冪、回報「程式碼沒問題」—— 實際上那個順序只用來建
 `$byDate` 索引，**順序根本不影響畫面**。
 
-⚠⚠ **也不要去看 `public/js/attendance-detail.js`。** 那支是**死碼** ——
+⚠⚠ **我還跑去看了 `public/js/attendance-detail.js`，但那支是死碼。**
 明細頁早就改成 server-side 渲染（`$timeline` ＋ Blade `@forelse`），
 `detail.blade.php` 的 `@section('scripts')` 只載 flatpickr，沒有載它。
 兩邊的欄位還不一樣（Blade 有「班別」「請假」，那支沒有），所以照著它查
@@ -132,6 +132,9 @@ Telegram 收到的那份會對不起來 —— 那種不一致最難查，因為
 
 > 需求方的截圖裡有「班別」欄，而那支 JS 沒有 —— **那就是「你在看錯檔案」
 > 的訊號**。欄位對不上時先確認畫面到底是誰畫的。
+
+那支（連同只有它在用的 `ajax-user-monthly` 端點與三條 CSS）**2026-11-02
+已經刪掉**，見下面「清掉的死碼」。
 
 ⚠ `values()` 不能省：`reverse()` 會保留原本的 key。
 
@@ -143,6 +146,26 @@ Telegram 收到的那份會對不起來 —— 那種不一致最難查，因為
 
 ⚠ 選單那兩條例外判斷為什麼長那樣、以及路由為什麼沒跟著搬到 `report.`
 前綴，見下面第 4 節 —— 要搬路由的話那兩處一定要一起改。
+
+### 清掉的死碼（2026-11-02，v3.70）
+
+需求方：「死碼確定用不到可以刪除，但必須要確認真的沒有。」
+
+刪掉的三樣，以及**怎麼確認它們真的是死的**：
+
+| 刪掉的 | 確認方式 |
+|---|---|
+| `public/js/attendance-detail.js` | 全專案沒有任何 `<script src>` 指向它；而且它一開頭找的 `#attendance-detail-app` **在整個 resources/ 裡都不存在** —— 就算被載入也會立刻 return |
+| `attendance/ajax-user-monthly` 路由 ＋ `AttendanceController::ajaxUserMonthly()` | 全專案（含 tests/）對它的引用只有三處：方法本身、路由定義、以及上面那支死碼。刪掉後 `route:list` 查不到 |
+| `.att-month-input`（含 hover 與深色）、`.att-detail-header`、`.att-detail-meta` | 這三個 class 在 `resources/` 與其餘 JS 裡**一次都沒出現**。明細頁的月份選擇器用的是 `form-control form-control-sm`，不是 `att-month-input` |
+
+⚠ **`att-good`／`att-warn`／`att-table-desktop`／`dash-card*` 沒有刪** ——
+那四組雖然也被死碼用到，但**別的頁面還在用**。逐個 class 查過才動手，
+不要因為「這支檔案刪了」就把它引用的樣式一起清掉。
+
+⚠ 刪路由要跑 `artisan optimize`（路由有快取）。刪完驗過：
+`route:list` 沒有 `ajax-user-monthly`、明細頁 blade 仍編譯得過、
+時間軸仍產得出 30 列。
 
 ### 3. 報表頁本身不能綁 `can:` middleware
 
@@ -269,7 +292,7 @@ resources/lang/{tw,cn,en}/attendance.php    移除只給舊分頁用的 key；ba
 resources/views/layouts/app.blade.php       sidebar 新增「報表」；打卡入口條件移除 attendance.report
 resources/views/admin/attendance/detail.blade.php     返回鍵改回報表頁
 public/js/attendance.js                     移除「月報表」分頁與 loadReport/renderReport
-public/js/attendance-detail.js              返回鍵改回報表頁
+public/js/attendance-detail.js              返回鍵改回報表頁（檔案已於 2026-11-02 刪除）
 ```
 
 **2026-10-11 追加（不列主管以上）**
