@@ -172,11 +172,24 @@ return [
         // 補點那幾筆才有的三行：原本是多少、補多少、現在是多少
         'tooltip_before' => '原本',
         'tooltip_change' => '異動',
+        'tooltip_topup'   => '其中補點',
+        'tooltip_consume' => '其中消耗',
         'tooltip_after'  => '現在',
         'summary_range'  => '期間',
         'summary_first'  => '期初餘點',
         'summary_last'   => '期末餘點',
         'summary_diff'   => '變化',
+        /*
+         * ⚠ 「變化」是補點與消耗的總和，這兩格把它拆開（需求方 2026-11-01）。
+         * 扣點算在「補點」這一欄（顯示成負數）—— 那是人為異動，
+         * 跟客戶消耗是兩回事。
+         */
+        'summary_topup'   => '補點',
+        'summary_consume' => '消耗',
+        // 以每天 10 點那一筆同步當錨點，算兩天之間的「消耗」（不含補點）
+        'summary_daily_consume' => '平均每天消耗',
+        'summary_daily_na'      => '資料不足',
+        'summary_daily_days'    => '依 :days 天',
         'empty'          => '這段期間沒有同步紀錄。',
         // 「每次都失敗」跟「根本沒人同步」是兩回事，不能共用上面那句
         'empty_only_failed' => '這段期間的同步都沒有拿到點數，所以畫不出曲線，明細請見下方。',

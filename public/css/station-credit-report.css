@@ -78,6 +78,24 @@
     color: #adb5bd;
 }
 
+/* 摘要卡片上的數字，配色與 tooltip 同一套。
+
+   ⚠ **不要用 Bootstrap 的 `text-success` / `text-danger`**：那是綠漲紅跌，
+   跟這個專案指定的「＋紅 −綠」（華人金融市場慣例，需求方 2026-10-30）
+   **剛好相反**。2026-11-01 之前摘要卡片就是用 Bootstrap 那一組，所以
+   同一個畫面上，tooltip 的「−1000」是綠的、摘要的「變化 −1000」是紅的。 */
+.cr-amount.is-up {
+    color: #d6336c;
+}
+
+.cr-amount.is-down {
+    color: #0f9960;
+}
+
+.cr-amount.is-flat {
+    color: #6c757d;
+}
+
 .cr-tooltip-sub {
     margin-left: 1.05rem;
     color: #ced4da;

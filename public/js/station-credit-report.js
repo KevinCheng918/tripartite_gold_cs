@@ -141,15 +141,62 @@
             return;
         }
 
-        var diff = summary.diff || 0;
-        var diffClass = diff > 0 ? 'text-success' : (diff < 0 ? 'text-danger' : 'text-muted');
-
-        box.innerHTML = [
+        /*
+         * ⚠ 顏色一律走 `cr-amount` + `diffClass()`，**不要用 Bootstrap 的
+         * `text-success` / `text-danger`** —— 那是綠漲紅跌，跟這個專案指定的
+         * 「＋紅 −綠」相反。2026-11-01 之前這裡就是用 Bootstrap 那一組，
+         * 所以同一畫面上 tooltip 與摘要的同一個數字是反色的。
+         */
+        var cards = [
             card(i18n.summary_range, escapeHtml(range.start + ' ~ ' + range.end), ''),
             card(i18n.summary_first, formatNumber(summary.first), ''),
             card(i18n.summary_last, formatNumber(summary.last), ''),
-            card(i18n.summary_diff, signed(diff), diffClass)
-        ].join('');
+            card(i18n.summary_diff, signed(summary.diff || 0), amountClass(summary.diff)),
+            card(i18n.summary_topup, signed(summary.topup || 0), amountClass(summary.topup)),
+            card(i18n.summary_consume, signed(summary.consume || 0), amountClass(summary.consume)),
+            card(i18n.summary_daily_consume, dailyConsumeText(summary), amountClass(summary.daily_consume))
+        ];
+
+        box.innerHTML = cards.join('');
+    }
+
+    /**
+     * 摘要數字的顏色 class
+     *
+     * ⚠ 跟 tooltip 共用同一套「＋紅 −綠」，只是 class 前綴不同
+     * （`cr-amount` vs `cr-tooltip-diff`）—— 兩邊的規則放在同一個 CSS 檔裡
+     * 相鄰，改色時不會只改到一半。
+     *
+     * @param {number|null} value
+     * @return {string}
+     */
+    function amountClass(value) {
+        if (value === null || value === undefined) { return 'cr-amount is-flat'; }
+
+        return 'cr-amount ' + diffClass(value);
+    }
+
+    /**
+     * 「平均每天消耗」那一格的文字
+     *
+     * ⚠ 算不出來時要講原因，不要顯示 0：期間內只有一天（或更少）有 10 點那
+     * 一筆同步時，根本沒有「兩天之間」可以比。顯示 0 會被讀成「都沒在消耗」。
+     *
+     * ⚠ 後面附上實際依據幾天，不然看的人沒辦法判斷這個平均可不可信
+     * （跨 2 天跟跨 30 天的平均，份量差很多）。
+     *
+     * @param {object} summary
+     * @return {string}
+     */
+    function dailyConsumeText(summary) {
+        if (summary.daily_consume === null || summary.daily_consume === undefined) {
+            return '<span class="text-muted">' + escapeHtml(i18n.summary_daily_na) + '</span>';
+        }
+
+        return signed(Math.round(summary.daily_consume))
+            + ' <span class="text-muted" style="font-size:0.75rem">'
+            + escapeHtml((i18n.summary_daily_days || '').replace(':days', summary.daily_consume_days))
+            + '</span>';
     }
 
     /**
@@ -477,6 +524,16 @@
                 diff.className = 'cr-tooltip-diff ' + diffClass(point.diff);
                 diff.textContent = i18n.tooltip_diff + ' ' + signed(point.diff);
                 el.appendChild(diff);
+
+                /*
+                 * ⚠ **只有真的補過點才拆**（需求方 2026-11-01：補點與消耗
+                 * 分開顯示）。沒補點的那些點，「變化」與「消耗」是同一個
+                 * 數字 —— 兩行印一樣的值只是雜訊。
+                 */
+                if (point.topup) {
+                    appendSubLine(el, i18n.tooltip_topup + '：' + signed(point.topup));
+                    appendSubLine(el, i18n.tooltip_consume + '：' + signed(point.consume));
+                }
             }
 
             if (!point) { return; }
