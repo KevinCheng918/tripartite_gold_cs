@@ -49,7 +49,7 @@ return [
     'field_participant'     => '参与人',
     'assignee_hint'         => '负责把这件事做完的人（结案与否由他负责）。',
     'participant_hint'      => '一起处理或需要知道的人，但不负责结案。',
-    'participant_outsider'  => '（未参与此项目）',
+    'people_outsider'       => '（未参与此项目）',
     'assignee_empty'        => '未指派',
     'participant_empty'     => '无',
 

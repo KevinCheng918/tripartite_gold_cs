@@ -281,7 +281,8 @@
                             <label class="form-label">{{ trans('task_board.field_assignee') }}</label>
                             <div id="task-assignee-list" style="max-height:150px;overflow-y:auto;border:1px solid #dee2e6;border-radius:0.25rem;padding:0.5rem">
                                 @foreach($assignees as $u)
-                                    <div class="form-check">
+                                    {{-- data-user-id：選了專案之後要照參與專案過濾這一列（見 filterNewTaskPeople） --}}
+                                    <div class="form-check js-people-row" data-user-id="{{ $u->id }}">
                                         <input class="form-check-input js-assignee-check" type="checkbox" value="{{ $u->id }}" id="assignee-{{ $u->id }}">
                                         <label class="form-check-label" for="assignee-{{ $u->id }}">{{ $u->nickname }}</label>
                                     </div>
@@ -296,8 +297,8 @@
                             <label class="form-label">{{ trans('task_board.field_participant') }}</label>
                             <div id="task-participant-list" style="max-height:150px;overflow-y:auto;border:1px solid #dee2e6;border-radius:0.25rem;padding:0.5rem">
                                 @foreach($assignees as $u)
-                                    {{-- data-user-id：選了專案之後要照參與專案過濾這一列（見 filterNewTaskParticipants） --}}
-                                    <div class="form-check js-participant-row" data-user-id="{{ $u->id }}">
+                                    {{-- data-user-id：選了專案之後要照參與專案過濾這一列（見 filterNewTaskPeople） --}}
+                                    <div class="form-check js-people-row" data-user-id="{{ $u->id }}">
                                         <input class="form-check-input js-participant-check" type="checkbox" value="{{ $u->id }}" id="participant-{{ $u->id }}">
                                         <label class="form-check-label" for="participant-{{ $u->id }}">{{ $u->nickname }}</label>
                                     </div>
@@ -511,7 +512,7 @@ $(function () {
     var USER_PROJECTS = @json($assigneeProjects);
 
     /**
-     * 這張卡的參與人清單要不要顯示這個人
+     * 這張卡的人員清單（指派人員／參與人）要不要顯示這個人
      *
      * ⚠ **已經被勾選的人一律顯示，就算他沒參與這個專案。**
      * 藏起來的話，使用者按一次「確認」就會把他**靜悄悄地移除** ——
@@ -526,7 +527,7 @@ $(function () {
      * @param {Array} currentIds 目前已勾選的人
      * @returns {boolean}
      */
-    function showInParticipantList(userId, projectId, currentIds) {
+    function showInPeopleList(userId, projectId, currentIds) {
         if (!projectId) { return true; }
         if ((currentIds || []).indexOf(userId) !== -1) { return true; }
 
@@ -547,7 +548,7 @@ $(function () {
         if (!projectId) { return ''; }
         if ((USER_PROJECTS[userId] || []).indexOf(projectId) !== -1) { return ''; }
 
-        return ' <span class="text-danger" style="font-size:0.75rem">{{ trans('task_board.participant_outsider') }}</span>';
+        return ' <span class="text-danger" style="font-size:0.75rem">{{ trans('task_board.people_outsider') }}</span>';
     }
     var canCreate = {{ Auth::user()->hasPermission('task_board.create') ? 'true' : 'false' }};
     var canUpdate = {{ Auth::user()->hasPermission('task_board.update') ? 'true' : 'false' }};
@@ -1339,15 +1340,17 @@ $(function () {
                      */
                     var currentIds = t[fieldName] || [];
                     /*
-                     * ⚠ **只有參與人要照專案過濾**（需求方 2026-11-03）。
-                     * 指派人員維持列出全部 —— 那一欄沒有被要求改，
-                     * 而這兩者共用同一段，所以要看 `fieldName`。
+                     * ⚠ **指派人員與參與人都照專案過濾**（需求方 2026-11-03，
+                     * 先只要參與人，隔天追加指派人員）。
+                     *
+                     * 兩者共用這一段，所以不必分岔 —— 但**指派給不在專案裡的
+                     * 人後果更嚴重**：那張卡會指派給一個連看板都看不到它的人
+                     * （看板本身就照參與專案過濾），他永遠不會知道。
                      */
-                    var filterByProject = fieldName === 'participant_ids';
-                    var panelProjectId = filterByProject ? (t.project_id || null) : null;
+                    var panelProjectId = t.project_id || null;
                     var checkHtml = '<div style="max-height:150px;overflow-y:auto;border:1px solid #dee2e6;border-radius:0.25rem;padding:0.5rem">';
                     @foreach($assignees as $u)
-                    if (!filterByProject || showInParticipantList({{ $u->id }}, panelProjectId, currentIds)) {
+                    if (showInPeopleList({{ $u->id }}, panelProjectId, currentIds)) {
                         checkHtml += '<div class="form-check"><input class="form-check-input js-panel-assignee" type="checkbox" value="{{ $u->id }}"' + (currentIds.indexOf({{ $u->id }}) !== -1 ? ' checked' : '') + '><label class="form-check-label">{{ $u->nickname }}' + outsiderTag({{ $u->id }}, panelProjectId) + '</label></div>';
                     }
                     @endforeach
@@ -1590,12 +1593,11 @@ $(function () {
                  * 存檔就把參與人覆蓋成指派人員（而且畫面看起來像成功）。
                  */
                 var currentIds = t[propEditField] || [];
-                // ⚠ 只有參與人照專案過濾，理由同側邊面板那一段
-                var propFilterByProject = propEditField === 'participant_ids';
-                var propProjectId = propFilterByProject ? (t.project_id || null) : null;
+                // ⚠ 指派人員與參與人都照專案過濾，理由同側邊面板那一段
+                var propProjectId = t.project_id || null;
                 html = '<div style="max-height:200px;overflow-y:auto;border:1px solid #dee2e6;border-radius:0.25rem;padding:0.5rem">';
                 @foreach($assignees as $u)
-                if (!propFilterByProject || showInParticipantList({{ $u->id }}, propProjectId, currentIds)) {
+                if (showInPeopleList({{ $u->id }}, propProjectId, currentIds)) {
                     html += '<div class="form-check"><input class="form-check-input js-prop-assignee" type="checkbox" value="{{ $u->id }}"' + (currentIds.indexOf({{ $u->id }}) !== -1 ? ' checked' : '') + '><label class="form-check-label">{{ $u->nickname }}' + outsiderTag({{ $u->id }}, propProjectId) + '</label></div>';
                 }
                 @endforeach
@@ -2383,7 +2385,7 @@ $(function () {
     }
 
     /**
-     * 新增／編輯任務視窗：參與人只留有參與該專案的人
+     * 新增／編輯任務視窗：指派人員與參與人都只留有參與該專案的人
      *
      * ⚠ **被藏起來的同時一定要取消勾選。** 先挑了專案 A 勾了某人，再把專案
      * 換成 B（那個人不在 B 裡）—— 只藏不取消的話，那個勾還在表單裡，
@@ -2393,23 +2395,24 @@ $(function () {
      *
      * @returns {void}
      */
-    function filterNewTaskParticipants() {
+    function filterNewTaskPeople() {
         var projectId = parseInt($('#task-project').val(), 10) || null;
 
-        $('#task-participant-list .js-participant-row').each(function () {
+        // 兩份清單用同一個 class，一起處理 —— 規則一樣就不要寫兩遍
+        $('#task-assignee-list .js-people-row, #task-participant-list .js-people-row').each(function () {
             var $row = $(this);
             var userId = parseInt($row.data('user-id'), 10);
             var allowed = !projectId || (USER_PROJECTS[userId] || []).indexOf(projectId) !== -1;
 
             if (!allowed) {
-                $row.find('.js-participant-check').prop('checked', false);
+                $row.find('input[type="checkbox"]').prop('checked', false);
             }
 
             $row.toggle(allowed);
         });
     }
 
-    $('#task-project').on('change', filterNewTaskParticipants);
+    $('#task-project').on('change', filterNewTaskPeople);
 
     $('#btn-open-create-task').on('click', function () {
         $('#task-id').val('');
@@ -2418,7 +2421,7 @@ $(function () {
         $('#modal-task-title').text('{{ trans("task_board.action_create_task") }}');
         resetTaskStationPicker();
         // reset() 之後專案會回到預設值，清單要跟著重算
-        filterNewTaskParticipants();
+        filterNewTaskPeople();
         showBsModal('modal-task');
     });
 

@@ -49,7 +49,7 @@ return [
     'field_participant'     => 'Participants',
     'assignee_hint'         => 'The people responsible for getting this done — closing it is on them.',
     'participant_hint'      => 'People working on it with you or who need to know, but are not responsible for closing it.',
-    'participant_outsider'  => '(not in this project)',
+    'people_outsider'       => '(not in this project)',
     'assignee_empty'        => 'Unassigned',
     'participant_empty'     => 'None',
 
