@@ -510,7 +510,19 @@ class UserRepository
     public function getActiveForDropdown()
     {
         return User::query()
-            ->select(['id', 'nickname'])
+            /*
+             * ⚠ **`project_ids` 一定要撈**（2026-11-03 加）。
+             *
+             * 任務看板的參與人清單要照卡片所屬專案過濾，而判斷依據是
+             * `User::projectIdList()` 讀的這一欄 —— 沒撈的話它永遠是空陣列，
+             * **於是每一個人看起來都沒參與任何專案，清單會變成全空**。
+             *
+             * ⚠ 這是這個 Repository 同一種坑的第三次（前兩次是
+             * `findByTelegramUserId()` 漏 `level` 與漏 `project_ids`）：
+             * **欄位沒撈不會報錯**，只會讓依賴它的判斷安靜地全部走錯邊。
+             * 在這支加任何「依使用者判斷可見範圍」的功能前，先確認欄位在不在。
+             */
+            ->select(['id', 'nickname', 'project_ids'])
             ->where('status', config('constants.USER.STATUS.NORMAL'))
             ->where('level', '!=', config('constants.USER.LEVEL.ADMIN'))
             ->orderBy('nickname')

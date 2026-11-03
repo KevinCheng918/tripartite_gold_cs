@@ -296,7 +296,8 @@
                             <label class="form-label">{{ trans('task_board.field_participant') }}</label>
                             <div id="task-participant-list" style="max-height:150px;overflow-y:auto;border:1px solid #dee2e6;border-radius:0.25rem;padding:0.5rem">
                                 @foreach($assignees as $u)
-                                    <div class="form-check">
+                                    {{-- data-user-id：選了專案之後要照參與專案過濾這一列（見 filterNewTaskParticipants） --}}
+                                    <div class="form-check js-participant-row" data-user-id="{{ $u->id }}">
                                         <input class="form-check-input js-participant-check" type="checkbox" value="{{ $u->id }}" id="participant-{{ $u->id }}">
                                         <label class="form-check-label" for="participant-{{ $u->id }}">{{ $u->nickname }}</label>
                                     </div>
@@ -500,6 +501,54 @@
 <script>
 $(function () {
     var csrfToken = $('meta[name="csrf-token"]').attr('content');
+
+    /*
+     * 誰參與了哪些專案（user_id => [project_id]）。
+     *
+     * 需求方 2026-11-03：「參與人的彈窗只顯示有參與專案的人，避免沒參與
+     * 這個專案但被誤勾的問題。」
+     */
+    var USER_PROJECTS = @json($assigneeProjects);
+
+    /**
+     * 這張卡的參與人清單要不要顯示這個人
+     *
+     * ⚠ **已經被勾選的人一律顯示，就算他沒參與這個專案。**
+     * 藏起來的話，使用者按一次「確認」就會把他**靜悄悄地移除** ——
+     * 他根本沒看到那個人在清單上，也不會知道自己剛剛拔掉了誰。
+     * 舊卡片上留著早期勾選的人、或有人事後被移出專案，都會踩到。
+     *
+     * ⚠ 卡片沒有專案時（理論上不會，`project_id` 是必填）**全部顯示** ——
+     * 不確定要照什麼篩的時候，寧可多給選項也不要給一張空清單。
+     *
+     * @param {number} userId
+     * @param {number|null} projectId 卡片所屬專案
+     * @param {Array} currentIds 目前已勾選的人
+     * @returns {boolean}
+     */
+    function showInParticipantList(userId, projectId, currentIds) {
+        if (!projectId) { return true; }
+        if ((currentIds || []).indexOf(userId) !== -1) { return true; }
+
+        return (USER_PROJECTS[userId] || []).indexOf(projectId) !== -1;
+    }
+
+    /**
+     * 已勾選但沒參與這個專案的人，標一下
+     *
+     * ⚠ 不標的話，使用者會以為清單就是「專案成員」—— 然後把這個人留在上面，
+     * 而他其實已經不在專案裡了。標出來才會有人去處理。
+     *
+     * @param {number} userId
+     * @param {number|null} projectId
+     * @returns {string}
+     */
+    function outsiderTag(userId, projectId) {
+        if (!projectId) { return ''; }
+        if ((USER_PROJECTS[userId] || []).indexOf(projectId) !== -1) { return ''; }
+
+        return ' <span class="text-danger" style="font-size:0.75rem">{{ trans('task_board.participant_outsider') }}</span>';
+    }
     var canCreate = {{ Auth::user()->hasPermission('task_board.create') ? 'true' : 'false' }};
     var canUpdate = {{ Auth::user()->hasPermission('task_board.update') ? 'true' : 'false' }};
     var canDelete = {{ Auth::user()->hasPermission('task_board.delete') ? 'true' : 'false' }};
@@ -1289,9 +1338,18 @@ $(function () {
                      * 的話改參與人會把指派人員覆蓋掉（而且畫面上看起來像成功）。
                      */
                     var currentIds = t[fieldName] || [];
+                    /*
+                     * ⚠ **只有參與人要照專案過濾**（需求方 2026-11-03）。
+                     * 指派人員維持列出全部 —— 那一欄沒有被要求改，
+                     * 而這兩者共用同一段，所以要看 `fieldName`。
+                     */
+                    var filterByProject = fieldName === 'participant_ids';
+                    var panelProjectId = filterByProject ? (t.project_id || null) : null;
                     var checkHtml = '<div style="max-height:150px;overflow-y:auto;border:1px solid #dee2e6;border-radius:0.25rem;padding:0.5rem">';
                     @foreach($assignees as $u)
-                    checkHtml += '<div class="form-check"><input class="form-check-input js-panel-assignee" type="checkbox" value="{{ $u->id }}"' + (currentIds.indexOf({{ $u->id }}) !== -1 ? ' checked' : '') + '><label class="form-check-label">{{ $u->nickname }}</label></div>';
+                    if (!filterByProject || showInParticipantList({{ $u->id }}, panelProjectId, currentIds)) {
+                        checkHtml += '<div class="form-check"><input class="form-check-input js-panel-assignee" type="checkbox" value="{{ $u->id }}"' + (currentIds.indexOf({{ $u->id }}) !== -1 ? ' checked' : '') + '><label class="form-check-label">{{ $u->nickname }}' + outsiderTag({{ $u->id }}, panelProjectId) + '</label></div>';
+                    }
                     @endforeach
                     checkHtml += '</div>';
                     $valueDiv.html(checkHtml + '<div class="d-flex gap-2 mt-1">' + editConfirmBtn + editCancelBtn + '</div>');
@@ -1532,9 +1590,14 @@ $(function () {
                  * 存檔就把參與人覆蓋成指派人員（而且畫面看起來像成功）。
                  */
                 var currentIds = t[propEditField] || [];
+                // ⚠ 只有參與人照專案過濾，理由同側邊面板那一段
+                var propFilterByProject = propEditField === 'participant_ids';
+                var propProjectId = propFilterByProject ? (t.project_id || null) : null;
                 html = '<div style="max-height:200px;overflow-y:auto;border:1px solid #dee2e6;border-radius:0.25rem;padding:0.5rem">';
                 @foreach($assignees as $u)
-                html += '<div class="form-check"><input class="form-check-input js-prop-assignee" type="checkbox" value="{{ $u->id }}"' + (currentIds.indexOf({{ $u->id }}) !== -1 ? ' checked' : '') + '><label class="form-check-label">{{ $u->nickname }}</label></div>';
+                if (!propFilterByProject || showInParticipantList({{ $u->id }}, propProjectId, currentIds)) {
+                    html += '<div class="form-check"><input class="form-check-input js-prop-assignee" type="checkbox" value="{{ $u->id }}"' + (currentIds.indexOf({{ $u->id }}) !== -1 ? ' checked' : '') + '><label class="form-check-label">{{ $u->nickname }}' + outsiderTag({{ $u->id }}, propProjectId) + '</label></div>';
+                }
                 @endforeach
                 html += '</div>';
                 // 兩個欄位長得一樣，標題之外再加一句說明差別
@@ -2319,12 +2382,43 @@ $(function () {
         toggleTaskStationPanel(false);
     }
 
+    /**
+     * 新增／編輯任務視窗：參與人只留有參與該專案的人
+     *
+     * ⚠ **被藏起來的同時一定要取消勾選。** 先挑了專案 A 勾了某人，再把專案
+     * 換成 B（那個人不在 B 裡）—— 只藏不取消的話，那個勾還在表單裡，
+     * 送出時會把一個畫面上看不到的人寫進參與人。
+     *
+     * ⚠ 還沒選專案時**全部顯示**，不要先清空：那會讓人以為這張表壞了。
+     *
+     * @returns {void}
+     */
+    function filterNewTaskParticipants() {
+        var projectId = parseInt($('#task-project').val(), 10) || null;
+
+        $('#task-participant-list .js-participant-row').each(function () {
+            var $row = $(this);
+            var userId = parseInt($row.data('user-id'), 10);
+            var allowed = !projectId || (USER_PROJECTS[userId] || []).indexOf(projectId) !== -1;
+
+            if (!allowed) {
+                $row.find('.js-participant-check').prop('checked', false);
+            }
+
+            $row.toggle(allowed);
+        });
+    }
+
+    $('#task-project').on('change', filterNewTaskParticipants);
+
     $('#btn-open-create-task').on('click', function () {
         $('#task-id').val('');
         $('#form-task')[0].reset();
         $('#pri-medium').prop('checked', true);
         $('#modal-task-title').text('{{ trans("task_board.action_create_task") }}');
         resetTaskStationPicker();
+        // reset() 之後專案會回到預設值，清單要跟著重算
+        filterNewTaskParticipants();
         showBsModal('modal-task');
     });
 

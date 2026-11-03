@@ -67,6 +67,8 @@ class TaskBoardController extends Controller
         return view('admin.task-board.index', [
             'projects'  => $projects,
             'assignees' => $assignees,
+            // 參與人清單要照卡片的專案過濾，前端需要「誰參與了哪些專案」
+            'assigneeProjects' => $this->taskBoardService->assigneeProjectMap($assignees),
             'stations'  => $stations,
             'systems'   => $systems,
             // 首屏的卡片直接跟著頁面送出去，前端就不必再等一趟 ajax。

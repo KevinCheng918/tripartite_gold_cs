@@ -723,6 +723,33 @@ class TaskBoardService
     }
 
     /**
+     * 每個候選人參與了哪些專案（給前端過濾參與人清單用）
+     *
+     * 需求方 2026-11-03：「編輯參與人的彈窗這邊只顯示有參與專案的人，
+     * 避免沒參與這個專案，但被誤勾的問題。」
+     *
+     * ⚠ **用 `projectIdList()` 不要自己讀 `project_ids`**：正規化
+     * （null、字串數字）只有那一支做對，自己再寫一份遲早會分岔 ——
+     * 而分岔的那一邊就是「某個人明明有參與卻不出現在清單上」。
+     *
+     * ⚠ 候選名單本身**不含管理者**（`getActiveForDropdown()` 就濾掉了），
+     * 所以這裡不必處理「管理者看得到全部專案」那條規則。
+     *
+     * @param \Illuminate\Support\Collection $assignees
+     * @return array<int, array<int>> user_id => project_id 陣列
+     */
+    public function assigneeProjectMap($assignees)
+    {
+        $map = [];
+
+        foreach ($assignees as $user) {
+            $map[(int) $user->id] = $user->projectIdList();
+        }
+
+        return $map;
+    }
+
+    /**
      * 取得所有站台（下拉選單用）
      *
      * @return \Illuminate\Database\Eloquent\Collection
