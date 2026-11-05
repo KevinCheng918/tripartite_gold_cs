@@ -17,6 +17,14 @@ return [
     'status_success' => 'Success',
     'status_failed'  => 'Failed',
 
+    'field_os'      => 'OS',
+    'field_browser' => 'Browser',
+
+    // ⚠ Shared by the login-log table and the Telegram login notice, produced only by UserAgentPresenter
+    'device_desktop' => 'Desktop',
+    'device_mobile'  => 'Mobile',
+    'device_tablet'  => 'Tablet',
+
     'filter_all'     => 'All',
     'filter_success' => 'Success',
     'filter_failed'  => 'Failed',

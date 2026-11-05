@@ -4,7 +4,8 @@
 
 > 「我現在登入後台要發送私人通知，幾點幾分 IP 多少登入、作業系統、瀏覽器、裝置。」
 
-**狀態：規劃中，等裁示。**
+**狀態：已實作（v3.77，2026-11-05）。**
+**⚠ 上線前置：跑 migration `2026_11_06_000001`（加 `notified_at`）；正式機 `php artisan optimize`。沒跑 migration 的話 `login:notify` 每分鐘報錯。**
 
 ## 好消息：資料已經在記了，不用改登入流程
 
@@ -19,148 +20,205 @@
 
 所以這個需求**不是「開始記錄」，而是「把已經記的東西解析出來、私訊出去」**。
 
-## ⚠⚠ 最大的坑：UA 解析已經有一份，寫在 Blade 的 JS 裡
+## 架構：登入只寫紀錄，排程負責發
 
-`resources/views/admin/accounts/index.blade.php` 第 827 行附近有一個
-`parseUA()`，用正規表達式從 UA 撈出 OS 與瀏覽器，**只跑在瀏覽器端**。
-通知要在伺服器端發，所以伺服器端也需要一份。
+```
+LoginController::login()          登入當下只寫 login_log（本來就會寫）
+        ↓
+login:notify（每分鐘，withoutOverlapping）
+        ↓
+LoginNoticeService::run()         撈 notified_at 為 null 的 → 判斷 → 組字
+        ↓
+UserAgentPresenter::parse()       UA → 作業系統／瀏覽器／裝置
+StaffDmService::send()            私訊本人（不傳 noticeKey ＝ 不可靜音）
+        ↓
+LoginLogRepository::markNotified()  處理完就標記（含決定不發的）
+```
 
-**兩份各自維護的下場今天才剛修過**：`StaffResource` 與 `AccountResource`
-各寫一份 `calcTenure()`，兩份都有同一個 bug
-（見 [[../bugfix/2026-11-05-tenure-diff-skips-a-day]]）。
+⚠ **為什麼不在登入當下發**：`TelegramBotService` 的 HTTP client 是
+`['timeout' => 10]`，而 `QUEUE_CONNECTION=sync` —— **`dispatch()` 在這個專案
+是當場跑完、不是丟背景**（既有的 `AutoReplyJob` 等等也都是同步跑）。
+在登入流程裡發私訊的話，Telegram 慢或掛掉時使用者按下登入會卡最多 10 秒
+才進得去後台。登入是所有人每天第一個動作。
 
-> **所以這次要反過來做**：解析寫成 `UserAgentPresenter`（PHP），
-> 塞進 `LoginLogResource` 一起回前端，**然後把 Blade 裡那段 JS 刪掉**。
-> 畫面與通知從此看到同一份解析結果。
+⚠ 要 `withoutOverlapping`，否則同一批會被撈兩次（`notified_at` 是處理完才標）。
 
-⚠ 沒有裝任何 UA 解析套件（`composer.json` 裡沒有 `jenssegers/agent`
-之類）。PHP 版就照現有 JS 那組正規表達式搬過去，不為這個需求裝新套件。
+⚠ 沒有裝任何 UA 解析套件（`composer.json` 裡沒有 `jenssegers/agent` 之類），
+也刻意不為這個需求裝 —— 規則就這幾條，搬一份正規表達式比多一個依賴便宜。
 
-## ⚠⚠ 第二個坑：不能在登入當下同步打 Telegram
+## 通知長什麼樣
 
-`TelegramBotService` 的 HTTP client 是 `['timeout' => 10]`，而
-`QUEUE_CONNECTION=sync` ——  **`dispatch()` 在這個專案是當場跑完，不是丟背景**
-（既有的 `AutoReplyJob` 等等也都是同步跑）。
-
-在登入流程裡直接發私訊的話：Telegram 慢或掛掉時，**使用者按下登入會卡最多
-10 秒才進得去後台**。登入是所有人每天第一個動作，不能掛這種風險。
-
-**建議照抄 `task:notify-changes` 的做法**（這個專案已經有這個模式）：
-`login_log` 加一個 `notified_at`，新開 `login:notify` 每分鐘撈「成功登入但
-還沒通知」的紀錄發出去。登入流程完全不動、零延遲，代價是通知最多慢 1 分鐘。
-
-⚠ 要 `withoutOverlapping`，否則同一批會被撈兩次（`notified_at` 是發完才標）。
-
-## ⚠ 第三個坑：沒綁機器人的人收不到，而且不會報錯
-
-`StaffDmService::canDm()` 要 `telegram_user_id` **且** `telegram_dm_ready`
-兩個都成立 —— Telegram 不讓 bot 主動私訊沒對話過的人。
-
-沒私訊過 bot 的帳號，這個通知會**安靜地不送出**。對一般通知沒差，
-但這是**安全性通知**：以為自己被保護著、其實沒有，比沒有這個功能更糟。
-
-> 建議：後台人員管理列表要能看出「誰收不到登入通知」，
-> 或至少在個人設定頁標一行提示。
-
-## 通知長什麼樣（草稿）
+成功登入（已知來源）：
 
 ```
 🔐 您的帳號已登入
 
-時間：2026-11-05 14:32
+時間：2026-11-06 14:32
 IP：203.0.113.45
 作業系統：Windows 10
 瀏覽器：Chrome 131
 裝置：桌機
 
-若這不是您本人的操作，請立即聯繫管理者更換密碼。
+若這不是您本人的操作，請立即更換密碼並聯繫管理者。
 ```
 
-⚠ 「裝置」這一欄要討論 —— 見待釐清 4。
+沒見過的來源**不另外發一則**，而是在同一則後面加一行
+「⚠️ 這是我們沒有見過的登入來源。」—— 成功登入已經每次都發了，
+再多一則會變成同一件事兩則訊息。
 
-## 待釐清（等裁示）
+失敗另有兩種版本（陌生來源／連續失敗），四種文案都在
+`constants.LOGIN_NOTICE`。
 
-### 1. 即時發，還是最多慢 1 分鐘？
+## 裁示結果（需求方 2026-11-05／06）
 
-| 做法 | 延遲 | 代價 |
-|---|---|---|
-| **每分鐘排程**（推薦）| 最多 60 秒 | 登入流程零風險；要加 `notified_at` 欄位 |
-| 登入當下同步發 | 即時 | **Telegram 慢的時候登入會卡最多 10 秒** |
-
-### 2. 每次登入都發，還是只有「新 IP／新裝置」才發？
-
-每天開關電腦好幾次的人，每次都發等於每天好幾則私訊 —— 通知一吵就會被忽略，
-而被忽略的安全性通知等於沒有。
-
-| 做法 | 說明 |
+| 題目 | 裁示 |
 |---|---|
-| 每次都發 | 最符合字面需求，但會吵 |
-| **只有沒見過的 IP 或裝置才發**（推薦）| 真正要被看見的就是這種 |
-| 每次都發，但同一組 IP＋裝置 N 小時內只發一次 | 折衷 |
+| 發送時機 | **每分鐘排程**，不在登入當下同步發 |
+| 成功登入 | **每次都發** |
+| 失敗登入 | **沒見過的 IP 或裝置才發** |
+| 裝置欄位 | **桌機／手機／平板** |
+| 可否關閉 | **不可** |
+| IP 歸屬地 | 第一版不做 |
+| 收件人 | 只私訊登入者本人 |
 
-### 3. 登入失敗要不要也發？
+⚠ 需求方一開始同時選了「每次成功登入都發」與「只有沒見過的 IP 或裝置才發」，
+確認後才釐清：**前者是成功的規則、後者是失敗的規則**，不是互斥的二選一。
 
-⚠ **安全性上這個其實比成功登入更該通知** ——
-「有人在試你的帳號但沒進去」是唯一還來得及反應的時機。
-`login_log` 已經在記失敗了，發不發只是一個判斷。
+### 失敗登入的兩條路（實作時的補充設計）
 
-建議：失敗**不要每筆都發**（有人打錯密碼三次會收到三則），
-改成「同一帳號 N 分鐘內失敗滿 M 次才發一則」。N／M 請裁示。
+單純「沒見過才發」會漏掉一種情況：已知裝置上有人慢慢試密碼。所以分兩條：
 
-### 4. 「裝置」要顯示什麼？
+| 情況 | 行為 |
+|---|---|
+| 沒見過的 IP 或裝置 | **第 1 次就發**，不等累積 —— 那才是可疑的 |
+| 已知 IP 與裝置 | 5 分鐘內失敗滿 3 次才發一則 |
 
-⚠ 現有那份 JS 把「裝置」對應到**排版引擎**（WebKit／Gecko／Trident）——
-對使用者毫無意義，看到「WebKit」沒人知道那是什麼。
+⚠ 後者的門檻是為了「自己打錯密碼不該每次都被私訊」。
+窗口與門檻在 `constants.LOGIN_NOTICE`。
 
-建議改成**桌機／手機／平板**（從 UA 的 Mobile／iPad／Android 判斷），
-並且把既有畫面那一欄一起改掉。要不要保留引擎當附註請裁示。
+## 實作時踩到／刻意處理的
 
-### 5. 這個通知可以被關掉嗎？
+### ⚠⚠ 又多一份：UA 解析原本有**兩份** JS，不是一份
 
-`NOTICE.PERSONAL` 有一套個人靜音設定（班表、任務卡、催單、出勤四種），
-技術上加一個 `login` 進去就能關。
+規劃時只找到 `admin/accounts/index.blade.php` 的 `parseUA()`。
+實作時才發現 `layouts/app.blade.php` 還有一份 `myLoginLogParseUA()`
+（「我的登入紀錄」彈窗用的），兩份規則一字不差地重複。
 
-⚠ **但安全性通知可以關掉是有疑慮的**：帳號一旦被入侵，
-入侵者第一件事就能進後台把這個通知關掉，之後登入就完全無聲。
+加上伺服器端需要的那一份，本來會變成**三套各自維護**。
 
-建議：**不納入可靜音清單**（`send()` 不傳 `noticeKey`）。請裁示。
+兩份 JS 都已刪除，改由 `LoginLogResource` 回 `os`／`browser`／`device_type`，
+三個出口（兩個彈窗 ＋ Telegram 通知）看同一份 `UserAgentPresenter`。
 
-### 6. 要不要附 IP 歸屬地（國家／城市）？
+### ⚠⚠ 裝置指紋不能用 User-Agent 原字串
 
-「IP 203.0.113.45」一般人看不出有沒有問題，「從越南登入」才看得出。
-但這需要打外部 IP 查詢 API 或帶一份 GeoIP 資料庫 —— 是另一個工程量，
-建議第一版不做，先確認要不要排後面。
+Chrome 每次小版本更新 UA 就變（`131.0.6778.86` → `131.0.6778.140`）。
+拿原字串比「見過沒有」的話，**每個人每隔幾天就收到一則「新裝置登入」**——
+通知一吵就被忽略，而被忽略的安全通知等於沒有。
 
-### 7. 只通知本人，還是管理者也收一份？
+`UserAgentPresenter::signature()` 只取名稱不含版本號：`Windows|Chrome|桌機`。
+實測 131.0.6778.86 / .140 / 132 三者指紋相同、換 macOS 才不同。
 
-目前假設**只私訊登入者本人**。要不要讓管理者收到「所有人的登入」
-或「只有異常登入」請裁示。
+### ⚠⚠ 「見過」只採計成功登入
 
-## 預計動到的檔案（待裁示後才動工）
+把失敗也算進「見過」的話，攻擊者第一次失敗之後他的 IP 就變成「見過的 IP」，
+後續連續嘗試全部降級成要等累積門檻 —— **等於自己把警報關小聲**。
+`knownIps()`／`knownDevices()` 都有 `where('is_success', 1)`。
+
+### ⚠⚠ migration 一定要回填既有紀錄
+
+`notified_at` 留 null 的話，`login:notify` 第一次跑會把**整個歷史**判成未通知。
+正式機累積上千筆 —— 每個人會在同一分鐘內被轟幾十則幾個月前的登入，
+而 Telegram 訊息收回不來。回填成 `created_at`（不是 `now()`）：
+語意是「這筆在它發生的當下就算處理完了」。
+
+### ⚠ 回看窗口防「排程停掉後的補發雪崩」
+
+排程停一天再恢復，沒有下限會把一整天的登入全補發。超過
+`LOOKBACK_MINUTES`（30）的由 `staleNoticeIds()` 標記掉、不發。
+
+⚠ 那些**一定要標記**，不是放著 —— 留 null 會永遠被 `whereNull` 掃到。
+
+### ⚠ 新人第一次登入不報「新來源」
+
+完全沒有成功登入歷史時 `isNewSource()` 回 false。
+不然新人會在自己剛設定好帳號的那一刻收到「這是我們沒有見過的登入來源」——
+技術上正確，對他毫無意義。
+
+### ⚠ 刻意不納入可靜音清單
+
+`StaffDmService::send()` 不傳 `$noticeKey`（需求方裁示）。
+帳號被入侵時，入侵者第一件事就能把這個通知關掉。
+
+### 已知限制：沒綁機器人的人收不到，而且不報錯
+
+`canDm()` 要 `telegram_user_id` 與 `telegram_dm_ready` 都成立。
+這是**安全通知** —— 以為自己被保護著、其實沒有，比沒有這個功能更糟。
+每輪會把人數記一筆 `Log::warning`（記數量不記逐人，免得洗掉日誌）。
+要查是誰看帳號管理列表「有沒有私訊過機器人」那一欄。
+
+### ⚠ 順手發現：`admin.login-log.index` 的 view 不存在
+
+`routes/web.php` 有 `login-log.index` 指向 `view('admin.login-log.index')`，
+但 `resources/views/admin/login-log/` **整個目錄都沒有** —— 打開那個網址會
+`View not found`。側邊欄的「登入紀錄」走的是 `layouts/app.blade.php` 的彈窗
+（`menu-go-login-log` → `modal-my-login-log`），所以 UI 上沒人踩到。
+
+**這次沒修**（不在需求範圍），但那條路由是壞的，要嘛補 view 要嘛拿掉。
+
+## 實測
+
+**UA 解析（13 個案例）**
+
+| 檢查 | 結果 |
+|---|---|
+| iPad 不被判成 macOS（UA 含 `Mac OS X`）| iPadOS 17.1／平板 ✅ |
+| Android 手機 vs 平板（差在有無 `Mobile`）| 手機／平板 ✅ |
+| Edge／Opera 不被判成 Chrome（都含 `Chrome/`）| Edge 131／Opera 115 ✅ |
+| iOS 版 Chrome（`CriOS`）| Chrome 131／手機 ✅ |
+| Android 不被判成 Linux | Android 14 ✅ |
+| Windows NT 6.1 → 7 | Windows 7 ✅ |
+| 空字串／`curl/8.4.0` | 不爆，回 `-` ✅ |
+| 瀏覽器只留主版號 | `Chrome 131`（原字串仍在 `device`）✅ |
+
+**「沒見過的來源」判斷（7 項）全數通過**，含：同 IP ＋ Chrome 升版判已知、
+陌生 IP 判新、同 IP 換 iPhone 判新、新人無歷史判已知。
+
+**累積門檻**：1／2 次不發、3／5 次發。
+
+**四種通知文案**都實際渲染出來看過。
+
+**Command 與排程**：`login:notify` 已註冊、`schedule:list` 顯示 `* * * * *`。
+語系三語同步（`login_log`／`account` 各缺 0）。
+
+⚠ **端到端還沒跑過**：`notified_at` 欄位要等需求方跑 migration。
+跑完後建議先 `php artisan login:notify --dry-run` 看一輪會發什麼再開排程。
+
+## 動到的檔案
 
 **新增**
 
 ```
-database/migrations/..._add_notified_at_to_login_log_table.php   排程用的標記
-app/Presenters/UserAgentPresenter.php                            UA → OS／瀏覽器／裝置
-app/Services/LoginNoticeService.php                              組字 ＋ 發送
-app/Console/Commands/LoginNotifyCommand.php                      login:notify
+database/migrations/2026_11_06_000001_add_notified_at_to_login_log_table.php
+app/Presenters/UserAgentPresenter.php        UA → OS／瀏覽器／裝置 ＋ 指紋
+app/Services/LoginNoticeService.php          判斷 ＋ 組字 ＋ 發送
+app/Console/Commands/NotifyLoginCommand.php  login:notify（有 --dry-run）
 .claude/knowledge/features/login-notice.md（本檔）
 ```
 
 **修改**
 
 ```
-app/Repositories/LoginLogRepository.php   撈未通知的、標記已通知
-app/Http/Resources/LoginLogResource.php   帶上解析後的 OS／瀏覽器／裝置
-resources/views/admin/accounts/index.blade.php  ⚠ 刪掉那份 JS parseUA
+app/Repositories/LoginLogRepository.php   pendingNotices／staleNoticeIds／markNotified／
+                                          knownIps／knownDevices／countFailuresSince
+                                          ＋ 順手修掉 paginate() 的 6 處 `??`
+app/Http/Resources/LoginLogResource.php   帶上 os／browser／device_type
+app/Models/LoginLog.php                   notified_at 的 cast 與 @property
+resources/views/admin/accounts/index.blade.php  ⚠ 刪掉 parseUA()
+resources/views/layouts/app.blade.php           ⚠ 刪掉 myLoginLogParseUA()
 app/Console/Kernel.php                    每分鐘排程
-config/constants.php                      通知文案
-resources/lang/{tw,cn,en}/login_log.php   欄位名
+config/constants.php                      LOGIN_NOTICE：門檻與四種文案
+resources/lang/{tw,cn,en}/login_log.php   field_os／field_browser／device_*
 ```
-
-⚠ `LoginLogService::record()` 現在用了 `$params['user_id'] ?? null`
-這種寫法，違反專案的 helper 規則（要用 `Arr::get`）—— 動到這支時一併修掉。
 
 ## 相關
 

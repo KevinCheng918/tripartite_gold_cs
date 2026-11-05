@@ -763,28 +763,25 @@
             return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
         }
 
-        function myLoginLogParseUA(ua) {
-            if (!ua) return '-';
-            var os = '-', browser = '-', engine = '-';
-            var m;
-            if ((m = ua.match(/Windows NT ([\d.]+)/))) { os = 'Windows_' + m[1]; }
-            else if ((m = ua.match(/Mac OS X ([\d_]+)/))) { os = 'macOS_' + m[1].replace(/_/g, '.'); }
-            else if ((m = ua.match(/iPhone OS ([\d_]+)/))) { os = 'iOS_' + m[1].replace(/_/g, '.'); }
-            else if ((m = ua.match(/iPad.*OS ([\d_]+)/))) { os = 'iPadOS_' + m[1].replace(/_/g, '.'); }
-            else if ((m = ua.match(/Android ([\d.]+)/))) { os = 'Android_' + m[1]; }
-            else if (/Linux/i.test(ua)) { os = 'Linux'; }
-            if ((m = ua.match(/Edg\/([\d.]+)/))) { browser = 'Edge_' + m[1]; }
-            else if ((m = ua.match(/OPR\/([\d.]+)/))) { browser = 'Opera_' + m[1]; }
-            else if ((m = ua.match(/Chrome\/([\d.]+)/))) { browser = 'Chrome_' + m[1]; }
-            else if ((m = ua.match(/Firefox\/([\d.]+)/))) { browser = 'Firefox_' + m[1]; }
-            else if ((m = ua.match(/Version\/([\d.]+).*Safari/))) { browser = 'Safari_' + m[1]; }
-            if (/AppleWebKit/i.test(ua)) { engine = 'WebKit'; }
-            else if (/Gecko\//i.test(ua)) { engine = 'Gecko'; }
-            else if (/Trident/i.test(ua)) { engine = 'Trident'; }
+        /**
+         * 把登入來源那一格畫出來
+         *
+         * ⚠⚠ 解析**在伺服器端做**（`App\Presenters\UserAgentPresenter`），
+         * 這裡只負責排版。原本這裡有一份自己用正規表達式拆 UA 的
+         * `myLoginLogParseUA()`，而 `admin/accounts/index.blade.php` 還有
+         * 第二份一模一樣的 —— 登入通知是伺服器端發的，再加一份就是三套規則
+         * 各自維護。兩份 JS 都已經刪掉，現在三個出口（這個彈窗、帳號管理的
+         * 彈窗、Telegram 登入通知）看到的是同一份解析。
+         *
+         * ⚠ 「裝置」現在是桌機／手機／平板（需求方 2026-11-05 裁示）。
+         * 原本顯示的是排版引擎（WebKit／Gecko）—— 使用者看到「WebKit」
+         * 不知道那是什麼，對「這是不是我的裝置」毫無幫助。
+         */
+        function myLoginLogDevice(log) {
             return '<div style="line-height:1.6">'
-                + '<div><strong>作業系統：</strong>' + myLoginLogEscape(os) + '</div>'
-                + '<div><strong>瀏覽器：</strong>' + myLoginLogEscape(browser) + '</div>'
-                + '<div><strong>裝置：</strong>' + myLoginLogEscape(engine) + '</div></div>';
+                + '<div><strong>' + @json(trans('login_log.field_os')) + '：</strong>' + myLoginLogEscape(log.os) + '</div>'
+                + '<div><strong>' + @json(trans('login_log.field_browser')) + '：</strong>' + myLoginLogEscape(log.browser) + '</div>'
+                + '<div><strong>' + @json(trans('account.log_device')) + '：</strong>' + myLoginLogEscape(log.device_type) + '</div></div>';
         }
 
         var myLogPage = 1;
@@ -810,7 +807,7 @@
                                 + '<td class="text-nowrap">' + log.created_at + '</td>'
                                 + '<td><code>' + log.ip + '</code></td>'
                                 + '<td class="text-center">' + badge + '</td>'
-                                + '<td style="font-size:0.8125rem">' + myLoginLogParseUA(log.device) + '</td>'
+                                + '<td style="font-size:0.8125rem">' + myLoginLogDevice(log) + '</td>'
                                 + '<td>' + myLoginLogEscape(log.fail_reason || '-') + '</td>'
                                 + '</tr>';
                         }

@@ -118,6 +118,24 @@ class Kernel extends ConsoleKernel
         $schedule->command('auto-reply:remind')->everyMinute()->withoutOverlapping();
 
         /*
+         * 每分鐘把登入紀錄私訊通知給帳號本人（需求方 2026-11-05）。
+         *
+         * ⚠ **一定要每分鐘**：排程間隔等於通知的延遲，而這是安全通知 ——
+         * 「有人登入了你的帳號」晚五分鐘才說，能反應的時間就少了五分鐘。
+         *
+         * ⚠ **不要改成在登入當下同步發**：`TelegramBotService` 的 client 是
+         * `['timeout' => 10]`，而本專案 `QUEUE_CONNECTION=sync`（`dispatch()`
+         * 當場跑完、不進背景）—— Telegram 慢的時候使用者按下登入會卡 10 秒。
+         *
+         * ⚠ `withoutOverlapping`：上一輪還在發就再跑一次的話，同一批紀錄會被
+         * 撈到兩次（`notified_at` 是處理完才標的），同仁會收到兩則一樣的。
+         *
+         * 沒有未通知的紀錄時 Service 自己短路（開關關掉時連 DB 都不查），
+         * 所以每分鐘跑不等於每分鐘都在查一堆東西。
+         */
+        $schedule->command('login:notify')->everyMinute()->withoutOverlapping();
+
+        /*
          * 每分鐘問當班人員要不要追蹤那些說了「稍等」的事項。
          *
          * ⚠ `withoutOverlapping` 同上：上一輪還在送就再跑一次，同一筆會

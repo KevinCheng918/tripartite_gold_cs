@@ -824,36 +824,24 @@ $(function () {
         return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
-    function parseUA(ua) {
-        if (!ua) return '-';
-        var os = '-', browser = '-', engine = '-';
-
-        // 作業系統
-        var osMatch;
-        if ((osMatch = ua.match(/Windows NT ([\d.]+)/))) { os = 'Windows_' + osMatch[1]; }
-        else if ((osMatch = ua.match(/Mac OS X ([\d_]+)/))) { os = 'macOS_' + osMatch[1].replace(/_/g, '.'); }
-        else if ((osMatch = ua.match(/iPhone OS ([\d_]+)/))) { os = 'iOS_' + osMatch[1].replace(/_/g, '.'); }
-        else if ((osMatch = ua.match(/iPad.*OS ([\d_]+)/))) { os = 'iPadOS_' + osMatch[1].replace(/_/g, '.'); }
-        else if ((osMatch = ua.match(/Android ([\d.]+)/))) { os = 'Android_' + osMatch[1]; }
-        else if (/Linux/i.test(ua)) { os = 'Linux'; }
-
-        // 瀏覽器
-        var brMatch;
-        if ((brMatch = ua.match(/Edg\/([\d.]+)/))) { browser = 'Edge_' + brMatch[1]; }
-        else if ((brMatch = ua.match(/OPR\/([\d.]+)/))) { browser = 'Opera_' + brMatch[1]; }
-        else if ((brMatch = ua.match(/Chrome\/([\d.]+)/))) { browser = 'Chrome_' + brMatch[1]; }
-        else if ((brMatch = ua.match(/Firefox\/([\d.]+)/))) { browser = 'Firefox_' + brMatch[1]; }
-        else if ((brMatch = ua.match(/Version\/([\d.]+).*Safari/))) { browser = 'Safari_' + brMatch[1]; }
-
-        // 裝置引擎
-        if (/AppleWebKit/i.test(ua)) { engine = 'WebKit'; }
-        else if (/Gecko\//i.test(ua)) { engine = 'Gecko'; }
-        else if (/Trident/i.test(ua)) { engine = 'Trident'; }
-
+    /**
+     * 把登入來源那一格畫出來
+     *
+     * ⚠⚠ 解析**在伺服器端做**（`App\Presenters\UserAgentPresenter`），
+     * 這裡只負責排版。原本這裡有一份自己用正規表達式拆 UA 的 `parseUA()`，
+     * 而 `layouts/app.blade.php` 還有第二份一模一樣的 —— 登入通知是伺服器端
+     * 發的，再加一份就是三套規則各自維護。兩份 JS 都已經刪掉，現在三個出口
+     * （這個彈窗、「我的登入紀錄」彈窗、Telegram 登入通知）看到的是同一份解析。
+     *
+     * ⚠ 「裝置」現在是桌機／手機／平板（需求方 2026-11-05 裁示）。
+     * 原本顯示的是排版引擎（WebKit／Gecko）—— 使用者看到「WebKit」
+     * 不知道那是什麼，對「這是不是我的裝置」毫無幫助。
+     */
+    function renderLoginDevice(log) {
         return '<div style="line-height:1.6">'
-            + '<div><strong>' + @json(trans('account.log_os')) + '：</strong>' + escapeHtml(os) + '</div>'
-            + '<div><strong>' + @json(trans('account.log_browser')) + '：</strong>' + escapeHtml(browser) + '</div>'
-            + '<div><strong>' + @json(trans('account.log_device')) + '：</strong>' + escapeHtml(engine) + '</div>'
+            + '<div><strong>' + @json(trans('account.log_os')) + '：</strong>' + escapeHtml(log.os) + '</div>'
+            + '<div><strong>' + @json(trans('account.log_browser')) + '：</strong>' + escapeHtml(log.browser) + '</div>'
+            + '<div><strong>' + @json(trans('account.log_device')) + '：</strong>' + escapeHtml(log.device_type) + '</div>'
             + '</div>';
     }
 
@@ -881,7 +869,7 @@ $(function () {
                             + '<td class="text-nowrap">' + log.created_at + '</td>'
                             + '<td><code>' + log.ip + '</code></td>'
                             + '<td class="text-center">' + badge + '</td>'
-                            + '<td style="font-size:0.8125rem">' + parseUA(log.device) + '</td>'
+                            + '<td style="font-size:0.8125rem">' + renderLoginDevice(log) + '</td>'
                             + '<td>' + escapeHtml(log.fail_reason || '-') + '</td>'
                             + '</tr>';
                     }

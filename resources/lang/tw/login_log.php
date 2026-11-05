@@ -17,6 +17,19 @@ return [
     'status_success' => '成功',
     'status_failed'  => '失敗',
 
+    'field_os'      => '作業系統',
+    'field_browser' => '瀏覽器',
+
+    /*
+     * 裝置類型（需求方 2026-11-05 裁示：這一欄顯示桌機／手機／平板）。
+     *
+     * ⚠ 這三個字串同時用在登入紀錄表格與 Telegram 登入通知 ——
+     * `UserAgentPresenter` 是唯一的產出處，所以兩邊永遠一致。
+     */
+    'device_desktop' => '桌機',
+    'device_mobile'  => '手機',
+    'device_tablet'  => '平板',
+
     'filter_all'     => '全部',
     'filter_success' => '成功',
     'filter_failed'  => '失敗',

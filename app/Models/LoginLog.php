@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $device
  * @property string|null $fail_reason
  * @property string      $created_at
+ * @property string|null $notified_at
  */
 class LoginLog extends Model
 {
@@ -32,8 +33,9 @@ class LoginLog extends Model
     ];
 
     protected $casts = [
-        'is_success' => 'boolean',
-        'created_at' => 'datetime',
+        'is_success'  => 'boolean',
+        'created_at'  => 'datetime',
+        'notified_at' => 'datetime',
     ];
 
     /**
