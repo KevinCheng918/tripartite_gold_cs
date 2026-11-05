@@ -82,6 +82,21 @@
         }
     @endphp
 
+    @php
+        /*
+         * 假別 → 顯示文字（需求方 2026-11-05：明細要標註當天請什麼假）。
+         *
+         * ⚠ 認不得的值要回原文不要回空字串 —— 日後多一種假別卻忘了補語系時，
+         * 畫面上會是一個看得出問題的代碼，而不是一格空白。
+         */
+        $leaveTypeLabel = function ($type) {
+            $key = 'leave.leave_' . (string) $type;
+            $text = trans($key);
+
+            return $text === $key ? (string) $type : $text;
+        };
+    @endphp
+
     {{-- 每日明細 --}}
     <div class="main-card mb-3 card">
         <div class="card-body p-0">
@@ -161,6 +176,8 @@
                                     </td>
                                     <td>
                                         @if(filled($leave))
+                                            {{-- 假別在前、時段在後：先看「請什麼假」再看「請多久」 --}}
+                                            <span class="badge bg-primary">{{ $leaveTypeLabel($leave['type'] ?? '') }}</span>
                                             @if($leave['is_full_day'] === 1)
                                                 <span class="badge bg-info">{{ trans('attendance.leave_full_day') }}</span>
                                             @else
@@ -259,6 +276,7 @@
                                 </td>
                                 <td>
                                     @if(filled($r->leave_info))
+                                        <span class="badge bg-primary">{{ $leaveTypeLabel($r->leave_info['type'] ?? '') }}</span>
                                         @if($r->leave_info['is_full_day'] === 1)
                                             <span class="badge bg-info">{{ trans('attendance.leave_full_day') }}</span>
                                         @else

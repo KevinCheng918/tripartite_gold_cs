@@ -143,6 +143,8 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::post('/ajax-store', [LeaveRequestController::class, 'ajaxStore'])->middleware('can:leave_request.apply')->name('ajax-store');
         Route::put('/ajax-respond/{leaveRequest}', [LeaveRequestController::class, 'ajaxRespond'])->middleware('can:leave_request.review')->name('ajax-respond');
         Route::get('/ajax-check', [LeaveRequestController::class, 'ajaxCheck'])->middleware('can:shift.view')->name('ajax-check');
+        // 申請表單上的「還剩多少特休」（需求方 2026-11-05）
+        Route::get('/ajax-quota', [LeaveRequestController::class, 'ajaxQuota'])->middleware('can:leave_request.apply')->name('ajax-quota');
     });
 
     // Telegram 客服聊天（所有登入者可查看，回覆需權限，值班自動從排班指派）

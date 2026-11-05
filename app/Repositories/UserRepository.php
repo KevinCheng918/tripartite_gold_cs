@@ -879,7 +879,17 @@ class UserRepository
     public function getAllCsUsersWithDetail()
     {
         return User::query()
-            ->select(['id', 'account', 'nickname', 'level', 'status', 'hired_at', 'resigned_at', 'equipments'])
+            /*
+             * ⚠ **`work_mode` 一定要撈**（2026-11-05 加）：人員列表要顯示
+             * 本年度特休，而「一日幾小時」是看出勤模式的（輪班 12／固定班 8）。
+             * 沒撈的話 `LeaveQuotaService::dayMinutes()` 會把每個人都當成
+             * 輪班，固定班的人額度**憑空多出一半**，而且不會報錯。
+             *
+             * ⚠ 這是這個 Repository 同一種坑的第四次（`level`、`project_ids`
+             * ×2）——**在這支加任何「依使用者屬性判斷」的功能前，
+             * 先確認那個欄位在不在 select 裡。**
+             */
+            ->select(['id', 'account', 'nickname', 'level', 'status', 'hired_at', 'resigned_at', 'equipments', 'work_mode'])
             ->where('level', '!=', config('constants.USER.LEVEL.ADMIN'))
             ->orderBy('nickname')
             ->get();

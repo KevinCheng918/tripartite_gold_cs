@@ -38,6 +38,7 @@ return [
     'field_hired_at'  => '到职日',
     'field_resigned_at' => '离职日',
     'field_tenure'    => '年资',
+    'field_annual_leave' => '本年度特休',
     'field_action'    => '操作',
     'field_status'    => '状态',
     'filter_tenure'   => '年资筛选',

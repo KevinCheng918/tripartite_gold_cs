@@ -114,13 +114,15 @@
                                     <th class="col-tight">{{ trans('staff_manage.field_hired_at') }}</th>
                                     <th class="col-tight">{{ trans('staff_manage.field_resigned_at') }}</th>
                                     <th class="col-tight">{{ trans('staff_manage.field_tenure') }}</th>
+                                    {{-- 本年度特休（需求方 2026-11-05）--}}
+                                    <th class="col-tight">{{ trans('staff_manage.field_annual_leave') }}</th>
                                     @if(Auth::user()->hasPermission('staff_manage.edit'))
                                     <th class="col-actions">{{ trans('staff_manage.field_action') }}</th>
                                     @endif
                                 </tr>
                             </thead>
                             <tbody id="staff-table-body">
-                                <tr><td colspan="8" class="text-center text-muted py-4">{{ trans('staff_manage.loading') }}</td></tr>
+                                <tr><td colspan="9" class="text-center text-muted py-4">{{ trans('staff_manage.loading') }}</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -412,6 +414,23 @@ $(function () {
     var canEdit = {{ Auth::user()->hasPermission('staff_manage.edit') ? 'true' : 'false' }};
     var levelMap = @json(collect(config('constants.USER.LEVEL'))->mapWithKeys(function ($v, $k) { return [$v => trans('account.level_' . strtolower($k))]; })->except([config('constants.USER.LEVEL.ADMIN')]));
     var levelColorMap = { 0: 'bg-danger', 1: 'bg-dark', 2: 'bg-primary', 3: 'bg-info', 4: 'bg-secondary' };
+    /**
+     * 人員列表的「本年度特休」那一格
+     *
+     * ⚠ **「還沒有特休」與「有特休但用完了」要分得開**：前者該寫「—」，
+     * 後者該寫「剩 0」。都印 0 的話，主管會以為新人把特休請光了。
+     * 判準是 `period_start` 是不是 null（後端刻意不把它夾成 0）。
+     *
+     * @param {Object} q
+     * @returns {string}
+     */
+    function annualLeaveCell(q) {
+        if (!q || !q.period_start) { return '<span class="text-muted">—</span>'; }
+
+        return '<span class="cell-stack__main">' + q.remaining_hours + ' / ' + q.available_hours + ' 小時</span>'
+            + '<div class="cell-stack__sub">' + q.entitled_days + ' 日</div>';
+    }
+
     function levelBadge(lv) { return '<span class="badge ' + (levelColorMap[lv] || 'bg-secondary') + '">' + (levelMap[lv] || '-') + '</span>'; }
 
     function showMsg(msg) {
@@ -621,6 +640,7 @@ $(function () {
             html += '<td class="col-tight">' + (s.hired_at || '<span class="text-muted">' + I18N.not_set + '</span>') + '</td>';
             html += '<td class="col-tight">' + (s.resigned_at ? s.resigned_at : '<span class="badge bg-success">' + I18N.status_on_job_now + '</span>') + '</td>';
             html += '<td class="col-tight">' + (s.tenure || '-') + '</td>';
+            html += '<td class="col-tight">' + annualLeaveCell(s.annual_leave) + '</td>';
             if (canEdit) {
                 html += '<td class="col-actions"><div class="row-actions"><button class="btn btn-sm btn-outline-secondary btn-icon btn-transition js-staff-edit" data-id="' + s.id + '" data-nickname="' + s.nickname + '" data-hired="' + (s.hired_at || '') + '" data-resigned="' + (s.resigned_at || '') + '"><i class="fas fa-edit btn-icon-wrapper"></i>' + I18N.action_edit + '</button></div></td>';
             }

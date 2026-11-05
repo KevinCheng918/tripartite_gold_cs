@@ -28,6 +28,10 @@ return [
     'att_absent'    => 'Absent',
     'att_amend'     => 'Amendments',
     'att_leave'     => 'Leave',
+    'leave_annual'       => 'Annual',
+    'leave_sick'         => 'Sick',
+    'leave_personal'     => 'Personal',
+    'leave_unclassified' => 'Unclassified',
     'att_overtime'  => 'Overtime',
     'att_detail_hint' => 'Click a row to see that person\'s attendance detail.',
 

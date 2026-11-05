@@ -28,6 +28,10 @@ return [
     'att_absent'    => '旷工',
     'att_amend'     => '补打卡',
     'att_leave'     => '请假',
+    'leave_annual'       => '特休',
+    'leave_sick'         => '病假',
+    'leave_personal'     => '事假',
+    'leave_unclassified' => '未分类',
     'att_overtime'  => '加班',
     'att_detail_hint' => '点一行可以看那位同事的出勤明细。',
 

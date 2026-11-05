@@ -141,6 +141,20 @@
                 </select>
             </div>
             @endif
+            {{-- 假別（需求方 2026-11-05）。
+                 ⚠ 清單裡**沒有「未分類」** —— 那是改版前舊資料的標記，
+                 讓它出現在選項裡等於給人一種「不扣額度」的假可以選。 --}}
+            <div class="mb-3">
+                <label class="form-label" for="leave-type">{{ trans('leave.field_leave_type') }} <span class="text-danger">*</span></label>
+                <select id="leave-type" class="form-select" required>
+                    <option value="annual">{{ trans('leave.leave_annual') }}</option>
+                    <option value="sick">{{ trans('leave.leave_sick') }}</option>
+                    <option value="personal">{{ trans('leave.leave_personal') }}</option>
+                </select>
+                {{-- 剩餘特休（需求方指定要顯示在申請表單上）。
+                     ⚠ 不顯示的話，同仁不知道送下去會不會被擋，只能先送再說。 --}}
+                <div id="leave-quota-hint" class="form-text"></div>
+            </div>
             <div class="mb-3">
                 <label class="form-label">{{ trans('leave.field_date') }} <span class="text-danger">*</span></label>
                 <div class="input-group" id="leave-date-group">

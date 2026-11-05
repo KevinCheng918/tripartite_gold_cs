@@ -67,6 +67,14 @@ return [
      * ⚠ 必須是白名單：這個值決定去讀哪一把金鑰，認不得的值會落到主要那條 ——
      * 使用者按「測試備援」卻測到訂閱 token，拿到的「正常」是假的。
      */
+    /*
+     * 請假的假別（需求方 2026-11-05）。
+     *
+     * ⚠ **白名單裡沒有 `unclassified`** —— 那是改版前舊資料的標記，
+     * 不是給人選的。放行的話使用者就有一種不扣額度的假可以送。
+     */
+    'LEAVE_TYPE_IN' => 'in:annual,sick,personal',
+
     'SETTING_CREDENTIAL_TYPE_IN' => 'in:claude,fallback',
 
     /*

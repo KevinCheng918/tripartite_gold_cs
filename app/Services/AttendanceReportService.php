@@ -167,11 +167,44 @@ class AttendanceReportService
                 'amend_count'  => (int) Arr::get($stat, 'amend_count'),
                 'leave_days'   => (float) Arr::get($stat, 'leave_days'),
                 'leave_hours'  => (float) Arr::get($stat, 'leave_hours'),
+                /*
+                 * 依假別分開的小時數（需求方 2026-11-05：打卡報表的請假
+                 * 也要註明假別）。
+                 *
+                 * ⚠ 這裡換算成**小時**再送出去，不要讓前端拿分鐘自己除 ——
+                 * 三個出口（報表頁、Telegram 完整版、個人版）都讀這一份，
+                 * 各算各的遲早有一邊的小數位不一樣。
+                 */
+                'leave_by_type' => $this->leaveHoursByType($stat),
                 'overtime_minutes' => (int) Arr::get($stat, 'overtime_total_minutes'),
             ];
         }
 
         return $rows;
+    }
+
+    /**
+     * 把依假別的分鐘數換成小時
+     *
+     * ⚠ **時數為 0 的假別不要列出來**：改版前的舊假單 `minutes` 是 0，
+     * 全部列出來的話報表上每個人後面都掛一個「未分類 0 小時」。
+     *
+     * @param array $stat
+     * @return array<string, float> 假別 => 小時
+     */
+    private function leaveHoursByType(array $stat)
+    {
+        $out = [];
+
+        foreach ((array) Arr::get($stat, 'leave_by_type', []) as $type => $minutes) {
+            if ((int) $minutes < 1) {
+                continue;
+            }
+
+            $out[(string) $type] = round((int) $minutes / 60, 1);
+        }
+
+        return $out;
     }
 
     /**
@@ -248,6 +281,7 @@ class AttendanceReportService
             $byUser[$userId]['leave_days'] = Arr::get($summary, 'days');
             $byUser[$userId]['leave_hours'] = Arr::get($summary, 'hours');
             $byUser[$userId]['leave_ranges'] = Arr::get($summary, 'ranges');
+            $byUser[$userId]['leave_by_type'] = Arr::get($summary, 'by_type', []);
         }
 
         /*
@@ -357,6 +391,7 @@ class AttendanceReportService
             'leave_days'             => 0,
             'leave_hours'            => 0,
             'leave_ranges'           => [],
+            'leave_by_type'          => [],
         ];
     }
 

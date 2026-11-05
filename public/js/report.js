@@ -218,7 +218,9 @@ $(function () {
                 '<td class="col-num">' + r.absent_count + '</td>' +
                 '<td class="col-num">' + r.amend_count + '</td>' +
                 '<td class="col-num">' + trans(i18n.unit_day, { n: r.leave_days }) +
-                '<div class="cell-stack__sub">' + trans(i18n.unit_hour, { n: r.leave_hours }) + '</div></td>' +
+                '<div class="cell-stack__sub">' + trans(i18n.unit_hour, { n: r.leave_hours }) + '</div>' +
+                // 哪幾種假、各幾小時（需求方 2026-11-05）
+                leaveTypeText(r.leave_by_type) + '</td>' +
                 '<td class="col-num">' + trans(i18n.unit_min, { n: r.overtime_minutes }) + '</td>' +
                 '</tr>';
         }).join('');
@@ -243,6 +245,33 @@ $(function () {
                 window.location.href = '/admin/attendance/detail/' + row.dataset.userId;
             });
         });
+    }
+
+    /**
+     * 請假欄底下那一行「特休 8 / 病假 4」
+     *
+     * 需求方 2026-11-05：「報表的打卡報表這邊請假也要註明。」
+     *
+     * ⚠ **沒有任何假別時回空字串**，不要印一行「—」：那一欄本來就常常是 0，
+     * 每一列都掛一條空的次要資訊只會讓表格變吵。
+     *
+     * ⚠ 後端已經換算成小時了（`leave_by_type`），這裡不要再拿分鐘自己除 ——
+     * 三個出口讀同一份，各算各的遲早有一邊小數位不一樣。
+     *
+     * @param {Object} byType 假別 => 小時
+     * @returns {string}
+     */
+    function leaveTypeText(byType) {
+        var parts = [];
+
+        Object.keys(byType || {}).forEach(function (type) {
+            var label = i18n['leave_' + type] || type;
+            parts.push(escapeHtml(label) + ' ' + byType[type]);
+        });
+
+        if (!parts.length) { return ''; }
+
+        return '<div class="cell-stack__sub">' + parts.join(' / ') + '</div>';
     }
 
     // ===== 超時提醒統計 =====

@@ -23,6 +23,22 @@ return [
     'reviewed_by_at'  => 'Reviewed by :name · :time',
     'reviewed_at'     => 'Reviewed :time',
 
+    'field_leave_type' => 'Leave type',
+    'leave_annual'     => 'Annual leave',
+    'leave_sick'       => 'Sick leave',
+    'leave_personal'   => 'Personal leave',
+    'leave_unclassified' => 'Unclassified',
+
+    'quota_title'     => 'Annual leave this year',
+    'quota_remaining' => 'Remaining',
+    'quota_entitled'  => 'Entitled',
+    'quota_used'      => 'Used',
+    'quota_carry'     => 'Carried over',
+    'quota_period'    => 'Period',
+    'quota_none'      => 'Not yet entitled (under 6 months)',
+    'unit_hours'      => ':value h',
+    'unit_days'       => ':value d',
+
     'type_full_day'   => 'Full Day',
     'type_hours'      => 'Hours',
 
@@ -35,6 +51,8 @@ return [
         'approved'         => 'Leave approved',
         'rejected'         => 'Leave rejected',
         'overlap'          => 'Leave already exists for this date range',
+        'quota_exceeded'   => 'Not enough annual leave: only :hours hours left',
+        'user_not_found'   => 'Applicant account not found',
         'already_reviewed' => 'This leave has already been reviewed',
         'on_leave_today'   => 'You are on leave today, cannot clock in',
         'leave_blocked'    => 'Approved leave exists on this date, cannot assign shift',

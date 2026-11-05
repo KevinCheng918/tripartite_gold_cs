@@ -1725,6 +1725,8 @@
                 if (dateSeparator) { dateSeparator.style.display = 'flex'; }
                 var fullDayCheck = document.getElementById('leave-full-day');
                 if (fullDayCheck) { fullDayCheck.checked = true; }
+                // reset() 之後假別回到第一個（特休），剩餘要跟著重撈
+                refreshLeaveQuota();
                 showBsModal('modal-leave-apply');
             });
         }
@@ -1809,6 +1811,56 @@
         });
     });
 
+    /**
+     * 把剩餘特休填進申請表單底下那一行
+     *
+     * ⚠ **只有選特休時才顯示**：病假事假第一版不管額度，掛一行「剩餘 X 小時」
+     * 在那裡只會讓人以為那兩種也有額度。
+     *
+     * ⚠ 失敗就留空不要顯示錯誤 —— 這一行是輔助資訊，不該在申請視窗裡
+     * 跳出一個跟申請無關的錯誤擋住人。
+     *
+     * @returns {void}
+     */
+    function refreshLeaveQuota() {
+        var hint = document.getElementById('leave-quota-hint');
+        var typeEl = document.getElementById('leave-type');
+
+        if (!hint || !typeEl) { return; }
+
+        if (typeEl.value !== 'annual') {
+            hint.textContent = '';
+
+            return;
+        }
+
+        var url = '/admin/leave-request/ajax-quota';
+        var userSelect = document.getElementById('leave-user-id');
+
+        if (userSelect && userSelect.value) { url += '?user_id=' + userSelect.value; }
+
+        apiFetch(url)
+            .then(function (body) {
+                if (!body || body.period_start === null) {
+                    hint.textContent = leaveI18n.quota_none || '';
+
+                    return;
+                }
+
+                var remain = Math.round((body.remaining_minutes / 60) * 10) / 10;
+                var entitled = Math.round((body.available_minutes / 60) * 10) / 10;
+                hint.textContent = (leaveI18n.quota_remaining || '剩餘') + ' ' + remain
+                    + ' / ' + entitled + ' 小時（' + body.period_start + ' ~ ' + body.period_end + '）';
+            })
+            .catch(function () { hint.textContent = ''; });
+    }
+
+    document.addEventListener('change', function (e) {
+        if (e.target && (e.target.id === 'leave-type' || e.target.id === 'leave-user-id')) {
+            refreshLeaveQuota();
+        }
+    });
+
     // 請假送出
     document.addEventListener('submit', function (e) {
         if (e.target && e.target.id === 'form-leave-apply') {
@@ -1818,7 +1870,9 @@
             var payload = {
                 start_date: startDate,
                 end_date: isFullDay ? document.getElementById('leave-end-date').value : startDate,
-                is_full_day: isFullDay
+                is_full_day: isFullDay,
+                // 假別（需求方 2026-11-05）—— 後端只收白名單，不認得的一律當事假
+                type: document.getElementById('leave-type').value
             };
             if (!isFullDay) {
                 payload.start_time = document.getElementById('leave-start-time').value;

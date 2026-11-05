@@ -704,6 +704,8 @@ class AttendanceService
                         'is_full_day' => (int) $leave->is_full_day,
                         'start_time'  => $leave->start_time,
                         'end_time'    => $leave->end_time,
+                        // 那天請的是什麼假（需求方 2026-11-05：明細要標假別）
+                        'type'        => (string) $leave->type,
                     ];
                 }
 
@@ -795,9 +797,13 @@ class AttendanceService
         $days = 0;
         $hours = 0;
         $ranges = [];
+        $byType = [];
 
         foreach ($leaves as $leave) {
             $count++;
+
+            $type = (string) $leave->type;
+            $byType[$type] = (int) Arr::get($byType, $type, 0) + (int) $leave->minutes;
 
             // 不論整天或時段，顯示用的區間都先跟統計區間夾好
             $from = max(strtotime($startDate), strtotime($leave->start_date->format('Y-m-d')));
@@ -834,6 +840,17 @@ class AttendanceService
             'days'   => $days,
             'hours'  => round($hours, 1),
             'ranges' => $ranges,
+            /*
+             * 依假別分開的分鐘數（需求方 2026-11-05：報表的請假要註明假別）。
+             *
+             * ⚠ 用 `minutes` 加總而不是天／小時：那兩個單位以前是分開累加的，
+             * 加不起來 —— 統一成分鐘才算得出「特休用了多少、病假用了多少」。
+             *
+             * ⚠ 舊假單的 `minutes` 是 0（改版前沒有這一欄），所以它們會
+             * 出現在 `unclassified` 且時數為 0 —— 這是刻意的，不要回頭補算，
+             * 那得猜當時的班別。
+             */
+            'by_type' => $byType,
         ];
     }
 

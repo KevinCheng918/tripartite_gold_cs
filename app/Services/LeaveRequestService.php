@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Models\LeaveRequest;
 use App\Repositories\LeaveRequestRepository;
+use App\Repositories\UserRepository;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -15,12 +17,21 @@ class LeaveRequestService
 {
     private $leaveRepository;
     private $approvalNotice;
+    private $userRepository;
+    // 特休額度：算一日幾分鐘、還剩多少（需求方 2026-11-05）
+    private $leaveQuota;
 
-    public function __construct(LeaveRequestRepository $leaveRepository, ApprovalNoticeService $approvalNotice)
-    {
+    public function __construct(
+        LeaveRequestRepository $leaveRepository,
+        ApprovalNoticeService $approvalNotice,
+        UserRepository $userRepository,
+        LeaveQuotaService $leaveQuota
+    ) {
         $this->leaveRepository = $leaveRepository;
         // 申請與審核都要私訊通知主管（收件人在通知設定頁維護）
         $this->approvalNotice = $approvalNotice;
+        $this->userRepository = $userRepository;
+        $this->leaveQuota = $leaveQuota;
     }
 
     /**
@@ -70,10 +81,44 @@ class LeaveRequestService
             ]);
         }
 
+        $user = $this->userRepository->find((int) $userId);
+
+        if (blank($user)) {
+            throw ValidationException::withMessages([
+                'date' => [trans('leave.msg.user_not_found')],
+            ]);
+        }
+
+        $type = $this->resolveType(Arr::get($params, 'type'));
+        $minutes = $this->minutesOf($params, $endDate, $user);
+
+        /*
+         * ⚠ **額度要在這裡擋，不是等審核**（需求方 2026-11-05：
+         * 「特休請完就不能請了」）。只在核准時檢查的話，同一個人可以連送
+         * 十張超額的單，全部送得出去，然後在審核階段一張一張爆掉 ——
+         * 而主管要一張一張看懂為什麼。
+         *
+         * ⚠ 第一版**只有特休**會被擋（`constants.LEAVE.QUOTA_TYPES`）。
+         */
+        if ($this->needsQuota($type) && !$this->leaveQuota->canAfford($user, $minutes)) {
+            throw ValidationException::withMessages([
+                'date' => [trans('leave.msg.quota_exceeded', [
+                    'hours' => $this->hoursText($this->leaveQuota->summaryFor($user)['remaining_minutes']),
+                ])],
+            ]);
+        }
+
         $leaveRequest = $this->leaveRepository->create([
             'user_id'    => $userId,
             'start_date' => $params['start_date'],
             'end_date'   => $endDate,
+            'type'       => $type,
+            /*
+             * ⚠ **換算後的分鐘數存下來**，不要每次用時再算：
+             * 「一日幾小時」是跟著人的出勤模式走的（輪班 12／固定班 8），
+             * 那個人日後換了模式，舊假單不該跟著變。
+             */
+            'minutes'    => $minutes,
             'is_full_day' => (int) $params['is_full_day'],
             'start_time' => Arr::get($params, 'start_time'),
             'end_time'   => Arr::get($params, 'end_time'),
@@ -89,6 +134,99 @@ class LeaveRequestService
         $this->approvalNotice->leaveApplied($leaveRequest);
 
         return $leaveRequest;
+    }
+
+    /**
+     * 假別：只收白名單內的，其餘一律當事假
+     *
+     * ⚠ **不能收 `unclassified`**：那是改版前舊資料的標記，不是給人選的。
+     * 讓它從表單進來的話，使用者就有一種「不扣任何額度」的假可以選。
+     *
+     * @param mixed $type
+     * @return string
+     */
+    private function resolveType($type)
+    {
+        $allowed = [
+            LeaveRequest::TYPE_ANNUAL,
+            LeaveRequest::TYPE_SICK,
+            LeaveRequest::TYPE_PERSONAL,
+        ];
+
+        $value = (string) $type;
+
+        return in_array($value, $allowed, true) ? $value : LeaveRequest::TYPE_PERSONAL;
+    }
+
+    /**
+     * 這個假別要不要扣額度
+     *
+     * @param string $type
+     * @return bool
+     */
+    private function needsQuota($type)
+    {
+        return in_array($type, (array) config('constants.LEAVE.QUOTA_TYPES'), true);
+    }
+
+    /**
+     * 這張假單總共幾分鐘
+     *
+     * ⚠ **整天假要換算**（天數 × 該員的日時數），時段假才是真的算時間差 ——
+     * 這兩個以前是分開統計的（天歸天、小時歸小時），所以「特休剩幾小時」
+     * 根本算不出來。統一成分鐘是這次改動的核心。
+     *
+     * ⚠ 時段假**支援跨午夜**（19:30~00:00）：終點小於起點就加一天，
+     * 跟 `AttendanceService::summariseLeaves()` 原本的算法一致。
+     *
+     * @param array  $params
+     * @param string $endDate
+     * @param \App\Models\User $user
+     * @return int
+     */
+    private function minutesOf(array $params, $endDate, $user)
+    {
+        if ((int) Arr::get($params, 'is_full_day') === 1) {
+            $from = Carbon::parse($params['start_date'])->startOfDay();
+            $to = Carbon::parse($endDate)->startOfDay();
+
+            return ($from->diffInDays($to) + 1) * $this->leaveQuota->dayMinutes($user);
+        }
+
+        $start = $this->minutesOfClock(Arr::get($params, 'start_time'));
+        $end = $this->minutesOfClock(Arr::get($params, 'end_time'));
+        $minutes = $end - $start;
+
+        // 跨午夜
+        if ($minutes <= 0) {
+            $minutes += 1440;
+        }
+
+        return $minutes;
+    }
+
+    /**
+     * `HH:MM` → 當天的第幾分鐘
+     *
+     * @param mixed $clock
+     * @return int
+     */
+    private function minutesOfClock($clock)
+    {
+        $parts = explode(':', (string) $clock);
+
+        return ((int) Arr::get($parts, 0)) * 60 + ((int) Arr::get($parts, 1));
+    }
+
+    /**
+     * 分鐘數講成「幾小時」給人看
+     *
+     * @param int $minutes
+     * @return string
+     */
+    private function hoursText($minutes)
+    {
+        return (string) round(max(0, (int) $minutes) / 60, 1);
     }
 
     /**

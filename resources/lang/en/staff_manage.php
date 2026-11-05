@@ -38,6 +38,7 @@ return [
     'field_hired_at'  => 'Hired on',
     'field_resigned_at' => 'Resigned on',
     'field_tenure'    => 'Tenure',
+    'field_annual_leave' => 'Annual leave',
     'field_action'    => 'Actions',
     'field_status'    => 'Status',
     'filter_tenure'   => 'Tenure filter',

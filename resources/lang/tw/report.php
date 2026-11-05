@@ -28,6 +28,14 @@ return [
     'att_absent'    => '曠工',
     'att_amend'     => '補打卡',
     'att_leave'     => '請假',
+    /*
+     * ⚠ 假別名稱在這裡**也要有一份**：打卡報表的 i18n 是 `report` 這一包，
+     * 拿不到 `leave` 那包。兩邊的字要一致（需求方 2026-11-05）。
+     */
+    'leave_annual'       => '特休',
+    'leave_sick'         => '病假',
+    'leave_personal'     => '事假',
+    'leave_unclassified' => '未分類',
     'att_overtime'  => '加班',
     'att_detail_hint' => '點一列可以看那位同仁的出勤明細。',
 

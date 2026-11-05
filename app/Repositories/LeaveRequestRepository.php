@@ -11,8 +11,14 @@ use Illuminate\Database\Eloquent\Collection;
 class LeaveRequestRepository
 {
     /** @var array 查詢欄位 */
+    /*
+     * ⚠ `type` 與 `minutes` 是 2026-11-05 加的，**一定要在這裡**：
+     * 出勤明細要標假別、報表要分類統計、額度要靠 `minutes` 加總 ——
+     * 少撈任何一欄都不會報錯，只會讓假別變空白、額度永遠算成 0。
+     * （這個專案為「select 漏欄位」修過好幾次。）
+     */
     private const LIST_COLUMNS = [
-        'id', 'user_id', 'start_date', 'end_date',
+        'id', 'user_id', 'start_date', 'end_date', 'type', 'minutes',
         'is_full_day', 'start_time', 'end_time',
         'reason', 'status', 'reviewed_by', 'reviewed_at', 'review_note',
         'created_at',
@@ -149,6 +155,47 @@ class LeaveRequestRepository
             ->where('end_date', '>=', $start)
             ->orderBy('start_date')
             ->get();
+    }
+
+    /**
+     * 某人某段期間、某狀態的**特休**假單（算額度用）
+     *
+     * ⚠ 條件是**區間有交集**不是被包含：12/28～1/3 的假單在查 1 月時也要
+     * 撈得到 —— 跨年度那幾天正是最容易超支的時候。真正該算幾分鐘由
+     * `LeaveQuotaService` 自己按天分攤。
+     *
+     * ⚠ **只撈會扣額度的假別**（`constants.LEAVE.QUOTA_TYPES`）。
+     * 寫死 `annual` 的話，日後要把病假也納入管控就得同時改這裡與那份設定，
+     * 而漏改的那一邊會安靜地不生效。
+     *
+     * @param int    $userId
+     * @param string $start Y-m-d
+     * @param string $end   Y-m-d（含當天）
+     * @param int    $status
+     * @return Collection
+     */
+    public function getAnnualByUserAndRange($userId, $start, $end, $status)
+    {
+        return LeaveRequest::query()
+            ->select(self::LIST_COLUMNS)
+            ->where('user_id', (int) $userId)
+            ->whereIn('type', (array) config('constants.LEAVE.QUOTA_TYPES'))
+            ->where('status', (int) $status)
+            ->where('start_date', '<=', $end)
+            ->where('end_date', '>=', $start)
+            ->orderBy('start_date')
+            ->get();
+    }
+
+    /**
+     * 依 id 查一張假單
+     *
+     * @param int $id
+     * @return LeaveRequest|null
+     */
+    public function find($id)
+    {
+        return LeaveRequest::query()->select(self::LIST_COLUMNS)->find((int) $id);
     }
 
     /**
