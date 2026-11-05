@@ -1,6 +1,12 @@
 <?php
 
 return [
+    'tenure_not_started' => 'Not started',
+    'tenure_today'       => 'Started today',
+    'tenure_years'       => ':value y',
+    'tenure_months'      => ':value m',
+    'tenure_days'        => ':value d',
+
     'nav_label' => 'Accounts',
     'page_title' => 'Accounts',
     'subtitle'   => 'Manage accounts and permissions',

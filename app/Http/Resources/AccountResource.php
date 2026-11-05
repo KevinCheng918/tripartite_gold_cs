@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Presenters\UserPresenter;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
@@ -32,7 +33,12 @@ class AccountResource extends JsonResource
             'level'               => $this->level,
             'project_ids'         => $this->project_ids ?? [],
             'hired_at'            => $this->hired_at ? $this->hired_at->format('Y-m-d') : null,
-            'tenure'              => $this->hired_at ? $this->calcTenure() : null,
+            /*
+             * ⚠ 走共用的 `UserPresenter::tenureText()`。這裡原本有自己的
+             * `calcTenure()`，跟 `StaffResource` 各算一份 —— 而兩份都用了
+             * `DateTime::diff()` 的年月日拆解，在 Asia/Taipei 會跳號。
+             */
+            'tenure'              => UserPresenter::tenureText($this->hired_at),
             'equipments'          => $this->equipments ?? [],
             'permission_keywords' => $this->whenLoaded('permissions', function () {
                 return $this->permissions->pluck('permission_keyword')->all();
@@ -41,23 +47,4 @@ class AccountResource extends JsonResource
         ];
     }
 
-    /**
-     * 計算年資（年/月/日）
-     *
-     * @return string
-     */
-    private function calcTenure()
-    {
-        if ($this->hired_at->isFuture()) {
-            return '尚未到職';
-        }
-
-        $diff = $this->hired_at->diff(now());
-        $parts = [];
-        if ($diff->y > 0) { $parts[] = "{$diff->y} 年"; }
-        if ($diff->m > 0) { $parts[] = "{$diff->m} 個月"; }
-        if ($diff->d > 0) { $parts[] = "{$diff->d} 天"; }
-
-        return !empty($parts) ? implode(' ', $parts) : '今天到職';
-    }
 }

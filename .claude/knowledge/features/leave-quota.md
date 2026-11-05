@@ -33,7 +33,7 @@
 | 統計 | `AttendanceService::summariseLeaves()` 把整天假算「天」、時段假算「小時」，**兩者不互通** |
 | 個人每日出勤狀況 | 有「請假」欄，只顯示「請假中」或時段，**不分假別** |
 | 打卡報表 | 有「請假」欄，顯示 `N 天 / N 小時`，**不分假別** |
-| 年資 | `StaffResource` 與 `AccountResource` **各算一份**（都從 `hired_at` 推） |
+| 年資 | `UserPresenter::tenureText()`，兩個 Resource 共用（見 [[../bugfix/2026-11-05-tenure-diff-skips-a-day]]）|
 
 ## ⚠⚠ 最大的結構問題：天與小時現在是兩套，無法相加
 
@@ -156,8 +156,8 @@
 **新增**
 
 ```
-database/migrations/..._add_type_to_leave_request_table.php   假別欄位
-database/migrations/..._add_minutes_to_leave_request_table.php 換算後的分鐘數
+database/migrations/2026_11_05_000001_add_type_and_minutes_to_leave_request_table.php
+                                                              假別 ＋ 換算後的分鐘數（同一支）
 app/Services/LeaveQuotaService.php                            年資 → 額度、已用、剩餘
 .claude/knowledge/features/leave-quota.md（本檔）
 ```

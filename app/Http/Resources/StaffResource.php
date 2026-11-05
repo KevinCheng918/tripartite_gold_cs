@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Presenters\UserPresenter;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
@@ -17,19 +18,14 @@ class StaffResource extends JsonResource
      */
     public function toArray($request)
     {
-        $tenure = null;
-        if (filled($this->hired_at)) {
-            if ($this->hired_at->isFuture()) {
-                $tenure = '尚未到職';
-            } else {
-                $diff = $this->hired_at->diff(now());
-                $parts = [];
-                if ($diff->y > 0) { $parts[] = "{$diff->y} 年"; }
-                if ($diff->m > 0) { $parts[] = "{$diff->m} 個月"; }
-                if ($diff->d > 0) { $parts[] = "{$diff->d} 天"; }
-                $tenure = !empty($parts) ? implode(' ', $parts) : '今天到職';
-            }
-        }
+        /*
+         * ⚠ 年資走 `UserPresenter::tenureText()`，**不要在這裡自己 `diff()`**
+         * —— `DateTime::diff()` 的年月日拆解在 Asia/Taipei 會跳號
+         * （到職日差一天、年資差兩天），理由與實測見那一支的 docblock。
+         * 這裡原本就是自己算的那一份，`AccountResource` 還有第二份 ——
+         * 兩份已經合併成一支。
+         */
+        $tenure = UserPresenter::tenureText($this->hired_at);
 
         return [
             'id'         => $this->id,

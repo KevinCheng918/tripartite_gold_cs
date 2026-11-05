@@ -2,6 +2,8 @@
 
 namespace App\Presenters;
 
+use Illuminate\Support\Carbon;
+
 /**
  * 使用者 Presenter
  *
@@ -70,5 +72,76 @@ class UserPresenter
         $color = self::$levelColorMap[$level] ?? 'bg-secondary';
 
         return '<span class="badge ' . $color . '">' . $name . '</span>';
+    }
+
+    /**
+     * 年資講成「N 年 N 個月 N 天」
+     *
+     * ⚠⚠ **不要用 `$hired->diff(now())` 的 `->y / ->m / ->d`。**
+     *
+     * PHP 的 `DateTime::diff()` 在 `Asia/Taipei` 這種有歷史時區轉換的時區下，
+     * **年月日的拆解會跳號** —— 總天數是對的，拆出來的那三個數字不是。
+     *
+     * 2026-11-05 需求方回報：到職日差一天，年資卻差兩天。實測
+     * （基準 2026-11-05）：
+     *
+     * | 到職日 | Asia/Taipei | UTC |
+     * |---|---|---|
+     * | 2025-09-30 | 1 年 1 月 **6** 天 | 1 年 1 月 6 天 |
+     * | 2025-10-01 | 1 年 1 月 **5** 天 | 1 年 1 月 **4** 天 |
+     * | 2025-10-02 | 1 年 1 月 **3** 天 | 1 年 1 月 3 天 |
+     *
+     * 台北那一欄的 4 被跳過了，所以 10-01 與 10-02 相差兩天。
+     * 總天數兩邊都是 401／400／399（那個是對的）。
+     *
+     * 改成**自己逐段推進**：先加滿整年、再加滿整月、剩下的才是天數。
+     * 每一步都是明確的日期運算，不經過 `diff()` 的拆解。
+     *
+     * ⚠ `addYearsNoOverflow` / `addMonthsNoOverflow` 不能換成一般版本：
+     * 1/31 加一個月在一般版本會溢位成 3/2或3/3。
+     *
+     * ⚠ `diffInYears` / `diffInDays` **不受這個問題影響**（它們是計數不是
+     * 拆解），所以 `LeaveQuotaService` 的年資級距是對的 —— 不要連那裡
+     * 一起「修」。
+     *
+     * @param mixed $hiredAt 到職日（null ＝ 沒填）
+     * @return string|null null ＝ 沒填到職日
+     */
+    public static function tenureText($hiredAt)
+    {
+        if (blank($hiredAt)) {
+            return null;
+        }
+
+        $hired = Carbon::parse($hiredAt)->startOfDay();
+        $today = now()->startOfDay();
+
+        if ($hired->greaterThan($today)) {
+            return trans('account.tenure_not_started');
+        }
+
+        $years = (int) $hired->diffInYears($today);
+        $afterYears = $hired->copy()->addYearsNoOverflow($years);
+
+        $months = (int) $afterYears->diffInMonths($today);
+        $afterMonths = $afterYears->copy()->addMonthsNoOverflow($months);
+
+        $days = (int) $afterMonths->diffInDays($today);
+
+        $parts = [];
+
+        if ($years > 0) {
+            $parts[] = trans('account.tenure_years', ['value' => $years]);
+        }
+
+        if ($months > 0) {
+            $parts[] = trans('account.tenure_months', ['value' => $months]);
+        }
+
+        if ($days > 0) {
+            $parts[] = trans('account.tenure_days', ['value' => $days]);
+        }
+
+        return filled($parts) ? implode(' ', $parts) : trans('account.tenure_today');
     }
 }

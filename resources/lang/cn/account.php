@@ -1,6 +1,12 @@
 <?php
 
 return [
+    'tenure_not_started' => '尚未到职',
+    'tenure_today'       => '今天到职',
+    'tenure_years'       => ':value 年',
+    'tenure_months'      => ':value 个月',
+    'tenure_days'        => ':value 天',
+
     'nav_label' => '账号管理',
     'page_title' => '账号管理',
     'subtitle'   => '管理系统账号与权限',
