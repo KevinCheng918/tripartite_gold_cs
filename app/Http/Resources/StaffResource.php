@@ -3,7 +3,9 @@
 namespace App\Http\Resources;
 
 use App\Presenters\UserPresenter;
+use App\Services\LeaveQuotaService;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Arr;
 
 /**
  * 內部管理員工 Resource
@@ -33,8 +35,8 @@ class StaffResource extends JsonResource
             'account'    => $this->account,
             'level'      => $this->level,
             'status'     => $this->status,
-            'hired_at'    => $this->hired_at ? $this->hired_at->format('Y-m-d') : null,
-            'resigned_at' => $this->resigned_at ? $this->resigned_at->format('Y-m-d') : null,
+            'hired_at'    => filled($this->hired_at) ? $this->hired_at->format('Y-m-d') : null,
+            'resigned_at' => filled($this->resigned_at) ? $this->resigned_at->format('Y-m-d') : null,
             'tenure'     => $tenure,
             /*
              * 本年度特休（需求方 2026-11-05：人員管理要按年資算特休天數）。
@@ -47,7 +49,8 @@ class StaffResource extends JsonResource
              * 算不出「還能請幾個下午」。日數另外給，兩個都要。
              */
             'annual_leave' => $this->annualLeave(),
-            'equipments' => $this->equipments ?? [],
+            // JSON cast 欄位，沒設過是 null —— 前端一律當陣列跑，所以補成 []
+            'equipments' => filled($this->equipments) ? $this->equipments : [],
         ];
     }
 
@@ -62,15 +65,15 @@ class StaffResource extends JsonResource
      */
     private function annualLeave()
     {
-        $summary = app(\App\Services\LeaveQuotaService::class)->summaryFor($this->resource);
+        $summary = app(LeaveQuotaService::class)->summaryFor($this->resource);
 
         return [
-            'entitled_days'  => $summary['entitled_days'],
-            'period_start'   => $summary['period_start'],
-            'period_end'     => $summary['period_end'],
-            'available_hours' => round($summary['available_minutes'] / 60, 1),
-            'used_hours'      => round($summary['used_minutes'] / 60, 1),
-            'remaining_hours' => round($summary['remaining_minutes'] / 60, 1),
+            'entitled_days'   => Arr::get($summary, 'entitled_days'),
+            'period_start'    => Arr::get($summary, 'period_start'),
+            'period_end'      => Arr::get($summary, 'period_end'),
+            'available_hours' => round(Arr::get($summary, 'available_minutes') / 60, 1),
+            'used_hours'      => round(Arr::get($summary, 'used_minutes') / 60, 1),
+            'remaining_hours' => round(Arr::get($summary, 'remaining_minutes') / 60, 1),
         ];
     }
 }

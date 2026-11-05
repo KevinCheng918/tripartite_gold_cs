@@ -31,15 +31,16 @@ class AccountResource extends JsonResource
             'nickname'            => $this->nickname,
             'status'              => $this->status,
             'level'               => $this->level,
-            'project_ids'         => $this->project_ids ?? [],
-            'hired_at'            => $this->hired_at ? $this->hired_at->format('Y-m-d') : null,
+            // JSON cast 欄位，沒設過是 null —— 前端一律當陣列跑，所以補成 []
+            'project_ids'         => filled($this->project_ids) ? $this->project_ids : [],
+            'hired_at'            => filled($this->hired_at) ? $this->hired_at->format('Y-m-d') : null,
             /*
              * ⚠ 走共用的 `UserPresenter::tenureText()`。這裡原本有自己的
              * `calcTenure()`，跟 `StaffResource` 各算一份 —— 而兩份都用了
              * `DateTime::diff()` 的年月日拆解，在 Asia/Taipei 會跳號。
              */
             'tenure'              => UserPresenter::tenureText($this->hired_at),
-            'equipments'          => $this->equipments ?? [],
+            'equipments'          => filled($this->equipments) ? $this->equipments : [],
             'permission_keywords' => $this->whenLoaded('permissions', function () {
                 return $this->permissions->pluck('permission_keyword')->all();
             }),

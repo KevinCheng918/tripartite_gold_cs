@@ -2,6 +2,7 @@
 
 namespace App\Presenters;
 
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 
 /**
@@ -33,8 +34,8 @@ class UserPresenter
             if (in_array($value, $excludeLevels)) {
                 continue;
             }
-            $label = trans(self::$levelLangMap[$value] ?? "account.level_{$key}");
-            $html .= '<option value="' . $value . '">' . $label . '</option>';
+            $label = trans(Arr::get(self::$levelLangMap, $value, "account.level_{$key}"));
+            $html .= "<option value=\"{$value}\">{$label}</option>";
         }
 
         return $html;
@@ -57,7 +58,7 @@ class UserPresenter
      */
     public static function levelName($level)
     {
-        return trans(self::$levelLangMap[$level] ?? 'account.level_cs');
+        return trans(Arr::get(self::$levelLangMap, $level, 'account.level_cs'));
     }
 
     /**
@@ -69,9 +70,9 @@ class UserPresenter
     public static function levelBadge($level)
     {
         $name = self::levelName($level);
-        $color = self::$levelColorMap[$level] ?? 'bg-secondary';
+        $color = Arr::get(self::$levelColorMap, $level, 'bg-secondary');
 
-        return '<span class="badge ' . $color . '">' . $name . '</span>';
+        return "<span class=\"badge {$color}\">{$name}</span>";
     }
 
     /**

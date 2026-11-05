@@ -110,3 +110,50 @@ toast（`showMessage()`）顯示，串五句會爆版；要全部的前端自己
 
 - [[../features/leave-quota]] — 特休額度
 - [[2026-11-05-tenure-diff-skips-a-day]] — 同一天的另一個「兩份各自維護」
+
+---
+
+## 收尾：按 PROMPTS.md 逐條稽核，補修 11 處 style 違反
+
+需求方要求「嚴格嚴謹按照 PROMPTS.md」，所以把這次 session 動過的六個檔案
+逐條核對。**零行為變更**，前後輸出對照測過（含 level 99 的 fallback 路徑）。
+
+| 檔案 | 違反 | 處數 |
+|---|---|---|
+| `UserPresenter.php` | `??` 取陣列值 → `Arr::get` | 3 |
+| `UserPresenter.php` | `'<option value="' . $value . '">'` → `"{$var}"` | 2 |
+| `StaffResource.php` | `$summary['x']` → `Arr::get`（**我自己上一輪寫的**）| 6 |
+| `StaffResource.php` | `?? []`、`$this->hired_at ? ... : null` → `filled` | 3 |
+| `AccountResource.php` | 同上 | 3 |
+
+⚠ `StaffResource::annualLeave()` 那六處是**前一輪自己剛寫的**，當下沒套規則。
+規則是「寫的當下就套用」，補修比重寫便宜，但更便宜的是第一次就寫對。
+
+⚠ `app(\App\Services\LeaveQuotaService::class)` 的 inline FQCN 一併改成 import。
+
+### 刻意沒改的
+
+`LeaveRequestService::apply()` 裡的 `$params['start_date']`、`$params['end_date']`
+維持直接取值 —— 那些是 Request 驗證過的 `required` 欄位，不可能是 null；
+**選用欄位（`end_date`、`type`、`user_id`、`review_note`）才用 `Arr::get`**。
+這條界線是刻意的，不是漏掉。
+
+### ⚠ 稽核本身踩到的坑（三次假的「乾淨」）
+
+這次有三次 grep 回報「乾淨」但其實是壞的指令，差點就把沒驗到的東西報成驗過：
+
+1. `grep ... $FILES`（多檔名存在變數裡）—— **zsh 不對未加引號的變數斷詞**
+   （與 bash 不同），整串被當成單一檔名，`ugrep` 回 `No such file or directory`
+   後輸出空結果
+2. `grep -n "\. \$"` —— 雙引號裡的 `\$` 被 shell 展開成 `$`，
+   regex 變成「句點＋空格＋**行尾**」，所以一行都沒中
+3. 第一次還把真有問題的輸出整批當成 docblock 誤判而跳過
+
+> **稽核指令回報「乾淨」時，先確認那個指令真的會在有問題時報出東西** ——
+> 空結果與壞指令長得一模一樣。這次是靠 `ugrep` 的 warning 才發現。
+
+### 不加版本紀錄的理由
+
+零行為變更。版本紀錄是給客服看的（左下角面板），1600 多行既有條目**每一條
+都是客服看得見的事**，沒有「純內部整理」的先例。編一條「無功能變更」塞進去
+只是噪音，所以記在這裡。
