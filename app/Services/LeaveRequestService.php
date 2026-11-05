@@ -102,9 +102,7 @@ class LeaveRequestService
          */
         if ($this->needsQuota($type) && !$this->leaveQuota->canAfford($user, $minutes)) {
             throw ValidationException::withMessages([
-                'date' => [trans('leave.msg.quota_exceeded', [
-                    'hours' => $this->hoursText($this->leaveQuota->summaryFor($user)['remaining_minutes']),
-                ])],
+                'date' => [$this->quotaErrorFor($user)],
             ]);
         }
 
@@ -227,6 +225,34 @@ class LeaveRequestService
     private function hoursText($minutes)
     {
         return (string) round(max(0, (int) $minutes) / 60, 1);
+    }
+
+    /**
+     * 特休不夠的時候，要告訴他哪一種「不夠」
+     *
+     * ⚠ **「還沒有特休」與「有過但用完了」是兩件事，訊息不能混用。**
+     * 兩種都回「額度不足，目前只剩 0 小時」的話，未滿六個月的新人會以為
+     * 自己有特休卻被請光了，跑去追帳 —— 而申請表單底下那一行明明寫著
+     * 「尚未取得特休（未滿六個月）」，兩句話互相矛盾，更難懂。
+     *
+     * 判斷依據是 `period_start` 為 null（`summaryFor()` 在還沒滿六個月或
+     * 根本沒填到職日時回 `emptySummary()`）—— 跟畫面那一行用的是同一個訊號，
+     * 所以兩邊永遠一致。
+     *
+     * @param object $user
+     * @return string
+     */
+    private function quotaErrorFor($user)
+    {
+        $summary = $this->leaveQuota->summaryFor($user);
+
+        if (blank(Arr::get($summary, 'period_start'))) {
+            return trans('leave.msg.quota_not_yet');
+        }
+
+        return trans('leave.msg.quota_exceeded', [
+            'hours' => $this->hoursText(Arr::get($summary, 'remaining_minutes')),
+        ]);
     }
 
     /**

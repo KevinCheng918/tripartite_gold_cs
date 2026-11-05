@@ -52,6 +52,8 @@ return [
         'rejected'         => 'Leave rejected',
         'overlap'          => 'Leave already exists for this date range',
         'quota_exceeded'   => 'Not enough annual leave: only :hours hours left',
+        // ⚠ Distinct from the line above: this one is "none yet", that one is "had some, used it up"
+        'quota_not_yet'    => 'You are not yet entitled to annual leave (less than six months of service). Please apply for sick or personal leave instead.',
         'user_not_found'   => 'Applicant account not found',
         'already_reviewed' => 'This leave has already been reviewed',
         'on_leave_today'   => 'You are on leave today, cannot clock in',

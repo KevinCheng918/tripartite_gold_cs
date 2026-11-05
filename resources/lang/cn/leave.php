@@ -52,6 +52,8 @@ return [
         'rejected'         => '请假已拒绝',
         'overlap'          => '该日期区间已有请假申请',
         'quota_exceeded'   => '特休额度不足，目前只剩 :hours 小时',
+        // ⚠ 跟上面那句是两种情况：这句是「还没有」，上面那句是「有过但用完了」
+        'quota_not_yet'    => '您目前尚未取得特休（受雇未满六个月），这段期间可改申请病假或事假',
         'user_not_found'   => '找不到申请人的账号',
         'already_reviewed' => '此请假已审核过',
         'on_leave_today'   => '今日已请假，无法打卡上班',

@@ -4,7 +4,9 @@ namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Illuminate\Session\TokenMismatchException;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -90,6 +92,47 @@ class Handler extends ExceptionHandler
         }
 
         return parent::render($request, $e);
+    }
+
+    /**
+     * 驗證失敗的 JSON 回應，`message` 換成真正的錯誤內容
+     *
+     * Laravel 原本回的是 `$exception->getMessage()`，而
+     * `ValidationException` 的建構式寫死 `'The given data was invalid.'`
+     * （`vendor/.../Validation/ValidationException.php`）——
+     * 真正的訊息只在 `errors` 裡面。
+     *
+     * ⚠ **這不只影響 FormRequest**：Service 裡 `ValidationException::withMessages()`
+     * 丟出來的業務訊息（「特休額度不足」「這個時段已經有假單」）走的是同一支，
+     * 所以操作者看到的也是那句廢話，完全不知道該改什麼。
+     *
+     * ⚠ **為什麼修在這裡，而不是前端**：前端有十份各自獨立的 `apiFetch`，
+     * 呼叫端一律只讀 `body.message`。已經有 **五個 JS 檔各自補了一份
+     * 「從 errors 撈第一句」的程式**（`attendance.js`、`notification-setting.js`、
+     * `report.js`、`setting-admin.js`、`vm/index.blade.php`）——
+     * 同一個問題被遇到五次、補了五份。源頭只有一個，就修這裡。
+     *
+     * ⚠ **`errors` 原封不動保留**。上面那五份補救程式是先讀 `errors`、
+     * 讀不到才退回 `message`，所以照舊運作，不會變成顯示兩次。
+     *
+     * ⚠ **多個欄位同時不合格時只回第一句**。刻意的 —— 這個專案的錯誤都用
+     * 單行 toast 顯示（`showMessage()`），把五句串起來會爆版；要看全部的
+     * 前端自己讀 `errors`。
+     *
+     * @param \Illuminate\Http\Request $request
+     * @param ValidationException      $exception
+     * @return \Illuminate\Http\JsonResponse
+     */
+    protected function invalidJson($request, ValidationException $exception)
+    {
+        $errors = $exception->errors();
+        $first = Arr::first(Arr::flatten($errors));
+
+        return response()->json([
+            // 撈不到就留原本那句，至少不是空字串
+            'message' => filled($first) ? $first : $exception->getMessage(),
+            'errors'  => $errors,
+        ], $exception->status);
     }
 
     /**

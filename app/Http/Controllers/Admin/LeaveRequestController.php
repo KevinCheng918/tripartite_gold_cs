@@ -14,6 +14,7 @@ use App\Repositories\UserRepository;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 /**
  * 請假管理控制器
@@ -87,6 +88,12 @@ class LeaveRequestController extends Controller
     /**
      * Ajax 申請請假
      *
+     * ⚠ `ValidationException` 要**單獨接著往上丟**，不能被下面那個 `\Exception`
+     * 吃掉：它的 `getMessage()` 寫死是 `'The given data was invalid.'`，
+     * 真正的訊息（「特休額度不足」「這個時段已經有假單」）只在 `errors` 裡。
+     * 被吃掉的話操作者只看到那句廢話，不知道該改什麼。
+     * 丟上去由 `App\Exceptions\Handler::invalidJson()` 統一組 `message`。
+     *
      * @param StoreLeaveRequest $request
      * @return \Illuminate\Http\JsonResponse
      */
@@ -96,8 +103,8 @@ class LeaveRequestController extends Controller
 
         try {
             $user = Auth::user();
-            $targetUserId = $user->isAdmin() && filled($params['user_id'] ?? null)
-                ? (int) $params['user_id']
+            $targetUserId = $user->isAdmin() && filled(Arr::get($params, 'user_id'))
+                ? (int) Arr::get($params, 'user_id')
                 : Auth::id();
 
             $leave = $this->leaveService->apply($params, $targetUserId);
@@ -106,6 +113,9 @@ class LeaveRequestController extends Controller
                 'message' => trans('leave.msg.submitted'),
                 'data'    => new LeaveRequestResource($leave->load(['user', 'reviewer'])),
             ]);
+        } catch (ValidationException $e) {
+            // 不是系統錯誤，不記 log：使用者填錯本來就會走到這裡
+            throw $e;
         } catch (\Exception $e) {
             Log::error('請假申請失敗', ['error' => $e->getMessage()]);
 
@@ -129,7 +139,7 @@ class LeaveRequestController extends Controller
                 $leaveRequest,
                 (int) $params['status'],
                 Auth::id(),
-                $params['review_note'] ?? null
+                Arr::get($params, 'review_note')
             );
 
             $msg = (int) $params['status'] === LeaveRequest::STATUS_APPROVED
@@ -140,6 +150,9 @@ class LeaveRequestController extends Controller
                 'message' => $msg,
                 'data'    => new LeaveRequestResource($leave->load(['user', 'reviewer'])),
             ]);
+        } catch (ValidationException $e) {
+            // 理由同 ajaxStore()：審核也會丟業務訊息（例如「這張單已經審過了」）
+            throw $e;
         } catch (\Exception $e) {
             Log::error('請假審核失敗', ['error' => $e->getMessage(), 'leave_id' => $leaveRequest->id]);
 
