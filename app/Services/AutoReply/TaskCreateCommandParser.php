@@ -23,8 +23,31 @@ class TaskCreateCommandParser
     /** @var string 這句話不是要開卡 */
     const INTENT_NOT_CREATE = 'not_create';
 
-    /** @var string 是要開卡，但沒講標題 */
+    /**
+     * 模型自己也不確定這句話是什麼
+     *
+     * ⚠⚠ **這一種一定要讓給下一支 handler，不可以回話。**
+     *
+     * 2026-11-05 踩過：有人說「購物網站規章」，模型回 unknown，而當時的服務
+     * 把 unknown 當成「要開卡但沒講標題」直接回了「要開什麼卡片？」並
+     * `return true` —— 於是**規章那支永遠跑不到**。
+     *
+     * 這一支在分派器裡排得很前面，所以它一旦誤判就會把訊息整個吞掉。
+     * 「不確定」的歸宿是後面的 handler，不是這裡。
+     *
+     * @var string
+     */
     const INTENT_UNKNOWN = 'unknown';
+
+    /**
+     * 確定是要開卡，但沒講要開什麼
+     *
+     * ⚠ 跟 `INTENT_UNKNOWN` **不是同一件事**：這一種是模型明確說了 create，
+     * 只是標題拆不出來 —— 那時候回「要開什麼卡片？」才有意義。
+     *
+     * @var string
+     */
+    const INTENT_NEED_TITLE = 'need_title';
 
     /** @var array<string> 優先序的合法值（對應 constants.TASK.PRIORITY.*） */
     const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
@@ -59,7 +82,7 @@ class TaskCreateCommandParser
      * @param string $text 已經去掉 @機器人
      * @return array{intent: string, title: string|null, project: string|null,
      *     assignee: string|null, priority: string|null, due_date: string|null}|null
-     *     null = 模型不可用
+     *     intent 見 INTENT_*；null = 模型不可用
      */
     public function parse($text)
     {
@@ -108,11 +131,16 @@ class TaskCreateCommandParser
             return $this->notCreate();
         }
 
+        // 模型自己不確定 —— 讓給下一支，理由見 `INTENT_UNKNOWN`
+        if ($intent !== self::INTENT_CREATE) {
+            return $this->unknown();
+        }
+
         $title = trim((string) Arr::get($result, 'title'));
 
-        // 是要開卡但沒講標題 —— 問回去，不要用整句話當標題
-        if ($intent !== self::INTENT_CREATE || blank($title)) {
-            return $this->unknown();
+        // 確定要開卡但沒講標題 —— 問回去，不要拿整句話當標題
+        if (blank($title)) {
+            return $this->needTitle();
         }
 
         return [
@@ -199,6 +227,21 @@ class TaskCreateCommandParser
     /**
      * @return array
      */
+    private function needTitle()
+    {
+        return [
+            'intent'   => self::INTENT_NEED_TITLE,
+            'title'    => null,
+            'project'  => null,
+            'assignee' => null,
+            'priority' => null,
+            'due_date' => null,
+        ];
+    }
+
+    /**
+     * @return array
+     */
     private function unknown()
     {
         return [
@@ -222,7 +265,7 @@ class TaskCreateCommandParser
                 'intent' => [
                     'type'        => 'string',
                     'enum'        => [self::INTENT_CREATE, self::INTENT_NOT_CREATE, self::INTENT_UNKNOWN],
-                    'description' => '要開一張任務卡（create）、不是要開卡（not_create）、是要開卡但沒講要開什麼（unknown）',
+                    'description' => '要開一張任務卡（create）、不是要開卡（not_create）、你不確定這句話是什麼（unknown）。不確定就填 unknown 或 not_create，不要硬猜成 create',
                 ],
                 'title' => [
                     'type'        => ['string', 'null'],

@@ -89,11 +89,27 @@ class TaskCreateCommandService
 
         $intent = (string) Arr::get($parsed, 'intent');
 
-        // 不是要開卡 —— 讓分派器換下一個
-        if ($intent === TaskCreateCommandParser::INTENT_NOT_CREATE) {
+        /*
+         * ⚠⚠ **「不是開卡」與「模型不確定」都要讓給下一支，而且不可以回話。**
+         *
+         * 2026-11-05 踩過：有人說「購物網站規章」，模型回 unknown，而當時
+         * 這裡把 unknown 當成「要開卡但沒講標題」—— 回了「要開什麼卡片？」
+         * 又 `return true`，**規章那支永遠跑不到**。
+         *
+         * 這一支在分派器裡排得很前面（會寫入的先問），所以它一旦誤判就會把
+         * 訊息整個吞掉。排前面的代價就是**必須更保守**：
+         * 只有確定是自己的事才認領。
+         */
+        if ($intent === TaskCreateCommandParser::INTENT_NOT_CREATE
+            || $intent === TaskCreateCommandParser::INTENT_UNKNOWN) {
             return false;
         }
 
+        /*
+         * ⚠ **權限要查在意圖定案之後。** 排在前面的話，任何一句模型沒讀懂的
+         * 話都會讓沒有開卡權限的人收到「你沒有用指令開卡的權限」——
+         * 他根本沒想開卡。
+         */
         $user = $this->resolveUser($from);
 
         if (blank($user)) {
@@ -109,7 +125,8 @@ class TaskCreateCommandService
             return true;
         }
 
-        if ($intent !== TaskCreateCommandParser::INTENT_CREATE) {
+        // 確定要開卡，只是沒講要開什麼 —— 這時候問回去才有意義
+        if ($intent === TaskCreateCommandParser::INTENT_NEED_TITLE) {
             $this->reply((string) Arr::get($config, 'NEED_TITLE_TEXT'), $threadId);
 
             return true;
