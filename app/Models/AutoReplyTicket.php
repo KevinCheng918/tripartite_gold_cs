@@ -78,20 +78,44 @@ class AutoReplyTicket extends Model
     }
 
     /**
-     * 是否已處理完畢（已回客人／已入題庫／已忽略）
+     * 答案已經送給客人、或已經進了題庫 —— 這張單不該再接受新答案
+     *
+     * ⚠⚠ **IGNORED 與 EXPIRED 刻意不算在內。**（2026-11-07 修的 bug）
+     *
+     * 這支原本叫 `isClosed()`，把 IGNORED 也當成「不准再作答」。問題是
+     * `AutoReplyTicketRepository::ignoreOpenByGroup()` 會在客服對客人送出
+     * **任何一則**人工訊息時，把那個對話**全部**未結案的單標成 IGNORED ——
+     * 包含客服還沒作答的那幾張。於是：
+     *
+     *   客服先跟客人說一句「稍等，我確認一下」
+     *     → 那個對話所有求助單變成 IGNORED
+     *     → 回支援群組要作答，卻只拿到「這張單已經處理過了」
+     *     → 只能登入後台處理
+     *
+     * IGNORED 真正的語意是**「不要再催這張單」**（否則會一路催到上限、
+     * 報表永遠紅著），不是「不准回答」。兩件事被同一個狀態表達，
+     * 而這道判斷挑了錯的那個意思。
+     *
+     * ⚠ EXPIRED（放太久被 `ticket:close-stale` 收掉）同理：單被系統收掉，
+     * 不代表同仁現在補的答案沒有價值 —— 那個答案還要進題庫給下一次用。
+     *
+     * ⚠ 真正該擋的只有 REPLIED／SAVED：答案已經送出去或已經存進題庫了，
+     * 再回一次是重複，要改內容該去後台題庫改。
+     *
+     * ⚠ 不必擔心重新作答會讓催促復活：催促的查詢只看
+     * `status = PENDING`（`getTicketsDueForRemind()`），而重新作答之後是
+     * ANSWERED，撈不到。
      *
      * @return bool
      */
-    public function isClosed()
+    public function isAnswerDelivered()
     {
-        $closed = [
-            config('constants.AUTO_REPLY.TICKET_STATUS.REPLIED'),
-            config('constants.AUTO_REPLY.TICKET_STATUS.SAVED'),
-            config('constants.AUTO_REPLY.TICKET_STATUS.IGNORED'),
-            // 放太久被系統收掉的也算結束 —— 不然同仁回覆它還會跑作答流程
-            config('constants.AUTO_REPLY.TICKET_STATUS.EXPIRED'),
+        $delivered = [
+            (int) config('constants.AUTO_REPLY.TICKET_STATUS.REPLIED'),
+            (int) config('constants.AUTO_REPLY.TICKET_STATUS.SAVED'),
         ];
 
-        return in_array($this->status, $closed, false);
+        // status 有 cast 成 integer，所以用嚴格比對
+        return in_array((int) $this->status, $delivered, true);
     }
 }

@@ -377,7 +377,14 @@ class AutoReplySupportService
             return;
         }
 
-        if ($ticket->isClosed()) {
+        /*
+         * ⚠ 只擋「答案已經送出去或已入題庫」，**不擋 IGNORED／EXPIRED**。
+         *
+         * 理由見 `AutoReplyTicket::isAnswerDelivered()`：客服只要先跟客人說
+         * 一句「稍等」，`ignoreOpenByGroup()` 就會把那個對話全部的單標成
+         * IGNORED —— 以前那會讓這裡擋下來，同仁再也無法引用作答，只能登入後台。
+         */
+        if ($ticket->isAnswerDelivered()) {
             $this->sendToSupport('這張單已經處理過了，如果要更新答案請直接到後台題庫修改。', null, $message['message_id']);
 
             return;
@@ -479,7 +486,8 @@ class AutoReplySupportService
     {
         $ticket = $this->ticketRepository->find((int) Arr::get($parts, 0, 0));
 
-        if (blank($ticket) || $ticket->isClosed()) {
+        // 只擋已送出／已入題庫，理由見 `AutoReplyTicket::isAnswerDelivered()`
+        if (blank($ticket) || $ticket->isAnswerDelivered()) {
             $this->editSupportMessage($messageId, '這張單已經處理過了。');
 
             return;
@@ -681,7 +689,8 @@ class AutoReplySupportService
         $action = (string) Arr::get($parts, 0, '');
         $ticket = $this->ticketRepository->find((int) Arr::get($parts, 1, 0));
 
-        if (blank($ticket) || $ticket->isClosed()) {
+        // 只擋已送出／已入題庫，理由見 `AutoReplyTicket::isAnswerDelivered()`
+        if (blank($ticket) || $ticket->isAnswerDelivered()) {
             $this->editSupportMessage($messageId, '這張單已經處理過了。');
 
             return;
@@ -1077,8 +1086,12 @@ class AutoReplySupportService
      * 回報到支援群組：這張單在後台處理掉了
      *
      * ⚠ **一定要講一聲。** 求助訊息還掛在群裡，後台改了狀態而群組不知道的話，
-     * 同仁還是會去引用它作答 —— 然後只拿到一句「這張單已經處理過了」，
-     * 不知道發生什麼事、也不知道是誰處理的。
+     * 同仁還是會去引用它作答 —— 不知道這張單已經有人在後台處理掉了、
+     * 也不知道是誰處理的。
+     *
+     * ⚠ 2026-11-07 起引用作答**不會再被擋**（閘門從 `isClosed()` 換成
+     * `isAnswerDelivered()`），所以這則的文案也改成邀請同仁補答案進題庫 ——
+     * 以前引用只會拿到一句「已經處理過了」，那時不能這樣寫。
      *
      * ⚠ 失敗不能讓整件事失敗：狀態已經改掉了，這則送不出去只是少一個通知，
      * 丟例外的話呼叫端會以為沒改成功而再按一次。比照 `sendRemind()`。
