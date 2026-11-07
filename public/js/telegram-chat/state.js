@@ -29,6 +29,24 @@ window.TgChat = (function () {
 
         // 目前這個對話的自動回覆是否開啟。開著時整個輸入區要鎖住
         autoReplyOn: false,
+
+        /*
+         * 取消勾選時那個 modal 的設定。
+         *
+         * `enabled` 關著時不問意圖、直接關掉 —— 沒有排程會幫他勾回來，
+         * 多問一句只是多一次點擊。
+         */
+        resume: {
+            enabled: root.dataset.resumeEnabled === '1',
+            defaultMinutes: parseInt(root.dataset.resumeDefault, 10) || 30,
+            presets: (root.dataset.resumePresets || '').split(',')
+                .map(function (value) { return parseInt(value, 10); })
+                .filter(function (value) { return value > 0; }),
+            min: parseInt(root.dataset.resumeMin, 10) || 5,
+            max: parseInt(root.dataset.resumeMax, 10) || 1440,
+            modeTemporary: parseInt(root.dataset.resumeModeTemporary, 10) || 1,
+            modePermanent: parseInt(root.dataset.resumeModePermanent, 10) || 2,
+        },
         wsKey: root.dataset.wsKey,
         wsHost: root.dataset.wsHost || '127.0.0.1',
         wsPort: parseInt(root.dataset.wsPort || '6001', 10),

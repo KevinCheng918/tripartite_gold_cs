@@ -22,6 +22,14 @@
     // 待傳送的附件（截圖與一般檔案），按下發送才會真的送到客戶群組
     var pendingFiles = [];
 
+    /*
+     * 關閉自動回覆的 modal 是不是按「確定」關掉的。
+     *
+     * 需要這個 flag 是因為 `hidden.bs.modal` 兩種情況都會觸發 ——
+     * 取消要把勾勾彈回去，確定則不能彈（送出流程自己會管勾勾）。
+     */
+    var offConfirmed = false;
+
     // 目前引用的訊息 id，送出後清空
     var quotedId = null;
 
@@ -154,29 +162,63 @@
     }
 
     /**
-     * 切換自動回覆
+     * 勾選框被動到：開啟直接送，關閉要先問意圖
+     *
+     * 問意圖的理由：關掉的人有兩種完全不同的打算 —— 處理完就該勾回來的，
+     * 與這個客戶之後一直人工的。只看「關閉」這個動作分不出來，而猜錯的
+     * 其中一邊會把自動回覆的訊息發給不該收到的客人。
+     *
+     * @param {HTMLInputElement} toggle
+     */
+    function handleAutoReplyToggle(toggle) {
+        // 開啟不問：勾回來沒有「暫時／永久」可言
+        if (toggle.checked) {
+            submitAutoReply(toggle, true, {});
+
+            return;
+        }
+
+        // 自動恢復功能關著時也不問：沒有排程會幫他勾回來，多問一句只是多一次點擊
+        if (!T.resume.enabled) {
+            submitAutoReply(toggle, false, {});
+
+            return;
+        }
+
+        openAutoReplyOffModal(toggle);
+    }
+
+    /**
+     * 送出自動回覆開關
      *
      * **存檔成功才鎖 UI** —— 失敗要把勾勾彈回去，畫面不能跟資料庫說不一樣。
      *
      * @param {HTMLInputElement} toggle
+     * @param {boolean}          enabled
+     * @param {Object}           extra   關閉時的 mode / quiet_minutes
      */
-    function toggleAutoReply(toggle) {
-        var enabled = toggle.checked;
+    function submitAutoReply(toggle, enabled, extra) {
         toggle.disabled = true;
+
+        var payload = Object.assign(
+            { group_id: T.selectedGroupId, enabled: enabled },
+            extra || {}
+        );
 
         T.apiFetch('/admin/telegram-chat/ajax-toggle-auto-reply', {
             method: 'POST',
-            body: JSON.stringify({ group_id: T.selectedGroupId, enabled: enabled }),
+            body: JSON.stringify(payload),
         })
             .then(function (body) {
                 T.autoReplyOn = !!body.auto_reply;
                 toggle.checked = T.autoReplyOn;
-                syncGroupCache();
+                syncGroupCache(localResumeAt(enabled, extra));
                 applyAutoReplyLock();
 
                 // 忽略名單按鈕只在自動回覆開著時出現，標題列要跟著重畫，
                 // 否則剛打開開關的人要切走再切回來才看得到那顆按鈕
                 if (T.renderHeader) { T.renderHeader(T.selectedGroupId); }
+                if (T.renderGroupList) { T.renderGroupList(); }
             })
             .catch(function (body) {
                 toggle.checked = !enabled;
@@ -188,13 +230,219 @@
     }
 
     /**
+     * 本地先算出預計恢復時間，讓倒數立刻出現
+     *
+     * 不等下一次清單重載（最多 30 秒）—— 剛關掉的人要馬上看到「約 N 分後
+     * 恢復」，否則他分不出自己剛剛選的是暫時還是永久。
+     *
+     * ⚠ 這只是樂觀顯示。權威值是後端算的 `max(關閉時間, 最後一則訊息時間)`
+     * ＋分鐘數，下一次清單重載就會被蓋掉 —— 客人在這之間又說話的話，
+     * 後端那個會比這裡晚，而後端才是對的。
+     *
+     * @param {boolean} enabled
+     * @param {Object}  extra
+     * @returns {string|null} ISO 8601 時間；開啟或永久關閉時為 null
+     */
+    function localResumeAt(enabled, extra) {
+        var minutes = parseInt((extra || {}).quiet_minutes, 10);
+
+        if (enabled || !(minutes > 0)) {
+            return null;
+        }
+
+        return new Date(Date.now() + minutes * 60000).toISOString();
+    }
+
+    /**
+     * 取消勾選時問一句：暫時轉人工，還是永久關閉
+     *
+     * ⚠ 關掉視窗（右上 ×、取消、按 Esc）**一定要把勾勾彈回去**：使用者取消了
+     * 這個決定，開關卻已經視覺上變成關閉 —— 畫面會跟資料庫說不一樣，
+     * 而他會以為自己已經關掉了。
+     *
+     * @param {HTMLInputElement} toggle
+     */
+    function openAutoReplyOffModal(toggle) {
+        var modalEl = document.getElementById('modal-tg-auto-reply-off');
+
+        if (!modalEl) {
+            document.body.insertAdjacentHTML('beforeend', autoReplyOffModalHtml());
+            modalEl = document.getElementById('modal-tg-auto-reply-off');
+
+            document.getElementById('btn-tg-off-confirm')
+                .addEventListener('click', function () { confirmAutoReplyOff(toggle); });
+
+            // 快捷鈕只是把數字填進輸入框，真正送出的值一律讀輸入框
+            modalEl.querySelectorAll('.js-tg-off-preset').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    document.getElementById('tg-off-minutes').value = btn.dataset.minutes;
+                    updateOffModeUi();
+                });
+            });
+
+            modalEl.querySelectorAll('input[name="tg-off-mode"]').forEach(function (radio) {
+                radio.addEventListener('change', updateOffModeUi);
+            });
+
+            /*
+             * 沒有按「確定關閉」就關掉視窗 —— 彈回去。
+             *
+             * 用 flag 區分：按確定時也會觸發 hidden，那時不該彈回去
+             * （送出流程自己會管勾勾）。
+             */
+            modalEl.addEventListener('hidden.bs.modal', function () {
+                if (offConfirmed) {
+                    offConfirmed = false;
+
+                    return;
+                }
+
+                toggle.checked = true;
+            });
+        }
+
+        offConfirmed = false;
+        modalEl.querySelector('#tg-off-mode-temporary').checked = true;
+        document.getElementById('tg-off-minutes').value = T.resume.defaultMinutes;
+        document.getElementById('tg-off-error').textContent = '';
+        updateOffModeUi();
+        showBsModal('modal-tg-auto-reply-off');
+    }
+
+    /**
+     * modal 的 HTML
+     *
+     * ⚠ 提示文字要寫「對話靜置 N 分鐘」而不是「N 分鐘後」：客人還在聊的時候
+     * 兩者行為完全不同（會繼續等，不會中途把 AI 放回來），而填數字的人
+     * 預設會理解成固定延遲。
+     *
+     * @returns {string}
+     */
+    function autoReplyOffModalHtml() {
+        var i18n = T.i18n;
+        var presets = T.resume.presets.map(function (minutes) {
+            return '<button type="button" class="btn btn-outline-secondary btn-sm js-tg-off-preset" ' +
+                'data-minutes="' + minutes + '">' + minutes + '</button>';
+        }).join('');
+
+        return '<div class="modal fade" id="modal-tg-auto-reply-off" tabindex="-1">' +
+            '<div class="modal-dialog">' +
+            '<div class="modal-content">' +
+            '<div class="modal-header py-2">' +
+            '<h5 class="modal-title" style="font-size:0.9375rem">' +
+            T.escapeHtml(i18n.off_title || '要轉成人工回覆嗎？') + '</h5>' +
+            '<button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>' +
+            '<div class="modal-body">' +
+
+            '<div class="form-check mb-1">' +
+            '<input class="form-check-input" type="radio" name="tg-off-mode" id="tg-off-mode-temporary" checked>' +
+            '<label class="form-check-label fw-bold" for="tg-off-mode-temporary">' +
+            T.escapeHtml(i18n.off_temporary || '暫時轉人工') + '</label></div>' +
+
+            '<div class="ms-4 mb-3" id="tg-off-temporary-box">' +
+            '<div class="d-flex align-items-center gap-2 mb-1">' +
+            '<label class="form-label mb-0" for="tg-off-minutes" style="font-size:0.8125rem">' +
+            T.escapeHtml(i18n.off_minutes_label || '靜置多久後恢復') + '</label>' +
+            '<input type="number" class="form-control form-control-sm" id="tg-off-minutes" ' +
+            'style="width:6rem" min="' + T.resume.min + '" max="' + T.resume.max + '" step="1">' +
+            '<span class="text-muted" style="font-size:0.8125rem">' +
+            T.escapeHtml(i18n.off_minutes_unit || '分鐘') + '</span>' +
+            '<div class="btn-group btn-group-sm ms-1">' + presets + '</div>' +
+            '</div>' +
+            '<small class="text-muted d-block" id="tg-off-temporary-hint"></small>' +
+            '</div>' +
+
+            '<div class="form-check mb-1">' +
+            '<input class="form-check-input" type="radio" name="tg-off-mode" id="tg-off-mode-permanent">' +
+            '<label class="form-check-label fw-bold" for="tg-off-mode-permanent">' +
+            T.escapeHtml(i18n.off_permanent || '永久關閉') + '</label></div>' +
+            '<small class="text-muted d-block ms-4">' +
+            T.escapeHtml(i18n.off_permanent_hint || '') + '</small>' +
+
+            '<div class="text-danger mt-2" id="tg-off-error" style="font-size:0.8125rem"></div>' +
+            '</div>' +
+            '<div class="modal-footer py-2">' +
+            '<button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">' +
+            T.escapeHtml(i18n.off_cancel || '取消') + '</button>' +
+            '<button type="button" class="btn btn-primary btn-sm" id="btn-tg-off-confirm">' +
+            T.escapeHtml(i18n.off_confirm || '確定關閉') + '</button>' +
+            '</div></div></div></div>';
+    }
+
+    /**
+     * 選了永久就把分鐘數那一區停用，並讓提示句跟著目前填的數字走
+     */
+    function updateOffModeUi() {
+        var isTemporary = document.getElementById('tg-off-mode-temporary').checked;
+        var box = document.getElementById('tg-off-temporary-box');
+        var minutes = parseInt(document.getElementById('tg-off-minutes').value, 10) || T.resume.defaultMinutes;
+
+        box.style.opacity = isTemporary ? '1' : '0.45';
+        box.querySelectorAll('input, button').forEach(function (el) {
+            el.disabled = !isTemporary;
+        });
+
+        document.getElementById('tg-off-temporary-hint').textContent = (T.i18n.off_temporary_hint || '')
+            .replace(':minutes', minutes);
+    }
+
+    /**
+     * 按下確定：驗分鐘數再送出
+     *
+     * 前端先驗一次是為了當場給錯誤訊息（modal 不關、數字還在），
+     * 後端那層仍然會驗 —— 這裡不是唯一的防線。
+     *
+     * @param {HTMLInputElement} toggle
+     */
+    function confirmAutoReplyOff(toggle) {
+        var isTemporary = document.getElementById('tg-off-mode-temporary').checked;
+        var $error = document.getElementById('tg-off-error');
+
+        if (!isTemporary) {
+            offConfirmed = true;
+            hideBsModal(document.getElementById('modal-tg-auto-reply-off'));
+            submitAutoReply(toggle, false, { mode: T.resume.modePermanent });
+
+            return;
+        }
+
+        var minutes = parseInt(document.getElementById('tg-off-minutes').value, 10);
+
+        if (!(minutes > 0)) {
+            $error.textContent = T.i18n.msg.quiet_minutes_required || '';
+
+            return;
+        }
+
+        if (minutes < T.resume.min || minutes > T.resume.max) {
+            $error.textContent = (T.i18n.msg.quiet_minutes_range || '')
+                .replace(':min', T.resume.min)
+                .replace(':max', T.resume.max);
+
+            return;
+        }
+
+        offConfirmed = true;
+        hideBsModal(document.getElementById('modal-tg-auto-reply-off'));
+        submitAutoReply(toggle, false, {
+            mode: T.resume.modeTemporary,
+            quiet_minutes: minutes,
+        });
+    }
+
+    /**
      * 把開關狀態寫回群組快取
      *
      * 不同步的話，切走再切回來會看到舊狀態。
+     *
+     * @param {string|null} resumeAt 預計恢復時間
      */
-    function syncGroupCache() {
+    function syncGroupCache(resumeAt) {
         (T.groupsData || []).forEach(function (g) {
-            if (g.id === T.selectedGroupId) { g.auto_reply = T.autoReplyOn; }
+            if (g.id !== T.selectedGroupId) { return; }
+
+            g.auto_reply = T.autoReplyOn;
+            g.auto_reply_resume_at = resumeAt || null;
         });
     }
 
@@ -311,7 +559,7 @@
         // 自動回覆勾選框
         var autoToggle = document.getElementById('tg-auto-reply');
         if (autoToggle) {
-            autoToggle.addEventListener('change', function () { toggleAutoReply(autoToggle); });
+            autoToggle.addEventListener('change', function () { handleAutoReplyToggle(autoToggle); });
         }
 
         renderPendingFiles();

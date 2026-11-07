@@ -38,6 +38,7 @@ class TelegramChatService
     private $userRepository;
     private $bindService;
     private $readRepository;
+    private $resumeService;
 
     public function __construct(
         TelegramRepository $telegramRepository,
@@ -51,7 +52,8 @@ class TelegramChatService
         AutoReplyProgressService $progressService,
         UserRepository $userRepository,
         TelegramBindService $bindService,
-        TelegramGroupReadRepository $readRepository
+        TelegramGroupReadRepository $readRepository,
+        AutoReplyResumeService $resumeService
     ) {
         $this->telegramRepository = $telegramRepository;
         // 未讀是「每個客服各自」的，所以讀取位置存在另一張表，不在訊息上
@@ -69,6 +71,8 @@ class TelegramChatService
         $this->progressService = $progressService;
         // 私訊綁定要用：對 username、寫 telegram_dm_ready
         $this->userRepository = $userRepository;
+        // 對話清單要顯示「人工中，約 N 分後恢復」的倒數
+        $this->resumeService = $resumeService;
     }
 
     /**
@@ -111,7 +115,15 @@ class TelegramChatService
         // 逐群組 COUNT 的話群組有幾個就打幾次
         $unreadCounts = $this->readRepository->getUnreadCountsByUser((int) Auth::id());
 
-        return $groups->map(function ($group) use ($onDutyUsers, $runningIds, $unreadCounts) {
+        /*
+         * 轉人工的對話各自預計什麼時候被勾回來 —— 同理一次撈回整批。
+         *
+         * 不顯示的話，客服會遇到「我明明關了它怎麼自己開了」，
+         * 也看不出自己現在是「暫時」還是「永久」那一種關閉。
+         */
+        $resumeAt = $this->resumeService->resumeAtByGroupIds($groups->pluck('id')->all());
+
+        return $groups->map(function ($group) use ($onDutyUsers, $runningIds, $unreadCounts, $resumeAt) {
             return [
                 'id'              => $group->id,
                 'chat_id'         => $group->chat_id,
@@ -120,7 +132,9 @@ class TelegramChatService
                 'auto_reply'      => $group->isAutoReplyOn(),
                 // 重新整理或切對話時，Pusher 事件早就發完了，靠這個值還原畫面
                 'auto_reply_running' => in_array($group->id, $runningIds, true),
-                'last_message_at' => $group->last_message_at ? $group->last_message_at->toDateTimeString() : null,
+                // 沒有待恢復就是 null（前端據此決定要不要顯示倒數）
+                'auto_reply_resume_at' => Arr::get($resumeAt, $group->id),
+                'last_message_at' => filled($group->last_message_at) ? $group->last_message_at->toDateTimeString() : null,
                 'unread_count'    => (int) Arr::get($unreadCounts, $group->id, 0),
             ];
         })->all();

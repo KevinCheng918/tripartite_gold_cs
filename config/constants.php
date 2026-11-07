@@ -883,6 +883,18 @@ return [
              * 「任務卡專區」那個話題的這一項勾起來。
              */
             'task_change' => ['needs_reply' => false],
+
+            /*
+             * 自動回覆被關掉之後自己勾回來了（需求方 2026-11-07）。
+             *
+             * ⚠ `needs_reply` 是 **false**：事後告知，沒有人要引用回覆它。
+             * 填 true 會變成「只能勾一個話題」，而這類通知勾幾個都無所謂。
+             *
+             * ⚠ **不要勾在放 `auto_reply_ticket` 的那個話題**：那裡是客服要
+             * 引用回覆作答的作業區，每一則都在等人動作。混進純告知會讓那一區的
+             * 「有新訊息」失去意義。建議跟 `ticket_handover` 同一個排程通知話題。
+             */
+            'auto_reply_resume' => ['needs_reply' => false],
         ],
 
         // 話題名稱只是給人看的備註，Bot API 沒有「依名稱查話題」的方法
@@ -3859,6 +3871,89 @@ return [
             'SAVE_ONLY'      => 'only',  // 只加入題庫
             'ASK_INFO'       => 'ask',   // 先問客人，並記住這種問法要問什麼
             'IGNORE'         => 'skip',  // 忽略
+        ],
+    ],
+
+    /*
+     * 自動回覆關掉之後自己勾回來
+     *
+     * 客服改人工處理，處理完忘記勾回來 —— 群組從此一直是人工。
+     * 詳見 .claude/knowledge/features/auto-reply-resume.md
+     */
+    'AUTO_REPLY_RESUME' => [
+        // 關閉意圖。只有「暫時」會被排程恢復
+        'MODE' => [
+            'TEMPORARY' => 1,
+            'PERMANENT' => 2,
+        ],
+
+        'STATUS' => [
+            'PENDING'   => 1, // 等靜置夠久就恢復
+            'RESUMED'   => 2, // 排程自動恢復了
+            'MANUAL'    => 3, // 客服自己勾回來了，排程不必再管
+            'PERMANENT' => 4, // 永久關閉，排程不會碰
+            'VOIDED'    => 5, // 作廢（群組被封存）
+        ],
+
+        /*
+         * 靜置分鐘數的允許範圍。
+         *
+         * ⚠ **下限不只是防呆**：客服思考、打字、等客人看訊息，對話安靜
+         * 3～5 分鐘很常見。填 1 分鐘會讓 AI 在人工處理的中途插話 ——
+         * 靜置基準擋不住這麼短的值。
+         *
+         * ⚠ **上限的理由相反**：填一週等於「忘記」，這個功能對那一筆就失效了。
+         *
+         * 同時寫在 `config/rules.php`（驗證）與設定頁的 hint，改這裡要一起改。
+         */
+        'MIN_MINUTES' => 5,
+        'MAX_MINUTES' => 1440,
+
+        // modal 的預填值（設定頁可改）。不是上限、也不是唯一值，只是省去每次打字
+        'DEFAULT_MINUTES' => 30,
+
+        // modal 上的快捷鈕。純介面用，填自訂值不受這份清單限制
+        'PRESET_MINUTES' => [15, 30, 60, 120],
+
+        /*
+         * 恢復後發到內部支援群組的那一則。
+         *
+         * ⚠ **一輪恢復幾個群組就是幾列、但只發一則**：這支每分鐘跑，
+         * 一筆一則的話同時到期五個就是五則連發，沒有人會看。
+         *
+         * ⚠ 不要自己 `e()` / `htmlspecialchars()`：`TelegramBotService::sendMessage()`
+         * 已經 `escapeHtml()`（並還原 `<b>` 等允許的標籤），再跳脫一次會變成
+         * 字面的 `&lt;b&gt;`。
+         */
+        'NOTICE' => [
+            'HEADER' => "🤖 <b>自動回覆已自動恢復</b>\n"
+                . "以下對話轉人工後已靜置足夠時間，系統已把自動回覆勾回來：\n",
+
+            // 誰關的要 tag（需求方 2026-11-07 指定）、關多久也要寫 —— 那是「忘記了」的證據
+            'LINE' => "\n• {group}\n　{operator}｜轉人工 {waited}（設定靜置 {minutes} 分鐘）\n",
+
+            /*
+             * tag 不到人的時候 —— 關掉的人沒填 Telegram 帳號、或帳號已被刪除。
+             *
+             * ⚠ 退回顯示名字而不是整則不發：恢復這件事已經發生了，
+             * 沉默只會讓人以為開關自己壞掉。比照
+             * `TicketHandoverService::buildMentions()` 的處理。
+             */
+            'NO_MENTION' => '（{name}，未填 Telegram 帳號所以沒 tag 到）',
+
+            'FOOTER' => "\n如果其中有需要一直人工的對話，取消勾選時請改選「永久關閉」。",
+
+            // 等待時間的顯示（餵給 NoticeText::waited()）
+            'WAITED_DAYS'  => '{days} 天 {hours} 小時',
+            'WAITED_HOURS' => '{hours} 小時 {minutes} 分',
+            'WAITED_MINS'  => '{minutes} 分鐘',
+
+            // 群組名稱太長會把訊息撐爆
+            'GROUP_CHARS' => 40,
+
+            // 超過這個數量只報總數（Telegram 單則上限 4096 字）
+            'MAX_LINES' => 20,
+            'MORE_LINE' => "\n…另外還有 {count} 個對話也一起恢復了\n",
         ],
     ],
 

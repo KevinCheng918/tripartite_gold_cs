@@ -109,6 +109,36 @@
     };
 
     /**
+     * 「人工中 · 約 N 分後恢復」那一行的文字
+     *
+     * ⚠ 剩不到一分鐘時換成「即將恢復」而不是寫「約 0 分後」—— 後者看起來
+     * 像壞掉的倒數。
+     *
+     * @param {Object} group
+     * @returns {string} 不需要顯示時回空字串
+     */
+    function resumeLabel(group) {
+        if (group.auto_reply || !group.auto_reply_resume_at) {
+            return '';
+        }
+
+        var minutes = Math.ceil((new Date(group.auto_reply_resume_at).getTime() - Date.now()) / 60000);
+
+        if (!(minutes > 0)) {
+            return T.i18n.resume_pending_soon || '';
+        }
+
+        return (T.i18n.resume_pending || '').replace(':minutes', minutes);
+    }
+
+    /**
+     * 讓別的模組重畫清單（關閉自動回覆後要立刻顯示倒數）
+     */
+    T.renderGroupList = function () {
+        renderGroupList(T.groupsData || []);
+    };
+
+    /**
      * 渲染群組列表
      */
     function renderGroupList(groups) {
@@ -133,6 +163,17 @@
                 ? '<i class="fas fa-robot text-muted ms-2" title="' + T.escapeHtml(T.i18n.auto_reply_running) + '"></i>'
                 : '';
 
+            /*
+             * 轉人工且會自動勾回來的對話，寫出還有多久。
+             *
+             * 不寫的話，客服會遇到「我明明關了它怎麼自己開了」—— 而且看不出
+             * 自己剛剛選的是暫時還是永久（永久的沒有恢復時間，所以不顯示）。
+             */
+            var resumeText = resumeLabel(g);
+            var resumeLine = resumeText
+                ? '<small class="text-warning d-block text-truncate">' + T.escapeHtml(resumeText) + '</small>'
+                : '';
+
             return (
                 '<div class="p-3 border-bottom d-flex align-items-center tg-group-item' + activeCls + '" data-id="' + g.id + '" style="cursor:pointer">' +
                 '<div class="widget-content-left me-3">' +
@@ -141,6 +182,7 @@
                 '<div class="widget-content-left flex-fill" style="min-width:0">' +
                 '<div class="fw-bold text-truncate">' + g.title + '</div>' +
                 '<small class="text-muted">' + time + '</small>' +
+                resumeLine +
                 '</div>' +
                 runningIcon +
                 unreadBadge +

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Notification\UpdateApprovalNoticeRequest;
+use App\Http\Requests\Notification\UpdateAutoReplyResumeRequest;
 use App\Http\Requests\Notification\UpdateFinanceNoticeRequest;
 use App\Http\Requests\Notification\UpdateWalletNoticeRequest;
 use App\Http\Requests\Notification\UpdateAttendanceReportRequest;
@@ -121,6 +122,27 @@ class NotificationController extends Controller
             return response()->json(['message' => trans('notification.msg.saved')]);
         } catch (\Exception $e) {
             Log::error('提醒統計設定更新失敗', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
+
+            return response()->json(['message' => trans('notification.msg.save_failed')], 500);
+        }
+    }
+
+    /**
+     * Ajax 更新「自動回覆自動恢復」的設定
+     *
+     * @param UpdateAutoReplyResumeRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxUpdateAutoReplyResume(UpdateAutoReplyResumeRequest $request)
+    {
+        $params = $request->validated();
+
+        try {
+            $this->settingService->updateAutoReplyResume($params, Auth::id());
+
+            return response()->json(['message' => trans('notification.msg.saved')]);
+        } catch (\Exception $e) {
+            Log::error('自動回覆自動恢復設定更新失敗', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
 
             return response()->json(['message' => trans('notification.msg.save_failed')], 500);
         }

@@ -15,6 +15,17 @@
          data-can-delete="{{ Auth::user()->hasPermission('telegram_chat.delete') ? '1' : '0' }}"
          data-can-ignore="{{ Auth::user()->hasPermission('telegram_chat.ignore_manage') ? '1' : '0' }}"
          data-auto-reply-available="{{ $autoReplyAvailable ? '1' : '0' }}"
+         {{--
+             取消勾選時那個 modal 的設定。
+             `enabled` 關著時不問意圖、直接關掉 —— 沒有排程會幫他勾回來，問了也沒用。
+         --}}
+         data-resume-enabled="{{ Arr::get($autoReplyResume, 'enabled') ? '1' : '0' }}"
+         data-resume-default="{{ Arr::get($autoReplyResume, 'default') }}"
+         data-resume-presets="{{ implode(',', Arr::get($autoReplyResume, 'presets', [])) }}"
+         data-resume-min="{{ Arr::get($autoReplyResume, 'min') }}"
+         data-resume-max="{{ Arr::get($autoReplyResume, 'max') }}"
+         data-resume-mode-temporary="{{ Arr::get($autoReplyResume, 'modes.TEMPORARY') }}"
+         data-resume-mode-permanent="{{ Arr::get($autoReplyResume, 'modes.PERMANENT') }}"
          data-ws-key="{{ config('broadcasting.connections.pusher.key') }}"
          data-ws-host="{{ config('broadcasting.connections.pusher.options.host') }}"
          data-ws-port="{{ config('broadcasting.connections.pusher.options.port') }}"

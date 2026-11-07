@@ -654,6 +654,37 @@
         });
     }
 
+    // ===== 自動回覆自動恢復（放在「求助單提醒」分頁的第二張卡） =====
+
+    function renderAutoReplyResume() {
+        var resume = settings.auto_reply_resume || {};
+
+        document.getElementById('resume-enabled').checked = !!resume.enabled;
+        document.getElementById('resume-minutes').value = resume.default_minutes;
+    }
+
+    function bindAutoReplyResume() {
+        document.getElementById('form-auto-reply-resume').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            var resume = settings.auto_reply_resume || {};
+            var minutes = parseInt(document.getElementById('resume-minutes').value, 10);
+
+            submit('/admin/notification/ajax-update-auto-reply-resume', {
+                // 後端用 (bool) 判斷，沒勾就送 null（不要送 false —— 那也是 filled）
+                enabled: document.getElementById('resume-enabled').checked ? 1 : null,
+                /*
+                 * 空白或非數字時退回後端給的預設值，不要自己寫死一個數字 ——
+                 * 寫死的話，哪天 constants 的預設改了，這裡會悄悄跟它分岔。
+                 */
+                default_minutes: minutes || resume.default_minutes
+            }, event.target.querySelector('button[type="submit"]'), function () {
+                settings.auto_reply_resume.enabled = document.getElementById('resume-enabled').checked;
+                settings.auto_reply_resume.default_minutes = minutes || resume.default_minutes;
+            });
+        });
+    }
+
     // ===== 分頁八：待追蹤事項 =====
 
     function renderFollowup() {
@@ -723,6 +754,7 @@
 
     renderGroup();
     renderRemind();
+    renderAutoReplyResume();
     renderTopics();
     renderShift();
     renderReport();
@@ -737,6 +769,7 @@
     if (canManage) {
         bindGroup();
         bindRemind();
+        bindAutoReplyResume();
         bindTopics();
         bindShift();
         bindReport();

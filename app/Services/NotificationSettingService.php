@@ -110,6 +110,8 @@ class NotificationSettingService
             // 錢包有 TRC20 轉入或轉出（需求方 2026-10-27）
             'wallet' => $this->walletSection(),
             'followup' => $this->followupSection(),
+            // 自動回覆被關掉後自己勾回來（需求方 2026-11-07）
+            'auto_reply_resume' => $this->autoReplyResumeSection(),
             'options' => [
                 'systems'       => $this->systemOptions(),
                 'dm_candidates' => $this->dmCandidates(),
@@ -213,6 +215,55 @@ class NotificationSettingService
             AppSettingService::KEY_FOLLOWUP_REPORT_MANAGER   => $this->appSettingService->idListValue(
                 Arr::get($params, 'report_user_ids', [])
             ),
+        ], $userId);
+    }
+
+    /**
+     * 自動回覆被關掉之後自己勾回來
+     *
+     * ⚠ **這一區只有兩個欄位，而且都不是「靜置幾分鐘」**：分鐘數由關閉的人
+     * 在聊天視窗的 modal 當場填（存在每一筆關閉紀錄上），這裡的
+     * `default_minutes` 只是那個 modal 的預填值。
+     *
+     * 放一個全域的「靜置幾分鐘」在這裡會讓兩邊各說一套，而真正生效的是
+     * 紀錄上那一個 —— 改了設定卻沒有任何變化，是最難查的那種問題。
+     *
+     * @return array
+     */
+    private function autoReplyResumeSection()
+    {
+        $resume = (array) config('constants.AUTO_REPLY_RESUME');
+
+        return [
+            'enabled'         => $this->appSettingService->getBool(AppSettingService::KEY_AUTO_REPLY_RESUME_ENABLED),
+            'default_minutes' => $this->appSettingService->getInt(
+                AppSettingService::KEY_AUTO_REPLY_RESUME_DEFAULT_MINUTES,
+                (int) Arr::get($resume, 'DEFAULT_MINUTES')
+            ),
+            // ⚠ 這三個只是給人看的字（hint 要寫出允許範圍），真正的驗證在 config/rules.php
+            'min_minutes'     => (int) config('rules.AUTO_REPLY_RESUME_MIN_MINUTES'),
+            'max_minutes'     => (int) config('rules.AUTO_REPLY_RESUME_MAX_MINUTES'),
+            'presets'         => (array) Arr::get($resume, 'PRESET_MINUTES'),
+        ];
+    }
+
+    /**
+     * 存自動回覆自動恢復的設定
+     *
+     * @param array    $params
+     * @param int|null $userId
+     * @return void
+     */
+    public function updateAutoReplyResume($params, $userId = null)
+    {
+        $this->appSettingService->putMany([
+            /*
+             * 開關存 '1' / '0'。用 `(bool)` 不是 `filled()` ——
+             * 理由同 `updateFollowup()`：`filled(false)` 會回 true，
+             * 開關就再也關不掉而且不報錯。
+             */
+            AppSettingService::KEY_AUTO_REPLY_RESUME_ENABLED => (bool) Arr::get($params, 'enabled') ? '1' : '0',
+            AppSettingService::KEY_AUTO_REPLY_RESUME_DEFAULT_MINUTES => (string) Arr::get($params, 'default_minutes'),
         ], $userId);
     }
 

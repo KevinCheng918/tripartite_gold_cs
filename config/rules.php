@@ -123,4 +123,20 @@ return [
      * 是**安靜截斷**，存檔看起來成功、後面少一段卻沒有人會發現。
      */
     'REGULATION_CONTENT_MAX' => 50000,
+
+    /*
+     * 自動回覆轉人工時的靜置分鐘數（關閉的人在 modal 當場填）。
+     *
+     * ⚠ **下限不只是防呆**：客服思考、打字、等客人看訊息，對話安靜 3～5 分鐘
+     * 很常見。填 1 分鐘會讓 AI 在人工處理的中途插話 —— 靜置基準擋不住
+     * 這麼短的值。
+     *
+     * ⚠ **上限的理由相反**：填一週等於「忘記」，自動恢復對那一筆就失效了。
+     *
+     * ⚠ 同一組數字也寫在 `constants.AUTO_REPLY_RESUME.MIN_MINUTES` / `MAX_MINUTES`
+     * （給設定頁 hint 與 Service 夾值用）。改這裡要一起改 —— 兩邊分岔的話，
+     * 介面會說一套、驗證擋另一套。
+     */
+    'AUTO_REPLY_RESUME_MIN_MINUTES' => 5,
+    'AUTO_REPLY_RESUME_MAX_MINUTES' => 1440,
 ];

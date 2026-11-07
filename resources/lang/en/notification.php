@@ -52,6 +52,20 @@ return [
     'report_personal_desc'  => 'Anyone who was reminded yesterday receives their own summary at :time (which tickets they were chased on). This is automatic and needs no setup; people who were not reminded receive nothing.',
 
     // ===== Pending follow-ups =====
+    /*
+     * Auto-resume for auto reply (requested 2026-11-07).
+     *
+     * ⚠ The `resume_minutes` label must say "default": the number that actually
+     * applies is typed by the agent in the chat window modal; this is only the
+     * pre-filled value for that field.
+     */
+    'resume_title'   => 'Auto Reply Auto-Resume',
+    'resume_desc'    => 'Agents uncheck auto reply to handle a conversation manually and then forget to check it back on, leaving that conversation manual forever. When enabled, a conversation that was switched to manual is re-enabled once it stays idle long enough, with a notice to the support group tagging whoever turned it off. ⚠ Only conversations turned off as "temporarily manual" are restored: conversations that never had auto reply on, and those turned off permanently, are never touched.',
+    'resume_enabled' => 'Enable auto-resume',
+    'resume_enabled_hint' => 'While off, no conversation switch is ever changed; existing turn-off records are kept.',
+    'resume_minutes'      => 'Default idle minutes',
+    'resume_minutes_hint' => '⚠ This is **only the pre-filled value for the chat window modal**, not a global setting — the number that applies is chosen by the agent turning it off (they know how long that case takes). Between :min and :max minutes.',
+
     'followup_title'   => 'Pending Follow-ups',
     'followup_desc'    => 'When someone in a chat says "hold on, I\'ll send it later", it is recorded as a pending follow-up. Once the chat has been quiet for a while, the system tags the on-duty staff in the support group and asks whether to follow up: choosing to follow up messages the customer about progress (or, when one of our own staff made the promise, tags the on-duty staff to pick it up instead), and choosing to drop it closes the item. If nobody presses a button it asks again at a fixed interval, and from the :escalate reminder onwards it also tags leaders and the boss.',
     'followup_enabled' => 'Enable pending follow-ups',
@@ -206,6 +220,17 @@ return [
             . '⚠ Consecutive changes to the same card are **merged into one message** (sent after a few quiet minutes), not one per edit. '
             . 'Description, title and checklist ticks are **not** notified (too frequent)',
 
+        /*
+         * Auto reply re-enabled itself (requested 2026-11-07).
+         *
+         * ⚠ The hint must warn against the "AI questions" topic: that one is the
+         * work queue where agents reply by quoting, and mixing in pure notices
+         * makes its unread marker meaningless.
+         */
+        'auto_reply_resume'      => 'Auto Reply Resumed',
+        'auto_reply_resume_hint' => 'Sent when a conversation has stayed idle long enough after being switched to manual and the system re-enables auto reply, tagging whoever turned it off. '
+            . '⚠ Best kept in the same topic as "Morning Handover List"; do **not** tick it on "AI questions" (that topic is reserved for tickets needing quoted replies)',
+
         'scheduled_reminder'      => 'Assistant',
         'scheduled_reminder_hint' => '⚠ This picks which topics may USE the assistant commands, not where replies go — '
             . 'the assistant always replies in the topic you spoke in. None ticked = every topic may use it',
@@ -237,6 +262,9 @@ return [
         'followup_max_invalid'      => 'Number of asks must be between 1 and 200',
         'followup_stale_required'   => 'Please enter the number of days (use 0 to never close automatically)',
         'followup_stale_invalid'    => 'Days must be between 0 and 365',
+
+        'resume_minutes_required' => 'Please enter the default idle minutes',
+        'resume_minutes_range'    => 'Default idle minutes must be between :min and :max',
         'report_user_not_found' => 'Account not found',
         'report_test_sent'      => ':sent test summary message(s) sent, please check Telegram',
         'report_test_partial'   => ':sent sent, but these people did not receive it: :failed (ask them to message the bot once)',

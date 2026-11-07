@@ -52,6 +52,32 @@ return [
     'badge_auto'             => '自動',
     'auto_reply_running'     => 'AI 正在查詢題庫並回覆客人…',
 
+    /*
+     * 取消勾選自動回覆時問一句的 modal。
+     *
+     * ⚠ `off_temporary_hint` 一定要寫成「對話靜置」而不是「N 分鐘後」：
+     * 客人還在聊的時候兩者行為完全不同，而填數字的人預設會理解成固定延遲。
+     */
+    'off_title'             => '要轉成人工回覆嗎？',
+    'off_temporary'         => '暫時轉人工',
+    'off_temporary_hint'    => '對話靜置 :minutes 分鐘後，系統會自動把自動回覆勾回來（客人還在聊就會繼續等，不會中途把 AI 放回來）',
+    'off_permanent'         => '永久關閉',
+    'off_permanent_hint'    => '這個對話之後一直由人工回覆，系統不會自動勾回來',
+    'off_minutes_label'     => '靜置多久後恢復',
+    'off_minutes_unit'      => '分鐘',
+    'off_minutes_range'     => '可填 :min ～ :max 分鐘',
+    'off_confirm'           => '確定關閉',
+    'off_cancel'            => '取消',
+
+    /*
+     * 對話清單的狀態字。
+     *
+     * ⚠ 只有「會自動勾回來」的才顯示 —— 永久關閉沒有恢復時間，
+     * 未勾的勾選框本身就說明它是人工，再寫一行只是重複。
+     */
+    'resume_pending'        => '人工中 · 約 :minutes 分後恢復',
+    'resume_pending_soon'   => '人工中 · 即將恢復',
+
     // 不自動回覆的成員
     'ignore_title'          => '不自動回覆的成員',
     'ignore_btn'            => '設定不自動回覆的成員',
@@ -105,6 +131,9 @@ return [
         'file_send_failed'  => '檔案傳送失敗',
         'auto_reply_unavailable' => '尚未設定 Claude，無法開啟自動回覆',
         'auto_reply_failed'      => '自動回覆開關切換失敗',
+        'off_mode_invalid'       => '關閉方式不正確',
+        'quiet_minutes_required' => '請填寫靜置多久後恢復自動回覆',
+        'quiet_minutes_range'    => '靜置時間請填 :min ～ :max 分鐘',
         'member_not_found'       => '找不到這位成員',
         'member_already_ignored' => '這個 username 已經在名單裡了',
         'username_required'      => '請輸入 username',

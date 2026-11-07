@@ -11,6 +11,7 @@ use App\Http\Requests\TelegramChat\ToggleIgnoreMemberRequest;
 use App\Http\Resources\GroupMemberResource;
 use App\Http\Resources\StaffIgnoreResource;
 use App\Http\Resources\TelegramMessageResource;
+use App\Services\AutoReplyResumeService;
 use App\Services\AutoReplyService;
 use App\Services\ImageUploadService;
 use App\Services\QuickReplyService;
@@ -38,6 +39,7 @@ class TelegramChatController extends Controller
     private $autoReplyService;
     private $memberService;
     private $staffIgnoreService;
+    private $resumeService;
 
     public function __construct(
         TelegramChatService $chatService,
@@ -46,7 +48,8 @@ class TelegramChatController extends Controller
         ImageUploadService $imageUploadService,
         AutoReplyService $autoReplyService,
         TelegramGroupMemberService $memberService,
-        StaffIgnoreService $staffIgnoreService
+        StaffIgnoreService $staffIgnoreService,
+        AutoReplyResumeService $resumeService
     ) {
         $this->chatService = $chatService;
         $this->sharedFileService = $sharedFileService;
@@ -55,6 +58,7 @@ class TelegramChatController extends Controller
         $this->autoReplyService = $autoReplyService;
         $this->memberService = $memberService;
         $this->staffIgnoreService = $staffIgnoreService;
+        $this->resumeService = $resumeService;
     }
 
     /**
@@ -74,6 +78,21 @@ class TelegramChatController extends Controller
         return view('admin.telegram-chat.index', [
             // 沒設定 Claude 憑證時，前端要把自動回覆勾選框停用並提示去「AI 引擎」設定
             'autoReplyAvailable' => $this->autoReplyService->isAvailable(),
+
+            /*
+             * 取消勾選時那個 modal 要用的設定。
+             *
+             * `enabled` 關著時 modal 不問意圖，直接關掉就好 —— 問了也不會有人
+             * 幫他勾回來，等於白問一句。
+             */
+            'autoReplyResume' => [
+                'enabled'  => $this->resumeService->isEnabled(),
+                'default'  => $this->resumeService->defaultMinutes(),
+                'presets'  => (array) config('constants.AUTO_REPLY_RESUME.PRESET_MINUTES'),
+                'min'      => (int) config('rules.AUTO_REPLY_RESUME_MIN_MINUTES'),
+                'max'      => (int) config('rules.AUTO_REPLY_RESUME_MAX_MINUTES'),
+                'modes'    => (array) config('constants.AUTO_REPLY_RESUME.MODE'),
+            ],
         ]);
     }
 
@@ -88,7 +107,15 @@ class TelegramChatController extends Controller
         $params = $request->validated();
 
         try {
-            $group = $this->autoReplyService->toggle((int) $params['group_id'], (bool) $params['enabled']);
+            $group = $this->autoReplyService->toggle(
+                (int) Arr::get($params, 'group_id'),
+                (bool) Arr::get($params, 'enabled'),
+                [
+                    'mode'          => Arr::get($params, 'mode'),
+                    'quiet_minutes' => Arr::get($params, 'quiet_minutes'),
+                ],
+                Auth::user()
+            );
 
             return response()->json(['auto_reply' => (bool) $group->auto_reply]);
         } catch (\RuntimeException $e) {

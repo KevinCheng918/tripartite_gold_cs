@@ -118,6 +118,26 @@ class Kernel extends ConsoleKernel
         $schedule->command('auto-reply:remind')->everyMinute()->withoutOverlapping();
 
         /*
+         * 每分鐘把「轉人工後靜置夠久」的對話勾回自動回覆（需求方 2026-11-07）。
+         *
+         * ⚠ **一定要每分鐘**：靜置時間是關閉的人當場自己填的（最短 5 分鐘），
+         * 排程間隔等於額外的延遲。跑五分鐘一次的話，填 5 分鐘的那一筆
+         * 實際上要等最多 10 分鐘。
+         *
+         * ⚠ `withoutOverlapping`：上一輪還在發通知就再跑一次的話，同一批紀錄
+         * 會被撈到兩次（狀態是處理完才改的），群組會收到兩則一樣的。
+         *
+         * ⚠ **不要改成在關閉時排一個延遲 Job**：本專案 `QUEUE_CONNECTION=sync`
+         * （`dispatch()` 當場跑完、不進背景），delay 不會生效。而且靜置是
+         * 「對話最後一則訊息」的滾動條件，不是固定延遲 —— 關閉當下算不出
+         * 正確的到期時間。
+         *
+         * 功能開關預設關著（`auto_reply_resume.enabled`），指令自己會短路，
+         * 所以掛排程不等於開始改群組的開關。
+         */
+        $schedule->command('auto-reply:resume')->everyMinute()->withoutOverlapping();
+
+        /*
          * 每分鐘把登入紀錄私訊通知給帳號本人（需求方 2026-11-05）。
          *
          * ⚠ **一定要每分鐘**：排程間隔等於通知的延遲，而這是安全通知 ——

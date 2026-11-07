@@ -51,6 +51,34 @@ return [
     'badge_auto'             => 'Auto',
     'auto_reply_running'     => 'AI is searching the knowledge base and replying to the customer...',
 
+    /*
+     * The modal shown when auto reply is unchecked.
+     *
+     * ⚠ `off_temporary_hint` must say "idle", not "in N minutes": the two behave
+     * very differently while the customer keeps talking, and whoever types the
+     * number will assume a fixed delay.
+     */
+    'off_title'             => 'Switch to manual replies?',
+    'off_temporary'         => 'Temporarily manual',
+    'off_temporary_hint'    => 'Auto reply is re-enabled once the conversation stays idle for :minutes minutes (it keeps waiting while the customer is still talking, so the AI never cuts in mid-conversation)',
+    'off_permanent'         => 'Turn off permanently',
+    'off_permanent_hint'    => 'This conversation stays manual; the system will never re-enable it',
+    'off_minutes_label'     => 'Idle time before re-enabling',
+    'off_minutes_unit'      => 'minutes',
+    'off_minutes_range'     => 'Between :min and :max minutes',
+    'off_confirm'           => 'Turn off',
+    'off_cancel'            => 'Cancel',
+
+    /*
+     * Status text in the conversation list.
+     *
+     * ⚠ Only shown for conversations that will be re-enabled — a permanent
+     * turn-off has no resume time, and the unchecked switch already says
+     * it is manual.
+     */
+    'resume_pending'        => 'Manual · resumes in ~:minutes min',
+    'resume_pending_soon'   => 'Manual · resuming shortly',
+
     // Members excluded from auto-reply
     'ignore_title'          => 'Members excluded from auto-reply',
     'ignore_btn'            => 'Manage auto-reply exclusions',
@@ -104,6 +132,9 @@ return [
         'file_send_failed'  => 'Failed to send file',
         'auto_reply_unavailable' => 'Claude is not configured, auto reply cannot be enabled',
         'auto_reply_failed'      => 'Failed to toggle auto reply',
+        'off_mode_invalid'       => 'Invalid turn-off option',
+        'quiet_minutes_required' => 'Please enter the idle time before auto reply resumes',
+        'quiet_minutes_range'    => 'Idle time must be between :min and :max minutes',
         'member_not_found'       => 'Member not found',
         'member_already_ignored' => 'This username is already on the list',
         'username_required'      => 'Please enter a username',

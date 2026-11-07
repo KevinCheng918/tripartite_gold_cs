@@ -185,6 +185,20 @@ class AppSettingService
      */
     const KEY_FOLLOWUP_REPORT_MANAGER = 'followup.report_user_ids';
 
+    /*
+     * 自動回覆關掉之後自己勾回來。
+     *
+     * ENABLED         = 總開關，預設關（新功能不該一部署就開始改群組的開關）
+     * DEFAULT_MINUTES = **只是 modal 的預填值**，不是全域生效的靜置時間
+     *
+     * ⚠ **這裡沒有「靜置幾分鐘」**，那是刻意的（需求方 2026-11-07）：分鐘數
+     * 存在每一筆關閉紀錄上（`auto_reply_resume.quiet_minutes`），由關閉的人
+     * 當場填 —— 他才知道這一通要處理多久。放一個全域值在這裡會讓兩邊
+     * 各說一套，而真正生效的是紀錄上那個。
+     */
+    const KEY_AUTO_REPLY_RESUME_ENABLED         = 'auto_reply_resume.enabled';
+    const KEY_AUTO_REPLY_RESUME_DEFAULT_MINUTES = 'auto_reply_resume.default_minutes';
+
     // 每日匯率報價（匯率頁維護）
     const KEY_DAILY_RATE_TEMPLATE = 'daily_rate.ask_template';
 

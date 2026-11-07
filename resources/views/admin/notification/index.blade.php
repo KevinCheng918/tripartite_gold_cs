@@ -173,6 +173,41 @@
                         </form>
                     </div>
                 </div>
+
+                {{--
+                    自動回覆自動恢復（需求方 2026-11-07）。
+
+                    放在這個分頁而不是另開一頁：它跟上面那張卡都是「自動回覆的
+                    行為設定」，分開只會讓人找不到。
+                --}}
+                <div class="main-card mb-3 card">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ trans('notification.resume_title') }}</h5>
+                        <p class="text-muted" style="font-size:0.875rem">{{ trans('notification.resume_desc') }}</p>
+                        <form id="form-auto-reply-resume">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="resume-enabled">
+                                <label class="form-check-label" for="resume-enabled">{{ trans('notification.resume_enabled') }}</label>
+                                <small class="form-text text-muted d-block">{{ trans('notification.resume_enabled_hint') }}</small>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label" for="resume-minutes">{{ trans('notification.resume_minutes') }}</label>
+                                    <input type="number" class="form-control" id="resume-minutes"
+                                           min="{{ config('rules.AUTO_REPLY_RESUME_MIN_MINUTES') }}"
+                                           max="{{ config('rules.AUTO_REPLY_RESUME_MAX_MINUTES') }}" step="1">
+                                    <small class="form-text text-muted">
+                                        {{ trans('notification.resume_minutes_hint', [
+                                            'min' => config('rules.AUTO_REPLY_RESUME_MIN_MINUTES'),
+                                            'max' => config('rules.AUTO_REPLY_RESUME_MAX_MINUTES'),
+                                        ]) }}
+                                    </small>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary js-manage-only">{{ trans('notification.action_save') }}</button>
+                        </form>
+                    </div>
+                </div>
             </div>
 
             {{-- ============ 分頁三：班表通知 ============ --}}

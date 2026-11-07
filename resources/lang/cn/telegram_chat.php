@@ -51,6 +51,32 @@ return [
     'badge_auto'             => '自动',
     'auto_reply_running'     => 'AI 正在查询题库并回覆客人…',
 
+    /*
+     * 取消勾选自动回复时问一句的 modal。
+     *
+     * ⚠ `off_temporary_hint` 一定要写成「对话静置」而不是「N 分钟后」：
+     * 客人还在聊的时候两者行为完全不同，而填数字的人预设会理解成固定延迟。
+     */
+    'off_title'             => '要转成人工回复吗？',
+    'off_temporary'         => '暂时转人工',
+    'off_temporary_hint'    => '对话静置 :minutes 分钟后，系统会自动把自动回复勾回来（客人还在聊就会继续等，不会中途把 AI 放回来）',
+    'off_permanent'         => '永久关闭',
+    'off_permanent_hint'    => '这个对话之后一直由人工回复，系统不会自动勾回来',
+    'off_minutes_label'     => '静置多久后恢复',
+    'off_minutes_unit'      => '分钟',
+    'off_minutes_range'     => '可填 :min ～ :max 分钟',
+    'off_confirm'           => '确定关闭',
+    'off_cancel'            => '取消',
+
+    /*
+     * 对话清单的状态字。
+     *
+     * ⚠ 只有「会自动勾回来」的才显示 —— 永久关闭没有恢复时间，
+     * 未勾的勾选框本身就说明它是人工，再写一行只是重复。
+     */
+    'resume_pending'        => '人工中 · 约 :minutes 分后恢复',
+    'resume_pending_soon'   => '人工中 · 即将恢复',
+
     // 不自动回覆的成员
     'ignore_title'          => '不自动回覆的成员',
     'ignore_btn'            => '设定不自动回覆的成员',
@@ -104,6 +130,9 @@ return [
         'file_send_failed'  => '档案传送失败',
         'auto_reply_unavailable' => '尚未设置 Claude，无法开启自动回复',
         'auto_reply_failed'      => '自动回复开关切换失败',
+        'off_mode_invalid'       => '关闭方式不正确',
+        'quiet_minutes_required' => '请填写静置多久后恢复自动回复',
+        'quiet_minutes_range'    => '静置时间请填 :min ～ :max 分钟',
         'member_not_found'       => '找不到这位成员',
         'member_already_ignored' => '这个 username 已经在名单里了',
         'username_required'      => '请输入 username',

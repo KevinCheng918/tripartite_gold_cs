@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Contracts\AutoReplyMatcher;
 use App\Models\TelegramGroup;
+use App\Models\User;
 use App\Repositories\QuickReplyRepository;
 use App\Repositories\StationRepository;
 use App\Repositories\TelegramRepository;
@@ -12,6 +13,7 @@ use App\Services\AutoReply\OpeningSanitizer;
 use App\Services\AutoReply\WaitWriter;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -54,6 +56,7 @@ class AutoReplyService
     private $splitter;
     private $waitWriter;
     private $applyDiagnose;
+    private $resumeService;
 
     public function __construct(
         AutoReplyMatcher $matcher,
@@ -67,7 +70,8 @@ class AutoReplyService
         PaymentConfigService $paymentConfigService,
         AnswerSplitter $splitter,
         WaitWriter $waitWriter,
-        ApplyErrorDiagnoseService $applyDiagnose
+        ApplyErrorDiagnoseService $applyDiagnose,
+        AutoReplyResumeService $resumeService
     ) {
         $this->matcher = $matcher;
         $this->telegramRepository = $telegramRepository;
@@ -85,6 +89,8 @@ class AutoReplyService
         $this->waitWriter = $waitWriter;
         // 客人貼開單 request 時的欄位預排查（題庫答不了這種東西）
         $this->applyDiagnose = $applyDiagnose;
+        // 關掉之後忘記勾回來的，由它記帳並靠排程勾回來
+        $this->resumeService = $resumeService;
     }
 
     /**
@@ -382,12 +388,22 @@ class AutoReplyService
     /**
      * 切換某個對話的自動回覆開關
      *
-     * @param int  $groupId
-     * @param bool $enabled
+     * 關掉時會順便記一筆關閉紀錄 —— 排程靠它把「處理完忘記勾回來」的對話
+     * 勾回來（見 .claude/knowledge/features/auto-reply-resume.md）。
+     *
+     * ⚠ **記紀錄跟改開關一定要在同一個 transaction 裡**：開關關了卻沒記到，
+     * 那個對話就變成「永遠不會被恢復」—— 而那正是這個功能要解決的問題，
+     * 失敗的方式剛好是最難被發現的那一種。
+     *
+     * @param int       $groupId
+     * @param bool      $enabled
+     * @param array     $params   mode（見 constants.AUTO_REPLY_RESUME.MODE）、
+     *                            quiet_minutes（暫時關閉的靜置分鐘數）
+     * @param User|null $operator 操作者，關閉紀錄要存他是誰才 tag 得到
      * @return TelegramGroup
      * @throws \RuntimeException
      */
-    public function toggle($groupId, $enabled)
+    public function toggle($groupId, $enabled, array $params = [], $operator = null)
     {
         $group = $this->telegramRepository->findGroup($groupId);
 
@@ -400,7 +416,32 @@ class AutoReplyService
             throw new \RuntimeException(trans('telegram_chat.msg.auto_reply_unavailable'));
         }
 
-        return $this->telegramRepository->setAutoReply($group, $enabled);
+        return DB::transaction(function () use ($group, $enabled, $params, $operator) {
+            $updated = $this->telegramRepository->setAutoReply($group, $enabled);
+
+            /*
+             * 客服自己勾回來了 —— 把待恢復結案，排程不必再管。
+             * 不結案的話聊天視窗會一直顯示一個不會到來的倒數。
+             */
+            if ($enabled) {
+                $this->resumeService->closePendingByManual($group->id);
+
+                return $updated;
+            }
+
+            $this->resumeService->recordOff(
+                $group,
+                $operator,
+                (int) Arr::get(
+                    $params,
+                    'mode',
+                    config('constants.AUTO_REPLY_RESUME.MODE.TEMPORARY')
+                ),
+                Arr::get($params, 'quiet_minutes')
+            );
+
+            return $updated;
+        });
     }
 
     /**

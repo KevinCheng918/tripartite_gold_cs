@@ -41,6 +41,33 @@ class TelegramRepository
     }
 
     /**
+     * 上線盤點：現在關著、但曾經真的自動回覆過的群組
+     *
+     * 自動恢復是靠「關閉事件」紀錄運作的（見
+     * .claude/knowledge/features/auto-reply-resume.md），代價是上線前就已經
+     * 忘記勾回來的群組沒有紀錄、撈不到。
+     *
+     * `auto_reply_at`（最後一次自動回覆時間）只會經由 `updateAutoReplyState()`
+     * 寫入，而那支只在 `isAutoReplyOn()` 閘門之後到得了 —— 所以它是可靠的
+     * 「曾經真的開著回過客人」訊號：有值且現在關著，就很可能是忘記勾回來的。
+     *
+     * ⚠ `auto_reply_at` 為 null 的**刻意不撈**：那是從來沒開過自動回覆的群組，
+     * 也就是「一直都不打開」那幾個。撈進來等於把盤點清單變成誤導。
+     *
+     * @return Collection
+     */
+    public function getAutoReplyAuditCandidates()
+    {
+        return TelegramGroup::query()
+            ->select(['id', 'title', 'auto_reply_at', 'last_message_at'])
+            ->where('status', config('constants.TELEGRAM.GROUP_STATUS.ACTIVE'))
+            ->where('auto_reply', 0)
+            ->whereNotNull('auto_reply_at')
+            ->orderByDesc('auto_reply_at')
+            ->get();
+    }
+
+    /**
      * 取得所有群組（供站台選擇用）
      *
      * @return Collection
