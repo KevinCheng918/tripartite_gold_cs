@@ -594,6 +594,23 @@ class TelegramChatService
         // webhook 同步等下去會逾時，Telegram 會重送而造成重複回覆
         //
         /*
+         * 要丟給自動回覆的那句話。
+         *
+         * ⚠ **客人只傳一張圖、一個檔而不打字也要處理**（需求方 2026-11-08）。
+         * 以前這裡是 `filled($rawText)`，純媒體訊息連 Job 都不派送 ——
+         * 不回答、也不開求助單，客人等著而**沒有任何人知道**。
+         * 錯誤畫面、對帳單、收據截圖本身就是他要問的東西。
+         *
+         * 改成用 `[圖片]`／`[檔案]` 這種標籤當問題丟進去，模型讀不到圖的
+         * 內容所以會判 `unclear` → 轉人工 → 支援群組收到單。
+         * 詳見 .claude/knowledge/bugfix/2026-11-08-silent-black-hole.md
+         *
+         * ⚠ 擺在下面那串判斷之外不影響「由便宜到貴」的順序：它只讀 config
+         * （而且客人有打字時第一行就回傳了），不碰 DB 也不碰快取。
+         */
+        $autoReplyText = $this->autoReplyQuestion($rawText, $mediaType);
+
+        /*
          * 四個判斷的順序是刻意的，由便宜到貴：
          *
          * 1. isAutoReplyOn()  欄位判斷，沒開自動回覆的對話什麼名單都不讀
@@ -606,20 +623,6 @@ class TelegramChatService
          *                     先把不必判斷的訊息擋掉，真正會走到這裡的只有
          *                     「整則都是 tag」那種，一天最多一次外部呼叫。
          */
-        /*
-         * 要丟給自動回覆的那句話。
-         *
-         * ⚠ **客人只傳一張圖、一個檔而不打字也要處理**（需求方 2026-11-08）。
-         * 以前這裡是 `filled($rawText)`，純媒體訊息連 Job 都不派送 ——
-         * 不回答、也不開求助單，客人等著而**沒有任何人知道**。
-         * 錯誤畫面、對帳單、收據截圖本身就是他要問的東西。
-         *
-         * 改成用 `[圖片]`／`[檔案]` 這種標籤當問題丟進去，模型讀不到圖的
-         * 內容所以會判 `unclear` → 轉人工 → 支援群組收到單。
-         * 詳見 .claude/knowledge/bugfix/2026-11-08-silent-black-hole.md
-         */
-        $autoReplyText = $this->autoReplyQuestion($rawText, $mediaType);
-
         if ($group->isAutoReplyOn() && filled($autoReplyText)
             && !$this->staffIgnoreService->isStaff($from, $group->id)
             && !$this->memberService->isIgnored($group->id, $from)
@@ -1246,9 +1249,15 @@ class TelegramChatService
      */
     private function mediaLabel($key)
     {
-        $labels = config('constants.TELEGRAM.MEDIA_LABELS');
+        $labels = (array) config('constants.TELEGRAM.MEDIA_LABELS');
 
-        return $labels[$key] ?? $labels['default'];
+        /*
+         * ⚠ 原本是 `$labels[$key] ?? $labels['default']`，2026-11-08 改成
+         * `Arr::get`（規則：陣列取值一律 Arr::get）。兩者在這裡等價 ——
+         * `MEDIA_LABELS` 裡沒有任何 null 值，而那是 `??` 與 `Arr::get`
+         * 唯一會分岔的地方（`??` 連 null 值也會 fallback，`Arr::get` 不會）。
+         */
+        return (string) Arr::get($labels, $key, Arr::get($labels, 'default'));
     }
 
     /**

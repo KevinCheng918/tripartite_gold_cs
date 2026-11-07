@@ -179,3 +179,74 @@ question / request / chat
 - [[../features/auto-reply-natural]] — intent 判斷與承接句（`unclear` 是第四個 intent）
 - [[../features/auto-reply-burst]] — 連發合併（客人連傳五張圖只會開一張單靠它）
 - [[2026-11-07-ticket-blocked-by-group-ignore]] — 同一天的另一個「狀態被當成兩種意思」
+
+---
+
+## 第二輪收尾稽核（2026-11-08）
+
+需求方再次要求「嚴格嚴謹按照 PROMPTS.md」。本次**找到 2 項、都修了，零行為變更。**
+
+### 1. `mediaLabel()` 的 `??` 與陣列下標
+
+```php
+// 舊
+return $labels[$key] ?? $labels['default'];
+// 新
+return (string) Arr::get($labels, $key, Arr::get($labels, 'default'));
+```
+
+這一行是**既有的**，不是本次寫的。但它現在被本次新增的 `autoReplyQuestion()`
+呼叫（第 4 個呼叫端），而規則是「陣列取值一律 `Arr::get`、禁止 `??`」——
+我依賴它、就該讓它合規，跟 `StaffResource` 那次同一個判準。
+
+⚠ **等價性有實測過，不是宣稱。** `??` 與 `Arr::get` 唯一會分岔的地方是
+「key 存在但值是 null」（`??` 會 fallback，`Arr::get` 不會）。驗了兩件事：
+
+- `MEDIA_LABELS` 的 9 個值裡**沒有任何 null／空值**
+- 13 個 key（9 個既有的 ＋ 不存在的 ＋ 空字串 ＋ `default` 自己）逐一比對
+  舊寫法與新寫法的輸出，**全部相同**
+
+### 2. 註解被我擠開，離它描述的 `if` 太遠
+
+上一輪把 `$autoReplyText = ...` 插在「**四個判斷的順序是刻意的，由便宜到貴**」
+那段註解與它描述的 `if` **之間** —— 兩段註解疊在一起，而讀的人會以為
+那段順序說明是在講我新加的那一行。
+
+改成：我的註解＋賦值擺在前面，順序說明緊貼著 `if`。並在我的註解補一句說明
+為什麼擺在那串判斷之外不違反「由便宜到貴」：
+
+> ⚠ 擺在下面那串判斷之外不影響「由便宜到貴」的順序：它只讀 config
+> （而且客人有打字時第一行就回傳了），不碰 DB 也不碰快取。
+
+⚠ 這是**自己造成的**可讀性退步。插一行進既有區塊時，要看一下上面那段註解
+是在講誰 —— 註解與它描述的程式之間被塞進東西，比沒有註解更誤導。
+
+### 逐條核對結果
+
+| 檢核項 | 結果 |
+|---|---|
+| `??`／`isset`／`empty`／`!filled` | ✅ 上一輪新增的 180 行內零處；順手修掉相依方法的 1 處既有違反 |
+| 陣列下標取值 | ✅ 程式碼零處；prompt 字串插值的 6 處是刻意保留（見下） |
+| 字串 `.` 串接變數 | ✅ 零處 |
+| `fn(`／`else`／`!== null`／`=== null` | ✅ 零處 |
+| Controller 無商業邏輯／無 DB | ✅ 本次沒動 Controller |
+| Service 無 HTTP 處理 | ✅ grep `request()`／`Auth::` 皆無 |
+| Model 無商業邏輯 | ✅ 本次沒動 Model |
+| PHPDoc | ✅ `autoReplyQuestion()` 有 `@param` ×2 ＋ `@return`，並寫明為什麼排除貼圖 |
+| SELECT 欄位／N+1／Transaction | ✅ 不適用（沒有新查詢、新寫入） |
+| Config/Cache 判斷先於 DB 查詢 | ✅ `autoReplyQuestion()` 只讀 config；客人有打字時第一行就回傳 |
+| Early Return | ✅ `autoReplyQuestion()` 三道 early return，無 `else` |
+| 語系 tw → cn → en | ✅ 不適用 —— 本次唯一的新字串是 **prompt**（給模型看的，不是使用者介面），而對客／群組文案刻意留在 config |
+| 改 `config/`／`routes/` → `optimize` | ✅ 本次兩者都沒動，不需重跑（上一輪已跑過） |
+
+⚠ **prompt 字串裡的 `{$intents['UNCLEAR']}` 刻意保留下標**：那是字串插值，
+`Arr::get()` 沒辦法寫在 `"{...}"` 裡而不另開一堆變數，而且周圍四十幾行
+既有的 prompt 全部都是這個寫法。要改就整段 prompt 一起改，而那會讓
+一個純文案區塊變得難讀。
+
+### 不加新版號
+
+本次只有一行等價改寫與註解重排，**零使用者可見變更**。v3.80 已在修正那個
+commit 裡，而且它已經把使用者看得到的事都寫進去了（傳圖會轉人工、
+只打幾個字不會再被沉默、「好」「收到」仍然不回）。
+先例見 [[2026-11-05-validation-message-swallowed]] 的「不加版本紀錄的理由」。
