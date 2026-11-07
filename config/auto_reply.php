@@ -59,7 +59,8 @@ return [
      *
      * prompt 內容改版時要一起換 key（結尾的版號），否則舊的會留到 TTL 到期才換掉。
      */
-    'prompt_cache_key'     => 'auto_reply.prompt.v4',
+    // v5（2026-11-08）：加入 `unclear` intent 與「只傳圖片／檔案」的規則
+    'prompt_cache_key'     => 'auto_reply.prompt.v5',
     'prompt_cache_seconds' => 300,
 
     /*

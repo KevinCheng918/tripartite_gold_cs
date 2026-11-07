@@ -606,7 +606,21 @@ class TelegramChatService
          *                     先把不必判斷的訊息擋掉，真正會走到這裡的只有
          *                     「整則都是 tag」那種，一天最多一次外部呼叫。
          */
-        if ($group->isAutoReplyOn() && filled($rawText)
+        /*
+         * 要丟給自動回覆的那句話。
+         *
+         * ⚠ **客人只傳一張圖、一個檔而不打字也要處理**（需求方 2026-11-08）。
+         * 以前這裡是 `filled($rawText)`，純媒體訊息連 Job 都不派送 ——
+         * 不回答、也不開求助單，客人等著而**沒有任何人知道**。
+         * 錯誤畫面、對帳單、收據截圖本身就是他要問的東西。
+         *
+         * 改成用 `[圖片]`／`[檔案]` 這種標籤當問題丟進去，模型讀不到圖的
+         * 內容所以會判 `unclear` → 轉人工 → 支援群組收到單。
+         * 詳見 .claude/knowledge/bugfix/2026-11-08-silent-black-hole.md
+         */
+        $autoReplyText = $this->autoReplyQuestion($rawText, $mediaType);
+
+        if ($group->isAutoReplyOn() && filled($autoReplyText)
             && !$this->staffIgnoreService->isStaff($from, $group->id)
             && !$this->memberService->isIgnored($group->id, $from)
             && !$this->isTagToOutsidersOnly($message, $rawText, $group->id)) {
@@ -625,7 +639,7 @@ class TelegramChatService
              * 這段才有意義的前提是真的有佇列。
              */
             $delay = (int) config('auto_reply.burst_delay');
-            $job = AutoReplyJob::dispatch($group->id, $rawText, $msg->id);
+            $job = AutoReplyJob::dispatch($group->id, $autoReplyText, $msg->id);
 
             if ($delay > 0) {
                 $job->delay(now()->addSeconds($delay));
@@ -1235,6 +1249,42 @@ class TelegramChatService
         $labels = config('constants.TELEGRAM.MEDIA_LABELS');
 
         return $labels[$key] ?? $labels['default'];
+    }
+
+    /**
+     * 要丟給自動回覆比對的那句話（沒有就回 null＝不觸發）
+     *
+     * 客人打了字就用他的字；只傳媒體沒打字時用 `[圖片]` 這種標籤
+     * —— 模型讀不到圖的內容，會判 `unclear` 而轉人工，同仁就會收到求助單。
+     *
+     * ⚠ **貼圖與動圖回 null。** 那是寒暄，為它們開求助單只會製造雜訊，
+     * 而雜訊多到一定程度支援群組就沒有人看了。清單在
+     * `constants.TELEGRAM.AUTO_REPLY_SKIP_MEDIA`。
+     *
+     * ⚠ 這裡**不處理「要不要自動回覆」以外的事**：忽略名單、tag 判斷仍由
+     * 呼叫端那串條件負責，它們的順序是刻意由便宜到貴排的。
+     *
+     * @param string|null $rawText   客人真正打的字（不含媒體替代文字）
+     * @param string|null $mediaType 內部 media_type，純文字訊息為 null
+     * @return string|null
+     */
+    private function autoReplyQuestion($rawText, $mediaType)
+    {
+        if (filled($rawText)) {
+            return $rawText;
+        }
+
+        if (blank($mediaType)) {
+            return null;
+        }
+
+        $skip = (array) config('constants.TELEGRAM.AUTO_REPLY_SKIP_MEDIA');
+
+        if (in_array($mediaType, $skip, true)) {
+            return null;
+        }
+
+        return $this->mediaLabel($mediaType);
     }
 
     /**

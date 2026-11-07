@@ -532,21 +532,44 @@ class AutoReplyService
      */
     private function decide(array $result, ?TelegramGroup $group = null)
     {
-        $actions = config('constants.AUTO_REPLY.DECISION');
-        $intents = config('constants.AUTO_REPLY.INTENT');
+        $actions = (array) config('constants.AUTO_REPLY.DECISION');
+        $intents = (array) config('constants.AUTO_REPLY.INTENT');
         $intent = Arr::get($result, 'intent');
         $opening = $this->sanitizeOpening(Arr::get($result, 'opening'));
 
-        // 寒暄：有話要回就回一句，沒有就閉嘴
-        if ($intent === $intents['CHAT']) {
-            $action = filled($opening) ? $actions['REPLY'] : $actions['SILENT'];
+        /*
+         * 判斷不出來 —— 轉人工（需求方 2026-11-08）。
+         *
+         * ⚠ **這一條要擺在寒暄之前。** 以前 enum 沒有 `unclear`，模型遇到
+         * 「一張圖」「一個字」只能硬塞一個，而最像的是 `chat` ——
+         * 接著沒有承接句可寫就落到 SILENT，**既不回答也不轉人工**。
+         * 詳見 .claude/knowledge/bugfix/2026-11-08-silent-black-hole.md
+         */
+        if ($intent === Arr::get($intents, 'UNCLEAR')) {
+            return ['action' => Arr::get($actions, 'WAIT'), 'item' => null, 'opening' => $opening];
+        }
+
+        /*
+         * 寒暄：有話要回就回一句，沒有就閉嘴。
+         *
+         * ⚠ 這裡的 SILENT 現在有**正面依據**才會成立：模型已經有 `unclear`
+         * 可以表達「我分不出來」，所以它還是填 `chat`＋不給承接句，就真的是
+         * 在說「這只是客人在道謝／說收到，不需要回應」。
+         *
+         * ⚠ **不要把 SILENT 改成也開求助單**：客人說一句「好」就開一張單，
+         * 支援群組會被雜訊淹掉，而淹掉之後連真的單也沒人看。
+         */
+        if ($intent === Arr::get($intents, 'CHAT')) {
+            $action = filled($opening)
+                ? Arr::get($actions, 'REPLY')
+                : Arr::get($actions, 'SILENT');
 
             return ['action' => $action, 'item' => null, 'opening' => $opening];
         }
 
         // 需求不是題庫該回答的東西 —— 硬比對只會撈出不相干的答案，一律轉人工
-        if ($intent === $intents['REQUEST']) {
-            return ['action' => $actions['WAIT'], 'item' => null, 'opening' => $opening];
+        if ($intent === Arr::get($intents, 'REQUEST')) {
+            return ['action' => Arr::get($actions, 'WAIT'), 'item' => null, 'opening' => $opening];
         }
 
         $itemId = Arr::get($result, 'item_id');
@@ -567,7 +590,7 @@ class AutoReplyService
             $item = $this->quickReplyRepository->findActiveItem($itemId);
 
             if (filled($item)) {
-                return ['action' => $actions['ASK_INFO'], 'item' => $item, 'opening' => $opening];
+                return ['action' => Arr::get($actions, 'ASK_INFO'), 'item' => $item, 'opening' => $opening];
             }
         }
 
@@ -577,7 +600,7 @@ class AutoReplyService
             $item = $this->quickReplyRepository->findActiveItem($itemId);
 
             if (filled($item)) {
-                return ['action' => $actions['ANSWER'], 'item' => $item, 'opening' => $opening];
+                return ['action' => Arr::get($actions, 'ANSWER'), 'item' => $item, 'opening' => $opening];
             }
 
             // 模型挑到的題目剛好被停用或刪掉，當作沒命中
@@ -586,7 +609,7 @@ class AutoReplyService
 
         // 沒把握就轉人工。答錯的代價遠高於多轉一次人工，
         // 而且每轉一次就是一次把題庫補起來的機會
-        return ['action' => $actions['WAIT'], 'item' => null, 'opening' => $opening];
+        return ['action' => Arr::get($actions, 'WAIT'), 'item' => null, 'opening' => $opening];
     }
 
     /**
