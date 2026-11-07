@@ -261,9 +261,11 @@ class AutoReplyResumeService
         }
 
         DB::transaction(function () use ($resumed, $brokenIds, $statuses) {
-            foreach ($resumed as $resume) {
-                $this->telegramRepository->setAutoReply($resume->group, true);
-            }
+            // 整批一句 whereIn —— 逐筆 setAutoReply() 是 2N 次查詢（update + refresh）
+            $this->telegramRepository->setAutoReplyBulk(
+                collect($resumed)->pluck('telegram_group_id')->all(),
+                true
+            );
 
             $this->repository->markStatus(
                 collect($resumed)->pluck('id')->all(),

@@ -100,15 +100,12 @@ class AutoReplyResumeRepository
      */
     public function getDueForResume()
     {
-        $modes = (array) config('constants.AUTO_REPLY_RESUME.MODE');
-        $statuses = (array) config('constants.AUTO_REPLY_RESUME.STATUS');
-
         return AutoReplyResume::query()
             ->select(self::COLUMNS)
             ->with(['group', 'user'])
             ->join('telegram_group', 'telegram_group.id', '=', 'auto_reply_resume.telegram_group_id')
-            ->where('auto_reply_resume.status', $statuses['PENDING'])
-            ->where('auto_reply_resume.mode', $modes['TEMPORARY'])
+            ->where('auto_reply_resume.status', config('constants.AUTO_REPLY_RESUME.STATUS.PENDING'))
+            ->where('auto_reply_resume.mode', config('constants.AUTO_REPLY_RESUME.MODE.TEMPORARY'))
             ->whereNotNull('auto_reply_resume.quiet_minutes')
             ->where('telegram_group.auto_reply', 0)
             ->where('telegram_group.status', config('constants.TELEGRAM.GROUP_STATUS.ACTIVE'))
@@ -133,12 +130,10 @@ class AutoReplyResumeRepository
      */
     public function getPendingForArchivedGroups()
     {
-        $statuses = (array) config('constants.AUTO_REPLY_RESUME.STATUS');
-
         return AutoReplyResume::query()
             ->select(self::COLUMNS)
             ->join('telegram_group', 'telegram_group.id', '=', 'auto_reply_resume.telegram_group_id')
-            ->where('auto_reply_resume.status', $statuses['PENDING'])
+            ->where('auto_reply_resume.status', config('constants.AUTO_REPLY_RESUME.STATUS.PENDING'))
             ->where('telegram_group.status', '!=', config('constants.TELEGRAM.GROUP_STATUS.ACTIVE'))
             ->orderBy('auto_reply_resume.id')
             ->get();

@@ -148,6 +148,32 @@ class TelegramRepository
     }
 
     /**
+     * 整批切換自動回覆開關
+     *
+     * ⚠ 排程一輪可能恢復十幾個對話，逐筆走 `setAutoReply()` 是
+     * **2N 次查詢**（`update()` 一次、`refresh()` 一次）。這裡只要把欄位改掉，
+     * 呼叫端不需要刷新後的 Model，所以一句 `whereIn` 就夠。
+     * 比照 `AutoReplyResumeRepository::markStatus()`。
+     *
+     * @param array $groupIds
+     * @param bool  $enabled
+     * @return int 影響列數
+     */
+    public function setAutoReplyBulk(array $groupIds, $enabled)
+    {
+        if (blank($groupIds)) {
+            return 0;
+        }
+
+        return TelegramGroup::query()
+            ->whereIn('id', $groupIds)
+            ->update([
+                'auto_reply' => $enabled,
+                'updated_at' => now(),
+            ]);
+    }
+
+    /**
      * 記錄本次自動回覆的狀態
      *
      * auto_reply_at 服務兩件事：模板要用完整版還是精簡版、以及「稍等」的冷卻。

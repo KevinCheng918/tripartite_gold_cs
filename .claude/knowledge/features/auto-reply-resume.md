@@ -375,3 +375,82 @@ PENDING 還留著 —— 短路掉的話，客服自己勾回來之後那筆仍�
 - [[auto-reply-natural]] — 現行的 intent 判斷與承接句
 - [[support-group-topics]] — 通知發到哪個話題
 - [[customer-followup]] — 同樣的「靜置夠久才動作」模式（`quiet_minutes`）
+
+---
+
+## 收尾：按 PROMPTS.md 逐條稽核（2026-11-07）
+
+需求方要求「嚴格嚴謹按照 PROMPTS.md」，所以把本功能動過的 15 個 PHP 檔
+逐條核對「完成前自我檢核」。**找到 2 項真違反，都修了。**
+
+### 修掉的
+
+| 檔案 | 違反 | 處數 |
+|---|---|---|
+| `AutoReplyResumeRepository.php` | `$statuses['PENDING']`／`$modes['TEMPORARY']` 陣列下標取值 → 直接用 `config()` dot notation | 3 |
+| `AutoReplyResumeService::flipOn()` | 逐筆 `setAutoReply()` 是 **2N 次查詢**（`update()` + `refresh()`）→ 新增 `TelegramRepository::setAutoReplyBulk()`，一句 `whereIn` | 1 |
+
+⚠ 那三處**是我自己這一輪剛寫的** —— 規則是「寫的當下就套用」。
+同一個教訓在 [[../bugfix/2026-11-05-validation-message-swallowed]] 的
+`StaffResource` 已經記過一次（六處也是前一輪自己寫的）。
+
+⚠ 批次更新不影響正確性：翻完開關之後只用到 `$resume->group->title`
+（組通知文案），沒有人需要刷新後的 Model。
+
+### 刻意沒做的（附證據，不要再重新爭論一次）
+
+**1. 沒有建 `app/Criteria/AutoReplyResume/`。**
+
+檢核表寫「Repository 使用 Criteria 封裝」，但專案的實際慣例是
+**38 支 Repository 只有 3 支用 Criteria**，而那 3 支都用在
+`paginate(array $criteria)` 這條「可組合的篩選條件」路徑上。
+
+最直接的先例是 `ConversationFollowupRepository`：它的 `paginate()` 吃 Criteria，
+但 `getDueForAsk()`（＝我的 `getDueForResume()` 的對應物，固定條件的排程查詢）
+**沒有**用。條件固定的查詢硬包一層只會多一個檔案。
+
+**2. 沒有新增 Resource 檔。** 兩支端點回的是 `['auto_reply' => bool]` 與
+`['message' => '...']`，跟既有的 `ajaxToggleAutoReply`／`ajaxUpdateFollowup`
+同一個形狀 —— 那些也都沒有 Resource。
+
+**3. 沒有新增權限 keyword。** 沒有新介面：聊天視窗的開關沿用
+`telegram_chat.reply`，設定頁沿用 `notification.manage`。
+
+**4. 兩個 Request 的 `rules()` 沒寫 PHPDoc。** 專案裡**沒有任何一支 Request**
+在 `rules()` 上寫 PHPDoc（查過 `UpdateFollowupRequest`／`UpdateRemindRequest`／
+`ReplyRequest`）。類別層的 docblock 有寫「為什麼這樣驗」，那才是會被看的。
+
+**5. 6 處 inline `style=`。** 檢核表寫 CSS 要分離，但 `input.js` 既有 38 處、
+`layout.js` 既有 14 處 inline style，而且**本專案沒有 `webpack.mix.js`**
+（CLAUDE.md 還寫著它，實際已不存在），`public/js` 是直接載入不經編譯的。
+為 6 個一次性樣式另開一支 css 反而跟整份檔案不一致。
+
+### 逐條核對結果
+
+| 檢核項 | 結果 |
+|---|---|
+| PHPDoc 已補齊 | ✅ 複雜陣列都有 `array<int, AutoReplyResume>`／`array<int, string>` |
+| Controller 無商業邏輯、無直接 DB | ✅ grep `DB::`／`::query()`／`::where(` 皆無 |
+| Service 無 HTTP 處理 | ✅ grep `request()`／`Request`／`Auth::` 皆無 |
+| Service 無 `Model::where` | ✅ 全部走 Repository |
+| Model 無商業邏輯 | ✅ 只有 2 個關聯 + 2 個衍生屬性（`quietSince()`／`resumeAt()`），比照既有 `TelegramGroup::isAutoReplyOn()` |
+| 無 PHP 7.4 不相容語法 | ✅ 無 `fn(` |
+| `??`／`isset`／`empty`／`!filled` | ✅ 本次新增的 1725 行 PHP 內**零處** |
+| SELECT 指定欄位 | ✅ 5 個查詢全部有 `select()`，eager load 的 `group()`／`user()` 也指定欄位 |
+| N+1 已消除 | ✅ `resumeAtByGroupIds()` 整批、`getDueForResume()` eager load、翻開關改批次 |
+| Config/Cache 判斷先於 DB 查詢 | ✅ `isEnabled()` 短路在 `recordOff()`／`resumeDue()`／`resumeAtByGroupIds()` 最前面 |
+| 字串插值 `{$var}` | ✅ 無 `'...' . $var` 串接 |
+| Early Return | ✅ 新檔案**一個 `else` 都沒有**，無 16 格以上縮排的 `if` |
+| Ajax route 含 `ajax-` 前綴 | ✅ `ajax-update-auto-reply-resume` |
+| Controller params 用 `$params` | ✅ 兩支都是 `$params = $request->validated()` |
+| 多表寫入用 Transaction | ✅ `toggle()`（group + resume）、`flipOn()`（group + resume） |
+| 外部輸入／異常有 Log | ✅ 自動恢復、永久關閉、開關切換失敗 |
+| 語系 tw → cn → en | ✅ 122/122/122、253/253/253 |
+| 改 route → `artisan optimize` | ✅ 上一個 commit 已執行；本次稽核沒動 `config/`／`routes/`，不需重跑 |
+
+### 不加新版號的理由
+
+**零使用者可見變更。** 唯一的行為差異是「翻開關從 2N 次查詢變成 1 次」——
+客服看不到。v3.78 已經在功能那一個 commit 裡，內容仍然準確，不需要改。
+編一條「改了程式風格」塞進版本紀錄只是噪音 ——
+先例見 [[../bugfix/2026-11-05-validation-message-swallowed]] 同名小節。
