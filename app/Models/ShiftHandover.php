@@ -71,23 +71,4 @@ class ShiftHandover extends Model
             ->select(['id', 'name', 'display_name', 'reply_start_time', 'reply_end_time']);
     }
 
-    /**
-     * 已經完成交接了嗎
-     *
-     * @return bool
-     */
-    public function isHanded()
-    {
-        return (int) $this->status === (int) config('constants.SHIFT_HANDOVER_TOPIC.STATUS.HANDED');
-    }
-
-    /**
-     * 還在等人交接（會被一直催）
-     *
-     * @return bool
-     */
-    public function isPending()
-    {
-        return (int) $this->status === (int) config('constants.SHIFT_HANDOVER_TOPIC.STATUS.PENDING');
-    }
 }

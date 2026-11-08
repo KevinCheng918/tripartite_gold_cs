@@ -180,32 +180,40 @@ class ShiftAssignmentRepository
     }
 
     /**
-     * 某一天排某一班的人（交接提醒用）
+     * 一段日期內「哪一天的哪一班有哪些人」（交接提醒整輪只查一次）
      *
-     * ⚠ **日期是「那一班回訊開始的那一天」，不是交接窗口那一天。**
-     * 大夜班回訊 23:00–09:00，它跟早班的交接窗口在**隔天** 08:00–09:00，
-     * 而 `shift_assignments.date` 記的是 23:00 那天 —— 傳錯日期會查到
-     * 隔天那批人（或查不到人）。呼叫端負責算對，見
-     * `ShiftHandoverService::buildWindows()`。
+     * ⚠ **存在的理由就是消 N+1。** 交接提醒一輪要問好幾次「某天某班有誰」
+     * （每個窗口的上一班與下一班各一次，加上建窗口時的判斷）——
+     * 逐窗口各查一次就是那個次數的查詢。
+     * 比照 `CustomerFollowupService::askOnDuty()` 的「整輪只查一次」。
      *
-     * ⚠ 只回 id 不回 model：呼叫端要的是「有沒有人、是哪幾個」，
-     * 名稱與 Telegram 帳號由 `UserRepository::getMentionableByIds()` 統一撈
-     * （那支會濾掉工程帳號、停用帳號、沒填 Telegram 帳號的）。
+     * ⚠ 只回 id：名稱與 Telegram 帳號由呼叫端用
+     * `UserRepository::getMentionableByIds()` 一次撈完（那支會濾掉工程、
+     * 停用、沒填 Telegram 帳號的）。
      *
-     * @param int    $shiftId
-     * @param string $date Y-m-d
-     * @return array<int>
+     * @param string $dateFrom Y-m-d
+     * @param string $dateTo   Y-m-d（含當天）
+     * @return array<string, array<int, array<int>>> [Y-m-d][shift_id] => [user_id, ...]
      */
-    public function getUserIdsByShiftAndDate($shiftId, $date)
+    public function getShiftUserMapByDateRange($dateFrom, $dateTo)
     {
-        $ids = ShiftAssignment::query()
-            ->distinct()
-            ->where('shift_id', $shiftId)
-            ->where('date', $date)
-            ->pluck('user_id')
-            ->all();
+        $rows = ShiftAssignment::query()
+            ->select(['date', 'shift_id', 'user_id'])
+            ->whereBetween('date', [$dateFrom, $dateTo])
+            ->get();
 
-        return array_map('intval', $ids);
+        $map = [];
+
+        foreach ($rows as $row) {
+            // `date` 有 cast 成 date，所以一律格式化成 Y-m-d 當 key
+            $date = $row->date instanceof \DateTimeInterface
+                ? $row->date->format('Y-m-d')
+                : (string) $row->date;
+
+            $map[$date][(int) $row->shift_id][] = (int) $row->user_id;
+        }
+
+        return $map;
     }
 
     /**

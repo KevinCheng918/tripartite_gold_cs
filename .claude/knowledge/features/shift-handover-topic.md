@@ -364,3 +364,100 @@ PHP 的重複陣列 key 會讓**後者無聲覆蓋前者**，所以那一版等�
 - [[scheduling]] — 班別與回訊時間
 - [[support-group-topics]] — 話題分流（本功能是第一個「雙向」的類型）
 - [[remind-escalation]] — 主管升級名單（本功能沿用）
+
+---
+
+## 收尾稽核：按 PROMPTS.md 逐條核對（2026-11-08）
+
+需求方要求「嚴格嚴謹按照 PROMPTS.md」。核對上一個 commit 的 1663 行新增，
+**找到 4 項，都修了。**
+
+### 1. ⚠ N+1：`mentionableFor()` 在三個迴圈裡各自查兩次 DB
+
+這是本次最實質的一項，而且**專案自己的註解早就警告過**：
+
+> `CustomerFollowupService::askOnDuty()`
+> ⚠ **當班人員整輪只查一次**。這支每分鐘跑，同時卡住十筆是常態 ——
+> 逐筆去查排班與主管名單就是十倍查詢，而一分鐘內名單都不會變。
+
+而我寫的 `mentionableFor()` 自己查「某天某班有誰」＋「這些人能不能被 tag」，
+**每筆催促呼叫兩次**（上一班、下一班），`noticeNoStaff()` 再一次，
+`syncWindows()` 又逐窗口查一次。
+
+→ 新增 `ShiftAssignmentRepository::getShiftUserMapByDateRange()`，
+在 `run()` 開頭用 `buildRoster()` **整輪撈一次**（排班 1 次 ＋ 可 tag 名單 1 次），
+`mentionableFor()` 改成純陣列查找、完全不碰 DB。
+
+| 檢查 | 修前 | 修後 |
+|---|---|---|
+| `buildRoster()` | — | 1～2 次查詢（沒排班時 1 次，`getMentionableByIds([])` 自己短路） |
+| `mentionableFor()` 呼叫 4 次 | 8 次查詢 | **0 次** |
+| `run()` 在沒設話題時 | — | **0 次查詢**（短路在 `buildRoster()` 之前） |
+
+### 2. 死碼：`ShiftHandover::isHanded()` / `isPending()`
+
+兩支都沒有任何呼叫端（狀態判斷全在 Repository 的 where 裡）。刪掉。
+
+### 3. 死碼：`getUserIdsByShiftAndDate()`
+
+改用整輪撈的 roster 之後就沒人用了。刪掉，順手修掉另一段註解裡對它的引用。
+
+### 4. 沒用到的參數：`mentionableFor(ShiftHandover $handover, ...)`
+
+`$handover` 整個方法裡沒用到。重構時一併移除。
+
+### ⚠⚠ 驗證時另外抓到一個行為問題：`CREATE_WITHIN_HOURS` 原本是 24
+
+實測 `buildWindows()` 時發現它會把**昨天**的三個窗口也算出來 —— 那表示
+**第一次上線會立刻為過去一整天的窗口建紀錄並同時開始催**，而那些班次
+根本還沒有交接流程，催了也沒有人知道在催什麼。
+
+→ 調成 **2 小時**。要講清楚的是它**不影響「催到完成」**：這個值只管
+「要不要為一個已經過去的窗口補建一筆」，一旦建出來就照常催到完成。
+交接窗口本身只有一小時，2 小時足夠涵蓋「排程掛掉一陣子才回來」。
+
+⚠ 代價：排程中斷超過 2 小時的話，那段期間的窗口不會被補建也不會被催。
+刻意的取捨 —— 漏催一次比上線當天亂催一輪好。
+
+實測八個時間點（`Carbon::setTestNow`）：
+
+| 模擬時間 | 情境 | 建出 |
+|---|---|---|
+| 12:50 | 還沒到 12:55 提醒起點 | 0 ✅ |
+| 12:55 | 早班→午班 提醒起點 | 1 ✅ |
+| 13:30 | 窗口進行中 | 1 ✅ |
+| 14:50 | 窗口結束但仍在 2 小時內 | 1 ✅ |
+| 15:30 | 超過 2 小時 | 0 ✅ |
+| 17:55 / 22:55 | 午→晚 / 晚→大夜 提醒起點 | 1 ✅ |
+| 隔天 07:55 | 大夜→早班（跨午夜） | 1 ✅ `date=前一天` |
+
+### 逐條核對結果
+
+| 檢核項 | 結果 |
+|---|---|
+| `??`／`isset`／`empty`／`!filled` | ✅ 1663 行新增內零處 |
+| 陣列下標讀取 | ✅ 零處（只有 `$windows[] =` 這種 append） |
+| 字串 `.` 串接變數 | ✅ 零處 |
+| `fn(`／`else`／`!== null` | ✅ 零處 |
+| Controller 無商業邏輯／無 DB | ✅ `NotificationController` 只 `$params` → Service；webhook 只呼叫一支 |
+| Service 無 HTTP 處理 | ✅ grep `request()`／`Auth::` 皆無 |
+| Service 無 `Model::where` | ✅ 全走 Repository |
+| Model 無商業邏輯 | ✅ 刪掉兩支述詞後只剩關聯與 casts |
+| PHPDoc | ✅ 複雜回傳都標了（`array{assignments:…, users:…}`、`[Y-m-d][shift_id] => [user_id]`） |
+| SELECT 指定欄位 | ✅ 新增的查詢都有 `select()` |
+| **N+1** | ✅ 本次修掉（見上） |
+| Config/Cache 判斷先於 DB | ✅ `isEnabled()`／`isConfigured()`／`topicIds()` 三道都在 `buildRoster()` 之前 |
+| Early Return | ✅ 無 `else` |
+| Ajax route 含 `ajax-` 前綴 | ✅ `ajax-update-shift-handover` |
+| Controller params 用 `$params` | ✅ |
+| 多表寫入用 Transaction | ✅ 不適用 —— 每次只寫 `shift_handover` 一張表（`firstOrCreateWindow` / `update`），沒有跨表寫入 |
+| 外部輸入／異常有 Log | ✅ 送出、交接完成、認不出發言者、沒勾話題各有一筆 |
+| 語系 tw → cn → en | ✅ 268/268/268 |
+| 改 `config/` → `optimize` | ✅ 容器內已執行 |
+
+### 不加新版號
+
+v3.81 已在功能那個 commit，而本次是 **N+1 重構（零行為變更）＋ 刪死碼 ＋
+一個常數調整**。常數那一項唯一的使用者可見差別是「第一次上線不會亂催
+昨天的班」—— 那是讓 v3.81 的描述成立，不是新增的行為，所以不另編版號。
+先例見 [[../bugfix/2026-11-05-validation-message-swallowed]] 的同名小節。

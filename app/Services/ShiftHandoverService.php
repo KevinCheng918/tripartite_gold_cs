@@ -144,9 +144,53 @@ class ShiftHandoverService
             return 0;
         }
 
-        $this->syncWindows();
+        /*
+         * ⚠ **排班與可 tag 名單整輪只查一次。**
+         *
+         * 一輪要問好幾次「某天某班有誰」（建窗口時每個窗口一次、催的時候
+         * 上下兩班各一次）—— 逐次去查就是那個次數的查詢，而一分鐘內
+         * 名單不會變。比照 `CustomerFollowupService::askOnDuty()`。
+         */
+        $roster = $this->buildRoster();
 
-        return $this->remindPending() + $this->noticeNoStaff();
+        $this->syncWindows($roster);
+
+        $due = $this->repository->getDueForRemind($this->leadMinutes(), $this->intervalMinutes());
+        $noStaff = $this->repository->getNoStaffPendingNotice($this->leadMinutes());
+
+        return $this->remindPending($due, $roster) + $this->noticeNoStaff($noStaff, $roster);
+    }
+
+    /**
+     * 這幾天的排班與可以被 tag 的人（整輪只查兩次）
+     *
+     * ⚠ **範圍是昨天到明天**：大夜班那一窗的上一班排在昨天、下一班落在
+     * 今天；而今天的窗口可能把下一班算到明天。抓寬一天比少抓一天安全 ——
+     * 少抓會讓某一班變成「查不到人」而被誤判成沒排班。
+     *
+     * @return array{assignments: array, users: \Illuminate\Support\Collection}
+     */
+    private function buildRoster()
+    {
+        $assignments = $this->assignmentRepository->getShiftUserMapByDateRange(
+            now()->copy()->subDay()->format('Y-m-d'),
+            now()->copy()->addDay()->format('Y-m-d')
+        );
+
+        $userIds = [];
+
+        foreach ($assignments as $byShift) {
+            foreach ($byShift as $ids) {
+                $userIds = array_merge($userIds, $ids);
+            }
+        }
+
+        return [
+            'assignments' => $assignments,
+            // 以 id 為 key，後面逐班取名單時就只是陣列查找，不再碰 DB
+            'users'       => collect($this->userRepository->getMentionableByIds(array_unique($userIds)))
+                ->keyBy('id'),
+        ];
     }
 
     /**
@@ -159,14 +203,16 @@ class ShiftHandoverService
      *
      * @return void
      */
-    private function syncWindows()
+    private function syncWindows(array $roster)
     {
         $statuses = (array) config('constants.SHIFT_HANDOVER_TOPIC.STATUS');
 
         foreach ($this->buildWindows() as $window) {
-            $fromUserIds = $this->assignmentRepository->getUserIdsByShiftAndDate(
-                (int) Arr::get($window, 'from_shift_id'),
-                (string) Arr::get($window, 'date')
+            // 走整輪撈好的排班表，不要在迴圈裡再查一次 DB
+            $fromUserIds = (array) Arr::get(
+                $roster,
+                'assignments.' . Arr::get($window, 'date') . '.' . Arr::get($window, 'from_shift_id'),
+                []
             );
 
             /*
@@ -339,23 +385,23 @@ class ShiftHandoverService
     /**
      * 催還沒交接的那幾筆
      *
-     * @return int
+     * @param \Illuminate\Database\Eloquent\Collection $due    `getDueForRemind()` 的結果
+     * @param array                                    $roster `buildRoster()` 的回傳
+     * @return int 送出幾則
      */
-    private function remindPending()
+    private function remindPending($due, array $roster)
     {
-        $due = $this->repository->getDueForRemind($this->leadMinutes(), $this->intervalMinutes());
-
         if ($due->isEmpty()) {
             return 0;
         }
 
-        // ⚠ 主管名單整輪只查一次 —— 逐筆查就是 N 倍查詢，而一分鐘內它不會變
+        // ⚠ 主管名單同理，整輪只查一次 —— 逐筆查就是 N 倍查詢
         $managers = $this->userRepository->getManagersForMention();
         $escalateAt = (int) config('constants.SHIFT_HANDOVER_TOPIC.ESCALATE_AT');
         $sent = 0;
 
         foreach ($due as $handover) {
-            if ($this->remindOne($handover, $managers, $escalateAt)) {
+            if ($this->remindOne($handover, $roster, $managers, $escalateAt)) {
                 $sent++;
             }
         }
@@ -369,16 +415,23 @@ class ShiftHandoverService
      * ⚠ **不論送不送得出去，`remind_count` 都要往前推進**：tag 不到人就不更新
      * 的話，這筆每分鐘都會被重試（求助單與待追蹤事項都踩過）。
      *
-     * @param ShiftHandover                          $handover
+     * @param ShiftHandover                            $handover
+     * @param array                                    $roster `buildRoster()` 的回傳
      * @param \Illuminate\Database\Eloquent\Collection $managers
-     * @param int                                    $escalateAt
+     * @param int                                      $escalateAt
      * @return bool
      */
-    private function remindOne(ShiftHandover $handover, $managers, $escalateAt)
+    private function remindOne(ShiftHandover $handover, array $roster, $managers, $escalateAt)
     {
         $seq = (int) $handover->remind_count + 1;
-        $fromUsers = $this->mentionableFor($handover, $handover->from_shift_id, (string) $handover->date->format('Y-m-d'));
-        $toUsers = $this->mentionableFor($handover, $handover->to_shift_id, $handover->window_start->format('Y-m-d'));
+
+        /*
+         * ⚠ 兩邊的日期不一樣，**不要都用同一個**：
+         * 上一班用 `date`（它回訊開始的那一天），下一班用 `window_start`
+         * 那一天 —— 大夜班那一窗兩者相差一天。
+         */
+        $fromUsers = $this->mentionableFor($roster, $handover->from_shift_id, $handover->date->format('Y-m-d'));
+        $toUsers = $this->mentionableFor($roster, $handover->to_shift_id, $handover->window_start->format('Y-m-d'));
 
         // 催到第 N 次還沒人動，連主管一起 tag（沿用求助單那份名單）
         if ($seq >= $escalateAt) {
@@ -408,18 +461,36 @@ class ShiftHandoverService
     }
 
     /**
-     * 那一班可以被 tag 的人
+     * 那一班可以被 tag 的人（純查找，不碰 DB）
      *
-     * @param ShiftHandover $handover
-     * @param int           $shiftId
-     * @param string        $date Y-m-d（那一班回訊開始的那一天）
+     * ⚠ **這支以前會自己查兩次 DB，而它是在迴圈裡被呼叫的** ——
+     * 2026-11-08 稽核時改成吃 `buildRoster()` 的結果。那正是
+     * `CustomerFollowupService::askOnDuty()` 的註解警告過的事。
+     *
+     * @param array  $roster  `buildRoster()` 的回傳
+     * @param int    $shiftId
+     * @param string $date    Y-m-d（那一班回訊開始的那一天）
      * @return \Illuminate\Support\Collection
      */
-    private function mentionableFor(ShiftHandover $handover, $shiftId, $date)
+    private function mentionableFor(array $roster, $shiftId, $date)
     {
-        $ids = $this->assignmentRepository->getUserIdsByShiftAndDate((int) $shiftId, $date);
+        $ids = (array) Arr::get($roster, "assignments.{$date}." . (int) $shiftId, []);
 
-        return collect($this->userRepository->getMentionableByIds($ids));
+        if (blank($ids)) {
+            return collect();
+        }
+
+        /*
+         * 名單已經在 `buildRoster()` 撈好並以 id 為 key ——
+         * 這裡只是挑出這一班的那幾個。撈不到的是被
+         * `getMentionableByIds()` 濾掉的人（工程、停用、沒填 Telegram 帳號）。
+         */
+        return collect($ids)
+            ->map(function ($id) use ($roster) {
+                return Arr::get($roster, 'users')->get((int) $id);
+            })
+            ->filter()
+            ->values();
     }
 
     /**
@@ -463,12 +534,14 @@ class ShiftHandoverService
     // ---------------------------------------------------------------
 
     /**
-     * @return int
+     * 上一班沒人的那幾筆 → 跟下一班講一聲（只發一次）
+     *
+     * @param \Illuminate\Database\Eloquent\Collection $pending `getNoStaffPendingNotice()` 的結果
+     * @param array                                    $roster  `buildRoster()` 的回傳
+     * @return int 送出幾則
      */
-    private function noticeNoStaff()
+    private function noticeNoStaff($pending, array $roster)
     {
-        $pending = $this->repository->getNoStaffPendingNotice($this->leadMinutes());
-
         if ($pending->isEmpty()) {
             return 0;
         }
@@ -480,7 +553,7 @@ class ShiftHandoverService
 
         foreach ($pending as $handover) {
             $toUsers = $this->mentionableFor(
-                $handover,
+                $roster,
                 $handover->to_shift_id,
                 $handover->window_start->format('Y-m-d')
             );
