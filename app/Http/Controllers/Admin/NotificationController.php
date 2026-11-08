@@ -12,6 +12,7 @@ use App\Http\Requests\Notification\UpdateGroupRequest;
 use App\Http\Requests\Notification\UpdateFollowupRequest;
 use App\Http\Requests\Notification\UpdateRemindRequest;
 use App\Http\Requests\Notification\UpdateReportRequest;
+use App\Http\Requests\Notification\UpdateShiftHandoverRequest;
 use App\Http\Requests\Notification\UpdateShiftNoticeRequest;
 use App\Http\Requests\Notification\UpdateTaskNoticeRequest;
 use App\Http\Requests\Notification\UpdateTopicRequest;
@@ -122,6 +123,27 @@ class NotificationController extends Controller
             return response()->json(['message' => trans('notification.msg.saved')]);
         } catch (\Exception $e) {
             Log::error('提醒統計設定更新失敗', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
+
+            return response()->json(['message' => trans('notification.msg.save_failed')], 500);
+        }
+    }
+
+    /**
+     * Ajax 更新班別交接的設定
+     *
+     * @param UpdateShiftHandoverRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxUpdateShiftHandover(UpdateShiftHandoverRequest $request)
+    {
+        $params = $request->validated();
+
+        try {
+            $this->settingService->updateShiftHandover($params, Auth::id());
+
+            return response()->json(['message' => trans('notification.msg.saved')]);
+        } catch (\Exception $e) {
+            Log::error('班別交接設定更新失敗', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
 
             return response()->json(['message' => trans('notification.msg.save_failed')], 500);
         }

@@ -51,7 +51,25 @@ return [
     'report_personal_title' => 'Personal summary',
     'report_personal_desc'  => 'Anyone who was reminded yesterday receives their own summary at :time (which tickets they were chased on). This is automatic and needs no setup; people who were not reminded receive nothing.',
 
-    // ===== Pending follow-ups =====
+    // ===== Shift Handover =====
+    /*
+     * Shift handover (requested 2026-11-08).
+     *
+     * ⚠ `handover_interval_hint` must spell out that there is NO cap on the
+     * number of reminders: whoever types 5 minutes would not otherwise realise
+     * it means tagging a group of people every 5 minutes until someone acts.
+     */
+    'handover_title'   => 'Shift Handover',
+    'handover_desc'    => 'Every shift must post its handover notes in the handover topic. The hour where two shifts\' reply windows overlap is the handover window; a few minutes before the incoming shift starts replying, the system tags both sides in the handover topic — the outgoing shift ("please post your handover") and the incoming one ("you are about to go live, read the handover first"). It counts as done once someone from that shift posts in the topic. ⚠ When the outgoing shift has nobody rostered that day there is **no nagging**; instead the incoming shift gets one notice quoting the previous handover (that is the current situation for the overnight shift, in which case read the daily "Morning Handover List").',
+    'handover_enabled' => 'Enable handover reminders',
+    'handover_enabled_hint' => 'While off, no handover message is ever sent; existing handover records are kept. ⚠ This one is **on by default** (every shift is expected to hand over).',
+    'handover_lead'      => 'Start reminding this many minutes early',
+    'handover_lead_hint' => 'Counted back from the incoming shift\'s reply start time. If the afternoon shift starts replying at 13:00 and this is 5, the first message goes out at 12:55.',
+    'handover_interval'      => 'Repeat every (minutes) until handed over',
+    'handover_interval_hint' => '⚠ **There is no cap** — it keeps nagging until someone from that shift posts in the handover topic (with nothing to hand over, a one-word "none" ends it). So this number is the only control over how noisy it gets; do not set it too low. Managers are tagged as well from reminder :escalate onward.',
+    'handover_topic_missing' => '"Shift Handover" is not ticked on any topic yet (see the "Support Group & Topics" tab) — until it is, this feature stays inactive, so it never nags in the group\'s main area about something that cannot be completed there.',
+
+    // ===== Auto Reply Auto-Resume =====
     /*
      * Auto-resume for auto reply (requested 2026-11-07).
      *
@@ -66,6 +84,7 @@ return [
     'resume_minutes'      => 'Default idle minutes',
     'resume_minutes_hint' => '⚠ This is **only the pre-filled value for the chat window modal**, not a global setting — the number that applies is chosen by the agent turning it off (they know how long that case takes). Between :min and :max minutes.',
 
+    // ===== Pending follow-ups =====
     'followup_title'   => 'Pending Follow-ups',
     'followup_desc'    => 'When someone in a chat says "hold on, I\'ll send it later", it is recorded as a pending follow-up. Once the chat has been quiet for a while, the system tags the on-duty staff in the support group and asks whether to follow up: choosing to follow up messages the customer about progress (or, when one of our own staff made the promise, tags the on-duty staff to pick it up instead), and choosing to drop it closes the item. If nobody presses a button it asks again at a fixed interval, and from the :escalate reminder onwards it also tags leaders and the boss.',
     'followup_enabled' => 'Enable pending follow-ups',
@@ -231,6 +250,19 @@ return [
         'auto_reply_resume_hint' => 'Sent when a conversation has stayed idle long enough after being switched to manual and the system re-enables auto reply, tagging whoever turned it off. '
             . '⚠ Best kept in the same topic as "Morning Handover List"; do **not** tick it on "AI questions" (that topic is reserved for tickets needing quoted replies)',
 
+        /*
+         * Shift handover (requested 2026-11-08).
+         *
+         * ⚠ This one is **bidirectional**: besides "notices go here", a post by
+         * that shift's staff in this topic counts as the handover being done.
+         * The hint must say so, or people will chat here and silently clear
+         * the reminder.
+         */
+        'shift_handover'      => 'Shift Handover',
+        'shift_handover_hint' => 'The "time to hand over" reminder, tagging both the outgoing and incoming shift. '
+            . '⚠ This is not only "send it here" — **a post by that shift\'s staff in this topic counts as the handover being completed**, '
+            . 'so tick a topic dedicated to handovers rather than one used for chatter',
+
         'scheduled_reminder'      => 'Assistant',
         'scheduled_reminder_hint' => '⚠ This picks which topics may USE the assistant commands, not where replies go — '
             . 'the assistant always replies in the topic you spoke in. None ticked = every topic may use it',
@@ -262,6 +294,11 @@ return [
         'followup_max_invalid'      => 'Number of asks must be between 1 and 200',
         'followup_stale_required'   => 'Please enter the number of days (use 0 to never close automatically)',
         'followup_stale_invalid'    => 'Days must be between 0 and 365',
+
+        'handover_lead_required'     => 'Please enter how many minutes early to start reminding',
+        'handover_lead_invalid'      => 'Lead time must be between 1 and 60 minutes',
+        'handover_interval_required' => 'Please enter the repeat interval',
+        'handover_interval_invalid'  => 'Repeat interval must be between 5 and 1440 minutes (this feature has no reminder cap, so under 5 minutes is not accepted)',
 
         'resume_minutes_required' => 'Please enter the default idle minutes',
         'resume_minutes_range'    => 'Default idle minutes must be between :min and :max',

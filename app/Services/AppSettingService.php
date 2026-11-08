@@ -199,6 +199,25 @@ class AppSettingService
     const KEY_AUTO_REPLY_RESUME_ENABLED         = 'auto_reply_resume.enabled';
     const KEY_AUTO_REPLY_RESUME_DEFAULT_MINUTES = 'auto_reply_resume.default_minutes';
 
+    /*
+     * 班別交接（交接話題）。
+     *
+     * ENABLED  = 總開關，**預設開**（需求方 2026-11-08 指定）
+     * LEAD     = 下一班回訊開始前幾分鐘開始提醒
+     * INTERVAL = 沒交接時每隔幾分鐘再催
+     *
+     * ⚠ **預設開跟其他功能相反**（followup／wallet_notice／auto_reply_resume
+     * 都預設關）。理由是這是**每班都要做的事**，預設關等於上線後沒有人
+     * 知道要去打開它。`getBool()` 的第二個參數就是為此而帶。
+     *
+     * ⚠ **這裡沒有「催幾次上限」**，那是刻意的：需求方指定「就是催到他完成
+     * 交接事項」，因為「他沒有就會打沒有了」—— 交接沒有正當的不做理由。
+     * 控制「會不會吵」的唯一旋鈕是 INTERVAL。
+     */
+    const KEY_SHIFT_HANDOVER_ENABLED          = 'shift_handover.enabled';
+    const KEY_SHIFT_HANDOVER_LEAD_MINUTES     = 'shift_handover.lead_minutes';
+    const KEY_SHIFT_HANDOVER_INTERVAL_MINUTES = 'shift_handover.interval_minutes';
+
     // 每日匯率報價（匯率頁維護）
     const KEY_DAILY_RATE_TEMPLATE = 'daily_rate.ask_template';
 

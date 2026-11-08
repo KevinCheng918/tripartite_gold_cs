@@ -654,6 +654,49 @@
         });
     }
 
+    // ===== 班別交接（放在「班表通知」分頁） =====
+
+    function renderShiftHandover() {
+        var handover = settings.shift_handover || {};
+
+        document.getElementById('handover-enabled').checked = !!handover.enabled;
+        document.getElementById('handover-lead').value = handover.lead_minutes;
+        document.getElementById('handover-interval').value = handover.interval_minutes;
+
+        /*
+         * 沒勾交接話題的話整個功能不會動作（服務端會短路）——
+         * 不講的話，使用者會看到開關是開的卻什麼都沒發生。
+         */
+        var warning = document.getElementById('handover-topic-warning');
+        if (warning) { warning.style.display = handover.topic_ready ? 'none' : ''; }
+    }
+
+    function bindShiftHandover() {
+        document.getElementById('form-shift-handover').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            var handover = settings.shift_handover || {};
+            var lead = parseInt(document.getElementById('handover-lead').value, 10);
+            var interval = parseInt(document.getElementById('handover-interval').value, 10);
+
+            submit('/admin/notification/ajax-update-shift-handover', {
+                /*
+                 * ⚠ 這個開關**預設開**，所以沒勾時要送 0 而不是 null ——
+                 * 後端用 `(bool)` 判斷，送 null 它存 '0' 是對的，但送 null
+                 * 看起來像「沒有這個欄位」。明確送 0 讓意圖不會被誤讀。
+                 */
+                enabled: document.getElementById('handover-enabled').checked ? 1 : 0,
+                // 空白或非數字時退回後端給的值，不要自己寫死一個數字
+                lead_minutes: lead || handover.lead_minutes,
+                interval_minutes: interval || handover.interval_minutes
+            }, event.target.querySelector('button[type="submit"]'), function () {
+                settings.shift_handover.enabled = document.getElementById('handover-enabled').checked;
+                settings.shift_handover.lead_minutes = lead || handover.lead_minutes;
+                settings.shift_handover.interval_minutes = interval || handover.interval_minutes;
+            });
+        });
+    }
+
     // ===== 自動回覆自動恢復（放在「求助單提醒」分頁的第二張卡） =====
 
     function renderAutoReplyResume() {
@@ -757,6 +800,7 @@
     renderAutoReplyResume();
     renderTopics();
     renderShift();
+    renderShiftHandover();
     renderReport();
     renderTask();
     renderAttendance();
@@ -772,6 +816,7 @@
         bindAutoReplyResume();
         bindTopics();
         bindShift();
+        bindShiftHandover();
         bindReport();
         bindTask();
         bindAttendance();

@@ -240,6 +240,49 @@
                             </div>
                         </div>
 
+                        {{--
+                            班別交接（需求方 2026-11-08）。
+
+                            放在班表分頁：它判斷的依據是班別的**回訊時間**，
+                            跟這一頁其他卡片同一個主題。
+                        --}}
+                        <div class="main-card mb-3 card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ trans('notification.handover_title') }}</h5>
+                                <p class="text-muted" style="font-size:0.875rem">{{ trans('notification.handover_desc') }}</p>
+
+                                {{-- 沒勾交接話題的話整個功能不會動，這件事一定要講在最上面 --}}
+                                <div class="alert alert-warning py-2" id="handover-topic-warning" style="display:none;font-size:0.8125rem">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>{{ trans('notification.handover_topic_missing') }}
+                                </div>
+
+                                <form id="form-shift-handover">
+                                    <div class="form-check form-switch mb-3">
+                                        <input class="form-check-input" type="checkbox" id="handover-enabled">
+                                        <label class="form-check-label" for="handover-enabled">{{ trans('notification.handover_enabled') }}</label>
+                                        <small class="form-text text-muted d-block">{{ trans('notification.handover_enabled_hint') }}</small>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label" for="handover-lead">{{ trans('notification.handover_lead') }}</label>
+                                            <input type="number" class="form-control" id="handover-lead" min="1" max="60" step="1">
+                                            <small class="form-text text-muted">{{ trans('notification.handover_lead_hint') }}</small>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label" for="handover-interval">{{ trans('notification.handover_interval') }}</label>
+                                            <input type="number" class="form-control" id="handover-interval" min="5" max="1440" step="1">
+                                            <small class="form-text text-muted">
+                                                {{ trans('notification.handover_interval_hint', [
+                                                    'escalate' => config('constants.SHIFT_HANDOVER_TOPIC.ESCALATE_AT'),
+                                                ]) }}
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary js-manage-only">{{ trans('notification.action_save') }}</button>
+                                </form>
+                            </div>
+                        </div>
+
                         {{-- 個人班表（純說明，沒有東西要設定） --}}
                         <div class="main-card mb-3 card">
                             <div class="card-body">

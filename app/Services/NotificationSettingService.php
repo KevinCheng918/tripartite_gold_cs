@@ -112,6 +112,8 @@ class NotificationSettingService
             'followup' => $this->followupSection(),
             // 自動回覆被關掉後自己勾回來（需求方 2026-11-07）
             'auto_reply_resume' => $this->autoReplyResumeSection(),
+            // 班別交接（需求方 2026-11-08）
+            'shift_handover' => $this->shiftHandoverSection(),
             'options' => [
                 'systems'       => $this->systemOptions(),
                 'dm_candidates' => $this->dmCandidates(),
@@ -245,6 +247,62 @@ class NotificationSettingService
             'max_minutes'     => (int) config('rules.AUTO_REPLY_RESUME_MAX_MINUTES'),
             'presets'         => (array) Arr::get($resume, 'PRESET_MINUTES'),
         ];
+    }
+
+    /**
+     * 班別交接（交接話題）
+     *
+     * @return array
+     */
+    private function shiftHandoverSection()
+    {
+        $default = (array) config('constants.SHIFT_HANDOVER_TOPIC.DEFAULT');
+
+        return [
+            // ⚠ 預設 true，跟其他功能相反（需求方 2026-11-08 指定預設開）
+            'enabled' => $this->appSettingService->getBool(
+                AppSettingService::KEY_SHIFT_HANDOVER_ENABLED,
+                true
+            ),
+            'lead_minutes' => $this->appSettingService->getInt(
+                AppSettingService::KEY_SHIFT_HANDOVER_LEAD_MINUTES,
+                (int) Arr::get($default, 'LEAD_MINUTES')
+            ),
+            'interval_minutes' => $this->appSettingService->getInt(
+                AppSettingService::KEY_SHIFT_HANDOVER_INTERVAL_MINUTES,
+                (int) Arr::get($default, 'INTERVAL_MINUTES')
+            ),
+            // ⚠ 這個只是給人看的字（hint 要寫出第幾次開始叫主管），真正的值在 config
+            'escalate_at' => (int) config('constants.SHIFT_HANDOVER_TOPIC.ESCALATE_AT'),
+            /*
+             * 交接話題勾了沒 —— 沒勾的話整個功能不會動作，設定頁要講出來。
+             *
+             * ⚠ 用 `topicIdsFor()` 不是 `threadIdsFor()`：後者沒勾時回 `[null]`
+             * 而不是空陣列，拿它判斷會永遠顯示「已設定」。
+             */
+            'topic_ready' => filled($this->supportGroup->topicIdsFor(ShiftHandoverService::NOTICE_TYPE)),
+        ];
+    }
+
+    /**
+     * 存班別交接的設定
+     *
+     * @param array    $params
+     * @param int|null $userId
+     * @return void
+     */
+    public function updateShiftHandover($params, $userId = null)
+    {
+        $this->appSettingService->putMany([
+            /*
+             * ⚠ 這個開關**預設開**，所以「沒勾」必須存成明確的 '0' ——
+             * 不能因為沒勾就不寫（那樣讀回來會套用預設值 true，
+             * 使用者會發現關不掉而且不報錯）。
+             */
+            AppSettingService::KEY_SHIFT_HANDOVER_ENABLED => (bool) Arr::get($params, 'enabled') ? '1' : '0',
+            AppSettingService::KEY_SHIFT_HANDOVER_LEAD_MINUTES => (string) Arr::get($params, 'lead_minutes'),
+            AppSettingService::KEY_SHIFT_HANDOVER_INTERVAL_MINUTES => (string) Arr::get($params, 'interval_minutes'),
+        ], $userId);
     }
 
     /**

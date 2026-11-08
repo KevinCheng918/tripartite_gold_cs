@@ -11,6 +11,7 @@ use App\Services\CreditAlertResendService;
 use App\Services\ScheduledBroadcastCommandService;
 use App\Services\TaskCreateCommandService;
 use App\Services\ScheduledReminderService;
+use App\Services\ShiftHandoverService;
 use App\Services\StationCreditCommandService;
 use App\Services\TelegramBotService;
 use App\Services\TelegramChatService;
@@ -39,6 +40,7 @@ class TelegramWebhookController extends Controller
     private $alertCommandService;
     private $alertResendService;
     private $botService;
+    private $handoverService;
 
     public function __construct(
         TelegramChatService $chatService,
@@ -52,7 +54,8 @@ class TelegramWebhookController extends Controller
         StationCreditCommandService $creditCommandService,
         CreditAlertCommandService $alertCommandService,
         CreditAlertResendService $alertResendService,
-        TelegramBotService $botService
+        TelegramBotService $botService,
+        ShiftHandoverService $handoverService
     ) {
         $this->chatService = $chatService;
         $this->supportService = $supportService;
@@ -78,6 +81,8 @@ class TelegramWebhookController extends Controller
         $this->alertResendService = $alertResendService;
         // 回應 callback_query，不然按鈕會一直轉圈
         $this->botService = $botService;
+        // 交接話題有人發言就記一筆（旁觀記錄，不消耗訊息）
+        $this->handoverService = $handoverService;
     }
 
     /**
@@ -132,6 +137,18 @@ class TelegramWebhookController extends Controller
             // 讓它往下走的話，內部群組會被當成新客戶建進對話列表，
             // 自己人的討論也會被存成客戶訊息
             if ($this->isFromSupportChat($payload)) {
+                /*
+                 * 交接話題有人發言就記成「這一班交接了」（需求方 2026-11-08）。
+                 *
+                 * ⚠ **這一支刻意不消耗訊息**（不 return），跟下面那幾支不一樣
+                 * —— 它只是旁觀記錄。同一則訊息可能同時是交接事項、又引用了
+                 * 某張求助單，兩件事都該發生。
+                 *
+                 * ⚠ 擺在最前面：它自己會先判斷 thread_id 是不是交接話題，
+                 * 不是就立刻回 false，成本極低。
+                 */
+                $this->handoverService->detect($payload);
+
                 /*
                  * 匯率報價與求助單都靠「引用回覆」運作，所以要先問匯率那邊
                  * 認不認得被引用的那則訊息。認得就由它處理完直接結束，

@@ -180,6 +180,61 @@ class ShiftAssignmentRepository
     }
 
     /**
+     * 某一天排某一班的人（交接提醒用）
+     *
+     * ⚠ **日期是「那一班回訊開始的那一天」，不是交接窗口那一天。**
+     * 大夜班回訊 23:00–09:00，它跟早班的交接窗口在**隔天** 08:00–09:00，
+     * 而 `shift_assignments.date` 記的是 23:00 那天 —— 傳錯日期會查到
+     * 隔天那批人（或查不到人）。呼叫端負責算對，見
+     * `ShiftHandoverService::buildWindows()`。
+     *
+     * ⚠ 只回 id 不回 model：呼叫端要的是「有沒有人、是哪幾個」，
+     * 名稱與 Telegram 帳號由 `UserRepository::getMentionableByIds()` 統一撈
+     * （那支會濾掉工程帳號、停用帳號、沒填 Telegram 帳號的）。
+     *
+     * @param int    $shiftId
+     * @param string $date Y-m-d
+     * @return array<int>
+     */
+    public function getUserIdsByShiftAndDate($shiftId, $date)
+    {
+        $ids = ShiftAssignment::query()
+            ->distinct()
+            ->where('shift_id', $shiftId)
+            ->where('date', $date)
+            ->pluck('user_id')
+            ->all();
+
+        return array_map('intval', $ids);
+    }
+
+    /**
+     * 某人在這幾天排到的班別 id（交接偵測用）
+     *
+     * 有人在交接話題發言時，要知道他排的是哪一班才算得出那句話屬於
+     * 哪一個交接窗口。
+     *
+     * ⚠ **要吃一個日期區間而不是單日**：大夜班的交接窗口在隔天早上，
+     * 那時他的排班紀錄還掛在前一天。呼叫端會傳「昨天到今天」。
+     *
+     * @param int    $userId
+     * @param string $dateFrom Y-m-d
+     * @param string $dateTo   Y-m-d（含當天）
+     * @return array<int>
+     */
+    public function getShiftIdsByUserAndDateRange($userId, $dateFrom, $dateTo)
+    {
+        $ids = ShiftAssignment::query()
+            ->distinct()
+            ->where('user_id', $userId)
+            ->whereBetween('date', [$dateFrom, $dateTo])
+            ->pluck('shift_id')
+            ->all();
+
+        return array_map('intval', $ids);
+    }
+
+    /**
      * 依員工和日期範圍查詢排班紀錄
      *
      * @param int    $userId

@@ -218,10 +218,19 @@ class StaffIgnoreService
     /**
      * 認出這個發話者是哪一個後台帳號
      *
+     * ⚠ **2026-11-08 從 private 改成 public**：交接偵測
+     * （`ShiftHandoverService::detect()`）要知道「在交接話題發言的是哪一位
+     * 同仁」，而這支已經是全專案最可靠的那套對法 ——
+     * **telegram_user_id 優先、username 退路、命中後回填 ID**，而且名單有快取。
+     *
+     * 另外寫一份 `findByTelegramUsername()` 版本會是**只有 username、沒有
+     * ID 比對、沒有回填**的弱化版 —— 那正是這份程式碼一再警告的
+     * 「兩邊各寫一次而漂移」。
+     *
      * @param array $from Telegram 的 from 物件
      * @return int|null 不是同事就回 null
      */
-    private function matchUserId(array $from)
+    public function matchUserId(array $from)
     {
         $keys = $this->keys();
 
