@@ -3936,6 +3936,79 @@ return [
     ],
 
     /*
+     * 求助單逾時升級：催到第 10 次就打電話把人叫起來
+     *
+     * 詳見 .claude/knowledge/features/ticket-overdue-escalation.md
+     *
+     * ⚠ key 取名前查過沒撞名（2026-11-08 踩過 `SHIFT_HANDOVER` 撞名、
+     * PHP 重複陣列 key 無聲覆蓋、把別的功能弄壞的坑）。
+     */
+    'TICKET_ESCALATION' => [
+        'STAGE' => [
+            'CALL'       => 1, // 打電話給當班人
+            'DM_ON_DUTY' => 2, // 私訊當班人
+            'DM_MANAGER' => 3, // 私訊勾選清單
+        ],
+
+        'RESULT' => [
+            'OK'       => 1, // 動作送出去了（⚠ 不代表人被叫醒或事情被處理）
+            'UNDELIVERABLE' => 2, // 送不出去：沒綁定私訊、或沒有可撥的 username
+            'REJECTED' => 3, // 被拒絕：隱私設定、對方封鎖等
+        ],
+
+        /*
+         * 撥號次數上限。
+         *
+         * ⚠⚠ **刻意寫死在這裡、不開放設定頁調整**（需求方 2026-11-09 的
+         * 3 次就是這個值）。它是封號風險的煞車 —— 自動化連撥是 Telegram
+         * 最容易判定為 spam 的行為樣態，不該讓人在介面上調大。
+         */
+        'MAX_CALLS' => 3,
+
+        'DEFAULT' => [
+            'TRIGGER_AT'    => 10, // 催到第幾次開始升級（≈ 逾時 100 分鐘）
+            'RING_SECONDS'  => 30, // 響幾秒（需求方 2026-11-09 指定 30 秒以上）
+            'CALL_INTERVAL' => 5,  // 兩通之間隔幾分鐘
+        ],
+
+        /*
+         * 私訊文案。
+         *
+         * ⚠ 這是**私訊**不是群組訊息，所以不要用 `{mentions}` —— 收件人就是
+         * 他本人，再 tag 一次很怪。
+         *
+         * ⚠ 粗體用 `<b>` 不是 markdown 的 `**`（2026-11-09 踩過）：
+         * `sendMessage()` 是 HTML parse_mode，星號會原樣印出來。
+         */
+        'DM_ON_DUTY' => "📞 <b>有一張求助單已經逾時很久了</b>\n"
+            . "系統剛剛撥了電話給您，就是為了這一題。\n\n"
+            . "　<b>{group}</b>\n"
+            . "　{question}\n\n"
+            . "已經提醒 {seq} 次、等了 {waited} 還沒有人處理。\n"
+            . '麻煩您到支援群組引用那則求助訊息回覆，或到後台處理。',
+
+        'DM_MANAGER' => "🆘 <b>求助單逾時，當班人員沒有回應</b>\n"
+            . "已經撥了 {calls} 通電話並私訊當班人，仍然沒有人處理。\n\n"
+            . "　<b>{group}</b>\n"
+            . "　{question}\n\n"
+            . "已經提醒 {seq} 次、等了 {waited}。\n"
+            . '麻煩協助指派人處理。',
+
+        // 私訊送不出去時，補回支援群組的那一則（不要靜靜失敗）
+        'UNDELIVERABLE_NOTICE' => "⚠️ <b>升級通知送不出去</b>\n"
+            . "　{names} 還沒私訊過機器人，收不到私訊。\n"
+            . '　請他們先私訊機器人一次，否則逾時升級對他們無效。',
+
+        // 等待時間的顯示（餵給 NoticeText::waited()）
+        'WAITED_DAYS'  => '{days} 天 {hours} 小時',
+        'WAITED_HOURS' => '{hours} 小時 {minutes} 分',
+        'WAITED_MINS'  => '{minutes} 分鐘',
+
+        // 題目太長會把訊息撐爆
+        'QUESTION_CHARS' => 80,
+    ],
+
+    /*
      * 班別交接（交接話題）
      *
      * 每班都要在交接話題打交接事項，沒打就 tag 兩邊催到完成。

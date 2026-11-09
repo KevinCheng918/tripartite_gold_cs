@@ -114,6 +114,8 @@ class NotificationSettingService
             'auto_reply_resume' => $this->autoReplyResumeSection(),
             // 班別交接（需求方 2026-11-08）
             'shift_handover' => $this->shiftHandoverSection(),
+            // 求助單逾時升級：打電話把當班人叫起來（需求方 2026-11-08）
+            'escalation' => $this->escalationSection(),
             'options' => [
                 'systems'       => $this->systemOptions(),
                 'dm_candidates' => $this->dmCandidates(),
@@ -282,6 +284,69 @@ class NotificationSettingService
              */
             'topic_ready' => filled($this->supportGroup->topicIdsFor(ShiftHandoverService::NOTICE_TYPE)),
         ];
+    }
+
+    /**
+     * 求助單逾時升級（打電話把當班人叫起來）
+     *
+     * @return array
+     */
+    private function escalationSection()
+    {
+        $default = (array) config('constants.TICKET_ESCALATION.DEFAULT');
+
+        return [
+            'enabled' => $this->appSettingService->getBool(AppSettingService::KEY_ESCALATION_ENABLED),
+            'trigger_at' => $this->appSettingService->getInt(
+                AppSettingService::KEY_ESCALATION_TRIGGER_AT,
+                (int) Arr::get($default, 'TRIGGER_AT')
+            ),
+            'ring_seconds' => $this->appSettingService->getInt(
+                AppSettingService::KEY_ESCALATION_RING_SECONDS,
+                (int) Arr::get($default, 'RING_SECONDS')
+            ),
+            'call_interval' => $this->appSettingService->getInt(
+                AppSettingService::KEY_ESCALATION_CALL_INTERVAL,
+                (int) Arr::get($default, 'CALL_INTERVAL')
+            ),
+            'manager_user_ids' => $this->appSettingService->getIntList(AppSettingService::KEY_ESCALATION_MANAGER),
+
+            /*
+             * 下面三個是給人看的字，不是設定值。
+             *
+             * `remind_max` 要顯示出來，因為**升級門檻必須小於它** ——
+             * 不顯示的話，使用者在這一頁填 10、卻不知道另一個分頁的上限是 8。
+             */
+            'max_calls'  => (int) config('constants.TICKET_ESCALATION.MAX_CALLS'),
+            'remind_max' => $this->appSettingService->getInt(
+                AppSettingService::KEY_REMIND_MAX_COUNT,
+                (int) config('constants.AUTO_REPLY.REMIND.MAX_COUNT')
+            ),
+            // 撥號設定（api 憑證與 session）齊不齊 —— 不齊的話電話那段不會動
+            'call_ready' => app(TelegramCallService::class)->isConfigured(),
+        ];
+    }
+
+    /**
+     * 存逾時升級的設定
+     *
+     * @param array    $params
+     * @param int|null $userId
+     * @return void
+     */
+    public function updateEscalation($params, $userId = null)
+    {
+        $this->appSettingService->putMany([
+            // 用 (bool) 不是 filled()：filled(false) 會回 true，開關就關不掉
+            AppSettingService::KEY_ESCALATION_ENABLED => (bool) Arr::get($params, 'enabled') ? '1' : '0',
+            AppSettingService::KEY_ESCALATION_TRIGGER_AT => (string) Arr::get($params, 'trigger_at'),
+            AppSettingService::KEY_ESCALATION_RING_SECONDS => (string) Arr::get($params, 'ring_seconds'),
+            AppSettingService::KEY_ESCALATION_CALL_INTERVAL => (string) Arr::get($params, 'call_interval'),
+            // 全部取消勾選時存 null —— 轉換與清空的規則都在 idListValue() 裡
+            AppSettingService::KEY_ESCALATION_MANAGER => $this->appSettingService->idListValue(
+                Arr::get($params, 'manager_user_ids', [])
+            ),
+        ], $userId);
     }
 
     /**

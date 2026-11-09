@@ -158,6 +158,24 @@ class Kernel extends ConsoleKernel
         $schedule->command('shift:handover-remind')->everyMinute()->withoutOverlapping();
 
         /*
+         * 求助單逾時升級：催到第 N 次還沒人處理就打電話把當班人叫起來
+         * （需求方 2026-11-08）。
+         *
+         * ⚠ **一定要每分鐘**：撥號的重試間隔是 5 分鐘，而且「撥滿三通就改
+         * 私訊勾選清單」要盡快發（需求方指定不等）。排程間隔等於那兩件事的
+         * 額外延遲。
+         *
+         * ⚠ `withoutOverlapping` **特別重要**：這支會開 Python 子程序去撥號，
+         * 一通響 30 秒、最多撥給每個當班的人 —— 整輪很容易超過一分鐘。
+         * 重疊的話同一張單會被撥兩次，而**連撥是 Telegram 判定 spam 的
+         * 主要行為樣態**，封號的是我們自己的 userbot 帳號。
+         *
+         * 總開關預設關（`ticket_escalation.enabled`），服務自己會短路 ——
+         * 所以掛排程不等於開始撥號。
+         */
+        $schedule->command('ticket:escalate')->everyMinute()->withoutOverlapping();
+
+        /*
          * 每分鐘把登入紀錄私訊通知給帳號本人（需求方 2026-11-05）。
          *
          * ⚠ **一定要每分鐘**：排程間隔等於通知的延遲，而這是安全通知 ——

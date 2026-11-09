@@ -51,6 +51,28 @@ return [
     'report_personal_title' => 'Personal summary',
     'report_personal_desc'  => 'Anyone who was reminded yesterday receives their own summary at :time (which tickets they were chased on). This is automatic and needs no setup; people who were not reminded receive nothing.',
 
+    // ===== Overdue Escalation =====
+    /*
+     * Overdue ticket escalation (requested 2026-11-08).
+     *
+     * ⚠ `escalation_trigger_hint` must state that it has to be lower than the
+     * reminder cap: set it higher and reminders stop before escalation ever
+     * happens — the phone never rings **and nothing reports an error**.
+     */
+    'escalation_title'   => 'Overdue Escalation (phone call)',
+    'escalation_desc'    => 'When a ticket has been chased this many times with nobody handling it, the system places a Telegram call to the staff on shift to wake them up, and sends them a direct message saying which ticket it is. After :calls calls with still nobody handling it, the people ticked below are messaged instead. ⚠ The call only rings — there is no voice content (answering it drops the line); what needs doing is in the direct message. ⚠ "Handled or not" is always judged by the ticket status, never by whether the call was answered.',
+    'escalation_enabled' => 'Enable overdue escalation',
+    'escalation_enabled_hint' => '⚠ This one is **off by default**. It places calls and sends direct messages — tick the recipients below and confirm the calling setup first.',
+    'escalation_trigger'      => 'Escalate after this many reminders',
+    'escalation_trigger_hint' => 'At the current reminder interval, the 10th is roughly 100 minutes after the ticket opened. ⚠ **Must be lower than "Maximum reminders" (currently :max)** — set it higher and reminders stop before escalation, so the phone never rings.',
+    'escalation_ring'      => 'Ring for (seconds)',
+    'escalation_ring_hint' => 'Telegram ends the call itself after about 90 seconds, so larger values do nothing. The longer it rings the more likely it is answered — and answering drops the line.',
+    'escalation_interval'      => 'Minutes between calls',
+    'escalation_interval_hint' => 'At most :calls calls (that number is not adjustable). ⚠ Too short a gap gets the bot account flagged as harassment and suspended, so under 3 minutes is not accepted.',
+    'escalation_manager'      => 'If calls go unanswered, message (multiple)',
+    'escalation_manager_hint' => 'Once all :calls calls are done and the ticket is still unhandled, these people are messaged immediately. Anyone marked "not linked" cannot receive it — ask them to message the bot once.',
+    'escalation_call_missing' => 'Calling is not fully configured yet (it needs Telegram application credentials and a login file) — until then only direct messages are sent, no calls.',
+
     // ===== Shift Handover =====
     /*
      * Shift handover (requested 2026-11-08).
@@ -294,6 +316,15 @@ return [
         'followup_max_invalid'      => 'Number of asks must be between 1 and 200',
         'followup_stale_required'   => 'Please enter the number of days (use 0 to never close automatically)',
         'followup_stale_invalid'    => 'Days must be between 0 and 365',
+
+        'escalation_trigger_required' => 'Please enter how many reminders before escalating',
+        'escalation_trigger_invalid'  => 'The escalation threshold must be between 2 and 200',
+        'escalation_trigger_too_high' => 'The escalation threshold must be lower than "Maximum reminders" (currently :max) — otherwise reminders stop before escalation and the phone never rings',
+        'escalation_ring_required'    => 'Please enter how long the call should ring',
+        'escalation_ring_invalid'     => 'Ring duration must be between 5 and 90 seconds',
+        'escalation_interval_required' => 'Please enter the gap between calls',
+        'escalation_interval_invalid'  => 'The gap between calls must be between 3 and 60 minutes (too short gets the bot account flagged as harassment)',
+        'remind_max_below_escalation'  => 'The reminder cap must be greater than the escalation threshold (currently reminder :trigger) — otherwise reminders stop before escalation and the phone never rings',
 
         'handover_lead_required'     => 'Please enter how many minutes early to start reminding',
         'handover_lead_invalid'      => 'Lead time must be between 1 and 60 minutes',

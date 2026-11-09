@@ -175,6 +175,70 @@
                 </div>
 
                 {{--
+                    逾時升級：打電話把當班人叫起來（需求方 2026-11-08）。
+
+                    放在這個分頁：它是接在求助單提醒之後的下一層，
+                    而且門檻跟上面那張卡的「最多提醒幾次」互相牽制。
+                --}}
+                <div class="main-card mb-3 card">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ trans('notification.escalation_title') }}</h5>
+                        <p class="text-muted" style="font-size:0.875rem">
+                            {{ trans('notification.escalation_desc', ['calls' => config('constants.TICKET_ESCALATION.MAX_CALLS')]) }}
+                        </p>
+
+                        {{-- 撥號憑證沒設完的話只會私訊、不會撥，這件事要講在最上面 --}}
+                        <div class="alert alert-warning py-2" id="escalation-call-warning" style="display:none;font-size:0.8125rem">
+                            <i class="fas fa-exclamation-triangle me-1"></i>{{ trans('notification.escalation_call_missing') }}
+                        </div>
+
+                        <form id="form-escalation">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="escalation-enabled">
+                                <label class="form-check-label" for="escalation-enabled">{{ trans('notification.escalation_enabled') }}</label>
+                                <small class="form-text text-muted d-block">{{ trans('notification.escalation_enabled_hint') }}</small>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label" for="escalation-trigger">{{ trans('notification.escalation_trigger') }}</label>
+                                    <input type="number" class="form-control" id="escalation-trigger" min="2" max="200" step="1">
+                                    <small class="form-text text-muted" id="escalation-trigger-hint"></small>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label" for="escalation-ring">{{ trans('notification.escalation_ring') }}</label>
+                                    <input type="number" class="form-control" id="escalation-ring" min="5" max="90" step="1">
+                                    <small class="form-text text-muted">{{ trans('notification.escalation_ring_hint') }}</small>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label" for="escalation-interval">{{ trans('notification.escalation_interval') }}</label>
+                                    <input type="number" class="form-control" id="escalation-interval" min="3" max="60" step="1">
+                                    <small class="form-text text-muted">
+                                        {{ trans('notification.escalation_interval_hint', ['calls' => config('constants.TICKET_ESCALATION.MAX_CALLS')]) }}
+                                    </small>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <label class="form-label mb-0">{{ trans('notification.escalation_manager') }}</label>
+                                    <div class="form-check mb-0">
+                                        <input class="form-check-input" type="checkbox" id="escalation-manager-all">
+                                        <label class="form-check-label" for="escalation-manager-all">{{ trans('notification.select_all') }}</label>
+                                    </div>
+                                </div>
+                                <div id="escalation-manager-list" class="notice-check-list p-2"></div>
+                                <small class="form-text text-muted">
+                                    {{ trans('notification.escalation_manager_hint', ['calls' => config('constants.TICKET_ESCALATION.MAX_CALLS')]) }}
+                                </small>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary js-manage-only">{{ trans('notification.action_save') }}</button>
+                        </form>
+                    </div>
+                </div>
+
+                {{--
                     自動回覆自動恢復（需求方 2026-11-07）。
 
                     放在這個分頁而不是另開一頁：它跟上面那張卡都是「自動回覆的

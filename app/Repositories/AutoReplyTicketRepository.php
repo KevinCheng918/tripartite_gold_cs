@@ -111,6 +111,33 @@ class AutoReplyTicketRepository
     }
 
     /**
+     * 催到升級門檻、而且還沒人處理的單（逾時升級用）
+     *
+     * 催到第 N 次代表已經逾時一個多小時，該打電話把當班人叫起來了。
+     *
+     * ⚠ **狀態條件用 `openStatuses()`** —— 已回覆客人、已入題庫、被忽略、
+     * 被收掉的單都不該再升級。這也是「事情處理了沒」唯一可信的訊號：
+     * 電話接起來會斷線、私訊讀不到已讀，兩者都不能當確認。
+     *
+     * ⚠ **沒有上界**：一旦跨過門檻就一直撈得到，直到那張單被處理。
+     * 要不要繼續升級由呼叫端看升級紀錄決定（撥滿 3 通就換私訊、
+     * 私訊完就停），不是在這裡擋。
+     *
+     * @param int $triggerAt 催到第幾次開始升級
+     * @return Collection<AutoReplyTicket>
+     */
+    public function getEscalationCandidates($triggerAt)
+    {
+        return AutoReplyTicket::query()
+            ->select(self::COLUMNS)
+            ->with('group')
+            ->whereIn('status', $this->openStatuses())
+            ->where('remind_count', '>=', $triggerAt)
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
      * 取得「該提醒了」的未回答求助單（排程提醒用）
      *
      * 2026-10-06 從固定兩階段改成持續提醒，所以判斷依據從

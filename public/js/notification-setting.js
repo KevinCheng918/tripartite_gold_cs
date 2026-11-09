@@ -654,6 +654,64 @@
         });
     }
 
+    // ===== 逾時升級（放在「求助單提醒」分頁的第三張卡） =====
+
+    function renderEscalation() {
+        var esc = settings.escalation || {};
+
+        document.getElementById('escalation-enabled').checked = !!esc.enabled;
+        document.getElementById('escalation-trigger').value = esc.trigger_at;
+        document.getElementById('escalation-ring').value = esc.ring_seconds;
+        document.getElementById('escalation-interval').value = esc.call_interval;
+
+        /*
+         * 門檻的說明要帶出「目前的提醒次數上限」——
+         * 上限是在同一頁上面那張卡改的，不寫出來的話，使用者在這裡填 10
+         * 卻不知道上限只有 8，存檔被擋下來才發現。
+         */
+        var hint = document.getElementById('escalation-trigger-hint');
+        if (hint) {
+            hint.textContent = (i18n.escalation_trigger_hint || '').replace(':max', esc.remind_max);
+        }
+
+        // 撥號憑證沒設完的話只會私訊、不會撥 —— 要講出來
+        var warning = document.getElementById('escalation-call-warning');
+        if (warning) { warning.style.display = esc.call_ready ? 'none' : ''; }
+
+        renderUserList('escalation-manager-list', 'js-escalation-user', esc.manager_user_ids);
+        syncAll('escalation-manager-all', 'js-escalation-user');
+    }
+
+    function bindEscalation() {
+        bindSelectAll('escalation-manager-all', 'escalation-manager-list', 'js-escalation-user');
+
+        document.getElementById('form-escalation').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            var esc = settings.escalation || {};
+            var ids = checkedIds('js-escalation-user');
+            var trigger = parseInt(document.getElementById('escalation-trigger').value, 10);
+            var ring = parseInt(document.getElementById('escalation-ring').value, 10);
+            var interval = parseInt(document.getElementById('escalation-interval').value, 10);
+
+            submit('/admin/notification/ajax-update-escalation', {
+                // 後端用 (bool) 判斷，沒勾就送 null（不要送 false —— 那也是 filled）
+                enabled: document.getElementById('escalation-enabled').checked ? 1 : null,
+                // 空白或非數字時退回後端給的值，不要自己寫死一個數字
+                trigger_at: trigger || esc.trigger_at,
+                ring_seconds: ring || esc.ring_seconds,
+                call_interval: interval || esc.call_interval,
+                manager_user_ids: ids
+            }, event.target.querySelector('button[type="submit"]'), function () {
+                settings.escalation.enabled = document.getElementById('escalation-enabled').checked;
+                settings.escalation.trigger_at = trigger || esc.trigger_at;
+                settings.escalation.ring_seconds = ring || esc.ring_seconds;
+                settings.escalation.call_interval = interval || esc.call_interval;
+                settings.escalation.manager_user_ids = ids;
+            });
+        });
+    }
+
     // ===== 班別交接（放在「班表通知」分頁） =====
 
     function renderShiftHandover() {
@@ -797,6 +855,7 @@
 
     renderGroup();
     renderRemind();
+    renderEscalation();
     renderAutoReplyResume();
     renderTopics();
     renderShift();
@@ -813,6 +872,7 @@
     if (canManage) {
         bindGroup();
         bindRemind();
+        bindEscalation();
         bindAutoReplyResume();
         bindTopics();
         bindShift();

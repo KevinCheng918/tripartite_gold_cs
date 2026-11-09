@@ -218,6 +218,28 @@ class AppSettingService
     const KEY_SHIFT_HANDOVER_LEAD_MINUTES     = 'shift_handover.lead_minutes';
     const KEY_SHIFT_HANDOVER_INTERVAL_MINUTES = 'shift_handover.interval_minutes';
 
+    /*
+     * 求助單逾時升級（催到第 N 次就打電話把人叫起來）。
+     *
+     * ENABLED       = 總開關，**預設關**（這功能會私訊人**而且會撥號**，
+     *                 而收件人清單一開始是空的）
+     * TRIGGER_AT    = 催到第幾次開始升級
+     * RING_SECONDS  = 電話響幾秒
+     * CALL_INTERVAL = 兩通之間隔幾分鐘
+     * MANAGER       = 三通都沒反應時私訊給誰（逗號串接，可多位）
+     *
+     * ⚠ **撥號次數上限不在這裡**，寫死在 `constants.TICKET_ESCALATION.MAX_CALLS`
+     * —— 它是封號風險的煞車，不該讓人從介面調大。
+     *
+     * ⚠⚠ `TRIGGER_AT` 必須小於 `KEY_REMIND_MAX_COUNT`，否則提醒會在升級之前
+     * 就停止，電話永遠不會響**而且不報錯**。設定頁有驗證擋。
+     */
+    const KEY_ESCALATION_ENABLED       = 'ticket_escalation.enabled';
+    const KEY_ESCALATION_TRIGGER_AT    = 'ticket_escalation.trigger_at';
+    const KEY_ESCALATION_RING_SECONDS  = 'ticket_escalation.ring_seconds';
+    const KEY_ESCALATION_CALL_INTERVAL = 'ticket_escalation.call_interval';
+    const KEY_ESCALATION_MANAGER       = 'ticket_escalation.manager_user_ids';
+
     // 每日匯率報價（匯率頁維護）
     const KEY_DAILY_RATE_TEMPLATE = 'daily_rate.ask_template';
 

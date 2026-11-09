@@ -20,3 +20,8 @@ yarn-error.log
 # 臨時驗證腳本。放在專案根目錄是為了讓容器看得到（容器只掛載這個目錄），
 # 但它們是用完就丟的東西 —— verify_tmp.php 就這樣被 `git add -A` 收進 repo 過一次。
 /*_tmp.php
+# Telegram userbot 的登入 session。
+# ⚠ 這個檔**等同那個帳號的密碼** —— 拿到它就能以該帳號登入 Telegram。
+# 2026-11-09 實際在專案根目錄出現過（spike 腳本在這裡跑），差點被 git add -A 收進去。
+*.session
+*.session-journal

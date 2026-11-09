@@ -51,6 +51,27 @@ return [
     'report_personal_title' => '個人統計',
     'report_personal_desc'  => '昨天被提醒到的同仁，每天 :time 會各自收到「自己那份」（我被催了哪幾題）。這部分自動發送，不需要設定；沒被提醒到的人不會收到。',
 
+    // ===== 求助單逾時升級 =====
+    /*
+     * 求助單逾時升級（需求方 2026-11-08）。
+     *
+     * ⚠ `escalation_trigger_hint` 一定要寫出「必須小於提醒次數上限」：
+     * 設得比上限高的話，提醒會在升級之前就停止，電話永遠不會響**而且不報錯**。
+     */
+    'escalation_title'   => '逾時升級（打電話）',
+    'escalation_desc'    => '求助單催到指定次數還沒有人處理時，用 Telegram 撥電話給當班人員把他叫起來，同時私訊告訴他是哪一張單。撥滿 :calls 通仍然沒有人處理，就改私訊下面勾選的人。⚠ 電話只會響、沒有語音內容（接起來會斷線）—— 要處理什麼寫在私訊裡。⚠ 判斷「處理了沒」一律看那張單的狀態，不是看電話有沒有被接起。',
+    'escalation_enabled' => '啟用逾時升級',
+    'escalation_enabled_hint' => '⚠ 這一項**預設是關的**。它會撥電話也會私訊，請先把下面的收件人勾好、確認撥號設定完成再打開。',
+    'escalation_trigger'      => '催到第幾次開始升級',
+    'escalation_trigger_hint' => '以現行的提醒間隔，第 10 次大約是開單後 100 分鐘。⚠ **必須小於「最多提醒幾次」（目前是 :max）** —— 設得比它高的話，提醒會在升級之前就停止，電話永遠不會響。',
+    'escalation_ring'      => '電話響幾秒',
+    'escalation_ring_hint' => '超過約 90 秒 Telegram 會自己掛斷，填更大沒有用。越長越可能被接起來，而接起來會直接斷線。',
+    'escalation_interval'      => '兩通之間隔幾分鐘',
+    'escalation_interval_hint' => '最多撥 :calls 通（這個數字不開放調整）。⚠ 間隔太短會讓機器人帳號被 Telegram 判定為騷擾而停權，所以不接受小於 3 分鐘。',
+    'escalation_manager'      => '撥不通時私訊給（可多選）',
+    'escalation_manager_hint' => ':calls 通電話都撥完、那張單仍然沒有人處理時，立刻私訊這些人。標示「未綁定」的人收不到，請他先私訊機器人一次。',
+    'escalation_call_missing' => '撥號功能尚未設定完成（需要 Telegram 應用程式憑證與登入檔）—— 在那之前只會私訊，不會撥電話。',
+
     // ===== 班別交接 =====
     /*
      * 班別交接（需求方 2026-11-08）。
@@ -310,6 +331,15 @@ return [
         'followup_max_invalid'      => '詢問次數須介於 1 到 200 次',
         'followup_stale_required'   => '請填寫幾天沒結果就能收掉（不自動收請填 0）',
         'followup_stale_invalid'    => '天數須介於 0 到 365 天',
+
+        'escalation_trigger_required' => '請填寫催到第幾次開始升級',
+        'escalation_trigger_invalid'  => '升級門檻須介於 2 到 200 次',
+        'escalation_trigger_too_high' => '升級門檻必須小於「最多提醒幾次」（目前是 :max）—— 否則提醒會在升級之前就停止，電話永遠不會響',
+        'escalation_ring_required'    => '請填寫電話響幾秒',
+        'escalation_ring_invalid'     => '響鈴秒數須介於 5 到 90 秒',
+        'escalation_interval_required' => '請填寫兩通之間隔幾分鐘',
+        'escalation_interval_invalid'  => '撥號間隔須介於 3 到 60 分鐘（太短會讓機器人帳號被判定為騷擾）',
+        'remind_max_below_escalation'  => '提醒次數上限必須大於逾時升級的門檻（目前是第 :trigger 次）—— 否則提醒會在升級之前就停止，電話永遠不會響',
 
         'handover_lead_required'     => '請填寫提前幾分鐘開始提醒',
         'handover_lead_invalid'      => '提前時間須介於 1 到 60 分鐘',
