@@ -208,32 +208,64 @@ class ShiftHandoverService
         $statuses = (array) config('constants.SHIFT_HANDOVER_TOPIC.STATUS');
 
         foreach ($this->buildWindows() as $window) {
+            $date = (string) Arr::get($window, 'date');
+            $start = Arr::get($window, 'window_start');
+            $end = Arr::get($window, 'window_end');
+
             // 走整輪撈好的排班表，不要在迴圈裡再查一次 DB
-            $fromUserIds = (array) Arr::get(
+            $hasFrom = $this->hasStaff($roster, Arr::get($window, 'from_shift_id'), $date);
+
+            /*
+             * 下一班的排班掛在**窗口那一天**，不是 `date`（上一班回訊起始日）
+             * —— 大夜班那一窗兩者差一天。
+             */
+            $hasTo = $this->hasStaff(
                 $roster,
-                'assignments.' . Arr::get($window, 'date') . '.' . Arr::get($window, 'from_shift_id'),
-                []
+                Arr::get($window, 'to_shift_id'),
+                $start->format('Y-m-d')
             );
 
             /*
-             * 上一班今天沒有人排班 → 建成「不催」，只跟下一班講一聲。
+             * ⚠ **下一班沒人 → 把交接往後挪到上一班回訊結束前**
+             * （需求方 2026-11-09）。
              *
-             * 這正是需求方說的大夜班情況（「因為大夜班沒人，如果早班要上班
-             * 就請他去看早班待接手和昨天晚班的交接事項」）。
+             * 重疊那一小時的用意是「兩班都在線上時互相交接」。下一班根本
+             * 沒有人的話，那個重疊沒有意義 —— 不該讓上一班提早一小時停下來
+             * 寫交接，他後面還要繼續回訊。讓他做到回訊結束再寫，
+             * 內容也比較完整。
+             *
+             * 做法是把 `window_start` 移到 `window_end`，提醒邏輯
+             * （`window_start - lead`）完全不用動：
+             *   晚班→大夜（大夜沒人）：22:55 提醒 → 改成 **23:55**
+             *
+             * ⚠ 「下班」取的是**回訊結束**不是上下班的下班（需求方 2026-11-09
+             * 指定）—— 這個功能每一處判斷都看回訊時間，上下班時間四個班
+             * 大量重疊、拿來判斷誰該交接會一次撈到三個人。
              */
-            $status = blank($fromUserIds)
-                ? (int) Arr::get($statuses, 'NO_STAFF')
-                : (int) Arr::get($statuses, 'PENDING');
+            $start = $hasTo ? $start : $end;
+
+            /*
+             * 上一班沒有人排班 → 建成「不催」，只跟下一班講一聲。
+             *
+             * 這是需求方說的大夜班情況（「因為大夜班沒人，如果早班要上班
+             * 就請他去看早班待接手和昨天晚班的交接事項」）。
+             *
+             * ⚠ 跟上面那段是**兩件不同的事**：這裡是「**上一班**沒人所以
+             * 沒東西可交接」，上面是「**下一班**沒人所以不急著交接」。
+             */
+            $status = $hasFrom
+                ? (int) Arr::get($statuses, 'PENDING')
+                : (int) Arr::get($statuses, 'NO_STAFF');
 
             $this->repository->firstOrCreateWindow(
                 [
-                    'date'          => Arr::get($window, 'date'),
+                    'date'          => $date,
                     'from_shift_id' => Arr::get($window, 'from_shift_id'),
                     'to_shift_id'   => Arr::get($window, 'to_shift_id'),
                 ],
                 [
-                    'window_start' => Arr::get($window, 'window_start'),
-                    'window_end'   => Arr::get($window, 'window_end'),
+                    'window_start' => $start,
+                    'window_end'   => $end,
                     'status'       => $status,
                 ]
             );
@@ -438,8 +470,14 @@ class ShiftHandoverService
             $fromUsers = $fromUsers->concat($managers)->unique('id')->values();
         }
 
+        /*
+         * 下一班有沒有人**排班**（不是「有沒有人可以 tag」）——
+         * 決定要不要改用「沒有人接手」那套文案。理由見 `hasStaff()`。
+         */
+        $hasTo = $this->hasStaff($roster, $handover->to_shift_id, $handover->window_start->format('Y-m-d'));
+
         $this->supportGroup->send(
-            $this->buildRemindText($handover, $fromUsers, $toUsers, $seq),
+            $this->buildRemindText($handover, $fromUsers, $toUsers, $seq, $hasTo),
             null,
             null,
             self::NOTICE_TYPE
@@ -458,6 +496,27 @@ class ShiftHandoverService
         ]);
 
         return true;
+    }
+
+    /**
+     * 那一班那天**有沒有人排班**（純查找，不碰 DB）
+     *
+     * ⚠ 跟「有沒有人可以被 tag」**是兩件事**，不要互相取代：
+     *
+     * - 這一支問的是「**有沒有排班**」—— 決定要不要催、要不要把交接往後挪
+     * - `mentionableFor()` 回空還可能是「排了班但那個人沒填 Telegram 帳號」
+     *
+     * 混用的話，一個人只是漏填 Telegram 帳號，整個交接就會被當成「這一班
+     * 沒人」而靜悄悄跳過 —— 那是最難發現的那種壞法。
+     *
+     * @param array  $roster  `buildRoster()` 的回傳
+     * @param int    $shiftId
+     * @param string $date    Y-m-d
+     * @return bool
+     */
+    private function hasStaff(array $roster, $shiftId, $date)
+    {
+        return filled(Arr::get($roster, "assignments.{$date}." . (int) $shiftId, []));
     }
 
     /**
@@ -500,9 +559,10 @@ class ShiftHandoverService
      * @param \Illuminate\Support\Collection $fromUsers
      * @param \Illuminate\Support\Collection $toUsers
      * @param int                            $seq
+     * @param bool                           $hasTo 下一班那天**有沒有人排班**
      * @return string
      */
-    private function buildRemindText(ShiftHandover $handover, $fromUsers, $toUsers, $seq)
+    private function buildRemindText(ShiftHandover $handover, $fromUsers, $toUsers, $seq, $hasTo)
     {
         $notice = (array) config('constants.SHIFT_HANDOVER_TOPIC.NOTICE');
         $format = (string) Arr::get($notice, 'TIME_FORMAT');
@@ -524,9 +584,23 @@ class ShiftHandoverService
 
         $text .= strtr((string) Arr::get($notice, 'HEADER'), $replace);
         $text .= strtr((string) Arr::get($notice, 'FROM_LINE'), $replace);
-        $text .= strtr((string) Arr::get($notice, 'TO_LINE'), $replace);
 
-        return $text . strtr((string) Arr::get($notice, 'FOOTER'), $replace);
+        /*
+         * 下一班沒人排班時換一套說法。
+         *
+         * 原本那句是「你 {window_start} 要開始回訊了」—— 這種情況下沒有
+         * 那個人，而且 `window_start` 已經被挪成上一班的回訊結束時間，
+         * 照原句送出去會變成對著不存在的一班說「你 00:00 要開始回訊」。
+         */
+        $text .= $hasTo
+            ? strtr((string) Arr::get($notice, 'TO_LINE'), $replace)
+            : strtr((string) Arr::get($notice, 'NO_NEXT_LINE'), $replace);
+
+        $footer = $hasTo
+            ? Arr::get($notice, 'FOOTER')
+            : Arr::get($notice, 'FOOTER_NO_NEXT');
+
+        return $text . strtr((string) $footer, $replace);
     }
 
     // ---------------------------------------------------------------
@@ -552,6 +626,27 @@ class ShiftHandoverService
         $sent = 0;
 
         foreach ($pending as $handover) {
+            /*
+             * ⚠ **兩班都沒人 → 一則都不發。**
+             *
+             * 這則的用意是「跟下一班說上一班沒交接」，而下一班也沒人的話
+             * 就沒有收件人 —— 照發只會在話題裡留下一則 tag 不到任何人的
+             * 訊息（`mentions()` 會印「這一班沒有可以 tag 的人員」）。
+             *
+             * 仍然要標 `notified_next_at`，否則每分鐘都會重試一次。
+             */
+            if (!$this->hasStaff($roster, $handover->to_shift_id, $handover->window_start->format('Y-m-d'))) {
+                $this->repository->update($handover, ['notified_next_at' => now()]);
+
+                Log::info('交接窗口兩班都沒人排班，不發通知', [
+                    'handover_id' => $handover->id,
+                    'from_shift'  => $handover->from_shift_id,
+                    'to_shift'    => $handover->to_shift_id,
+                ]);
+
+                continue;
+            }
+
             $toUsers = $this->mentionableFor(
                 $roster,
                 $handover->to_shift_id,
