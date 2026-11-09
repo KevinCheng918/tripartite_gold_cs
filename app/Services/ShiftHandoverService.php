@@ -576,6 +576,14 @@ class ShiftHandoverService
             '{to_mentions}'   => $this->escalating->mentions($toUsers, Arr::get($notice, 'NO_MENTION')),
             '{window_start}'  => $handover->window_start->format($format),
             '{window_end}'    => $handover->window_end->format($format),
+            /*
+             * ⚠ 下一班**自己的**回訊開始時間，不是窗口起點。
+             *
+             * 「下一班沒人就把窗口延到上一班回訊結束」之後兩者會分岔 ——
+             * 窗口建立時沒人、之後臨時補了人，照窗口起點印就會對一個
+             * 23:00 就該上線的人說「你 00:00 要開始回訊了」。
+             */
+            '{to_start}'      => $this->shiftReplyStart($handover->toShift),
             '{seq}'           => $seq,
         ];
 
@@ -832,5 +840,24 @@ class ShiftHandoverService
     private function shiftName($shift)
     {
         return filled($shift) ? (string) $shift->display_name : '該班別';
+    }
+
+    /**
+     * 班別自己的回訊開始時間（`HH:mm`）
+     *
+     * ⚠ 欄位本來就是 `HH:mm` 字串（`shifts.reply_start_time` 是 varchar(5)），
+     * 不必也不該再格式化一次。
+     *
+     * @param \App\Models\Shift|null $shift
+     * @return string 關聯或欄位缺的時候回空字串 —— 寧可少一段時間，
+     *                也不要印出 `00:00` 這種看起來像真的卻是錯的時間
+     */
+    private function shiftReplyStart($shift)
+    {
+        if (blank($shift) || blank($shift->reply_start_time)) {
+            return '';
+        }
+
+        return (string) $shift->reply_start_time;
     }
 }
