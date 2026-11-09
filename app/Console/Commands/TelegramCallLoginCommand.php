@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Services\TelegramCallService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Arr;
 use Symfony\Component\Process\Process;
 
 /**
@@ -44,6 +45,19 @@ class TelegramCallLoginCommand extends Command
             return $this->missingCredentials();
         }
 
+        /*
+         * ⚠ **先驗直譯器，再往下走。**
+         *
+         * 2026-11-09 實際踩到：telethon 裝在 venv，但 `TG_CALL_PYTHON` 沒生效，
+         * 於是跑到系統的 python3 ——而腳本只會喊「請先安裝 telethon」，
+         * 讓人以為是沒裝。**錯誤訊息怪錯了對象**，查了很久。
+         *
+         * 所以這裡先把「用的是哪一個 python」印出來，再確認那一個有 telethon。
+         */
+        if (!$this->checkPython()) {
+            return 1;
+        }
+
         if (file_exists("{$session}.session")) {
             $this->warn("session 已經存在：{$session}.session");
 
@@ -72,6 +86,118 @@ class TelegramCallLoginCommand extends Command
         $this->showNextSteps();
 
         return 0;
+    }
+
+    /**
+     * 確認「要用的那個 python」存在而且裝了 telethon
+     *
+     * ⚠ 把直譯器路徑印出來是重點：telethon 裝在 venv、而程式跑到系統 python
+     * 的時候，光看「沒有 telethon」完全看不出問題在哪。
+     *
+     * @return bool
+     */
+    private function checkPython()
+    {
+        $python = (string) config('telegram_call.python');
+
+        $this->line("使用的 Python：<comment>{$python}</comment>");
+
+        $probe = new Process([$python, '-c', 'import telethon, sys; print(telethon.__version__); print(sys.version.split()[0])']);
+        $probe->setTimeout(30);
+
+        try {
+            $probe->run();
+        } catch (\Exception $e) {
+            $this->error("無法執行這個 Python：{$e->getMessage()}");
+            $this->showPythonHint($python);
+
+            return false;
+        }
+
+        if (!$probe->isSuccessful()) {
+            $this->line('');
+            $this->error("這個 Python 沒有 telethon（或根本不存在）。");
+            $this->line('');
+            $this->line('它回報的錯誤：');
+            $this->line('    ' . trim(mb_substr($probe->getErrorOutput(), 0, 300)));
+            $this->showPythonHint($python);
+
+            return false;
+        }
+
+        $lines = preg_split('/\R/', trim($probe->getOutput()));
+        $this->line('Telethon 版本：<comment>' . (string) Arr::get($lines, 0) . '</comment>'
+            . '（Python ' . (string) Arr::get($lines, 1) . '）');
+
+        $this->warnIfNotAbsolute($python);
+        $this->line('');
+
+        return true;
+    }
+
+    /**
+     * 路徑不是絕對路徑時警告 —— 就算現在成功也要講
+     *
+     * ⚠⚠ **「我從 shell 跑得起來」不等於「排程跑得起來」。**
+     *
+     * 2026-11-09 實際遇到：`TG_CALL_PYTHON` 沒設，但從互動式 shell 執行時
+     * 裸的 `python3` 解析到了 venv 裡那一支（因為那個使用者的 PATH 有它），
+     * 於是登入成功、看起來一切正常。
+     *
+     * 但真正撥號的是 **cron 與 php-fpm**，它們的 PATH 跟登入的 shell 不一樣
+     * —— 很可能解析到沒有 telethon 的系統 Python，然後**在客人已經等了兩小時
+     * 的那一刻靜悄悄失敗**。
+     *
+     * 所以這個警告不是潔癖：它擋的是一個只在最需要功能的時候才會現形的坑。
+     *
+     * @param string $python
+     * @return void
+     */
+    private function warnIfNotAbsolute($python)
+    {
+        if (strpos($python, '/') === 0) {
+            return;
+        }
+
+        $this->line('');
+        $this->warn("⚠ 現在用的是「{$python}」，**不是絕對路徑**。");
+        $this->line('');
+        $this->line('它在你這個 shell 裡找得到 telethon，但**排程與 php-fpm 的 PATH 不一樣** ——');
+        $this->line('很可能解析到別的 Python，然後在真的要撥號的時候才失敗。');
+        $this->line('');
+        $this->line('請在 .env 指定絕對路徑（先確認是哪一支）：');
+        $this->line('');
+        $this->line('    which -a python3        # 或 readlink -f $(which python3)');
+        $this->line('    TG_CALL_PYTHON=/path/to/venv/bin/python');
+        $this->line('    php artisan config:clear && php artisan config:cache');
+    }
+
+    /**
+     * 直譯器不對時要怎麼修
+     *
+     * @param string $python
+     * @return void
+     */
+    private function showPythonHint($python)
+    {
+        $this->line('');
+
+        if ($python === 'python3') {
+            $this->warn('⚠ 現在用的是**預設值** `python3`（系統 Python），而 telethon 多半裝在 venv。');
+        }
+
+        $this->line('請在 .env 指定那個 venv 的直譯器**絕對路徑**：');
+        $this->line('');
+        $this->line('    TG_CALL_PYTHON=/path/to/venv/bin/python');
+        $this->line('');
+        $this->line('然後重建設定快取：');
+        $this->line('');
+        $this->line('    php artisan config:clear && php artisan config:cache');
+        $this->line('');
+        $this->warn('⚠ 順序很重要 —— 先加 .env 那一行，再 config:cache。');
+        $this->warn('  反過來的話快取裡存的還是舊值，看起來就像沒生效。');
+        $this->line('');
+        $this->line('⚠ 一定要絕對路徑：php-fpm 與排程的 PATH 跟你的 shell 不一樣。');
     }
 
     /**

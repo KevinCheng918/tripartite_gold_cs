@@ -131,6 +131,13 @@ class TelegramCallService
                 'error'     => $error,
                 'retryable' => (bool) Arr::get($decoded, 'retryable'),
                 'detail'    => Arr::get($decoded, 'detail'),
+                /*
+                 * ⚠ **直譯器一定要記。** `TELETHON_NOT_INSTALLED` 幾乎都不是
+                 * 真的沒裝，而是**跑到了另一支 Python** —— telethon 裝在 venv，
+                 * 而排程的 PATH 解析到系統那支。不記下來的話，log 會指著
+                 * 「沒安裝」而實際上裝好好的（2026-11-09 實際踩過）。
+                 */
+                'python' => (string) config('telegram_call.python'),
             ]);
 
             return $this->failure($error, (bool) Arr::get($decoded, 'retryable'), Arr::get($decoded, 'detail'));

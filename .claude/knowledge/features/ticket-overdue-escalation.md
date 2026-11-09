@@ -361,3 +361,46 @@ false，只會私訊、不會撥電話（設定頁有黃色提示）。那是刻
 而版本紀錄面板是**給客服看的**（既有條目每一條都是客服看得見的事）。
 v3.83 已涵蓋這個功能對客服的全部變化。
 先例見 [[../bugfix/2026-11-05-validation-message-swallowed]] 的同名小節。
+
+## ⚠⚠ 上線時踩到的：「我跑得起來」不等於「排程跑得起來」
+
+2026-11-09 實際發生，兩段都值得記。
+
+### 一、錯誤訊息怪錯了對象
+
+IT 把 telethon 裝在 venv（`/home/lv_cs_uat/venv-tg/bin/python`，Python 3.12），
+系統 Python 是 3.9 沒有 telethon。`TG_CALL_PYTHON` 還沒設時跑登入指令，
+畫面只說：
+
+    請先安裝 telethon：pip3 install telethon
+
+**但 telethon 明明裝好好的** —— 真正的問題是「跑到了另一支 Python」。
+那句訊息讓人往「是不是沒裝」查，方向完全錯。
+
+→ 登入指令現在會**先印出用的是哪一個 Python、以及它的 telethon 版本**，
+失敗時直接說「這個 Python 沒有 telethon」並附上修法。
+撥號失敗的 Log 也補上 `python` 欄位 —— `TELETHON_NOT_INSTALLED` 幾乎都不是
+真的沒裝，而是跑錯直譯器。
+
+### 二、「沒設 TG_CALL_PYTHON 也能用」是個陷阱
+
+需求方回報：沒加 `.env` 那一行，登入指令**照樣成功**。
+
+原因是他用 `rduser` 從**互動式 shell** 跑，那個使用者的 `PATH` 把 venv 排在
+前面，所以裸的 `python3` 解析到了有 telethon 的那一支。
+
+⚠⚠ **但真正撥號的是 cron 與 php-fpm，它們的 PATH 不一樣** —— 很可能解析到
+系統的 3.9，然後**在客人已經等了兩小時的那一刻靜悄悄失敗**。
+
+→ 直譯器**不是絕對路徑時，就算探測成功也要警告**（`warnIfNotAbsolute()`）。
+這不是潔癖：它擋的是一個**只在最需要這個功能的時候才會現形**的坑。
+
+### 給部署的三條規則
+
+| 規則 | 為什麼 |
+|---|---|
+| `TG_CALL_PYTHON` 一定要**絕對路徑** | `Symfony\Component\Process` 不經 shell；php-fpm 與 cron 的 PATH 跟登入的 shell 不同 |
+| **先改 `.env`、再 `config:cache`** | 反過來的話快取裡是舊值，看起來像沒生效 |
+| 用**排程會用的那個身分**跑登入 | session 檔的擁有者要是 cron／apache 讀得到的 —— 用錯身分會「登入成功但排程撥不出去」 |
+
+⚠ 第三點是 IT 主動提醒的，而且他是對的。
