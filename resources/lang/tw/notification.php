@@ -72,7 +72,7 @@ return [
     'escalation_manager_hint' => ':calls 通電話都撥完、那張單仍然沒有人處理時，立刻私訊這些人。標示「未綁定」的人收不到，請他先私訊機器人一次。',
     'escalation_test'      => '測試撥號',
     'escalation_test_user' => '撥給誰',
-    'escalation_test_hint' => '會**真的撥一通**給選定的同仁、響 :seconds 秒。請先告知他，不然他會被嚇到。⚠ 只列出有填 Telegram 帳號的人 —— 沒填的撥不出去。',
+    'escalation_test_hint' => '會**真的撥一通**給選定的同仁、響 :seconds 秒。請先告知他，不然他會被嚇到。⚠ 名單跟真正會被撥的人一致：**會被排班、而且填了 Telegram 帳號**的人。沒填帳號的撥不出去，工程師帳號不會被排班所以不列。',
     'escalation_call_missing' => '撥號功能尚未設定完成（需要 Telegram 應用程式憑證與登入檔）—— 在那之前只會私訊，不會撥電話。',
 
     // ===== 班別交接 =====

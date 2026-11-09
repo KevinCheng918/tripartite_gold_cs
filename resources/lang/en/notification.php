@@ -73,7 +73,7 @@ return [
     'escalation_manager_hint' => 'Once all :calls calls are done and the ticket is still unhandled, these people are messaged immediately. Anyone marked "not linked" cannot receive it — ask them to message the bot once.',
     'escalation_test'      => 'Test call',
     'escalation_test_user' => 'Call',
-    'escalation_test_hint' => 'This **really places a call** to the person selected and rings for :seconds seconds. Tell them first or they will be startled. ⚠ Only staff with a Telegram username are listed — the others cannot be called.',
+    'escalation_test_hint' => 'This **really places a call** to the person selected and rings for :seconds seconds. Tell them first or they will be startled. ⚠ The list matches who actually gets called: staff who **can be rostered and have a Telegram username**. Without a username they cannot be called, and engineer accounts are never rostered so they are not listed.',
     'escalation_call_missing' => 'Calling is not fully configured yet (it needs Telegram application credentials and a login file) — until then only direct messages are sent, no calls.',
 
     // ===== Shift Handover =====

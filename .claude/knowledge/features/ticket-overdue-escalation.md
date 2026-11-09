@@ -505,3 +505,24 @@ sidecar 的錯誤碼一對一對到語系句子，而不是只回「撥號失敗
 - `resources/lang/{tw,cn,en}/notification.php` — 12 個 key
 - `resources/views/admin/notification/index.blade.php` — 下拉選單 ＋ 按鈕
 - `public/js/notification-setting.js` — `renderCallTest()`、`runTest()` 多一個選用的 payload 參數
+
+### 收尾稽核（2026-11-09，v3.84）
+
+逐條對 PROMPTS.md 重掃 v3.84 的 diff（399 行新增），抓到三處要修：
+
+| 違反 | 問題 | 修法 |
+|---|---|---|
+| **第 2 節 short-circuit** | `escalationSection()` 無條件跑 `getCallCandidates()`，但 `isConfigured()` 是純 config ＋ `file_exists`（不碰 DB），它為 false 時按鈕本來就 disabled、名單一個字都不會用到 —— **每次開設定頁白跑一趟查詢** | 先算 `$callReady`，false 就回 `[]`；順手把 map 抽成 `callCandidates()` |
+| **第 1 節 PHPDoc** | `ajaxTestCall` 的 `@param Request` 與簽章 `TestCallRequest` 不一致，而 `Request` 在那個檔已經不 import 了 —— docblock 指著一個解析不到的類別 | 改成 `@param TestCallRequest` |
+| 文案與程式不一致 | 提示與版本紀錄都寫「只列出有填 Telegram 帳號的人」，但條件**還排除了 ENGINEER**（level 3）。管理者會疑惑「為什麼 IT 的帳號不在名單裡」 | 三語提示與 v3.84 的版本紀錄一起改成「會被排班、而且填了 Telegram 帳號」並說明工程師不列 |
+
+順手確認過但**刻意不改**的兩項：
+
+- **`Criteria` 封裝**：`app/Criteria/User/` 只有 `UserKeywordSearchCriteria`，而
+  `UserRepository` 有 35 處手寫 where —— Criteria 在這個專案是給「複雜且可重用」
+  的條件用的。`getCallCandidates()` 是固定條件，照慣例手寫
+- **`escalationSection()` 的 `@return array`**：同檔 8 個 section 方法有 7 個是
+  `@return array`，只改這一個反而破壞一致性（而且它是既有的，不是本次新增）
+
+> **版本號的決定**：沒有另開 v3.85。v3.84 還沒上線，而其中一處要修的正是
+> v3.84 自己那一句不準確的文案 —— 那是**修正未發佈的內容**，不是新一版。

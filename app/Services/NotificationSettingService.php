@@ -295,6 +295,15 @@ class NotificationSettingService
     {
         $default = (array) config('constants.TICKET_ESCALATION.DEFAULT');
 
+        /*
+         * ⚠ **先問「撥號設定齊不齊」，再決定要不要查人。**
+         *
+         * `isConfigured()` 只看 config 與 `file_exists`（不碰 DB），而它為
+         * false 時測試按鈕本來就是 disabled、那份名單一個字都不會用到 ——
+         * 每次開設定頁白跑一趟查詢。這是 PROMPTS.md 的 short-circuit 那一條。
+         */
+        $callReady = app(TelegramCallService::class)->isConfigured();
+
         return [
             'enabled' => $this->appSettingService->getBool(AppSettingService::KEY_ESCALATION_ENABLED),
             'trigger_at' => $this->appSettingService->getInt(
@@ -323,7 +332,7 @@ class NotificationSettingService
                 (int) config('constants.AUTO_REPLY.REMIND.MAX_COUNT')
             ),
             // 撥號設定（api 憑證與 session）齊不齊 —— 不齊的話電話那段不會動
-            'call_ready' => app(TelegramCallService::class)->isConfigured(),
+            'call_ready' => $callReady,
 
             /*
              * 可以被撥電話的人（測試撥號的下拉選單）。
@@ -332,15 +341,28 @@ class NotificationSettingService
              * `telegram_username`（撥號靠它找人），那一份要 `telegram_dm_ready`。
              * 沒填 username 的人撥不出去，所以直接不列。
              */
-            'call_candidates' => $this->userRepository->getCallCandidates()
-                ->map(function ($user) {
-                    return ['id' => (int) $user->id, 'nickname' => (string) $user->nickname];
-                })
-                ->values()
-                ->all(),
+            'call_candidates' => $callReady ? $this->callCandidates() : [],
 
             'test_ring_seconds' => (int) config('constants.TICKET_ESCALATION.TEST_RING_SECONDS'),
         ];
+    }
+
+    /**
+     * 測試撥號下拉選單要列的人
+     *
+     * 只挑前端真的要用的兩個欄位 —— `telegram_username` 不要送到前端，
+     * 那是對外可見的頁面原始碼。
+     *
+     * @return array<int, array{id: int, nickname: string}>
+     */
+    private function callCandidates()
+    {
+        return $this->userRepository->getCallCandidates()
+            ->map(function ($user) {
+                return ['id' => (int) $user->id, 'nickname' => (string) $user->nickname];
+            })
+            ->values()
+            ->all();
     }
 
     /**

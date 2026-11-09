@@ -158,7 +158,7 @@ class NotificationController extends Controller
      * （對方隱私設定、不在聯絡人裡、直譯器跑錯、session 權限）只有真的撥
      * 一次才測得出來。
      *
-     * @param Request $request
+     * @param TestCallRequest $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function ajaxTestCall(TestCallRequest $request)
