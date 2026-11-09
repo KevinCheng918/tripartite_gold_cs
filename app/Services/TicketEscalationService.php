@@ -245,12 +245,11 @@ class TicketEscalationService
         $rows = [];
 
         foreach ($onDuty as $user) {
-            // 沒填 Telegram 帳號就撥不出去 —— 跟「tag 不到他」同一個根源
-            $target = filled($user->telegram_username)
-                ? '@' . ltrim(trim((string) $user->telegram_username), '@')
-                : null;
-
-            $outcome = $this->callService->ring($target, $seconds);
+            // 沒填 Telegram 帳號就撥不出去（回 null）—— 跟「tag 不到他」同一個根源
+            $outcome = $this->callService->ring(
+                $this->callService->targetFor($user->telegram_username),
+                $seconds
+            );
 
             $rows[] = $this->row($ticket, Arr::get($stages, 'CALL'), $attempt, $user, [
                 'result' => $this->callResult($outcome, $results),

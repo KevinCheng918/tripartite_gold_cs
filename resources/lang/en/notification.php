@@ -71,6 +71,9 @@ return [
     'escalation_interval_hint' => 'At most :calls calls (that number is not adjustable). ⚠ Too short a gap gets the bot account flagged as harassment and suspended, so under 3 minutes is not accepted.',
     'escalation_manager'      => 'If calls go unanswered, message (multiple)',
     'escalation_manager_hint' => 'Once all :calls calls are done and the ticket is still unhandled, these people are messaged immediately. Anyone marked "not linked" cannot receive it — ask them to message the bot once.',
+    'escalation_test'      => 'Test call',
+    'escalation_test_user' => 'Call',
+    'escalation_test_hint' => 'This **really places a call** to the person selected and rings for :seconds seconds. Tell them first or they will be startled. ⚠ Only staff with a Telegram username are listed — the others cannot be called.',
     'escalation_call_missing' => 'Calling is not fully configured yet (it needs Telegram application credentials and a login file) — until then only direct messages are sent, no calls.',
 
     // ===== Shift Handover =====
@@ -317,6 +320,16 @@ return [
         'followup_stale_required'   => 'Please enter the number of days (use 0 to never close automatically)',
         'followup_stale_invalid'    => 'Days must be between 0 and 365',
 
+        'call_test_sent'        => 'Called :name — check that their phone rang (there is no voice content and answering drops the line; that is normal)',
+        'call_test_not_ready'   => 'Calling is not set up yet — run php artisan telegram:call-login on the server first',
+        'call_test_no_user'     => 'No such person, or they have no Telegram username (without it they cannot be called)',
+        'call_test_privacy'     => 'Could not call :name — their Telegram "Who can call me" is set to My Contacts. Add them to this bot account\'s contacts, or ask them to change the setting',
+        'call_test_not_found'   => 'Could not find :name on Telegram — check the username they entered, or add them to the bot account\'s contacts first',
+        'call_test_no_session'  => 'The bot is not logged in — run php artisan telegram:call-login on the server',
+        'call_test_no_telethon' => 'The Python used for calling has no telethon — usually TG_CALL_PYTHON in .env does not point at that venv (absolute path required)',
+        'call_test_error'       => 'Call to :name failed: :error',
+        // No :name/:error here — the frontend uses this when it cannot reach the backend at all
+        'call_test_failed'      => 'Test call failed',
         'escalation_trigger_required' => 'Please enter how many reminders before escalating',
         'escalation_trigger_invalid'  => 'The escalation threshold must be between 2 and 200',
         'escalation_trigger_too_high' => 'The escalation threshold must be lower than "Maximum reminders" (currently :max) — otherwise reminders stop before escalation and the phone never rings',

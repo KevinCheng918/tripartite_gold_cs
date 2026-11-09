@@ -324,7 +324,97 @@ class NotificationSettingService
             ),
             // 撥號設定（api 憑證與 session）齊不齊 —— 不齊的話電話那段不會動
             'call_ready' => app(TelegramCallService::class)->isConfigured(),
+
+            /*
+             * 可以被撥電話的人（測試撥號的下拉選單）。
+             *
+             * ⚠ 跟 `options.dm_candidates` 是**兩份不同的名單**：這一份要
+             * `telegram_username`（撥號靠它找人），那一份要 `telegram_dm_ready`。
+             * 沒填 username 的人撥不出去，所以直接不列。
+             */
+            'call_candidates' => $this->userRepository->getCallCandidates()
+                ->map(function ($user) {
+                    return ['id' => (int) $user->id, 'nickname' => (string) $user->nickname];
+                })
+                ->values()
+                ->all(),
+
+            'test_ring_seconds' => (int) config('constants.TICKET_ESCALATION.TEST_RING_SECONDS'),
         ];
+    }
+
+    /**
+     * 測試撥號：真的撥一通給指定的同仁
+     *
+     * ⚠ **真的會撥**（跟這一頁其他「測試發送」一樣是真的發）——
+     * 空跑測不出這個功能真正會壞的那幾件事：對方的隱私設定擋住、
+     * userbot 不在他的聯絡人裡、直譯器跑錯、session 權限不對。
+     * 那些只有真的撥一次才知道。
+     *
+     * @param int $userId 要撥給誰
+     * @return array{ok:bool, message:string}
+     */
+    public function testCall($userId)
+    {
+        $callService = app(TelegramCallService::class);
+
+        if (!$callService->isConfigured()) {
+            return ['ok' => false, 'message' => trans('notification.msg.call_test_not_ready')];
+        }
+
+        $user = $this->userRepository->getCallCandidates()->firstWhere('id', (int) $userId);
+
+        if (blank($user)) {
+            return ['ok' => false, 'message' => trans('notification.msg.call_test_no_user')];
+        }
+
+        // 目標格式交給撥號服務 —— 跟正式升級走同一份，理由見 `targetFor()`
+        $outcome = $callService->ring(
+            $callService->targetFor($user->telegram_username),
+            (int) config('constants.TICKET_ESCALATION.TEST_RING_SECONDS')
+        );
+
+        if (Arr::get($outcome, 'ok')) {
+            return [
+                'ok'      => true,
+                'message' => trans('notification.msg.call_test_sent', ['name' => $user->nickname]),
+            ];
+        }
+
+        return [
+            'ok'      => false,
+            'message' => $this->callErrorMessage((string) Arr::get($outcome, 'error'), $user->nickname),
+        ];
+    }
+
+    /**
+     * 撥號失敗的原因翻成「下一步該做什麼」
+     *
+     * ⚠ 直接把 `USER_PRIVACY_RESTRICTED` 丟給使用者看是沒有用的 ——
+     * 這個功能真正會卡住的地方都是**設定問題**，訊息要講出怎麼修。
+     *
+     * @param string $error
+     * @param string $name
+     * @return string
+     */
+    private function callErrorMessage($error, $name)
+    {
+        $map = [
+            'USER_PRIVACY_RESTRICTED' => 'call_test_privacy',
+            'ENTITY_NOT_FOUND'        => 'call_test_not_found',
+            'SESSION_NOT_FOUND'       => 'call_test_no_session',
+            'SESSION_UNAUTHORIZED'    => 'call_test_no_session',
+            'TELETHON_NOT_INSTALLED'  => 'call_test_no_telethon',
+        ];
+
+        $key = Arr::get($map, $error);
+
+        if (filled($key)) {
+            return trans("notification.msg.{$key}", ['name' => $name]);
+        }
+
+        // 認不得的錯誤就把原文帶出來 —— 猜一個友善訊息只會蓋掉線索
+        return trans('notification.msg.call_test_error', ['name' => $name, 'error' => $error]);
     }
 
     /**

@@ -109,14 +109,23 @@
 
     /**
      * 測試發送的共用流程
+     *
+     * @param {string}      url
+     * @param {HTMLElement} button
+     * @param {string}      fallbackMessage
+     * @param {Object}      [payload] 需要帶參數的測試才給（例如測試撥號要撥給誰）
      */
-    function runTest(url, button, fallbackMessage) {
+    function runTest(url, button, fallbackMessage, payload) {
         var original = button.textContent;
+        var options = { method: 'POST' };
+
+        // 沒有 payload 的就不要帶 body —— 其他九個測試都是空的 POST
+        if (payload) { options.body = JSON.stringify(payload); }
 
         button.disabled = true;
         button.textContent = i18n.action_testing;
 
-        apiFetch(url, { method: 'POST' })
+        apiFetch(url, options)
             .then(function (body) {
                 showMessage(body.message || fallbackMessage);
             })
@@ -680,10 +689,47 @@
 
         renderUserList('escalation-manager-list', 'js-escalation-user', esc.manager_user_ids);
         syncAll('escalation-manager-all', 'js-escalation-user');
+        renderCallTest(esc);
+    }
+
+    /**
+     * 測試撥號的下拉選單
+     *
+     * ⚠ 這份名單跟上面的收件人清單**不一樣**：撥號靠 `telegram_username` 找人，
+     * 後端只給有填的人。一個都沒有的時候要把按鈕鎖起來 ——
+     * 讓人按下去再回「找不到人」，看起來像功能壞了。
+     */
+    function renderCallTest(esc) {
+        var select = document.getElementById('escalation-test-user');
+        var button = document.getElementById('btn-test-call');
+        var hint = document.getElementById('escalation-test-hint');
+        if (!select || !button) { return; }
+
+        var candidates = esc.call_candidates || [];
+        var html = '';
+
+        candidates.forEach(function (user) {
+            html += '<option value="' + user.id + '">' + escapeHtml(user.nickname) + '</option>';
+        });
+
+        select.innerHTML = html;
+
+        // 沒人可撥、或撥號設定還沒齊 —— 兩種都按不出結果
+        button.disabled = candidates.length === 0 || !esc.call_ready;
+
+        if (hint) {
+            hint.textContent = (i18n.escalation_test_hint || '').replace(':seconds', esc.test_ring_seconds);
+        }
     }
 
     function bindEscalation() {
         bindSelectAll('escalation-manager-all', 'escalation-manager-list', 'js-escalation-user');
+
+        document.getElementById('btn-test-call').addEventListener('click', function () {
+            var userId = parseInt(document.getElementById('escalation-test-user').value, 10);
+
+            runTest('/admin/notification/ajax-test-call', this, i18n.msg.call_test_failed, { user_id: userId });
+        });
 
         document.getElementById('form-escalation').addEventListener('submit', function (event) {
             event.preventDefault();

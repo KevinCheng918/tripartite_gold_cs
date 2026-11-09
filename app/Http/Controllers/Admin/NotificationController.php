@@ -12,6 +12,7 @@ use App\Http\Requests\Notification\UpdateGroupRequest;
 use App\Http\Requests\Notification\UpdateFollowupRequest;
 use App\Http\Requests\Notification\UpdateRemindRequest;
 use App\Http\Requests\Notification\UpdateReportRequest;
+use App\Http\Requests\Notification\TestCallRequest;
 use App\Http\Requests\Notification\UpdateShiftHandoverRequest;
 use App\Http\Requests\Notification\UpdateTicketEscalationRequest;
 use App\Http\Requests\Notification\UpdateShiftNoticeRequest;
@@ -147,6 +148,43 @@ class NotificationController extends Controller
             Log::error('逾時升級設定更新失敗', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
 
             return response()->json(['message' => trans('notification.msg.save_failed')], 500);
+        }
+    }
+
+    /**
+     * Ajax 測試撥號：真的撥一通給指定的同仁
+     *
+     * ⚠ **真的會撥**（跟這一頁其他測試一樣）—— 這個功能真正會壞的地方
+     * （對方隱私設定、不在聯絡人裡、直譯器跑錯、session 權限）只有真的撥
+     * 一次才測得出來。
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxTestCall(TestCallRequest $request)
+    {
+        $params = $request->validated();
+
+        try {
+            $result = $this->settingService->testCall(Arr::get($params, 'user_id'));
+
+            /*
+             * 撥不出去回 422 而不是 500 —— 使用者看到的訊息才是重點
+             * （對方隱私設定擋住、session 沒登入…都是他可以去處理的事），
+             * 而前端的 errorMessage() 只在非 2xx 時才去挖 message。
+             */
+            return response()->json(
+                ['message' => Arr::get($result, 'message')],
+                Arr::get($result, 'ok') ? 200 : 422
+            );
+        } catch (\Exception $e) {
+            Log::error('測試撥號失敗', [
+                'error'   => $e->getMessage(),
+                'user_id' => Auth::id(),
+                'target'  => Arr::get($params, 'user_id'),
+            ]);
+
+            return response()->json(['message' => trans('notification.msg.call_test_failed')], 500);
         }
     }
 

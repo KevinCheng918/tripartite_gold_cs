@@ -235,6 +235,25 @@
 
                             <button type="submit" class="btn btn-primary js-manage-only">{{ trans('notification.action_save') }}</button>
                         </form>
+
+                        {{--
+                            測試撥號放在表單**外面**（需求方 2026-11-09）。
+
+                            ⚠ 不只是版面問題：放進 form-escalation 裡的話，
+                            下拉選單會被一起送出，而更新 API 沒有這個欄位。
+                            這也跟其他分頁的「測試發送」一致 —— 測試從來不經過存檔。
+                        --}}
+                        <hr class="my-3">
+                        <div class="row align-items-end">
+                            <div class="col-md-5 mb-2">
+                                <label class="form-label" for="escalation-test-user">{{ trans('notification.escalation_test_user') }}</label>
+                                <select class="form-select" id="escalation-test-user"></select>
+                            </div>
+                            <div class="col-md-7 mb-2">
+                                <button type="button" class="btn btn-outline-secondary js-manage-only" id="btn-test-call">{{ trans('notification.escalation_test') }}</button>
+                            </div>
+                        </div>
+                        <div class="form-text" id="escalation-test-hint"></div>
                     </div>
                 </div>
 

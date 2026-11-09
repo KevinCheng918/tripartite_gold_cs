@@ -70,6 +70,9 @@ return [
     'escalation_interval_hint' => '最多拨 :calls 通（这个数字不开放调整）。⚠ 间隔太短会让机器人帐号被 Telegram 判定为骚扰而停权，所以不接受小于 3 分钟。',
     'escalation_manager'      => '拨不通时私讯给（可多选）',
     'escalation_manager_hint' => ':calls 通电话都拨完、那张单仍然没有人处理时，立刻私讯这些人。标示「未绑定」的人收不到，请他先私讯机器人一次。',
+    'escalation_test'      => '测试拨号',
+    'escalation_test_user' => '拨给谁',
+    'escalation_test_hint' => '会**真的拨一通**给选定的同事、响 :seconds 秒。请先告知他，不然他会被吓到。⚠ 只列出有填 Telegram 帐号的人 —— 没填的拨不出去。',
     'escalation_call_missing' => '拨号功能尚未设定完成（需要 Telegram 应用程式凭证与登入档）—— 在那之前只会私讯，不会拨电话。',
 
     // ===== 班别交接 =====
@@ -313,6 +316,16 @@ return [
         'followup_stale_required'   => '请填写几天没结果就能收掉（不自动收请填 0）',
         'followup_stale_invalid'    => '天数须介于 0 到 365 天',
 
+        'call_test_sent'        => '已拨给 :name，请确认他的手机有响（没有语音内容，接起来会断线，那是正常的）',
+        'call_test_not_ready'   => '拨号设定还没完成 —— 请先在伺服器上执行 php artisan telegram:call-login',
+        'call_test_no_user'     => '找不到这个人，或他没有填 Telegram 帐号（没填就拨不出去）',
+        'call_test_privacy'     => '拨不到 :name —— 他的 Telegram「谁可以打电话给我」设成仅联络人。请用这个机器人帐号把他加进联络人，或请他改设定',
+        'call_test_not_found'   => '找不到 :name 的 Telegram 帐号 —— 请确认他填的 username 正确，或先用机器人帐号把他加进联络人',
+        'call_test_no_session'  => '机器人还没登入 —— 请在伺服器上执行 php artisan telegram:call-login',
+        'call_test_no_telethon' => '拨号用的 Python 找不到 telethon —— 多半是 .env 的 TG_CALL_PYTHON 没指向那个 venv（要绝对路径）',
+        'call_test_error'       => '拨给 :name 失败：:error',
+        // 这一句不能带 :name／:error —— 前端把它当「连不上后端」的退路，那时候没有值可以填
+        'call_test_failed'      => '测试拨号失败',
         'escalation_trigger_required' => '请填写催到第几次开始升级',
         'escalation_trigger_invalid'  => '升级门槛须介于 2 到 200 次',
         'escalation_trigger_too_high' => '升级门槛必须小于「最多提醒几次」（目前是 :max）—— 否则提醒会在升级之前就停止，电话永远不会响',

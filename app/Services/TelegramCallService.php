@@ -39,6 +39,30 @@ class TelegramCallService
     }
 
     /**
+     * 把 `telegram_username` 轉成撥號目標
+     *
+     * ⚠ 這段**只能有一份**：逾時升級與設定頁的測試撥號都要用它，兩邊各自
+     * 寫一次的話，只要有一邊忘了 `ltrim('@')` 或 `trim()`，就會變成
+     * 「測試撥得通、正式撥不通」（或反過來）——而那是最難被發現的壞法。
+     *
+     * 沒填 username 就回 null，`ring()` 會以 `NO_TARGET` 擋下來。
+     *
+     * @param string|null $username
+     * @return string|null
+     */
+    public function targetFor($username)
+    {
+        if (blank($username)) {
+            return null;
+        }
+
+        // 使用者常把 @ 一起填進去，也常多打空白
+        $handle = ltrim(trim((string) $username), '@');
+
+        return blank($handle) ? null : "@{$handle}";
+    }
+
+    /**
      * 撥一通
      *
      * @param string $target  `@username`、`+886…`、或 Telegram user id

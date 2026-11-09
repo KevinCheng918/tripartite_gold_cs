@@ -404,3 +404,104 @@ IT 把 telethon 裝在 venv（`/home/lv_cs_uat/venv-tg/bin/python`，Python 3.12
 | 用**排程會用的那個身分**跑登入 | session 檔的擁有者要是 cron／apache 讀得到的 —— 用錯身分會「登入成功但排程撥不出去」 |
 
 ⚠ 第三點是 IT 主動提醒的，而且他是對的。
+
+---
+
+## 測試撥號（需求方 2026-11-09，v3.84）
+
+> 需求原話：「我想要做一個測試撥電話給某位客服，確認真的可以接通」
+
+### 為什麼需要
+
+逾時升級**平常完全不會動作** —— 它要等到有單催滿 10 次（約 100 分鐘）才第一次
+撥號。也就是說：撥號設定壞掉的話，第一個發現的時機，正好是客人已經等了
+一百分鐘、而這個功能是最後一道防線的那一刻。
+
+所以要有一個「現在就撥一通」的按鈕。
+
+### 放在哪、為什麼
+
+「通知設定 → 求助單提醒 → 逾時升級」那張卡的**最下面，表單外**。
+
+| 決定 | 理由 |
+|---|---|
+| 放這張卡 | 設定跟測試要在同一個地方，去另一頁找只會找不到 |
+| 放在 `form-escalation` **外面** | 放進去的話，下拉選單會被一起送出，而更新 API 沒有這個欄位。也跟其他九個「測試發送」一致 —— 測試從來不經過存檔 |
+| `type="button"` | 否則會觸發表單送出 |
+
+### ⚠⚠ 抓到的真問題：測試名單跟正式撥號路徑條件不一樣
+
+第一版 `UserRepository::getCallCandidates()` 寫成 `level > ADMIN`（排除管理者），
+但正式撥號走的 `getMentionableByIds()` 是 `level != ENGINEER`（排除工程師）。
+
+兩份條件不一樣 ⇒ 測試**完全失去意義**：
+
+- 排除 ADMIN ⇒ 真的會被排班、會被撥的管理者，**永遠測不到**
+- 沒排除 ENGINEER ⇒ 測得通的工程師，正式流程裡**根本不會被撥**
+
+已改成跟 `getMentionableByIds()` 一字不差（只差一個 `whereIn`），
+**兩支都加了「改一邊要改另一邊」的註解**。
+
+> 這是這個功能的第二次同型錯誤 —— 第一次是「撥號與私訊要用兩份不同名單」
+> （見上面的三個真 bug）。只要有兩份「誰可以被通知」的查詢，就會走偏。
+
+### 撥號目標的格式化只能有一份
+
+`'@' . ltrim(trim($username), '@')` 原本在 `TicketEscalationService` 裡手寫，
+測試撥號若再寫一次，就會變成「測試撥得通、正式撥不通」（或反過來）。
+
+抽成 `TelegramCallService::targetFor($username)`，兩邊共用。
+順手修掉一個邊角：username 只有 `'@'` 或只有空白時，舊寫法會撥
+`'@'`（`filled('@')` 是 true），現在回 `null` 由 `ring()` 以 `NO_TARGET` 擋下。
+
+### 錯誤訊息要講「可以去做什麼」
+
+sidecar 的錯誤碼一對一對到語系句子，而不是只回「撥號失敗」：
+
+| sidecar 錯誤 | 使用者看到的 |
+|---|---|
+| `USER_PRIVACY_RESTRICTED` | 他的「誰可以打電話給我」設成僅聯絡人 → 把他加進聯絡人，或請他改設定 |
+| `ENTITY_NOT_FOUND` | 找不到這個 username → 確認有沒有填錯 |
+| `SESSION_NOT_FOUND` / `SESSION_UNAUTHORIZED` | 機器人還沒登入 → 跑 `php artisan telegram:call-login` |
+| `TELETHON_NOT_INSTALLED` | ⚠ 多半不是沒裝，是 `TG_CALL_PYTHON` 沒指到那個 venv |
+| 其他 | **把原始錯誤碼帶出來** —— 猜一句友善訊息只會蓋掉線索 |
+
+### 幾個刻意的選擇
+
+- **響 10 秒不是 30 秒**（`TEST_RING_SECONDS`）：測試是一個 HTTP 請求在等，
+  響 30 秒代表那個請求要卡 30 秒，還可能撞到 php-fpm 逾時。
+  測試要確認的是「撥得出去、會響」，10 秒夠了
+- **撥不出去回 422 不是 500**：那些原因（隱私設定、沒登入）都是使用者可以
+  去處理的事，前端的 `errorMessage()` 也只在非 2xx 時才去挖 `message`
+- **名單空的 or `call_ready` 為 false ⇒ 按鈕直接 disabled**：
+  讓人按下去再回「找不到人」，看起來像功能壞了
+- **語系提示明講「這是真的撥出去，請先告知對方」**：不講的話，
+  被撥的同仁只會收到一通莫名的電話
+
+### ⚠ 自己踩的小坑
+
+- 語系字串第一版寫了 `<options=bold>` —— 那是 **Symfony Console 的格式**，
+  但這幾句是**網頁**上的提示，會被 blade 跳脫後原樣顯示。改用這一頁既有的 `**`
+- `call_test_failed` 第一版帶了 `:name`／`:error`，但前端把它當「連不上後端」
+  的退路用 —— 那時候沒有值可以填，會印出 `:name`。
+  拆成兩句：`call_test_error`（帶參數）與 `call_test_failed`（純文字）
+
+### 本次異動檔案
+
+**新增**
+
+- `app/Http/Requests/Notification/TestCallRequest.php`
+
+**修改**
+
+- `app/Repositories/UserRepository.php` — `getCallCandidates()`，條件與 `getMentionableByIds()` 綁在一起
+- `app/Services/TelegramCallService.php` — `targetFor()`
+- `app/Services/TicketEscalationService.php` — 改用 `targetFor()`
+- `app/Services/NotificationSettingService.php` — `testCall()`、`callErrorMessage()`、`escalationSection()` 多回 `call_candidates`／`test_ring_seconds`
+- `app/Http/Controllers/Admin/NotificationController.php` — `ajaxTestCall()`
+- `routes/web.php` — `ajax-test-call`
+- `config/constants.php` — `TICKET_ESCALATION.TEST_RING_SECONDS`
+- `config/changelog.php` — v3.84
+- `resources/lang/{tw,cn,en}/notification.php` — 12 個 key
+- `resources/views/admin/notification/index.blade.php` — 下拉選單 ＋ 按鈕
+- `public/js/notification-setting.js` — `renderCallTest()`、`runTest()` 多一個選用的 payload 參數

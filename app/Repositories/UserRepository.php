@@ -623,6 +623,41 @@ class UserRepository
     }
 
     /**
+     * 可以被撥電話的帳號清單（逾時升級的測試撥號用）
+     *
+     * ⚠ **跟 `getDmCandidates()` 條件相同但欄位不同**，不要互相取代：
+     * 撥號要 `telegram_username`（userbot 靠它找到人），私訊要
+     * `telegram_user_id` ＋ `telegram_dm_ready`。那一支沒有 username，
+     * 拿來撥號會每個人都撥不出去。
+     *
+     * ⚠ 沒填 `telegram_username` 的人**直接不列**：撥不出去的人出現在
+     * 測試的下拉選單裡只會讓人以為是功能壞了。
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getCallCandidates()
+    {
+        /*
+         * ⚠⚠ **條件要跟 `getMentionableByIds()` 一模一樣**（除了少一個 whereIn）。
+         *
+         * 那一支才是逾時升級真正撥號時用的名單。兩邊條件一旦走偏，測試就失去
+         * 意義：排除 ADMIN 的話，真的會被撥的管理者永遠測不到；沒排除 ENGINEER
+         * 的話，測得通的工程師在正式流程裡根本不會被撥。
+         *
+         * 改這裡請連同 `getMentionableByIds()` 一起改。
+         */
+        return User::query()
+            ->select(['id', 'nickname', 'telegram_username'])
+            ->where('status', config('constants.USER.STATUS.NORMAL'))
+            ->where('level', '!=', config('constants.USER.LEVEL.ENGINEER'))
+            ->whereNotNull('telegram_username')
+            ->where('telegram_username', '!=', '')
+            ->orderBy('level')
+            ->orderBy('nickname')
+            ->get();
+    }
+
+    /**
      * 依 Telegram 身份找人（擋多重綁定用）
      *
      * ⚠ `telegram_user_id` 只有 index、**沒有 unique**，所以同一個 Telegram
@@ -860,6 +895,7 @@ class UserRepository
             return new Collection();
         }
 
+        // 條件與 `getCallCandidates()`（測試撥號的名單）必須一致，理由寫在那一支
         return User::query()
             ->select(['id', 'nickname', 'telegram_username'])
             ->whereIn('id', $ids)
