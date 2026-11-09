@@ -139,4 +139,22 @@ return [
      */
     'AUTO_REPLY_RESUME_MIN_MINUTES' => 5,
     'AUTO_REPLY_RESUME_MAX_MINUTES' => 1440,
+
+    /*
+     * 私訊自動清除要保留最近幾小時。
+     *
+     * ⚠⚠ **上限必須小於 Telegram 的 48 小時刪除窗口**（`constants.STAFF_DM_WIPE
+     * .DELETE_WINDOW_HOURS`）。填 48 以上的話，排程撈出來的訊息永遠都已經
+     * 過期 —— **自動清除看起來開著，卻一則都清不掉而且不報錯**。
+     * 留 1 小時餘裕給排程本身的執行時間，所以是 47。
+     *
+     * ⚠ 下限 1 小時：私訊**就是通知本身**（逾時升級那則是唯一告訴人「哪張單
+     * 逾時了」的東西）。保留時間太短，等於通知剛發出去就被清掉。
+     *
+     * ⚠ 同一組數字也寫在 `constants.STAFF_DM_WIPE.MIN_KEEP_HOURS` /
+     * `MAX_KEEP_HOURS`（給設定頁 hint 與 Service 用）。改這裡要一起改 ——
+     * 兩邊分岔的話，介面會說一套、驗證擋另一套。
+     */
+    'STAFF_DM_WIPE_MIN_KEEP_HOURS' => 1,
+    'STAFF_DM_WIPE_MAX_KEEP_HOURS' => 47,
 ];

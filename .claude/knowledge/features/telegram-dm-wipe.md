@@ -395,3 +395,34 @@ Repository／Bot／AppSetting 全部換成假的綁進容器，不碰 DB、不�
 - `resources/lang/{tw,cn,en}/notification.php`、`.../permission.php`
 - `resources/views/admin/notification/index.blade.php` — 第十一個分頁 ＋ 二次確認 modal
 - `public/js/notification-setting.js` — `renderDmWipe()`／`bindDmWipe()`／`applyPermission()` 的例外
+
+### 收尾稽核（2026-11-09，v3.85）
+
+逐條對 PROMPTS.md 重掃 v3.85（1810 行新增），抓到兩處違反：
+
+| 違反 | 問題 | 修法 |
+|---|---|---|
+| **第 5 節 DB Transaction**（「多表寫入必須在交易中」） | `wipe()` 寫**兩張表** —— 標記清除結果（`staff_dm_message`）與稽核紀錄（`staff_dm_wipe_log`），卻沒有交易。⚠⚠ **稽核寫失敗而訊息已標成已清除 ⇒ 清掉了但沒有紀錄**，對一個以「每次清除都留痕」為前提的安全功能，那正好打掉它的根據 | 兩者包進 `DB::transaction`。⚠ **Telegram 的呼叫刻意留在交易外**（跨網路，包進去會讓連線在整串 HTTP 往返期間持有鎖）。順帶好處：標記從「每 100 則一次 UPDATE」變成一次批量 |
+| **第 1 節 Request**（「補 `config/rules.php`」） | 保留時數的上下限只寫在 `constants.php`。而最接近的類比 `UpdateAutoReplyResumeRequest` 正是從 `config/rules.php` 取邊界、並在兩邊互相交叉註解 | 加 `rules.STAFF_DM_WIPE_MIN/MAX_KEEP_HOURS`，Request 改讀它，兩個 config 互相註明「改這裡要一起改」 |
+
+#### ⚠ 交易帶來的一個已知邊角（可自癒）
+
+稽核寫入失敗時交易回滾，但**Telegram 那邊已經刪掉了**（既成事實，不可能回滾）。
+結果是：使用者看到「清除私訊失敗」、訊息其實已經不見、而且沒有稽核。
+
+**不是永久狀態**：那些列維持 `result = null` ⇒ 下一輪（排程或再按一次按鈕）
+會重送，Telegram 對已刪除的靜默跳過，然後標記成功並**補上稽核**。
+所以最終一致，只有那一瞬間的訊息會誤導。
+
+順手確認過但**刻意不改**：
+
+- **`Criteria` 封裝**：`app/Criteria/` 只給「複雜且可重用」的條件用
+  （`UserRepository` 有 35 處手寫 where），固定條件照慣例手寫
+- **Response 資源檔**：兩支 ajax 只回一句 `message`，同這一頁既有 20 支
+- **`webpack.mix.js`**：`public/js/notification-setting.js` 是直接載入、不經編譯
+- **`markExpiredBefore()` 不進交易**：單表、冪等的維護動作，
+  跟「這次誰清了誰」不是同一件事
+
+> **版本號**：**沒有加新版號**。兩處都是內部正確性修正，使用者看到的行為
+> 一字未變 —— 而 v3.85 的版本紀錄已經寫了「每一次清除都會留下紀錄」，
+> 交易正是讓那句話成立的東西，不是新功能。

@@ -7,6 +7,7 @@ use App\Repositories\StaffDmWipeLogRepository;
 use App\Repositories\UserRepository;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -159,12 +160,36 @@ class StaffDmWipeService
             Log::info('私訊清除達到單輪上限，剩下的下一輪處理', ['limit' => $limit]);
         }
 
-        $perUser = $this->deleteTargets($targets);
+        // ⚠ Telegram 的呼叫在這裡做完，**刻意在下面那個交易外面**（理由見下）
+        $outcome = $this->deleteTargets($targets);
+        $perUser = (array) Arr::get($outcome, 'per_user');
 
         // 「永久刪不掉幾則」逐人從資料算（理由同上）
         $expiredByUser = $this->messageRepository->countByUser($windowStart);
 
-        $this->writeLogs($perUser, $expiredByUser, $operator, $source, $userId);
+        /*
+         * ⚠⚠ **兩張表必須一起成功。**
+         *
+         * 標記清除結果（`staff_dm_message`）與稽核紀錄（`staff_dm_wipe_log`）
+         * 是同一件事的兩半。稽核寫失敗、訊息卻已經標成「已清除」的話，就出現
+         * **清掉了但沒有紀錄** —— 對一個以「每次清除都留痕」為前提的安全功能，
+         * 那正好打掉它的根據。
+         *
+         * ⚠ **Telegram 的呼叫刻意不包進來**：那是跨網路的操作，包進交易會讓
+         * DB 連線在整串 HTTP 往返期間持有鎖。而且真的死在中途也沒關係 ——
+         * 那些列維持 null，下一輪再送一次，Telegram 對已刪除的會靜默跳過。
+         *
+         * ⚠ `markExpiredBefore()` 不在交易內：它是單表、冪等的維護動作，
+         * 跟這次「誰清了誰」不是同一件事。
+         */
+        DB::transaction(function () use ($outcome, $perUser, $expiredByUser, $operator, $source, $userId) {
+            $this->messageRepository->markResult(
+                (array) Arr::get($outcome, 'cleared_ids'),
+                (int) config('constants.STAFF_DM_WIPE.RESULT.CLEARED')
+            );
+
+            $this->writeLogs($perUser, $expiredByUser, $operator, $source, $userId);
+        });
 
         return $this->totals($perUser, $expiredByUser, $userId);
     }
@@ -217,13 +242,13 @@ class StaffDmWipeService
      * 變成永久放棄。
      *
      * @param \Illuminate\Support\Collection $targets
-     * @return array<int, array{cleared: int, failed: int}> user_id => 計數（帳號已刪除者為 0）
+     * @return array{per_user: array<int, array{cleared: int, failed: int}>, cleared_ids: array<int>}
      */
     private function deleteTargets($targets)
     {
         $perUser = [];
+        $clearedIds = [];
         $batchSize = (int) config('constants.STAFF_DM_WIPE.BATCH_SIZE');
-        $cleared = (int) config('constants.STAFF_DM_WIPE.RESULT.CLEARED');
 
         foreach ($targets->groupBy('telegram_chat_id') as $chatId => $rows) {
             foreach ($rows->chunk($batchSize) as $chunk) {
@@ -240,16 +265,20 @@ class StaffDmWipeService
                 }
 
                 /*
-                 * ⚠ 成功才標記。失敗維持 null ⇒ 下一輪再試，
-                 * 等它過了 48 小時會被掃成 EXPIRED。標成失敗會讓一次
-                 * 暫時性的網路錯誤變成永久放棄。
+                 * ⚠ **這裡只收集，不寫 DB** —— 寫入由呼叫端跟稽核紀錄
+                 * 包在同一個交易裡（理由見 `wipe()`）。順帶好處是一次
+                 * 批量 UPDATE，而不是每 100 則一次。
                  *
-                 * ⚠ 標成「已清除」而不是「已刪除」：Telegram 對刪不掉的訊息是
+                 * ⚠ 成功才收集。失敗的維持 null ⇒ 下一輪再試，等它過了
+                 * 48 小時會被掃成 EXPIRED。標成失敗會讓一次暫時性的網路
+                 * 錯誤變成永久放棄。
+                 *
+                 * ⚠ 算成「已清除」而不是「已刪除」：Telegram 對刪不掉的訊息是
                  * **靜默跳過並回傳成功**，所以這裡面可能混著同仁自己早就刪掉的。
                  * 兩者的結果一樣（不在他的 Telegram 裡了），不必分。
                  */
                 if ($ok) {
-                    $this->messageRepository->markResult($chunk->pluck('id')->all(), $cleared);
+                    $clearedIds = array_merge($clearedIds, $chunk->pluck('id')->all());
                 }
 
                 // ⚠ 逐人累計，不要只回總數 —— 稽核紀錄要答得出「誰的被清了幾則」
@@ -259,7 +288,7 @@ class StaffDmWipeService
             }
         }
 
-        return $perUser;
+        return ['per_user' => $perUser, 'cleared_ids' => $clearedIds];
     }
 
     /**

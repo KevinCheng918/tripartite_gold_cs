@@ -20,8 +20,9 @@ class UpdateStaffDmWipeRequest extends FormRequest
 
     public function rules()
     {
-        $min = (int) config('constants.STAFF_DM_WIPE.MIN_KEEP_HOURS');
-        $max = (int) config('constants.STAFF_DM_WIPE.MAX_KEEP_HOURS');
+        // 驗證邊界取自 `config/rules.php`（這個專案的慣例，同 UpdateAutoReplyResumeRequest）
+        $min = (int) config('rules.STAFF_DM_WIPE_MIN_KEEP_HOURS');
+        $max = (int) config('rules.STAFF_DM_WIPE_MAX_KEEP_HOURS');
 
         return [
             // checkbox 沒勾時整個欄位不會送上來，所以是 nullable 而不是 required
@@ -36,8 +37,8 @@ class UpdateStaffDmWipeRequest extends FormRequest
     public function messages()
     {
         $params = [
-            'min' => (int) config('constants.STAFF_DM_WIPE.MIN_KEEP_HOURS'),
-            'max' => (int) config('constants.STAFF_DM_WIPE.MAX_KEEP_HOURS'),
+            'min' => (int) config('rules.STAFF_DM_WIPE_MIN_KEEP_HOURS'),
+            'max' => (int) config('rules.STAFF_DM_WIPE_MAX_KEEP_HOURS'),
         ];
 
         return [

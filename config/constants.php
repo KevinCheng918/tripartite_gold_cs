@@ -4847,7 +4847,13 @@ return [
          */
         'DEFAULT_KEEP_HOURS' => 12,
 
-        // 保留時數的可設定範圍（上限留 1 小時餘裕給排程的執行時間）
+        /*
+         * 保留時數的可設定範圍（上限留 1 小時餘裕給排程的執行時間）。
+         *
+         * ⚠ 同一組數字也寫在 `rules.STAFF_DM_WIPE_MIN_KEEP_HOURS` /
+         * `MAX_KEEP_HOURS`（Request 的驗證邊界）。改這裡要一起改 ——
+         * 兩邊分岔的話，介面會說一套、驗證擋另一套。
+         */
         'MIN_KEEP_HOURS' => 1,
         'MAX_KEEP_HOURS' => 47,
 
