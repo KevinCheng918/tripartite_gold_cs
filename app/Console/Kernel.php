@@ -170,10 +170,20 @@ class Kernel extends ConsoleKernel
          * 重疊的話同一張單會被撥兩次，而**連撥是 Telegram 判定 spam 的
          * 主要行為樣態**，封號的是我們自己的 userbot 帳號。
          *
+         * ⚠⚠ **鎖要自己設過期時間（10 分鐘），不能用預設的 1440。**
+         *
+         * `withoutOverlapping()` 不帶參數時鎖 **24 小時**。而這支是所有排程裡
+         * 最可能跑超過一分鐘的（開子程序撥號、一通響 30 秒、逐人撥），
+         * 也因此最可能被 OOM、部署、重開機砍掉 —— 被砍掉的 process 不會釋放鎖，
+         * **升級就會整整停擺一天**，而那是「客人已經等了快兩小時」的最後一道防線。
+         *
+         * 10 分鐘足夠蓋過最壞情況（3 個當班 × 30 秒 × 幾張單），
+         * 又讓意外中斷在十分鐘內自己恢復。
+         *
          * 總開關預設關（`ticket_escalation.enabled`），服務自己會短路 ——
          * 所以掛排程不等於開始撥號。
          */
-        $schedule->command('ticket:escalate')->everyMinute()->withoutOverlapping();
+        $schedule->command('ticket:escalate')->everyMinute()->withoutOverlapping(10);
 
         /*
          * 每分鐘把登入紀錄私訊通知給帳號本人（需求方 2026-11-05）。

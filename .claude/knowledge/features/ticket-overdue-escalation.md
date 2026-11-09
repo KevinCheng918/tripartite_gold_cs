@@ -287,9 +287,8 @@ index (auto_reply_ticket_id, stage)
 ### 上線要做的事
 
 1. **跑 migration**（建 `auto_reply_ticket_escalation` 表）
-2. **在伺服器上跑一次互動登入**產生 Telethon session：
-   `TG_API_ID=… TG_API_HASH=… TG_SESSION=storage/app/telegram/call_session python3 tools/tg_call.py @someone`
-   （第一次會問手機與驗證碼）
+2. **跑 `php artisan telegram:call-login`** 產生 Telethon session
+   （它會告訴你要填什麼；憑證沒設時會把 .env 要加的兩行印出來）
 3. **`.env` 設 `TG_CALL_API_ID` / `TG_CALL_API_HASH`**
 4. **容器裡 `pip3 install telethon`**
 5. **用 userbot 帳號把會被排班的同仁加成聯絡人**（沒設 `@username` 的人要靠這個）
@@ -298,3 +297,67 @@ index (auto_reply_ticket_id, stage)
 
 ⚠ 前面六步沒做完就打開開關的話：`TelegramCallService::isConfigured()` 會回
 false，只會私訊、不會撥電話（設定頁有黃色提示）。那是刻意的降級而不是壞掉。
+
+---
+
+## 收尾稽核（2026-11-09）
+
+1559 行新增逐條核對：`??`／`isset`／`empty`／`!filled` 零處、陣列下標讀取零處、
+字串串接零處、`fn(`／`else`／`!== null` 零處。Controller 無 DB、Service 無 HTTP
+也無 `Model::where`、新增查詢都有 `select()`、三語 289/289/289。
+
+⚠ `AppSettingService` 整包設定有 `Cache::remember`，所以 `isCallDue()` 在迴圈裡
+呼叫 `getInt()` 是讀快取不是查 DB —— **查證過才敢說沒有 N+1**。
+
+### ⚠⚠ 抓到的風險：`withoutOverlapping()` 的鎖預設 24 小時
+
+`withoutOverlapping()` 不帶參數時 `$expiresAt = 1440`（分鐘）。
+
+而 `ticket:escalate` 是所有排程裡**最可能跑超過一分鐘**的一支：開子程序撥號、
+一通響 30 秒、逐個當班的人撥。也因此**最可能被 OOM／部署／重開機砍掉** ——
+被砍掉的 process 不會釋放鎖，**升級就會整整停擺一天**。
+
+而那是「客人已經等了快兩小時」的最後一道防線。
+
+→ 改成 `withoutOverlapping(10)`。10 分鐘足夠蓋過最壞情況
+（3 個當班 × 30 秒 × 幾張單），又讓意外中斷在十分鐘內自己恢復。
+
+⚠ 其他排程都是裸的 `withoutOverlapping()` —— 它們跑得快、被砍的機率低，
+所以沒有一起改。要改的話是另一個任務。
+
+## 互動登入做成 artisan 指令（需求方 2026-11-09）
+
+> 「互動登入這個能不能做成一個 seeder，我執行就好，含我要填入的資訊」
+
+**不是 seeder，是 artisan 指令**：
+
+    php artisan telegram:call-login
+
+⚠ **為什麼不是 seeder**：seeder 是灌 DB 資料用的，而這件事**沒有任何資料要
+寫進資料庫** —— 它要的是互動輸入（手機號碼、驗證碼）。seeder 跑在非互動
+環境時會直接卡住。
+
+指令會做的事：
+
+| 情況 | 它會怎樣 |
+|---|---|
+| 憑證沒設 | **把要貼進 .env 的兩行直接印出來**，不是只說「請設定環境變數」 |
+| session 已存在 | 問要不要覆蓋 |
+| 登入前 | 說明接下來會被問的三件事（手機／驗證碼在 App 不是簡訊／兩步驗證） |
+| 登入後 | 用 `TelegramCallService::isConfigured()` 確認，再列出剩下的準備步驟 |
+
+⚠ **`setTty(true)` 不能省**：Telethon 的提示要讀 stdin，沒有 TTY 的話使用者
+看得到問題卻打不進去，而且會卡住到逾時。抓到 TTY 例外時會提示改用
+`docker-compose exec workspace bash` 進互動式 shell。
+
+⚠ `setTimeout(null)`：這是人在輸入，沒有合理的逾時可言。
+
+⚠ 撥號那支（`tg_call.py`）**刻意不做登入** —— 排程不該停下來等驗證碼，
+所以它找不到 session 就直接回 `SESSION_NOT_FOUND`。兩支的分工是刻意的。
+
+### 不加新版號
+
+鎖的過期時間是**不可見的穩定性修正**；登入指令是**給部署的人用的**，
+而版本紀錄面板是**給客服看的**（既有條目每一條都是客服看得見的事）。
+v3.83 已涵蓋這個功能對客服的全部變化。
+先例見 [[../bugfix/2026-11-05-validation-message-swallowed]] 的同名小節。
