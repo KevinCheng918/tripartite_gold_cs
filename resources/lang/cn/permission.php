@@ -110,6 +110,8 @@ return [
         'spider_setting'  => '用指令做 spider_setting',
         'gmail_credential' => '用指令验 Gmail 凭证',
         'regulation' => '用指令取系统规章',
+        // ⚠ 跟上面的 delete（删群组对话纪录）是两回事
+        'dm_wipe'    => '清除机器人与客服的私讯纪录',
     ],
     'staff_manage' => [
         'view' => '查看内部管理',

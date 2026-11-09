@@ -186,6 +186,22 @@ class Kernel extends ConsoleKernel
         $schedule->command('ticket:escalate')->everyMinute()->withoutOverlapping(10);
 
         /*
+         * 每十分鐘清掉超過保留時數的同仁私訊（需求方 2026-11-09）。
+         *
+         * ⚠ 總開關預設關（`staff_dm_wipe.auto_enabled`），服務自己會短路 ——
+         * 掛排程不等於開始刪東西。
+         *
+         * ⚠ **十分鐘而不是每分鐘**：它一次處理上千則、而且沒有「越早刪越好」
+         * 的需求（保留時數本來就以小時計）。每分鐘跑只是讓同一批訊息被
+         * 重複掃過。
+         *
+         * ⚠ `withoutOverlapping(10)` 的 10 是**鎖的分鐘數**，不是間隔 ——
+         * 不給的話預設 24 小時，程序被 kill 之後清除就停一整天
+         * （2026-11-09 在 ticket:escalate 踩過同一個坑）。
+         */
+        $schedule->command('staff-dm:wipe')->everyTenMinutes()->withoutOverlapping(10);
+
+        /*
          * 每分鐘把登入紀錄私訊通知給帳號本人（需求方 2026-11-05）。
          *
          * ⚠ **一定要每分鐘**：排程間隔等於通知的延遲，而這是安全通知 ——

@@ -246,6 +246,18 @@ return [
              * 群組裡有誰、訊息會被轉去哪，不是後台權限管得到的。
              */
             'telegram_chat.regulation' => 'permission.telegram_chat.regulation',
+
+            /*
+             * 清除機器人與客服的私訊紀錄（需求方 2026-11-09）。
+             *
+             * ⚠⚠ **不沿用 `telegram_chat.delete`**（那是刪**群組**對話紀錄），
+             * 也不沿用 `notification.manage`（那是改通知設定）。理由：
+             *
+             * 這個權限能**不可逆地刪掉同仁收到的通知**，而其中包含「哪張單
+             * 逾時了」那種責任紀錄 —— 它同時是一個**可以用來掩蓋「我沒處理」
+             * 的工具**。所以它必須單獨指派、而且有稽核（`staff_dm_wipe_log`）。
+             */
+            'telegram_chat.dm_wipe' => 'permission.telegram_chat.dm_wipe',
         ],
     ],
 

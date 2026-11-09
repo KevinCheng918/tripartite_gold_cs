@@ -65,6 +65,20 @@
                     <i class="fas fa-hourglass-half me-1"></i>{{ trans('notification.tab_followup') }}
                 </a>
             </li>
+            {{--
+                私訊清除（需求方 2026-11-09）。
+
+                ⚠ 獨立 keyword，**不是** notification.manage —— 這個分頁能
+                不可逆地刪掉同仁收到的通知，而其中包含「哪張單逾時了」那種
+                責任紀錄。沒有權限的人連分頁都不該看到（資料也不會送下來）。
+            --}}
+            @if (Auth::user()->hasPermission('telegram_chat.dm_wipe'))
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="tab" href="#tab-dm-wipe" role="tab">
+                        <i class="fas fa-user-shield me-1"></i>{{ trans('notification.tab_dm_wipe') }}
+                    </a>
+                </li>
+            @endif
         </ul>
 
         <div class="tab-content">
@@ -810,8 +824,117 @@
                 </div>
             </div>
 
+            {{-- ============ 分頁十一：私訊清除（需求方 2026-11-09）============ --}}
+            @if (Auth::user()->hasPermission('telegram_chat.dm_wipe'))
+                <div class="tab-pane fade" id="tab-dm-wipe" role="tabpanel">
+                    <div class="main-card mb-3 card">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ trans('notification.dm_wipe_title') }}</h5>
+                            <p class="text-muted" style="font-size:0.875rem">{{ trans('notification.dm_wipe_desc') }}</p>
+
+                            {{--
+                                ⚠⚠ 這兩個警示是這個功能最重要的兩句話，**不能收進小字裡**：
+
+                                一、48 小時以前的永遠刪不掉。不講的話，使用者按完會以為
+                                　　乾淨了，然後**不去做真正有效的事**（請同仁自己刪、換帳號）。
+                                二、它防的是「同仁的手機被看到」，不是防 bot token 外流 ——
+                                　　拿到 token 的人本來就讀不到歷史訊息。
+                            --}}
+                            <div class="alert alert-warning py-2" style="font-size:0.8125rem">
+                                {{ trans('notification.dm_wipe_limit', ['hours' => config('constants.STAFF_DM_WIPE.DELETE_WINDOW_HOURS')]) }}
+                            </div>
+                            <div class="alert alert-secondary py-2" style="font-size:0.8125rem">
+                                {{ trans('notification.dm_wipe_scope') }}
+                            </div>
+
+                            {{-- 自動清除的設定 --}}
+                            <form id="form-dm-wipe">
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="dm-wipe-auto">
+                                    <label class="form-check-label" for="dm-wipe-auto">{{ trans('notification.dm_wipe_auto') }}</label>
+                                    <small class="form-text text-muted d-block">{{ trans('notification.dm_wipe_auto_hint') }}</small>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-5 mb-3">
+                                        <label class="form-label" for="dm-wipe-keep">{{ trans('notification.dm_wipe_keep') }}</label>
+                                        <input type="number" class="form-control" id="dm-wipe-keep"
+                                               min="{{ config('constants.STAFF_DM_WIPE.MIN_KEEP_HOURS') }}"
+                                               max="{{ config('constants.STAFF_DM_WIPE.MAX_KEEP_HOURS') }}" step="1">
+                                        <small class="form-text text-muted">
+                                            {{ trans('notification.dm_wipe_keep_hint', [
+                                                'max'   => config('constants.STAFF_DM_WIPE.MAX_KEEP_HOURS'),
+                                                'hours' => config('constants.STAFF_DM_WIPE.DELETE_WINDOW_HOURS'),
+                                            ]) }}
+                                        </small>
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary js-manage-only">{{ trans('notification.action_save') }}</button>
+                            </form>
+
+                            {{-- 手動清除：放在表單外面，理由同測試撥號（選單不該被一起送出） --}}
+                            <hr class="my-3">
+                            <div class="row align-items-end">
+                                <div class="col-md-5 mb-2">
+                                    <label class="form-label" for="dm-wipe-user">{{ trans('notification.dm_wipe_target') }}</label>
+                                    <select class="form-select" id="dm-wipe-user"></select>
+                                </div>
+                                <div class="col-md-7 mb-2">
+                                    <button type="button" class="btn btn-outline-danger js-manage-only" id="btn-dm-wipe">
+                                        <i class="fas fa-trash-alt me-1"></i>{{ trans('notification.dm_wipe_action') }}
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-text">{{ trans('notification.dm_wipe_action_hint') }}</div>
+                        </div>
+                    </div>
+
+                    {{--
+                        稽核紀錄。
+
+                        ⚠⚠ 這張卡不是裝飾：能清掉自己通知紀錄的按鈕，正是內部人員
+                        要掩蓋「我沒處理那張單」時會用的東西。看得見的紀錄才有嚇阻力。
+                        （紀錄表本身**不會**被這個功能清掉，也沒有 TTL 排程）
+                    --}}
+                    <div class="main-card mb-3 card">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ trans('notification.dm_wipe_log_title') }}</h5>
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <tbody id="dm-wipe-log"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
         </div>
     </div>
+
+    {{--
+        清除前的二次確認（不用 confirm/alert，比照這一頁既有的 modal 慣例）。
+
+        ⚠ 這個 modal 存在的理由不是禮貌：操作不可逆、而且會刪掉同仁那一側
+        還沒讀的通知。
+    --}}
+    @if (Auth::user()->hasPermission('telegram_chat.dm_wipe'))
+        <div class="modal fade" id="modal-dm-wipe-confirm" tabindex="-1">
+            <div class="modal-content-wrapper modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="dm-wipe-confirm-title"></h5>
+                    </div>
+                    <div class="modal-body" style="font-size:0.875rem">{{ trans('notification.dm_wipe_confirm_body') }}</div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('notification.action_cancel') }}</button>
+                        <button type="button" class="btn btn-danger" id="btn-dm-wipe-confirm">{{ trans('notification.dm_wipe_action') }}</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 
     {{-- 訊息 Modal（不用 alert） --}}
     <div class="modal fade" id="modal-notification-msg" tabindex="-1">

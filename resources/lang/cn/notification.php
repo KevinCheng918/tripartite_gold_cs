@@ -17,6 +17,7 @@ return [
     'tab_finance'    => '财务申请',
     'tab_wallet'     => '钱包转帐',
     'tab_followup'   => '待跟进事项',
+    'tab_dm_wipe'    => '私讯清除',
 
     'select_all' => '全选',
     'unbound'    => '未绑定',
@@ -74,6 +75,29 @@ return [
     'escalation_test_user' => '拨给谁',
     'escalation_test_hint' => '会**真的拨一通**给选定的同事、响 :seconds 秒。请先告知他，不然他会被吓到。⚠ 名单跟真正会被拨的人一致：**会被排班、而且填了 Telegram 帐号**的人。没填帐号的拨不出去，工程师帐号不会被排班所以不列。',
     'escalation_call_missing' => '拨号功能尚未设定完成（需要 Telegram 应用程式凭证与登入档）—— 在那之前只会私讯，不会拨电话。',
+
+    // ===== 私讯清除（需求方 2026-11-09）=====
+    'dm_wipe_title'        => '清除机器人与客服的私讯纪录',
+    'dm_wipe_desc'         => '把机器人发给同事的私讯从 Telegram 删掉（同事那一侧也会消失）。所有通知都算：逾时升级、班表、打卡、任务卡、审核、财务、钱包、待追踪、登入通知。',
+    'dm_wipe_limit'        => '⚠ Telegram 只允许删除送出未满 :hours 小时的讯息。超过的**永久删不掉**，后台做什么都没用 —— 下面每个人的「已过期」就是那些。真的要清掉只能请同事自己删除那段对话。',
+    'dm_wipe_scope'        => '⚠ 这个功能**防的是同事的手机或帐号被人看到**。它不是在防机器人金钥外流 —— 拿到机器人 token 的人本来就读不到任何历史讯息。',
+    'dm_wipe_auto'         => '自动清除',
+    'dm_wipe_auto_hint'    => '打开之后，排程每 10 分钟把超过保留时数的私讯删掉。⚠ **第一次执行就会清掉现有的那些**，包含同事还没读的通知 —— 私讯就是通知本身。',
+    'dm_wipe_keep'         => '保留最近几小时',
+    'dm_wipe_keep_hint'    => '这几小时内的私讯不会被自动清除。⚠ 上限 :max 小时：超过 :hours 小时就删不掉了，设得太接近会让自动清除看起来开着却清不到东西。手动清除**不受这个设定影响**。',
+    'dm_wipe_target'       => '清除谁的私讯',
+    'dm_wipe_action'       => '立即清除',
+    'dm_wipe_action_hint'  => '手动清除会删掉这个人目前**所有**删得掉的私讯，不管保留时数 —— 给离职、手机遗失这种情况用。⚠ 不可逆，而且他还没读的通知会一起消失。',
+    'dm_wipe_counts'       => '可清 :pending 则／已过期 :expired 则',
+    'dm_wipe_confirm'      => '确定要清除 :name 的私讯吗？',
+    'dm_wipe_confirm_body' => '会把机器人发给他的私讯从 Telegram 删掉，他那一侧也会消失，包含还没读的通知。这个动作不可逆，而且会留下稽核纪录。',
+    'dm_wipe_log_title'    => '最近的清除纪录',
+    'dm_wipe_log_empty'    => '还没有清除纪录。',
+    'dm_wipe_log_head'     => '时间／操作者／对象／结果',
+    'dm_wipe_source_manual' => '后台手动',
+    'dm_wipe_source_auto'  => '排程自动',
+    'dm_wipe_no_permission' => '您没有清除私讯的权限。',
+
 
     // ===== 班别交接 =====
     /*
@@ -228,6 +252,8 @@ return [
     'action_save'    => '保存',
     'action_saving'  => '保存中…',
     'action_testing' => '发送中…',
+    'action_cancel'  => '取消',
+    'action_wiping'  => '清除中…',
 
     /*
      * 话题分流可以勾的通知类型。
@@ -316,6 +342,14 @@ return [
         'followup_stale_required'   => '请填写几天没结果就能收掉（不自动收请填 0）',
         'followup_stale_invalid'    => '天数须介于 0 到 365 天',
 
+        'dm_wipe_done'          => '已清除 :name 的 :cleared 则私讯。',
+        'dm_wipe_with_expired'  => '已清除 :name 的 :cleared 则私讯。⚠ 另有 :expired 则送出已超过 48 小时，Telegram 永久不允许删除 —— 那些还在他的 Telegram 里，只能请他自己删除那段对话。',
+        'dm_wipe_partial'       => '已清除 :name 的 :cleared 则私讯，:failed 则这次送不出去（维持未处理，排程会再试）。另有 :expired 则已超过 48 小时、永久删不掉。',
+        'dm_wipe_no_user'       => '找不到这个人，或他没有绑定 Telegram（没绑就不会有私讯）。',
+        'dm_wipe_failed'        => '清除私讯失败。',
+        'dm_wipe_hours_required' => '请填保留时数。',
+        'dm_wipe_hours_invalid' => '保留时数请填 :min 到 :max 之间的整数（:max 以上就超过 Telegram 的删除期限了）。',
+        'dm_wipe_removed_account' => '（已删除的帐号）',
         'call_test_sent'        => '已拨给 :name，请确认他的手机有响（没有语音内容，接起来会断线，那是正常的）',
         'call_test_not_ready'   => '拨号设定还没完成 —— 请先在伺服器上执行 php artisan telegram:call-login',
         'call_test_no_user'     => '找不到这个人，或他没有填 Telegram 帐号（没填就拨不出去）',

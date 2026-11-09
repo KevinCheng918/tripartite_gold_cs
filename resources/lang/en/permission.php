@@ -106,6 +106,8 @@ return [
         'spider_setting' => 'Build a spider_setting by command',
         'gmail_credential' => 'Verify Gmail credentials by command',
         'regulation' => 'Fetch system regulations by command',
+        // Not the same as delete above, which removes GROUP chat records
+        'dm_wipe'    => 'Wipe bot-to-staff direct message history',
         'reply'     => 'Reply messages',
         'assign'    => 'Assign duty staff',
         'broadcast' => 'Broadcast announcement',

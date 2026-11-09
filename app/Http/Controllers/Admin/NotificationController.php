@@ -13,6 +13,8 @@ use App\Http\Requests\Notification\UpdateFollowupRequest;
 use App\Http\Requests\Notification\UpdateRemindRequest;
 use App\Http\Requests\Notification\UpdateReportRequest;
 use App\Http\Requests\Notification\TestCallRequest;
+use App\Http\Requests\Notification\UpdateStaffDmWipeRequest;
+use App\Http\Requests\Notification\WipeStaffDmRequest;
 use App\Http\Requests\Notification\UpdateShiftHandoverRequest;
 use App\Http\Requests\Notification\UpdateTicketEscalationRequest;
 use App\Http\Requests\Notification\UpdateShiftNoticeRequest;
@@ -21,6 +23,7 @@ use App\Http\Requests\Notification\UpdateTopicRequest;
 use App\Services\NotificationSettingService;
 use App\Services\ShiftNoticeService;
 use App\Services\StaffDmService;
+use App\Services\StaffDmWipeService;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -37,10 +40,15 @@ use Illuminate\Support\Facades\Log;
 class NotificationController extends Controller
 {
     private $settingService;
+    private $wipeService;
 
-    public function __construct(NotificationSettingService $settingService)
-    {
+    public function __construct(
+        NotificationSettingService $settingService,
+        StaffDmWipeService $wipeService
+    ) {
         $this->settingService = $settingService;
+        // 清除機器人與同仁的私訊（獨立權限，資料不隨頁面一起給）
+        $this->wipeService = $wipeService;
     }
 
     /**
@@ -52,8 +60,23 @@ class NotificationController extends Controller
      */
     public function index()
     {
+        $settings = $this->settingService->forPage();
+
+        /*
+         * ⚠ **私訊清除的資料只給有那個權限的人。**
+         *
+         * 它帶著稽核紀錄（誰清了誰）與每位同仁的私訊則數 ——
+         * 那是獨立 keyword 控管的東西，不該因為「看得到通知設定」就看得到。
+         *
+         * 權限判斷放在 Controller 而不是 Service：這一頁其他區塊都不需要
+         * 它，把 auth 推進 Service 會讓那支變成「看呼叫者是誰」的東西。
+         */
+        if (Auth::user()->hasPermission('telegram_chat.dm_wipe')) {
+            $settings['dm_wipe'] = $this->wipeService->settings();
+        }
+
         return view('admin.notification.index', [
-            'initialSettings' => $this->settingService->forPage(),
+            'initialSettings' => $settings,
         ]);
     }
 
@@ -185,6 +208,61 @@ class NotificationController extends Controller
             ]);
 
             return response()->json(['message' => trans('notification.msg.call_test_failed')], 500);
+        }
+    }
+
+    /**
+     * Ajax 清除某一位同仁的私訊
+     *
+     * ⚠⚠ **這是不可逆的操作**，而且會把**同仁那一側也刪掉** ——
+     * 包含他可能還沒讀的通知。前端有二次確認。
+     *
+     * ⚠ 清不乾淨（有超過 48 小時的）**不算失敗**，照樣回 200 ——
+     * 那是 Telegram 的限制、不是操作出錯，而訊息裡會講清楚剩幾則刪不掉。
+     *
+     * @param WipeStaffDmRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxWipeDm(WipeStaffDmRequest $request)
+    {
+        $params = $request->validated();
+
+        try {
+            $result = $this->wipeService->wipeForUser(Arr::get($params, 'user_id'), Auth::user());
+
+            return response()->json(
+                ['message' => Arr::get($result, 'message')],
+                Arr::get($result, 'ok') ? 200 : 422
+            );
+        } catch (\Exception $e) {
+            Log::error('私訊清除失敗', [
+                'error'   => $e->getMessage(),
+                'user_id' => Auth::id(),
+                'target'  => Arr::get($params, 'user_id'),
+            ]);
+
+            return response()->json(['message' => trans('notification.msg.dm_wipe_failed')], 500);
+        }
+    }
+
+    /**
+     * Ajax 更新私訊自動清除的設定
+     *
+     * @param UpdateStaffDmWipeRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxUpdateDmWipe(UpdateStaffDmWipeRequest $request)
+    {
+        $params = $request->validated();
+
+        try {
+            $this->wipeService->updateSettings($params, Auth::id());
+
+            return response()->json(['message' => trans('notification.msg.saved')]);
+        } catch (\Exception $e) {
+            Log::error('私訊清除設定更新失敗', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
+
+            return response()->json(['message' => trans('notification.msg.save_failed')], 500);
         }
     }
 

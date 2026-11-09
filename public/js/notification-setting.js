@@ -758,6 +758,160 @@
         });
     }
 
+    // ===== 私訊清除（獨立分頁，獨立權限） =====
+
+    /**
+     * 畫私訊清除那一頁
+     *
+     * ⚠ `settings.dm_wipe` **可能整個不存在** —— 沒有 `telegram_chat.dm_wipe`
+     * 權限的人，後端刻意不把這段資料送下來（裡面有稽核紀錄與每個人的私訊
+     * 則數）。所以這裡要先確認資料與 DOM 都在，兩者缺一就什麼都不做。
+     */
+    function renderDmWipe() {
+        var wipe = settings.dm_wipe;
+        var select = document.getElementById('dm-wipe-user');
+        if (!wipe || !select) { return; }
+
+        document.getElementById('dm-wipe-auto').checked = !!wipe.auto_enabled;
+        document.getElementById('dm-wipe-keep').value = wipe.keep_hours;
+
+        var html = '';
+
+        (wipe.candidates || []).forEach(function (user) {
+            /*
+             * ⚠ 「已過期」要寫在選項上，不是只寫在結果訊息裡 ——
+             * 使用者要在**按下去之前**就知道這個人有多少則是永久清不掉的。
+             */
+            var counts = (i18n.dm_wipe_counts || '')
+                .replace(':pending', user.pending)
+                .replace(':expired', user.expired);
+
+            html += '<option value="' + user.id + '">' +
+                escapeHtml(user.nickname + '（' + counts + '）') + '</option>';
+        });
+
+        select.innerHTML = html;
+        document.getElementById('btn-dm-wipe').disabled = (wipe.candidates || []).length === 0;
+
+        renderDmWipeLog(wipe.logs || []);
+    }
+
+    /**
+     * 稽核紀錄表
+     *
+     * ⚠ 這張表是這個功能的嚇阻力來源，不是裝飾 —— 空的時候也要講一句，
+     * 不要留一塊空白讓人以為壞了。
+     */
+    function renderDmWipeLog(logs) {
+        var body = document.getElementById('dm-wipe-log');
+        if (!body) { return; }
+
+        if (!logs.length) {
+            body.innerHTML = '<tr><td class="text-muted">' + escapeHtml(i18n.dm_wipe_log_empty) + '</td></tr>';
+
+            return;
+        }
+
+        var html = '';
+
+        logs.forEach(function (log) {
+            var source = log.source === 1 ? i18n.dm_wipe_source_manual : i18n.dm_wipe_source_auto;
+            var result = (i18n.dm_wipe_counts || '')
+                .replace(':pending', log.cleared)
+                .replace(':expired', log.expired);
+
+            html += '<tr>' +
+                '<td class="text-muted" style="white-space:nowrap">' + escapeHtml(log.at) + '</td>' +
+                '<td>' + escapeHtml(log.operator) + '<small class="text-muted ms-1">' + escapeHtml(source) + '</small></td>' +
+                '<td>' + escapeHtml(log.target) + '</td>' +
+                '<td class="text-muted">' + escapeHtml(result) +
+                (log.failed > 0 ? '<span class="text-danger ms-1">／' + log.failed + '</span>' : '') +
+                '</td>' +
+                '</tr>';
+        });
+
+        body.innerHTML = html;
+    }
+
+    function bindDmWipe() {
+        var form = document.getElementById('form-dm-wipe');
+        if (!form) { return; }
+
+        form.addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            var wipe = settings.dm_wipe || {};
+            var hours = parseInt(document.getElementById('dm-wipe-keep').value, 10);
+
+            submit('/admin/notification/ajax-update-dm-wipe', {
+                // 後端用 filled() 判斷，沒勾就送 null（不要送 false —— 那也是 filled）
+                auto_enabled: document.getElementById('dm-wipe-auto').checked ? 1 : null,
+                // 空白或非數字時退回後端給的值，不要自己寫死一個數字
+                keep_hours: hours || wipe.keep_hours
+            }, event.target.querySelector('button[type="submit"]'), function () {
+                settings.dm_wipe.auto_enabled = document.getElementById('dm-wipe-auto').checked;
+                settings.dm_wipe.keep_hours = hours || wipe.keep_hours;
+            });
+        });
+
+        /*
+         * ⚠ **先確認再清**。操作不可逆，而且會刪掉同仁那一側還沒讀的通知 ——
+         * 這個 modal 不是禮貌，是最後一道煞車。
+         */
+        document.getElementById('btn-dm-wipe').addEventListener('click', function () {
+            var select = document.getElementById('dm-wipe-user');
+            var name = select.options[select.selectedIndex] ? select.options[select.selectedIndex].text : '';
+
+            document.getElementById('dm-wipe-confirm-title').textContent =
+                (i18n.dm_wipe_confirm || '').replace(':name', name);
+
+            new bootstrap.Modal(document.getElementById('modal-dm-wipe-confirm')).show();
+        });
+
+        document.getElementById('btn-dm-wipe-confirm').addEventListener('click', function () {
+            var modalEl = document.getElementById('modal-dm-wipe-confirm');
+            var instance = bootstrap.Modal.getInstance(modalEl);
+
+            if (instance) { instance.hide(); }
+
+            wipeDm(this);
+        });
+    }
+
+    /**
+     * 真的送出清除
+     *
+     * ⚠ 完成後**重新載入頁面**：清完之後每個人的則數、稽核紀錄全都變了，
+     * 只改畫面上的數字會跟後端對不上（而這一頁的數字是安全判斷的依據，
+     * 不能讓它顯示過期的值）。
+     */
+    function wipeDm(button) {
+        var userId = parseInt(document.getElementById('dm-wipe-user').value, 10);
+        var original = button.textContent;
+
+        button.disabled = true;
+        button.textContent = i18n.action_wiping;
+
+        apiFetch('/admin/notification/ajax-wipe-dm', {
+            method: 'POST',
+            body: JSON.stringify({ user_id: userId })
+        })
+            .then(function (body) {
+                showMessage(body.message || i18n.msg.dm_wipe_done);
+
+                // 訊息關掉之後重載，讓則數與稽核紀錄回到真實狀態
+                document.getElementById('modal-notification-msg')
+                    .addEventListener('hidden.bs.modal', function () { window.location.reload(); }, { once: true });
+            })
+            .catch(function (body) {
+                showMessage(errorMessage(body, i18n.msg.dm_wipe_failed));
+            })
+            .then(function () {
+                button.disabled = false;
+                button.textContent = original;
+            });
+    }
+
     // ===== 班別交接（放在「班表通知」分頁） =====
 
     function renderShiftHandover() {
@@ -893,6 +1047,16 @@
         if (canManage) { return; }
 
         root.querySelectorAll('input, select, textarea, button.js-manage-only').forEach(function (el) {
+            /*
+             * ⚠ **私訊清除是獨立權限**（`telegram_chat.dm_wipe`），跟
+             * `notification.manage` 無關 —— 刻意分開的，因為它能不可逆地
+             * 刪掉同仁的通知。
+             *
+             * 不排除的話，「有清除權限、但沒有改通知設定權限」的人會看到
+             * 那個分頁卻什麼都按不動（分頁本身是後端依權限渲染的）。
+             */
+            if (el.closest('#tab-dm-wipe')) { return; }
+
             el.disabled = true;
         });
     }
@@ -913,6 +1077,7 @@
     renderFinance();
     renderWallet();
     renderFollowup();
+    renderDmWipe();
     applyPermission();
 
     if (canManage) {
@@ -931,4 +1096,15 @@
         bindWallet();
         bindFollowup();
     }
+
+    /*
+     * ⚠ **私訊清除刻意在 `canManage` 之外綁定。**
+     *
+     * 它走的是獨立權限 `telegram_chat.dm_wipe`，而那個分頁本身是後端依權限
+     * 渲染的 —— `bindDmWipe()` 自己會用「表單在不在」當判斷。
+     *
+     * 放進上面那個區塊的話，「有清除權限、沒有改通知設定權限」的人會看到
+     * 分頁、按鈕也沒被鎖住，但**一個事件都沒綁** —— 按下去完全沒反應。
+     */
+    bindDmWipe();
 }());

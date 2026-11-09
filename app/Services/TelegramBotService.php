@@ -256,6 +256,78 @@ class TelegramBotService
     }
 
     /**
+     * 批次刪除訊息
+     *
+     * ⚠⚠ **Telegram 只允許刪送出未滿 48 小時的訊息**，超過就永久刪不掉。
+     * 這是 Telegram 的限制，不是權限問題，也沒有任何參數可以放寬。
+     *
+     * ⚠ **刪不掉的訊息會被靜默跳過、整批仍回傳成功** —— 所以拿不到逐則
+     * 結果，分不出「我刪掉的」與「對方早就自己刪掉的」。呼叫端不要試圖
+     * 從回傳值推論單則狀態（48 小時那條線請自己用送出時間算）。
+     *
+     * ⚠ 私訊中 bot 可以刪**雙方**的訊息，所以這支會把同仁那一側也清掉 ——
+     * 那正是目的，但也意味著**他還沒讀的通知會一起消失**。
+     *
+     * @param int|string $chatId
+     * @param array      $messageIds 一次最多 100 則（Telegram 的限制）
+     * @return array{ok: bool, description: string|null}
+     */
+    public function deleteMessages($chatId, array $messageIds)
+    {
+        if (blank($messageIds)) {
+            return ['ok' => true, 'description' => null];
+        }
+
+        try {
+            $response = $this->client->post("{$this->getBaseUrl()}/deleteMessages", [
+                'json' => [
+                    'chat_id'     => $chatId,
+                    'message_ids' => array_values(array_map('intval', $messageIds)),
+                ],
+            ]);
+
+            $body = json_decode($response->getBody()->getContents(), true);
+
+            return [
+                'ok'          => (bool) Arr::get((array) $body, 'ok'),
+                'description' => Arr::get((array) $body, 'description'),
+            ];
+        } catch (\Exception $e) {
+            $description = $this->errorDescription($e);
+
+            Log::warning('Telegram deleteMessages 失敗', [
+                'chat_id'     => $chatId,
+                'count'       => count($messageIds),
+                'description' => $description,
+                'error'       => $e->getMessage(),
+            ]);
+
+            return ['ok' => false, 'description' => $description];
+        }
+    }
+
+    /**
+     * 從 Guzzle 例外裡挖出 Telegram 給的 `description`
+     *
+     * ⚠ 這個字串是唯一能說明「為什麼刪不掉」的線索（被封鎖、chat 不存在、
+     * 訊息太舊…）。只記 `$e->getMessage()` 的話只會看到 HTTP 400，
+     * 完全看不出要去處理什麼。
+     *
+     * @param \Exception $e
+     * @return string|null
+     */
+    private function errorDescription(\Exception $e)
+    {
+        if (!($e instanceof \GuzzleHttp\Exception\RequestException) || blank($e->getResponse())) {
+            return null;
+        }
+
+        $body = json_decode((string) $e->getResponse()->getBody(), true);
+
+        return Arr::get((array) $body, 'description');
+    }
+
+    /**
      * 回應 callback_query
      *
      * 按下按鈕後一定要回這支，否則 Telegram 客戶端上的按鈕會一直轉圈。

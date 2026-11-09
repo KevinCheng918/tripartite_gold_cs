@@ -623,6 +623,31 @@ class UserRepository
     }
 
     /**
+     * 私訊清除的對象名單
+     *
+     * ⚠ **不排除任何身份**（跟 `getDmCandidates()` 不一樣，那支排除管理者）。
+     * 理由：管理者也收得到私訊 —— 登入通知就是發給本人的，不經過
+     * 「通知設定的收件人名單」。排除他的話，他的私訊永遠清不掉，
+     * 而這是個安全功能，留一個清不到的人就是留一個洞。
+     *
+     * ⚠ 只看 `telegram_user_id` 不看 `telegram_dm_ready`：收得到私訊的人
+     * 一定有前者，而後者可能被重設（他把機器人封鎖又解除）——
+     * 用後者過濾會讓已經發出去的私訊變成清不掉。
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getDmWipeCandidates()
+    {
+        return User::query()
+            ->select(['id', 'nickname'])
+            ->where('status', config('constants.USER.STATUS.NORMAL'))
+            ->whereNotNull('telegram_user_id')
+            ->orderBy('level')
+            ->orderBy('nickname')
+            ->get();
+    }
+
+    /**
      * 可以被撥電話的帳號清單（逾時升級的測試撥號用）
      *
      * ⚠ **跟 `getDmCandidates()` 條件相同但欄位不同**，不要互相取代：

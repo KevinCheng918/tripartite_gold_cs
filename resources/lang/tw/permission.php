@@ -103,6 +103,8 @@ return [
         'spider_setting'  => '用指令做 spider_setting',
         'gmail_credential' => '用指令驗 Gmail 憑證',
         'regulation' => '用指令取系統規章',
+        // ⚠ 跟上面的 delete（刪群組對話紀錄）是兩回事
+        'dm_wipe'    => '清除機器人與客服的私訊紀錄',
     ],
     'setting' => [
         'view'   => '檢視 AI 引擎設定與用量',

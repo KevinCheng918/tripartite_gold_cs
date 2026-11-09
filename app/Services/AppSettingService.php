@@ -240,6 +240,19 @@ class AppSettingService
     const KEY_ESCALATION_CALL_INTERVAL = 'ticket_escalation.call_interval';
     const KEY_ESCALATION_MANAGER       = 'ticket_escalation.manager_user_ids';
 
+    /*
+     * 清除機器人與同仁的私訊（通知設定 → 私訊清除）
+     *
+     * ⚠ **`AUTO_ENABLED` 預設關**（需求方 2026-11-09）：打開之後排程會把
+     * 超過保留時數的私訊刪掉，而**私訊就是通知本身** —— 還沒讀的也會一起
+     * 消失。那不是副作用，是這個功能的定義，但要由人明確打開。
+     *
+     * ⚠ 沒有「要不要記錄 message_id」的開關 —— 一律記。
+     * 理由見 `StaffDmService::recordForWipe()`。
+     */
+    const KEY_DM_WIPE_AUTO_ENABLED = 'staff_dm_wipe.auto_enabled';
+    const KEY_DM_WIPE_KEEP_HOURS   = 'staff_dm_wipe.keep_hours';
+
     // 每日匯率報價（匯率頁維護）
     const KEY_DAILY_RATE_TEMPLATE = 'daily_rate.ask_template';
 

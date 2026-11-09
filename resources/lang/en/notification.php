@@ -17,6 +17,7 @@ return [
     'tab_finance'    => 'Finance',
     'tab_wallet'     => 'Wallet',
     'tab_followup'   => 'Follow-ups',
+    'tab_dm_wipe'    => 'DM wipe',
 
     'select_all' => 'Select all',
     'unbound'    => 'not linked',
@@ -75,6 +76,29 @@ return [
     'escalation_test_user' => 'Call',
     'escalation_test_hint' => 'This **really places a call** to the person selected and rings for :seconds seconds. Tell them first or they will be startled. ⚠ The list matches who actually gets called: staff who **can be rostered and have a Telegram username**. Without a username they cannot be called, and engineer accounts are never rostered so they are not listed.',
     'escalation_call_missing' => 'Calling is not fully configured yet (it needs Telegram application credentials and a login file) — until then only direct messages are sent, no calls.',
+
+    // ===== Direct message wipe (requested 2026-11-09) =====
+    'dm_wipe_title'        => 'Wipe bot-to-staff direct messages',
+    'dm_wipe_desc'         => 'Deletes the direct messages the bot sent to staff from Telegram (they disappear on the staff side too). Covers every notification: overdue escalation, shifts, clock-in, task cards, approvals, finance, wallet, follow-ups and login notices.',
+    'dm_wipe_limit'        => '⚠ Telegram only allows deleting messages sent less than :hours hours ago. Anything older **can never be deleted** — that is what each person\'s "expired" count below means. The only way to clear those is to ask the staff member to delete the conversation themselves.',
+    'dm_wipe_scope'        => '⚠ This protects against **someone getting hold of a staff member\'s phone or account**. It does not protect against a leaked bot token — whoever holds the token cannot read past messages anyway.',
+    'dm_wipe_auto'         => 'Automatic wipe',
+    'dm_wipe_auto_hint'    => 'Once on, the scheduler deletes direct messages older than the retention window every 10 minutes. ⚠ **The first run clears what is already there**, including notices staff have not read — the direct message IS the notification.',
+    'dm_wipe_keep'         => 'Retain the last N hours',
+    'dm_wipe_keep_hint'    => 'Messages within this window are left alone by the automatic wipe. ⚠ Max :max hours: anything past :hours hours can no longer be deleted, so setting it too close makes the automatic wipe look enabled while clearing nothing. Manual wipe **ignores this setting**.',
+    'dm_wipe_target'       => 'Whose messages to wipe',
+    'dm_wipe_action'       => 'Wipe now',
+    'dm_wipe_action_hint'  => 'A manual wipe deletes **every** still-deletable direct message for that person regardless of the retention window — for departures and lost phones. ⚠ Irreversible, and any notice they have not read goes with it.',
+    'dm_wipe_counts'       => ':pending deletable / :expired expired',
+    'dm_wipe_confirm'      => 'Wipe :name\'s direct messages?',
+    'dm_wipe_confirm_body' => 'This deletes the bot\'s direct messages from Telegram, including on their side and including unread notices. The action is irreversible and is recorded in the audit log.',
+    'dm_wipe_log_title'    => 'Recent wipes',
+    'dm_wipe_log_empty'    => 'No wipes recorded yet.',
+    'dm_wipe_log_head'     => 'Time / operator / target / result',
+    'dm_wipe_source_manual' => 'Manual',
+    'dm_wipe_source_auto'  => 'Scheduled',
+    'dm_wipe_no_permission' => 'You do not have permission to wipe direct messages.',
+
 
     // ===== Shift Handover =====
     /*
@@ -230,6 +254,8 @@ return [
     'action_save'    => 'Save',
     'action_saving'  => 'Saving…',
     'action_testing' => 'Sending…',
+    'action_cancel'  => 'Cancel',
+    'action_wiping'  => 'Wiping…',
 
     /*
      * Notification types that a topic can subscribe to.
@@ -320,6 +346,14 @@ return [
         'followup_stale_required'   => 'Please enter the number of days (use 0 to never close automatically)',
         'followup_stale_invalid'    => 'Days must be between 0 and 365',
 
+        'dm_wipe_done'          => 'Cleared :cleared direct messages for :name.',
+        'dm_wipe_with_expired'  => 'Cleared :cleared direct messages for :name. ⚠ Another :expired were sent more than 48 hours ago and Telegram will never allow deleting them — those are still in their Telegram; only they can remove the conversation.',
+        'dm_wipe_partial'       => 'Cleared :cleared direct messages for :name; :failed could not be sent this time (left unprocessed, the scheduler will retry). Another :expired are past 48 hours and can never be deleted.',
+        'dm_wipe_no_user'       => 'No such person, or they have no Telegram linked (without it there are no direct messages).',
+        'dm_wipe_failed'        => 'Failed to wipe direct messages.',
+        'dm_wipe_hours_required' => 'Enter a retention window.',
+        'dm_wipe_hours_invalid' => 'The retention window must be a whole number between :min and :max hours (:max or more is past Telegram\'s deletion deadline).',
+        'dm_wipe_removed_account' => '(deleted account)',
         'call_test_sent'        => 'Called :name — check that their phone rang (there is no voice content and answering drops the line; that is normal)',
         'call_test_not_ready'   => 'Calling is not set up yet — run php artisan telegram:call-login on the server first',
         'call_test_no_user'     => 'No such person, or they have no Telegram username (without it they cannot be called)',

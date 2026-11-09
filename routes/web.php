@@ -192,6 +192,16 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::put('/ajax-update-shift-handover', [NotificationController::class, 'ajaxUpdateShiftHandover'])->middleware('can:notification.manage')->name('ajax-update-shift-handover');
         Route::put('/ajax-update-escalation', [NotificationController::class, 'ajaxUpdateEscalation'])->middleware('can:notification.manage')->name('ajax-update-escalation');
         Route::post('/ajax-test-call', [NotificationController::class, 'ajaxTestCall'])->middleware('can:notification.manage')->name('ajax-test-call');
+
+        /*
+         * 清除機器人與同仁的私訊（需求方 2026-11-09）。
+         *
+         * ⚠⚠ **權限刻意不是 `notification.manage`**：那個 keyword 給得比較寬
+         * （誰能改通知設定），而這兩支能**不可逆地刪掉同仁的通知**、
+         * 還會讓人有機會掩蓋「我沒處理那張單」。要單獨指派。
+         */
+        Route::post('/ajax-wipe-dm', [NotificationController::class, 'ajaxWipeDm'])->middleware('can:telegram_chat.dm_wipe')->name('ajax-wipe-dm');
+        Route::put('/ajax-update-dm-wipe', [NotificationController::class, 'ajaxUpdateDmWipe'])->middleware('can:telegram_chat.dm_wipe')->name('ajax-update-dm-wipe');
         Route::put('/ajax-update-task', [NotificationController::class, 'ajaxUpdateTask'])->middleware('can:notification.manage')->name('ajax-update-task');
         Route::post('/ajax-test-task', [NotificationController::class, 'ajaxTestTask'])->middleware('can:notification.manage')->name('ajax-test-task');
         Route::put('/ajax-update-attendance', [NotificationController::class, 'ajaxUpdateAttendance'])->middleware('can:notification.manage')->name('ajax-update-attendance');

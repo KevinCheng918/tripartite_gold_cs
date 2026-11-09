@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Repositories\StaffDmMessageRepository;
 use App\Repositories\UserNoticeMuteRepository;
 use App\Repositories\UserRepository;
 use Illuminate\Support\Arr;
@@ -34,6 +35,7 @@ class StaffDmService
     private $userRepository;
     private $botService;
     private $muteRepository;
+    private $dmMessageRepository;
 
     /**
      * 每種通知的靜音名單，查過就留著
@@ -48,12 +50,15 @@ class StaffDmService
     public function __construct(
         UserRepository $userRepository,
         TelegramBotService $botService,
-        UserNoticeMuteRepository $muteRepository
+        UserNoticeMuteRepository $muteRepository,
+        StaffDmMessageRepository $dmMessageRepository
     ) {
         $this->userRepository = $userRepository;
         $this->botService = $botService;
         // 帳號管理可以逐個帳號關掉某幾種個人版通知
         $this->muteRepository = $muteRepository;
+        // 記下 message_id，讓後台清得掉這些私訊
+        $this->dmMessageRepository = $dmMessageRepository;
     }
 
     /**
@@ -195,6 +200,8 @@ class StaffDmService
             $result = $this->botService->sendMessage($user->telegram_user_id, $text);
 
             if (filled(Arr::get((array) $result, 'result'))) {
+                $this->recordForWipe($user, $result, $noticeKey);
+
                 return true;
             }
 
@@ -206,6 +213,55 @@ class StaffDmService
             Log::error('私訊同仁失敗', ['user_id' => $user->id, 'error' => $e->getMessage()]);
 
             return false;
+        }
+    }
+
+    /**
+     * 記下 message_id，讓這則私訊將來刪得掉
+     *
+     * ⚠⚠ **只記 id，不記內容**。這個功能要防的就是「內部資訊留在同仁的
+     * Telegram 裡」—— 把內容抄進自己的 DB 等於把要防的東西搬到另一個地方。
+     *
+     * ⚠⚠ **記錄失敗絕對不能影響發送**。私訊本身是通知的載體（逾時升級那則
+     * 就是唯一告訴人「哪張單逾時了」的東西）。為了「將來刪得掉」而讓通知發
+     * 不出去，是把主要功能賠給附屬功能。所以整段包在 try/catch 裡，
+     * 失敗只記 log。
+     *
+     * ⚠ **不管開關有沒有開都要記**（刻意的）：手動清除按鈕需要有東西可清，
+     * 而「開了開關才開始記」會讓人按下去發現一則都清不掉。
+     * 代價是打開自動清除時會有一批舊的可清 —— 那是**設定頁明講的行為**，
+     * 不是 `AutoReplyResumeService::recordOff()` 那種會造成意外動作的情況
+     * （那邊是「開啟就會大量自動恢復」，這邊只在排程跑到時才動作）。
+     *
+     * @param object      $user
+     * @param array|null  $result    `sendMessage()` 的回傳
+     * @param string|null $noticeKey
+     * @return void
+     */
+    private function recordForWipe($user, $result, $noticeKey)
+    {
+        try {
+            $messageId = Arr::get((array) $result, 'result.message_id');
+
+            if (blank($messageId)) {
+                return;
+            }
+
+            $this->dmMessageRepository->create([
+                'user_id' => $user->id,
+                /*
+                 * 存**當下的** chat_id 快照：同仁換了 Telegram 帳號之後，
+                 * 舊訊息還是要刪得掉，而那要用舊的 chat_id 才行。
+                 */
+                'telegram_chat_id'    => $user->telegram_user_id,
+                'telegram_message_id' => $messageId,
+                'notice_key'          => $noticeKey,
+            ]);
+        } catch (\Exception $e) {
+            Log::warning('私訊索引寫入失敗（不影響發送）', [
+                'user_id' => $user->id,
+                'error'   => $e->getMessage(),
+            ]);
         }
     }
 
