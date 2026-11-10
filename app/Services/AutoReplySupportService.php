@@ -373,7 +373,7 @@ class AutoReplySupportService
             return;
         }
 
-        $quoted = (array) Arr::get($payload, 'message.reply_to_message', []);
+        $quoted = (array) Arr::get($message, 'reply_to_message', []);
         $quotedId = Arr::get($quoted, 'message_id');
 
         /*
@@ -382,6 +382,13 @@ class AutoReplySupportService
          * 所以這道判斷在 forum 群組裡幾乎擋不掉閒聊了。
          */
         if (blank($quotedId)) {
+            return;
+        }
+
+        $answer = $text;
+
+        // 沒有文字就不可能是作答（貼圖、純圖片的引用）—— 純字串判斷，排在讀設定之前
+        if (blank($answer)) {
             return;
         }
 
@@ -417,12 +424,6 @@ class AutoReplySupportService
             return;
         }
 
-        $answer = $text;
-
-        if (blank($answer)) {
-            return;
-        }
-
         $ticket = $this->matchTicket($quotedId, $message);
 
         if (blank($ticket)) {
@@ -437,7 +438,7 @@ class AutoReplySupportService
          * IGNORED —— 以前那會讓這裡擋下來，同仁再也無法引用作答，只能登入後台。
          */
         if ($ticket->isAnswerDelivered()) {
-            $this->sendToSupport('這張單已經處理過了，如果要更新答案請直接到後台題庫修改。', null, $message['message_id']);
+            $this->sendToSupport('這張單已經處理過了，如果要更新答案請直接到後台題庫修改。', null, Arr::get($message, 'message_id'));
 
             return;
         }
@@ -452,7 +453,7 @@ class AutoReplySupportService
         $this->sendToSupport(
             "收到 {$this->buildSenderName($message)} 的回覆，要怎麼處理？",
             $this->buildActionKeyboard($ticket->id),
-            $message['message_id']
+            Arr::get($message, 'message_id')
         );
     }
 
