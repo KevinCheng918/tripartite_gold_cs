@@ -11,14 +11,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * 題庫裡找不到答案時開一張單，轉到內部支援群組請自己人回答，
  * 再用按鈕決定要回覆客人／加入題庫。
  *
- * ask_message_id 是整條迴路的對應鍵 —— 內部群組同時有好幾張單在跑時，
- * 只有 Telegram 的 reply_to_message.message_id 能把答案精準對回原本那張單。
+ * (ask_chat_id, ask_message_id) 是整條迴路的對應鍵 —— 內部群組同時有好幾張單
+ * 在跑時，只有 Telegram 的 reply_to_message.message_id 能把答案精準對回原本那張單。
+ *
+ * ⚠⚠ **一定要兩個欄位一起比對**（2026-11-10 線上事故）：message_id 只在
+ * 單一 chat 內唯一，支援群組換過 chat 之後新舊兩批單的 ask_message_id 會
+ * 重疊 —— 只比 ask_message_id 的話，答案會被送到**另一個客人**的群組。
  *
  * @property int         $id
  * @property int         $telegram_group_id
  * @property int|null    $message_id          客人那則訊息（TTL 清理後為 null）
  * @property string      $question            客人問題原文（快照）
  * @property int|null    $ask_message_id      求助訊息在內部群組的 telegram message_id
+ * @property int|null    $ask_chat_id         那則求助訊息發在哪個支援群組（舊資料可能為 null）
  * @property string|null $answer              自己人的回答原文
  * @property string|null $answered_by         回答者的 Telegram 顯示名稱
  * @property string|null $answered_at
@@ -36,6 +41,7 @@ class AutoReplyTicket extends Model
         'telegram_group_id'   => 'integer',
         'message_id'          => 'integer',
         'ask_message_id'      => 'integer',
+        'ask_chat_id'         => 'integer',
         'answered_at'         => 'datetime',
         'remind_count'        => 'integer',
         'last_reminded_at'    => 'datetime',

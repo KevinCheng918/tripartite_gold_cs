@@ -13,7 +13,9 @@ class AutoReplyTicketRepository
     /** @var array 求助單欄位 */
     private const COLUMNS = [
         'id', 'telegram_group_id', 'message_id', 'question',
-        'ask_message_id', 'answer', 'answered_by', 'answered_at',
+        // ⚠ ask_chat_id 不能漏：少撈它會讓 Service 的 chat 比對永遠不相符，
+        //   而症狀是「引用回覆完全沒反應」，不會報錯（2026-11-10 事故的那一欄）
+        'ask_message_id', 'ask_chat_id', 'answer', 'answered_by', 'answered_at',
         'remind_count', 'last_reminded_at', 'status', 'quick_reply_item_id',
         'created_at',
     ];
@@ -42,12 +44,31 @@ class AutoReplyTicketRepository
     }
 
     /**
-     * 依內部群組的求助訊息 id 找單
+     * 依內部群組的求助訊息 id 找出**所有**可能的單
      *
      * 自己人引用回覆時，靠這個把答案對回原本那張單。
      *
+     * ⚠⚠ **刻意回傳多筆而不是 `first()`**（2026-11-10 線上事故）：
+     * Telegram 的 message_id **只在單一 chat 內唯一**，而這張表存著歷來
+     * 所有支援群組的單 —— 支援群組換過 chat（開啟話題會讓群組升級成
+     * supergroup 並換發 chat_id）之後，新舊兩批單的 ask_message_id 會重疊。
+     * 當時是無排序的 `first()`，撈到哪一張是**未定義行為**，結果把答案
+     * 送到了另一個客人的群組。
+     *
+     * 真正的對應鍵是 **(ask_chat_id, ask_message_id)**，但比對刻意留在
+     * Service：那裡才知道「現在的支援群組是哪一個」，而且同一次查詢的結果
+     * 還要用來分辨「對不到」與「對到別的 chat」——
+     * 後者要回一句說明給同仁，不能跟閒聊一樣靜靜吃掉。
+     *
+     * ⚠ **不要為了省事改回在這裡 `where('ask_chat_id', ...)`**：那樣
+     * 「這則引用其實屬於舊 chat」這個資訊就在 SQL 裡被丟掉了，
+     * 同仁會看到跟閒聊一模一樣的「沒反應」。
+     *
+     * ⚠ 不設 `limit`：同一個 ask_message_id 最多也只有換過幾次 chat 那幾筆，
+     * 而 `ask_message_id` 本來就有索引。
+     *
      * @param int $askMessageId Telegram message_id
-     * @return AutoReplyTicket|null
+     * @return Collection<AutoReplyTicket> 新的在前
      */
     public function findByAskMessageId($askMessageId)
     {
@@ -55,7 +76,8 @@ class AutoReplyTicketRepository
             ->select(self::COLUMNS)
             ->with('group')
             ->where('ask_message_id', $askMessageId)
-            ->first();
+            ->orderByDesc('id')
+            ->get();
     }
 
     /**

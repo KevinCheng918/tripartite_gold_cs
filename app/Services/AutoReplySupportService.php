@@ -111,7 +111,7 @@ class AutoReplySupportService
      */
     public function isSupportChat($chatId)
     {
-        $supportChatId = $this->appSettingService->get(AppSettingService::KEY_SUPPORT_CHAT_ID);
+        $supportChatId = $this->supportChatId();
 
         if (blank($supportChatId)) {
             return false;
@@ -177,7 +177,27 @@ class AutoReplySupportService
             return $ticket;
         }
 
-        return $this->ticketRepository->update($ticket, ['ask_message_id' => $askMessageId]);
+        /*
+         * ⚠⚠ **chat_id 要跟 message_id 一起存**（2026-11-10 線上事故）。
+         *
+         * Telegram 的 message_id 只在單一 chat 內唯一。支援群組換過 chat
+         * 之後，新舊兩批單的 ask_message_id 會從小數字開始重疊 ——
+         * 當時只比對 message_id，結果同仁回 TR 群組那張卡，答案被送到了
+         * **另一個客人**的群組。
+         *
+         * ⚠ 存的是**當下**的設定值，不是查詢時再去讀 ——
+         * 設定頁日後被改掉時，舊單仍要認得出自己屬於哪一個 chat。
+         *
+         * ⚠⚠ **migration 一定要先跑，再讓這段程式上線。**
+         * Laravel 8 的 `isGuarded()` 會呼叫 `isGuardableColumn()` 去查資料表
+         * 實際有哪些欄位 —— 欄位還沒建起來時，這個 `ask_chat_id` 會被
+         * **靜靜丟掉而且不會報錯**，結果是新單全都沒有 chat_id、
+         * 每一次引用作答都變成「對不到」。（本機實測踩到過。）
+         */
+        return $this->ticketRepository->update($ticket, [
+            'ask_message_id' => $askMessageId,
+            'ask_chat_id'    => $this->supportChatId(),
+        ]);
     }
 
     /**
@@ -371,7 +391,7 @@ class AutoReplySupportService
             return;
         }
 
-        $ticket = $this->ticketRepository->findByAskMessageId($quotedId);
+        $ticket = $this->matchTicket($quotedId, $message);
 
         if (blank($ticket)) {
             return;
@@ -402,6 +422,120 @@ class AutoReplySupportService
             $this->buildActionKeyboard($ticket->id),
             $message['message_id']
         );
+    }
+
+    /**
+     * 把「引用回覆的那則訊息」對回它本來的求助單
+     *
+     * ⚠⚠ **這一支是 2026-11-10 線上事故的修補點。**
+     *
+     * 事故：同仁引用回覆 TR 群組的求助卡作答，答案被送到**另一個客人**的
+     * 群組。原因是當時直接拿 `ask_message_id` 當全域唯一鍵查、而且是無排序的
+     * `first()` —— 但 Telegram 的 message_id **只在單一 chat 內唯一**。
+     * 支援群組換過 chat（開啟話題會讓群組升級成 supergroup 並換發 chat_id）
+     * 之後，新舊兩批單的 ask_message_id 會從小數字開始重疊，撈到哪一張是
+     * 未定義行為，而後面每一步都忠實地照那張單把答案送出去。
+     *
+     * 所以對應鍵是 **(ask_chat_id, ask_message_id)**，缺一不可。
+     *
+     * 三種結果分得很開，因為它們該有的反應完全不同：
+     *
+     * | 情況 | 反應 |
+     * |---|---|
+     * | 對到這個 chat 的單 | 正常作答 |
+     * | 一筆都沒有 | 靜靜忽略 —— ⚠ 話題群組裡**每則閒聊**都帶 `reply_to_message`，這是最常走到的一條 |
+     * | 對到的單屬於**別的** chat | 回一句說明 ＋ 記 error |
+     *
+     * ⚠ 最後那種**絕對不能靜靜忽略**：它跟閒聊的症狀一模一樣（沒反應），
+     * 同仁會以為系統壞了而一直重送，而我們直到客人抱怨才會知道。
+     *
+     * ⚠ **`ask_chat_id` 是 null 的舊單一律不認**（migration 刻意沒回填那些
+     * 重複的）：寧可讓那幾張舊卡「引用沒反應並且說明原因」，
+     * 也不要再賭一次、把答案送給錯的客人。
+     *
+     * @param int   $quotedId 被引用那則訊息的 telegram message_id
+     * @param array $message  webhook 收到的訊息（回話要用它的 message_id）
+     * @return AutoReplyTicket|null
+     */
+    private function matchTicket($quotedId, array $message)
+    {
+        $candidates = $this->ticketRepository->findByAskMessageId($quotedId);
+
+        // 短路：絕大多數引用都落在這裡（話題群組的每則閒聊都帶 reply_to_message）
+        if ($candidates->isEmpty()) {
+            return null;
+        }
+
+        $chatId = (string) $this->supportChatId();
+
+        $matched = $candidates->first(function ($ticket) use ($chatId) {
+            return filled($ticket->ask_chat_id) && (string) $ticket->ask_chat_id === $chatId;
+        });
+
+        /*
+         * ⚠ 碰撞本身要留痕：補上 `ask_chat_id` 之後**這一行理應永遠不會觸發**，
+         * 所以它一旦出現就是「還有一條沒想到的路徑」，而不是雜訊。
+         */
+        if ($candidates->count() > 1) {
+            Log::error('同一個 ask_message_id 對到多張求助單', [
+                'ask_message_id' => $quotedId,
+                'ticket_ids'     => $candidates->pluck('id')->all(),
+                'ask_chat_ids'   => $candidates->pluck('ask_chat_id')->all(),
+                'matched_id'     => filled($matched) ? $matched->id : null,
+            ]);
+        }
+
+        if (filled($matched)) {
+            return $matched;
+        }
+
+        /*
+         * 有單、但沒有一張屬於現在這個支援群組 —— 幾乎一定是換過 chat 之前
+         * 的舊卡。回一句話讓同仁知道要怎麼辦，不要讓他對著沒反應的訊息重送。
+         */
+        Log::warning('引用到的求助卡屬於別的支援群組，已拒絕作答', [
+            'ask_message_id'  => $quotedId,
+            'ticket_ids'      => $candidates->pluck('id')->all(),
+            'ask_chat_ids'    => $candidates->pluck('ask_chat_id')->all(),
+            'support_chat_id' => $chatId,
+        ]);
+
+        $this->sendToSupport(
+            "這則求助卡是舊的支援群組留下來的，為了避免答案送錯客人，這裡不接受作答。\n請到後台題庫處理，或是等這位客人再問一次。",
+            null,
+            Arr::get($message, 'message_id')
+        );
+
+        return null;
+    }
+
+    /**
+     * 「已安排回覆」那句，**帶上要送去哪個群組**
+     *
+     * ⚠ 這是 2026-11-10 事故的最後一道防線（前兩道是 `ask_chat_id` 與
+     * `matchTicket()`）。原本只寫「✅ 已安排回覆客人。」—— 答案送錯客人時
+     * 畫面上**看不出任何異狀**，我們是等客人抱怨才知道的。
+     *
+     * 把群組名寫進去之後，同仁按完就會看到「要送給誰」，跟他手上那張求助卡
+     * 第一行的「群組：…」一眼就能對上。⚠ 這道防線擋得住的不只是這一個 bug，
+     * 而是**所有**會讓對應錯掉的原因，包含還沒想到的那些。
+     *
+     * @param \App\Models\AutoReplyTicket $ticket
+     * @return string
+     */
+    private function repliedText($ticket)
+    {
+        return "✅ 已安排回覆〔{$this->ticketGroupTitle($ticket)}〕。";
+    }
+
+    /**
+     * 目前設定的內部支援群組 chat_id
+     *
+     * @return string|null
+     */
+    private function supportChatId()
+    {
+        return $this->appSettingService->get(AppSettingService::KEY_SUPPORT_CHAT_ID);
     }
 
     /**
@@ -589,7 +723,8 @@ class AutoReplySupportService
         $this->queueCustomerReply($ticket);
         $item = $this->saveToQuickReply($ticket, $this->askInfoCategoryId());
 
-        $lines = ['✅ 已安排把問題送給客人。'];
+        // 群組名要帶上，理由同 `repliedText()` —— 這一條也是往客人那邊送
+        $lines = ["✅ 已安排把問題送給〔{$this->ticketGroupTitle($ticket)}〕。"];
 
         if (blank($item)) {
             $lines[] = '';
@@ -709,7 +844,7 @@ class AutoReplySupportService
         if ($action === $actions['REPLY']) {
             $this->queueCustomerReply($ticket);
             $this->ticketRepository->update($ticket, ['status' => $statuses['REPLIED']]);
-            $this->editSupportMessage($messageId, '✅ 已安排回覆客人。');
+            $this->editSupportMessage($messageId, $this->repliedText($ticket));
 
             return;
         }
@@ -735,7 +870,7 @@ class AutoReplySupportService
 
             $this->editSupportMessage(
                 $messageId,
-                "✅ 已安排回覆客人。\n\n請選擇要把這題歸到哪個類別：",
+                "{$this->repliedText($ticket)}\n\n請選擇要把這題歸到哪個類別：",
                 $this->buildCategoryKeyboard($ticket->id)
             );
 
