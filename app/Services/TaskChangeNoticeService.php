@@ -213,7 +213,7 @@ class TaskChangeNoticeService
      * 版面是需求方 2026-11-01 看過實際範例後逐行指定的：
      *
      * ```
-     * 🔔 任務狀態更新通知
+     * 🔔 任務卡狀態更新、新留言  ← 抬頭由這次的異動組出來，見 `headline()`
      *
      * #12 主系統登入異常        ← 編號＋標題整串都是連結，點下去直接開那張卡
      * 指派：@mary @john        ← mention，各自一行
@@ -244,6 +244,10 @@ class TaskChangeNoticeService
      * `constants.TASK.CHANGE_NOTICE.FIELDS` **只有 `status`**，所以變更段落
      * 永遠只講狀態（加上封存／還原與新留言）。優先序同理，只出現在上面
      * 這一行的現狀裡。要讓某個欄位的變更也被通知，得先加進 `FIELDS`。
+     *
+     * ⚠ **抬頭不固定**（需求方 2026-11-10）：它要跟這一則實際講的事對得上，
+     * 所以由 `headline()` 依這次累積到的異動組出來 —— 只有留言的那種不會再
+     * 抬著「狀態更新」。版面固定講的是**下面那幾行**，不含抬頭。
      *
      * @param int                            $taskId
      * @param \Illuminate\Support\Collection $activities
@@ -284,14 +288,7 @@ class TaskChangeNoticeService
             return '';
         }
 
-        /*
-         * 抬頭分兩種：新卡片講「新任務卡」，其餘講「狀態更新」。
-         *
-         * ⚠ 一張卡在同一個合併窗口內被建立**又**改了狀態時，抬頭用「新任務卡」
-         * 而狀態那一行照出 —— 對看的人來說「這是新卡，而且已經動過了」
-         * 比「狀態更新」準確。
-         */
-        $out = [$isCreation ? '🆕 新任務卡' : '🔔 任務狀態更新通知', ''];
+        $out = [$this->headline($isCreation, $states, $lines, $commentLine), ''];
 
         /*
          * 第一行：標題，自己獨佔一行（需求方 2026-11-01）。
@@ -330,8 +327,14 @@ class TaskChangeNoticeService
             "優先序：{$this->priorityWithLight($task->priority)}",
         ]);
 
-        // 第五段：這次改了什麼（封存／還原、以及新留言也算在這裡）
-        $out = array_merge($out, $states, $lines);
+        /*
+         * 第五段：這次改了什麼（封存／還原、以及新留言也算在這裡）
+         *
+         * ⚠ `array_values()` 不能省：這兩支回傳的陣列**以「抬頭用的詞」為 key**
+         * （給 `headline()` 用），而 `array_merge()` 會把字串 key 原樣帶過來 ——
+         * 之後有人改成 `$out[] = ...` 插一行時就會把同名那一行蓋掉。
+         */
+        $out = array_merge($out, array_values($states), array_values($lines));
 
         if (filled($commentLine)) {
             $out[] = $commentLine;
@@ -341,6 +344,71 @@ class TaskChangeNoticeService
         $out[] = "觸發者：{$this->actorNames($activities, $comments)}";
 
         return implode("\n", $out);
+    }
+
+    /**
+     * 抬頭 —— **講出這一則到底是什麼事**（需求方 2026-11-10）
+     *
+     * 原本只分兩種（`🆕 新任務卡` / `🔔 任務狀態更新通知`），所以「只有人留了
+     * 一句話」也會抬著「狀態更新通知」出現 —— ⚠ **抬頭說的事跟內容不是同一件**，
+     * 看通知的人以為卡片動了狀態，點進去卻發現沒有。
+     *
+     * 改成由這次實際累積到的異動組出來：
+     *
+     * ```
+     * 💬 任務卡新留言              ← 只有人留言
+     * 🔔 任務卡狀態更新            ← 只改了狀態
+     * 🔔 任務卡狀態更新、新留言     ← 同一個窗口內兩件都有
+     * 🗄 任務卡已封存、新留言
+     * 🆕 新任務卡
+     * ```
+     *
+     * ⚠ **不要改回寫死「狀態」**：欄位名是從 `$lines` 的 key 取的，而那些 key
+     * 來自 `constants.TASK.CHANGE_NOTICE.FIELDS`（目前只有 `status`）。將來把
+     * 指派人員加進 `FIELDS` 時，抬頭會自己變成「任務卡指派人員更新」——
+     * 寫死的話就會變成抬頭說狀態、內容講指派，正是這次要修掉的毛病。
+     *
+     * ⚠ **建立仍然蓋過其他所有成分**：一張卡在同一個窗口內被建立**又**改了
+     * 狀態時，抬頭用「新任務卡」而狀態那一行照出 —— 對看的人來說
+     * 「這是新卡，而且已經動過了」比「狀態更新」準確。
+     *
+     * emoji 取**最重的那個成分**（封存／還原 → 欄位變更 → 留言）：抬頭只有
+     * 一個 emoji 的位置，而一眼掃過去要先認出「這是不是我得處理的事」。
+     *
+     * @param bool                 $isCreation
+     * @param array<string,string> $states      封存／還原，key 是抬頭用的詞
+     * @param array<string,string> $lines       欄位變更，key 是欄位名
+     * @param string               $commentLine
+     * @return string
+     */
+    private function headline($isCreation, array $states, array $lines, $commentLine)
+    {
+        // 短路：建立卡片不跟其他成分併列（理由見上）
+        if ($isCreation) {
+            return '🆕 新任務卡';
+        }
+
+        $parts = array_keys($states);
+
+        foreach (array_keys($lines) as $label) {
+            $parts[] = "{$label}更新";
+        }
+
+        if (filled($commentLine)) {
+            $parts[] = '新留言';
+        }
+
+        if (filled($states)) {
+            $emoji = '🗄';
+        } elseif (filled($lines)) {
+            $emoji = '🔔';
+        } else {
+            $emoji = '💬';
+        }
+
+        $what = implode('、', $parts);
+
+        return "{$emoji} 任務卡{$what}";
     }
 
     /**
@@ -593,8 +661,11 @@ class TaskChangeNoticeService
      * **最後一筆的 to**。不合的話「待處理→進行中、進行中→審核中」會變兩行，
      * 而看的人只想知道「從待處理變成審核中」。
      *
+     * ⚠ **回傳以欄位名為 key**（`['狀態' => '狀態：進行中 → 測試中']`）：
+     * `headline()` 要拿那些 key 組抬頭。要輸出訊息的話記得 `array_values()`。
+     *
      * @param \Illuminate\Support\Collection $activities
-     * @return array<string>
+     * @return array<string,string> 欄位名 => 那一行
      */
     private function changeLines($activities)
     {
@@ -629,7 +700,7 @@ class TaskChangeNoticeService
                 continue;
             }
 
-            $lines[] = "{$label}：{$from} → {$to}";
+            $lines[$label] = "{$label}：{$from} → {$to}";
         }
 
         return $lines;
@@ -642,19 +713,23 @@ class TaskChangeNoticeService
      * （`archiveTask()` 存的是 `['title' => …]`、`restoreTask()` 是 null），
      * 所以不能靠 `changeLines()` 處理。
      *
+     * ⚠ **回傳的 key 就是抬頭用的詞**（`headline()` 直接拿去接在「任務卡」
+     * 後面 ⇒ `🗄 任務卡已封存`）。所以 key 要寫成能單獨成句的動作詞，
+     * 不要寫成欄位名。要輸出訊息的話記得 `array_values()`。
+     *
      * @param \Illuminate\Support\Collection $activities
-     * @return array<string>
+     * @return array<string,string> 抬頭用的詞 => 那一行
      */
     private function stateLines($activities)
     {
         $lines = [];
 
         if (filled($activities->firstWhere('action', 'archived'))) {
-            $lines[] = '狀態：已封存';
+            $lines['已封存'] = '狀態：已封存';
         }
 
         if (filled($activities->firstWhere('action', 'restored'))) {
-            $lines[] = '狀態：已從封存還原';
+            $lines['已從封存還原'] = '狀態：已從封存還原';
         }
 
         return $lines;
