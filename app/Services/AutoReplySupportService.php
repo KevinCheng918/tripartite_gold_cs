@@ -373,15 +373,47 @@ class AutoReplySupportService
             return;
         }
 
-        $quotedId = Arr::get($payload, 'message.reply_to_message.message_id');
+        $quoted = (array) Arr::get($payload, 'message.reply_to_message', []);
+        $quotedId = Arr::get($quoted, 'message_id');
 
         /*
          * ⚠ 群組開了話題功能之後，**話題裡的每則訊息都會帶 `reply_to_message`**
          * （指向話題的建立訊息），不只是真的引用別人的那些 ——
          * 所以這道判斷在 forum 群組裡幾乎擋不掉閒聊了。
-         * 真正的過濾是下面的 `findByAskMessageId()` 查不到就 return。
          */
         if (blank($quotedId)) {
+            return;
+        }
+
+        /*
+         * ⚠⚠ **引用的不是機器人發的訊息，就不可能是求助卡**（2026-11-11 加）。
+         *
+         * 需求方在**交接專區**引用同仁的交接內容，機器人卻回了
+         * 「這張單已經處理過了」—— 因為那則交接訊息的 message_id 碰巧撞上
+         * 某張舊單的 `ask_message_id`，而當時唯一的過濾就是「查得到就當作答」。
+         *
+         * 求助卡一定是機器人自己發的，所以這一道把**所有同仁之間的對話**
+         * 擋在 DB 查詢之前 —— 既是正確性，也讓話題群組裡每則閒聊不再各查一次 DB。
+         */
+        if (Arr::get($quoted, 'from.is_bot') !== true) {
+            return;
+        }
+
+        /*
+         * ⚠⚠ **不在求助單那個話題裡，就不是作答**（2026-11-11 加）。
+         *
+         * 這一道補的是 `ask_chat_id` 補不到的那個洞：真正的碰撞不只是
+         * 「表裡兩張單撞號」，而是**表裡的單** vs **群組裡那些根本不在表裡的
+         * 訊息**（交接、任務卡、班表…）撞號 —— 後者再怎麼比對 chat_id 也查不出來，
+         * 因為那一側的 chat_id 就是現在這個群組。
+         *
+         * 求助卡只會發到勾了 `auto_reply_ticket` 的話題（而且那個類型是
+         * `needs_reply`，設定頁限制**只能勾一個**），所以用話題分辨最可靠。
+         *
+         * ⚠ 擺在查 DB 之前是刻意的：話題群組裡**每則訊息**都帶
+         * `reply_to_message`，不先擋掉的話每一句閒聊都要查一次資料庫。
+         */
+        if (!$this->isTicketTopic($message)) {
             return;
         }
 
@@ -438,16 +470,19 @@ class AutoReplySupportService
      *
      * 所以對應鍵是 **(ask_chat_id, ask_message_id)**，缺一不可。
      *
-     * 三種結果分得很開，因為它們該有的反應完全不同：
+     * ⚠ **呼叫端已經先擋掉三種不可能是作答的情況**（見 `handleSupportMessage()`）：
+     * 沒有引用、引用的不是機器人發的訊息、不在求助單那個話題裡。所以走到這裡的
+     * 都已經是「在求助話題裡引用了一則機器人訊息」——
+     * **這也是這一支可以放心回話的前提**。
      *
      * | 情況 | 反應 |
      * |---|---|
      * | 對到這個 chat 的單 | 正常作答 |
-     * | 一筆都沒有 | 靜靜忽略 —— ⚠ 話題群組裡**每則閒聊**都帶 `reply_to_message`，這是最常走到的一條 |
-     * | 對到的單屬於**別的** chat | 回一句說明 ＋ 記 error |
+     * | 一筆都沒有 | 靜靜忽略 |
+     * | 對到的單屬於**別的** chat | 回一句說明 ＋ 記 log |
      *
-     * ⚠ 最後那種**絕對不能靜靜忽略**：它跟閒聊的症狀一模一樣（沒反應），
-     * 同仁會以為系統壞了而一直重送，而我們直到客人抱怨才會知道。
+     * ⚠ 最後那種**不要改成靜靜忽略**：同仁是真的在求助話題裡引用求助卡，
+     * 沒反應的話他會以為系統壞了而一直重送，而我們直到客人抱怨才會知道。
      *
      * ⚠ **`ask_chat_id` 是 null 的舊單一律不認**（migration 刻意沒回填那些
      * 重複的）：寧可讓那幾張舊卡「引用沒反應並且說明原因」，
@@ -461,7 +496,7 @@ class AutoReplySupportService
     {
         $candidates = $this->ticketRepository->findByAskMessageId($quotedId);
 
-        // 短路：絕大多數引用都落在這裡（話題群組的每則閒聊都帶 reply_to_message）
+        // 引用的是求助話題裡某則機器人訊息，但它不是求助卡（例如催單、結案回報）
         if ($candidates->isEmpty()) {
             return null;
         }
@@ -490,14 +525,17 @@ class AutoReplySupportService
         }
 
         /*
-         * 有單、但沒有一張屬於現在這個支援群組 —— 幾乎一定是換過 chat 之前
-         * 的舊卡。回一句話讓同仁知道要怎麼辦，不要讓他對著沒反應的訊息重送。
+         * 有單、但沒有一張屬於現在這個支援群組 —— 幾乎一定是換過 chat 之前的舊卡。
+         *
+         * 這裡可以放心回話：呼叫端已經確認過這則訊息**發在求助單那個話題裡**，
+         * 所以不會像 2026-11-11 那次一樣跑去交接專區插話。
          */
-        Log::warning('引用到的求助卡屬於別的支援群組，已拒絕作答', [
+        Log::warning('引用到的求助卡不屬於現在的支援群組，已拒絕作答', [
             'ask_message_id'  => $quotedId,
             'ticket_ids'      => $candidates->pluck('id')->all(),
             'ask_chat_ids'    => $candidates->pluck('ask_chat_id')->all(),
             'support_chat_id' => $chatId,
+            'thread_id'       => Arr::get($message, 'message_thread_id'),
         ]);
 
         $this->sendToSupport(
@@ -507,6 +545,32 @@ class AutoReplySupportService
         );
 
         return null;
+    }
+
+    /**
+     * 這則訊息是不是發在「求助單」那個話題裡
+     *
+     * 求助卡只會發到勾了 `auto_reply_ticket` 的話題，所以別的話題
+     * （交接、任務卡、班表…）裡的訊息再怎麼撞號也不是在作答。
+     *
+     * ⚠ **一個話題都沒勾時求助卡發在主區**（`threadIdsFor()` 回 `[null]`），
+     * 而主區的訊息沒有 `message_thread_id` —— 所以那種設定下要反過來判斷
+     * 「沒有 thread_id 才算」。直接 `in_array(null, [])` 會永遠是 false，
+     * 等於在沒勾話題的環境把說明整個關掉。
+     *
+     * @param array $message
+     * @return bool
+     */
+    private function isTicketTopic(array $message)
+    {
+        $threadIds = $this->supportGroup->topicIdsFor(self::NOTICE_TYPE);
+        $threadId = Arr::get($message, 'message_thread_id');
+
+        if (blank($threadIds)) {
+            return blank($threadId);
+        }
+
+        return in_array((int) $threadId, $threadIds, true);
     }
 
     /**
