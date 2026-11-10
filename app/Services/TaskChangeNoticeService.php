@@ -359,7 +359,7 @@ class TaskChangeNoticeService
      * 💬 任務卡新留言              ← 只有人留言
      * 🔔 任務卡狀態更新            ← 只改了狀態
      * 🔔 任務卡狀態更新、新留言     ← 同一個窗口內兩件都有
-     * 🗄 任務卡已封存、新留言
+     * 📦 任務卡已封存、新留言
      * 🆕 新任務卡
      * ```
      *
@@ -398,8 +398,18 @@ class TaskChangeNoticeService
             $parts[] = '新留言';
         }
 
+        /*
+         * ⚠ 封存刻意用 `📦` 而不是看起來更貼切的 `🗄`（檔案櫃）：
+         * `U+1F5C4` 的 `Emoji_Presentation` 是 **No** —— 不補
+         * variation selector（`U+FE0F`）的話，部分平台會畫成單色字形甚至
+         * 缺字方框。這個專案既有的 `🗑️`（`public/js/telegram-chat/emoji.js`）
+         * 正是補了 `U+FE0F` 的寫法。
+         *
+         * `📦`（`U+1F4E6`）本身就是 emoji presentation，不必靠一個看不見的
+         * 字元才顯示得對 —— 而看不見的字元遲早會被某次編輯吃掉。
+         */
         if (filled($states)) {
-            $emoji = '🗄';
+            $emoji = '📦';
         } elseif (filled($lines)) {
             $emoji = '🔔';
         } else {
@@ -714,7 +724,7 @@ class TaskChangeNoticeService
      * 所以不能靠 `changeLines()` 處理。
      *
      * ⚠ **回傳的 key 就是抬頭用的詞**（`headline()` 直接拿去接在「任務卡」
-     * 後面 ⇒ `🗄 任務卡已封存`）。所以 key 要寫成能單獨成句的動作詞，
+     * 後面 ⇒ `📦 任務卡已封存`）。所以 key 要寫成能單獨成句的動作詞，
      * 不要寫成欄位名。要輸出訊息的話記得 `array_values()`。
      *
      * @param \Illuminate\Support\Collection $activities
