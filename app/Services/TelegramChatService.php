@@ -15,6 +15,7 @@ use App\Repositories\UserRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -617,7 +618,7 @@ class TelegramChatService
          * 2. isStaff()        後台帳號名單，**所有對話共用同一個快取 key**；
          *                     認出是同事後才會去讀該對話的放行例外
          * 3. isIgnored()      每個對話一個 key，命中 2 就不必再去碰它
-         * 4. isTagToOutsidersOnly()
+         * 4. isTalkingToOutsiders()
          *                     擺最後是因為**只有它可能打 Telegram API**
          *                     （查 Bot 自己的 username，快取一天）。前三道
          *                     先把不必判斷的訊息擋掉，真正會走到這裡的只有
@@ -626,7 +627,7 @@ class TelegramChatService
         if ($group->isAutoReplyOn() && filled($autoReplyText)
             && !$this->staffIgnoreService->isStaff($from, $group->id)
             && !$this->memberService->isIgnored($group->id, $from)
-            && !$this->isTagToOutsidersOnly($message, $rawText, $group->id)) {
+            && !$this->isTalkingToOutsiders($message, $rawText, $group->id, $from)) {
             /*
              * 壓一段延遲再處理，讓客人把話講完。
              *
@@ -1297,6 +1298,161 @@ class TelegramChatService
     }
 
     /**
+     * 這個人現在是在跟外人講話 —— 不必自動回覆
+     *
+     * 兩種都算，而且是同一件事的前後兩段：
+     *
+     * 1. **這一則整則都是在 tag 外人**（`isTagToOutsidersOnly()`）
+     * 2. **他剛剛才 tag 過外人，這一則是接著講的話**
+     *
+     * ⚠ 需求方 2026-11-13 回報：客人群組裡，對方的主管先發一則只有
+     * `Amy 2.0`（沒有 username，所以是 `text_mention`）的訊息把同事叫進來，
+     * 緊接著同一分鐘再發「所有人給你嗎？」—— **那句是問他同事的**，
+     * 小幫手卻回了「老闆，Amy 2.0 的開通範圍已經請專員為您確認」。
+     *
+     * 第 1 段（2026-10-27 上線）只看得懂「整則都是 tag」那一則，而人幾乎
+     * 不會把話塞進同一則：**先 tag、再講話**才是常態，所以真正要擋的是
+     * 後面那幾句。擋法是第 1 段命中時記一個短期標記，同群組、同一個人在
+     * 標記還在的期間講的話一律不自動回覆。
+     *
+     * ⚠ 標記**不續約**，而且他只要轉頭叫我們就當場失效（見
+     * `inTagOutsiderSilence()`）—— 客人 tag 完同事之後回頭問我們是很常見的，
+     * 靜默不能一路蓋下去，不然就變成沒有回覆也沒有求助單的黑洞
+     * （見 [[2026-11-08-silent-black-hole]]）。
+     *
+     * @param array  $message Telegram 原始訊息
+     * @param string $rawText 客人真正打的字（不含媒體替代文字）
+     * @param int    $groupId
+     * @param array  $from    Telegram 的 from 物件
+     * @return bool
+     */
+    private function isTalkingToOutsiders(array $message, $rawText, $groupId, array $from)
+    {
+        if ($this->isTagToOutsidersOnly($message, $rawText, $groupId)) {
+            $this->markTagToOutsiders($groupId, $from);
+
+            return true;
+        }
+
+        return $this->inTagOutsiderSilence($message, $rawText, $groupId, $from);
+    }
+
+    /**
+     * 記下「這個人剛剛把人叫進來了」
+     *
+     * ⚠ 標記是**逐對話、逐發話者**的：同一個群組裡另一位客人問的問題
+     * 跟這件事無關，不該被一起靜音。
+     *
+     * ⚠ 拿不到 Telegram user id 時不記 —— 用 0 當 key 會把整個群組的人
+     * 混在一起，寧可漏擋也不要擋錯人。
+     *
+     * @param int   $groupId
+     * @param array $from
+     * @return void
+     */
+    private function markTagToOutsiders($groupId, array $from)
+    {
+        $seconds = (int) config('auto_reply.tag_outsider_silence');
+        $userId = (int) Arr::get($from, 'id', 0);
+
+        if ($seconds <= 0 || $userId <= 0) {
+            return;
+        }
+
+        Cache::put($this->tagOutsiderKey($groupId, $userId), true, $seconds);
+    }
+
+    /**
+     * 他還在跟剛才叫進來的那個人講話嗎
+     *
+     * ⚠ **先看快取再看 tag**：快取沒命中就直接結束，絕大多數訊息都是這個
+     * 情況，不會走到可能打 Telegram API 的 `tagsOurSide()`。
+     *
+     * ⚠ 兩種情形要當場解除靜默，因為那代表他在叫我們：
+     *
+     * - 這一則 tag 了我方的人或機器人
+     * - 這一則**引用回覆**我方發出去的訊息
+     *
+     * 解除之後這一則照常走自動回覆（回傳 false）。
+     *
+     * @param array  $message
+     * @param string $rawText
+     * @param int    $groupId
+     * @param array  $from
+     * @return bool
+     */
+    private function inTagOutsiderSilence(array $message, $rawText, $groupId, array $from)
+    {
+        $seconds = (int) config('auto_reply.tag_outsider_silence');
+        $userId = (int) Arr::get($from, 'id', 0);
+
+        if ($seconds <= 0 || $userId <= 0) {
+            return false;
+        }
+
+        $key = $this->tagOutsiderKey($groupId, $userId);
+
+        if (!Cache::has($key)) {
+            return false;
+        }
+
+        if ($this->tagsOurSide($this->parseMentions($message, $rawText)) || $this->repliesToOurSide($message)) {
+            Cache::forget($key);
+
+            return false;
+        }
+
+        Log::info('剛 tag 過別人，這句話也是講給對方聽的，不自動回覆', [
+            'group_id'         => $groupId,
+            'telegram_user_id' => $userId,
+            'text'             => mb_substr((string) $rawText, 0, 50),
+        ]);
+
+        return true;
+    }
+
+    /**
+     * 這則是不是在引用回覆我們發出去的訊息
+     *
+     * ⚠ 機器人自己要**比 username 而不是比 user id** —— 我方同事的 id 才在
+     * `user` 表裡，機器人不是後台帳號，查不到。
+     *
+     * ⚠ 不能只看 `is_bot` —— 客戶群組裡常常還有對方自己的機器人。
+     *
+     * @param array $message
+     * @return bool
+     */
+    private function repliesToOurSide(array $message)
+    {
+        $from = Arr::get($message, 'reply_to_message.from', []);
+
+        if (blank($from)) {
+            return false;
+        }
+
+        $username = TelegramUsernamePresenter::normalize(Arr::get($from, 'username'));
+        $botUsername = TelegramUsernamePresenter::normalize($this->botService->getMyUsername());
+
+        if (filled($botUsername) && $username === $botUsername) {
+            return true;
+        }
+
+        return $this->staffIgnoreService->isOurSide((int) Arr::get($from, 'id', 0), $username);
+    }
+
+    /**
+     * 靜默標記的快取 key
+     *
+     * @param int $groupId
+     * @param int $telegramUserId
+     * @return string
+     */
+    private function tagOutsiderKey($groupId, $telegramUserId)
+    {
+        return "auto_reply.tag_outsider.{$groupId}.{$telegramUserId}";
+    }
+
+    /**
      * 這則整則都是在 tag 別人（不是我們）—— 不必自動回覆
      *
      * ⚠ 需求方 2026-10-27 回報：我們主動發餘點告警之後，客人回了一則
@@ -1316,6 +1472,10 @@ class TelegramChatService
      * ⚠ 用 Telegram 的 `entities` 判斷，不要自己拆 `@` —— `text_mention`
      * （對方沒有 username 時）文字裡根本沒有 `@`，而 `user@example.com`
      * 這種反而會被 `@` 的正則誤判。
+     *
+     * ⚠ 這支**只管這一則**。人通常是「先 tag、下一則才講話」，後面那幾句
+     * 由 `isTalkingToOutsiders()` 的靜默窗接手，不要把它塞進這裡 ——
+     * 這支的語意（整則都是 tag）是乾淨的，混進狀態會變得很難推理。
      *
      * @param array  $message Telegram 原始訊息
      * @param string $rawText 客人真正打的字（不含媒體替代文字）
