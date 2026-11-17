@@ -30,6 +30,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int         $remind_count        見 constants.AUTO_REPLY.REMIND
  * @property string|null $last_reminded_at
  * @property int         $status              見 constants.AUTO_REPLY.TICKET_STATUS
+ * @property int|null    $close_action        最後怎麼處理的，見 constants.AUTO_REPLY.CLOSE_ACTION
  * @property int|null    $quick_reply_item_id 加入題庫後的題目 id
  */
 class AutoReplyTicket extends Model
@@ -46,6 +47,12 @@ class AutoReplyTicket extends Model
         'remind_count'        => 'integer',
         'last_reminded_at'    => 'datetime',
         'status'              => 'integer',
+        /*
+         * ⚠ 跟 `status` 是兩件事：`status` 管流程（還能不能作答、要不要催），
+         * 這一欄管「這張單有沒有讓題庫長大」（每日統計用）。
+         * null = 還沒結案，或是上線前的舊單。
+         */
+        'close_action'        => 'integer',
         'quick_reply_item_id' => 'integer',
     ];
 

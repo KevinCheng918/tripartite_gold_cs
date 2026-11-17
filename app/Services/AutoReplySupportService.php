@@ -745,6 +745,13 @@ class AutoReplySupportService
             return DB::transaction(function () use ($ticket, $item) {
                 $this->ticketRepository->update($ticket, [
                     'status'              => config('constants.AUTO_REPLY.TICKET_STATUS.REPLIED'),
+                    /*
+                     * ⚠ **不是 `REPLY_ONLY`。** 這條路的 `status` 跟①一模一樣，
+                     * 但它把客人的原話記成了這一題的問法樣本（下面那行
+                     * `addPhrasing()`）—— 題庫長的是問法而不是題目，
+                     * 需求方 2026-11-18 明確要求這兩者不能混在一起。
+                     */
+                    'close_action'        => config('constants.AUTO_REPLY.CLOSE_ACTION.REPLY_BY_ITEM'),
                     'answer'              => $item->answer,
                     'quick_reply_item_id' => $item->id,
                     'answered_at'         => now(),
@@ -786,7 +793,11 @@ class AutoReplySupportService
     private function handleAskInfo(AutoReplyTicket $ticket, $messageId)
     {
         $this->queueCustomerReply($ticket);
-        $item = $this->saveToQuickReply($ticket, $this->askInfoCategoryId());
+        $item = $this->saveToQuickReply(
+            $ticket,
+            $this->askInfoCategoryId(),
+            config('constants.AUTO_REPLY.CLOSE_ACTION.ASK_INFO')
+        );
 
         // 群組名要帶上，理由同 `repliedText()` —— 這一條也是往客人那邊送
         $lines = ["✅ 已安排把問題送給〔{$this->ticketGroupTitle($ticket)}〕。"];
@@ -898,9 +909,18 @@ class AutoReplySupportService
 
         $actions = config('constants.AUTO_REPLY.ACTION');
         $statuses = config('constants.AUTO_REPLY.TICKET_STATUS');
+        /*
+         * ⚠ 每一個分支都要寫 `close_action` —— 每日統計完全靠它分類
+         * （`status` 分不出來，理由見 `constants.AUTO_REPLY.CLOSE_ACTION`）。
+         * 漏寫的那條路會變成「未分類」，而那一欄平常應該是 0。
+         */
+        $closeActions = config('constants.AUTO_REPLY.CLOSE_ACTION');
 
         if ($action === $actions['IGNORE']) {
-            $this->ticketRepository->update($ticket, ['status' => $statuses['IGNORED']]);
+            $this->ticketRepository->update($ticket, [
+                'status'       => $statuses['IGNORED'],
+                'close_action' => $closeActions['IGNORED'],
+            ]);
             $this->editSupportMessage($messageId, '已忽略這張單，不會回覆客人也不會加入題庫。');
 
             return;
@@ -908,7 +928,14 @@ class AutoReplySupportService
 
         if ($action === $actions['REPLY']) {
             $this->queueCustomerReply($ticket);
-            $this->ticketRepository->update($ticket, ['status' => $statuses['REPLIED']]);
+            $this->ticketRepository->update($ticket, [
+                'status' => $statuses['REPLIED'],
+                /*
+                 * ⚠ **這就是需求方要抓的那一種**：客人拿到答案了，但題庫
+                 * 一個字都沒長 —— 下次同樣的問題 AI 還是答不出來。
+                 */
+                'close_action' => $closeActions['REPLY_ONLY'],
+            ]);
             $this->editSupportMessage($messageId, $this->repliedText($ticket));
 
             return;
@@ -931,7 +958,15 @@ class AutoReplySupportService
              * 才顯示選單 —— 需求方 2026-10-06 回報「這個按鈕跑很慢」。
              */
             $this->queueCustomerReply($ticket);
-            $this->ticketRepository->update($ticket, ['status' => $statuses['REPLIED']]);
+            /*
+             * ⚠ 先寫 `REPLY_ONLY`，選完類別才改成 `REPLY_AND_SAVE`
+             * （`saveToQuickReply()` 那邊）。在類別選單按「取消」就停在這裡 ——
+             * 那是對的：客人確實收到答案了，題庫確實沒長。
+             */
+            $this->ticketRepository->update($ticket, [
+                'status'       => $statuses['REPLIED'],
+                'close_action' => $closeActions['REPLY_ONLY'],
+            ]);
 
             $this->editSupportMessage(
                 $messageId,
@@ -972,7 +1007,19 @@ class AutoReplySupportService
             return;
         }
 
-        $item = $this->saveToQuickReply($ticket, $categoryId);
+        /*
+         * 這張單是從②「回覆並加入題庫」來的，還是從④「只加入題庫」來的？
+         *
+         * ②按下去的當下已經寫了 `REPLY_ONLY`（客人收到答案了），④那時候
+         * 還是 null。按①之後不可能再走到這裡（`isAnswerDelivered()` 會先擋），
+         * 所以這個判斷不會誤判。
+         */
+        $closeActions = config('constants.AUTO_REPLY.CLOSE_ACTION');
+        $closeAction = (int) $ticket->close_action === (int) $closeActions['REPLY_ONLY']
+            ? $closeActions['REPLY_AND_SAVE']
+            : $closeActions['SAVE_ONLY'];
+
+        $item = $this->saveToQuickReply($ticket, $categoryId, $closeAction);
 
         if (blank($item)) {
             $this->editSupportMessage($messageId, '⚠️ 加入題庫失敗，請到後台手動新增。');
@@ -991,14 +1038,17 @@ class AutoReplySupportService
      *
      * @param AutoReplyTicket $ticket
      * @param int             $categoryId
+     * @param int             $closeAction 見 `constants.AUTO_REPLY.CLOSE_ACTION`
+     *                                     —— 回覆過客人的是 `REPLY_AND_SAVE`，
+     *                                     只入庫是 `SAVE_ONLY`，追問是 `ASK_INFO`
      * @return \App\Models\QuickReplyItem|null
      */
-    private function saveToQuickReply(AutoReplyTicket $ticket, $categoryId)
+    private function saveToQuickReply(AutoReplyTicket $ticket, $categoryId, $closeAction)
     {
         try {
             // 題庫與求助單狀態同生共死 —— 只寫進題庫卻沒標記求助單，
             // 這張單會被當成還沒回填，同一題有機會再被加進去一次
-            return DB::transaction(function () use ($ticket, $categoryId) {
+            return DB::transaction(function () use ($ticket, $categoryId, $closeAction) {
                 $item = $this->quickReplyService->createItem([
                     'category_id' => $categoryId,
                     'label'       => $ticket->question,
@@ -1007,6 +1057,11 @@ class AutoReplySupportService
 
                 $this->ticketRepository->update($ticket, [
                     'status'              => config('constants.AUTO_REPLY.TICKET_STATUS.SAVED'),
+                    /*
+                     * ⚠ `status` 到這裡會把②的 `REPLIED` 蓋掉，所以「有沒有
+                     * 回過客人」只剩 `close_action` 記得 —— 每日統計靠的就是它。
+                     */
+                    'close_action'        => $closeAction,
                     'quick_reply_item_id' => $item->id,
                 ]);
 

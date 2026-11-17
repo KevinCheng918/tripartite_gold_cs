@@ -273,6 +273,8 @@ return [
         'conversation_followup_hint' => 'Asks the on-duty staff whether to follow up after someone promised something and the chat went quiet. Decided with the buttons on the message — no reply needed',
         'ticket_handover'        => 'Morning handover list',
         'ticket_handover_hint'   => 'Unhandled questions handed to the morning shift at 7:30 daily',
+        'ticket_daily_report'      => 'Ticket outcome report',
+        'ticket_daily_report_hint' => 'A 1:00 AM summary of yesterday\'s escalated tickets: how many grew the knowledge base, and how many only got a reply with nothing saved. Best placed in the "AI escalations" topic',
         'shift_notice'           => 'Staff who missed the roster',
         'shift_notice_hint'      => 'A summary of whoever could not be reached by direct message. The roster itself is a DM and never reaches the group',
         'vm_payment'             => 'VM payment notices',

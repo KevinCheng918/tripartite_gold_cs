@@ -268,8 +268,9 @@ class AutoReplyTicketRepository
             // 再確認一次狀態：撈出來到更新之間，可能剛好有人處理掉了
             ->where('status', config('constants.AUTO_REPLY.TICKET_STATUS.PENDING'))
             ->update([
-                'status'     => config('constants.AUTO_REPLY.TICKET_STATUS.EXPIRED'),
-                'updated_at' => now(),
+                'status'       => config('constants.AUTO_REPLY.TICKET_STATUS.EXPIRED'),
+                'close_action' => config('constants.AUTO_REPLY.CLOSE_ACTION.EXPIRED'),
+                'updated_at'   => now(),
             ]);
     }
 
@@ -290,8 +291,9 @@ class AutoReplyTicketRepository
             ->where('id', $id)
             ->whereIn('status', $this->openStatuses())
             ->update([
-                'status'     => config('constants.AUTO_REPLY.TICKET_STATUS.IGNORED'),
-                'updated_at' => now(),
+                'status'       => config('constants.AUTO_REPLY.TICKET_STATUS.IGNORED'),
+                'close_action' => config('constants.AUTO_REPLY.CLOSE_ACTION.ADMIN_MARKED'),
+                'updated_at'   => now(),
             ]);
     }
 
@@ -327,7 +329,113 @@ class AutoReplyTicketRepository
         return AutoReplyTicket::query()
             ->where('telegram_group_id', $groupId)
             ->whereIn('status', $open)
-            ->update(['status' => config('constants.AUTO_REPLY.TICKET_STATUS.IGNORED')]);
+            ->update([
+                'status' => config('constants.AUTO_REPLY.TICKET_STATUS.IGNORED'),
+                /*
+                 * ⚠ 這條路跟「同仁按忽略」**語意相反**，統計上一定要分得開：
+                 * 客人其實有被回覆（客服自己在對話窗回的），只是題庫沒長。
+                 * 每日統計把它算在「回了客人，但題庫沒長」那一段。
+                 */
+                'close_action' => config('constants.AUTO_REPLY.CLOSE_ACTION.CS_REPLIED'),
+            ]);
+    }
+
+    /**
+     * 某一段期間開的單，依「最後怎麼處理的」分組
+     *
+     * ⚠ 用 `whereBetween` 而不是 `whereDate`：後者等於 `DATE(created_at) = ?`，
+     * 欄位被函式包住就吃不到 `(created_at, close_action)` 那個索引。
+     *
+     * ⚠ **還沒結案的（`close_action` 是 null）不會出現在結果裡** ——
+     * MySQL 的 `GROUP BY` 會把 null 當成一組，但那一組的意思是
+     * 「還沒處理完」而不是某種處理方式，所以呼叫端用
+     * `countUnclosedInRange()` 另外拿，不要在這裡混在一起。
+     *
+     * @param string $startDate Y-m-d
+     * @param string $endDate   Y-m-d（含當天）
+     * @return \Illuminate\Support\Collection<object{close_action:int, total:int}>
+     */
+    public function countByActionInRange($startDate, $endDate)
+    {
+        return AutoReplyTicket::query()
+            ->selectRaw('close_action, COUNT(*) AS total')
+            ->whereNotNull('close_action')
+            ->whereBetween('created_at', [
+                "{$startDate} 00:00:00",
+                "{$endDate} 23:59:59",
+            ])
+            ->groupBy('close_action')
+            ->get();
+    }
+
+    /**
+     * 某一段期間開的、到現在還沒結案的單有幾張
+     *
+     * ⚠ 條件是 `close_action` 為 null 而不是比對 `status` —— 兩者應該一致
+     * （未結案 ＝ PENDING／ANSWERED），但統計的主軸是 `close_action`，
+     * 兩個欄位萬一不同步時，用同一個欄位算出來的數字才加得起來。
+     *
+     * @param string $startDate Y-m-d
+     * @param string $endDate   Y-m-d（含當天）
+     * @return int
+     */
+    public function countUnclosedInRange($startDate, $endDate)
+    {
+        return AutoReplyTicket::query()
+            ->whereNull('close_action')
+            ->whereBetween('created_at', [
+                "{$startDate} 00:00:00",
+                "{$endDate} 23:59:59",
+            ])
+            ->count();
+    }
+
+    /**
+     * 某一段期間、某一種處理方式的單是誰經手的
+     *
+     * 用在「直接打字回覆」那一行 —— 只給數字的話沒有人知道要找誰
+     * （需求方 2026-11-18 的動機就是找出「只回不建題庫」的人）。
+     *
+     * ⚠ `answered_by` 存的是 **Telegram 顯示名稱**，同一個人改暱稱就會
+     * 變成兩個人。要準確得走 `telegram_username` 對 `user` 表，這一版先照
+     * 原樣印。
+     *
+     * ⚠ **沒有名字的也要算一列**（`answered_by` 為 null，例如客服在對話窗
+     * 自己回掉的那種批次收單）—— 丟掉的話這一行的人數會跟上面那行的總數
+     * 對不起來，看的人會以為算錯。
+     *
+     * @param string $startDate Y-m-d
+     * @param string $endDate   Y-m-d（含當天）
+     * @param int    $action    `constants.AUTO_REPLY.CLOSE_ACTION` 的值
+     * @return \Illuminate\Support\Collection<object{answered_by:string|null, total:int}>
+     */
+    public function countByAnsweredBy($startDate, $endDate, $action)
+    {
+        return AutoReplyTicket::query()
+            ->selectRaw('answered_by, COUNT(*) AS total')
+            ->where('close_action', $action)
+            ->whereBetween('created_at', [
+                "{$startDate} 00:00:00",
+                "{$endDate} 23:59:59",
+            ])
+            ->groupBy('answered_by')
+            ->orderByDesc('total')
+            ->get();
+    }
+
+    /**
+     * 此刻總共還有幾張掛著沒人處理
+     *
+     * ⚠ **跟期間無關**（比照待追蹤日報的 `countOpen()`）：這個數字回答的是
+     * 「現在總共欠多少」，不是「昨天那批的殘留」。報表上兩個數字要分得開。
+     *
+     * @return int
+     */
+    public function countOpen()
+    {
+        return AutoReplyTicket::query()
+            ->whereIn('status', $this->openStatuses())
+            ->count();
     }
 
     /**

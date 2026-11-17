@@ -275,6 +275,8 @@ return [
         'conversation_followup_hint' => '有人說「稍等」之後對話就安靜了，機器人來問當班人員要不要追蹤。靠訊息上的按鈕決定，不需要引用回覆',
         'ticket_handover'        => '早班待接手清單',
         'ticket_handover_hint'   => '每天 7:30 把還沒人處理的問題交接給當天早班',
+        'ticket_daily_report'      => '求助單去向統計',
+        'ticket_daily_report_hint' => '每天凌晨 1:00 統計前一天轉人工的求助單：有幾張讓題庫長大、有幾張只回了客人沒建題庫。建議勾在「AI 轉來的問題」那個話題',
         'shift_notice'           => '班表沒收到的人',
         'shift_notice_hint'      => '今日班表私訊不出去時，把沒收到的同仁彙總成一則。班表本身是私訊，不會進群組',
         'vm_payment'             => '虛擬機繳款',

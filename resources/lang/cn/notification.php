@@ -271,6 +271,8 @@ return [
         'conversation_followup_hint' => '有人说「稍等」之后对话就安静了，机器人来问当班人员要不要跟进。靠消息上的按钮决定，不需要引用回复',
         'ticket_handover'        => '早班待接手清单',
         'ticket_handover_hint'   => '每天 7:30 把还没人处理的问题交接给当天早班',
+        'ticket_daily_report'      => '求助单去向统计',
+        'ticket_daily_report_hint' => '每天凌晨 1:00 统计前一天转人工的求助单：有几张让题库长大、有几张只回了客人没建题库。建议勾在「AI 转来的问题」那个话题',
         'shift_notice'           => '班表没收到的人',
         'shift_notice_hint'      => '今日班表私信不出去时，把没收到的同事汇总成一则。班表本身是私信，不会进群组',
         'vm_payment'             => '虚拟机缴款',

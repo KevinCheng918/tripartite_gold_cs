@@ -20,6 +20,20 @@ class Kernel extends ConsoleKernel
         $schedule->command('attendance:mark-absent')->dailyAt('01:00');
 
         /*
+         * 每天凌晨 1:00 把前一天轉人工的求助單去向發到內部支援群組。
+         *
+         * ⚠ 這則回答的是「**題庫有沒有在長**」（需求方 2026-11-18：
+         * 「有些客服人員會都只回覆客人，而不去維護新增題庫」），
+         * 不是流水帳 —— 詳見 `TicketReportService`。
+         *
+         * 排在凌晨而不是早上那一串（07:00 班表、07:30 待接手、08:00 任務卡、
+         * 08:30 超時統計、10:30 待追蹤）：那一串講的是「今天要做什麼」，
+         * 這則是回頭看昨天，不該跟待辦擠在一起。同一分鐘只有
+         * `attendance:mark-absent`，那支不發訊息。
+         */
+        $schedule->command('ticket:report')->dailyAt('01:00')->withoutOverlapping();
+
+        /*
          * 每天早上 7:00 私訊今日班表 —— 勾選的人收完整班表、有班的人收自己那份。
          *
          * ⚠ **平假日都發**（需求方指定）：假日沒排班時完整班表那則會寫「今天沒有
