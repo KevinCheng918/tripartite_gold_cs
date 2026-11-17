@@ -44,17 +44,21 @@ class TicketReportCommand extends Command
         $result = $this->reportService->run($this->option('date'), $dryRun);
         $stat = (array) Arr::get($result, 'stat', []);
 
-        $this->info('日期：' . Arr::get($result, 'date') . ($dryRun ? '（空跑，沒有實際發送）' : ''));
-        $this->info('開了 ' . (int) Arr::get($stat, 'opened') . ' 張，'
-            . '已結案 ' . (int) Arr::get($stat, 'closed') . ' 張，'
-            . '其中讓題庫長大的 ' . (int) Arr::get($stat, 'grew') . ' 張');
+        $date = (string) Arr::get($result, 'date');
+        $opened = (int) Arr::get($stat, 'opened');
+        $closed = (int) Arr::get($stat, 'closed');
+        $grew = (int) Arr::get($stat, 'grew');
+        $unknown = (int) Arr::get($stat, 'unknown');
+
+        $this->info("日期：{$date}" . ($dryRun ? '（空跑，沒有實際發送）' : ''));
+        $this->info("開了 {$opened} 張，已結案 {$closed} 張，其中讓題庫長大的 {$grew} 張");
 
         /*
          * ⚠ 「未分類」有數字時要當成警告而不是資訊：那代表有一種處理方式
          * 沒被歸類，三段的數字會加不起來（見 `unknownCount()`）。
          */
-        if ((int) Arr::get($stat, 'unknown') > 0) {
-            $this->warn('有 ' . (int) Arr::get($stat, 'unknown') . ' 張的處理方式沒有被歸類，請檢查 CLOSE_ACTION 的分組');
+        if ($unknown > 0) {
+            $this->warn("有 {$unknown} 張的處理方式沒有被歸類，請檢查 CLOSE_ACTION 的分組");
         }
 
         if (!$dryRun) {
@@ -62,7 +66,8 @@ class TicketReportCommand extends Command
                 $this->info('已發到內部群組');
             } else {
                 $reason = (string) Arr::get($result, 'reason');
-                $this->warn('沒發出去 —— ' . Arr::get(self::REASONS, $reason, $reason));
+                $detail = (string) Arr::get(self::REASONS, $reason, $reason);
+                $this->warn("沒發出去 —— {$detail}");
             }
         }
 

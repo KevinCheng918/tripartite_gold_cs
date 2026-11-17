@@ -64,6 +64,26 @@ class TicketReportService
     public function run($date = null, $dryRun = false)
     {
         $date = filled($date) ? $date : now()->subDay()->toDateString();
+
+        /*
+         * ⚠ **短路擺在統計之前**：正式跑而且沒設內部群組時，這份報表哪裡都
+         * 去不了 —— 先讀設定（app_setting，有快取）再決定要不要查那幾次
+         * GROUP BY，不要反過來。
+         *
+         * 空跑不走這一關：那是用來看內容與排版的，沒設群組也該印得出來。
+         */
+        if (!$dryRun && !$this->supportGroup->isConfigured()) {
+            Log::warning('求助單每日統計沒發出去：未設定內部支援群組');
+
+            return [
+                'date'   => $date,
+                'text'   => null,
+                'stat'   => [],
+                'sent'   => false,
+                'reason' => self::SKIP_NO_GROUP,
+            ];
+        }
+
         $stat = $this->collect($date);
 
         $result = [
@@ -76,13 +96,6 @@ class TicketReportService
 
         if ($dryRun) {
             return $result;
-        }
-
-        // 短路：沒設群組就不必送了（組字串便宜，但 log 要講清楚原因）
-        if (!$this->supportGroup->isConfigured()) {
-            Log::warning('求助單每日統計沒發出去：未設定內部支援群組');
-
-            return array_merge($result, ['reason' => self::SKIP_NO_GROUP]);
         }
 
         if ($this->send(Arr::get($result, 'text'))) {
@@ -102,13 +115,14 @@ class TicketReportService
      */
     public function test()
     {
-        $date = now()->subDay()->toDateString();
-        $text = (string) config('constants.AUTO_REPLY.DAILY_REPORT.TEST_PREFIX')
-            . $this->buildText($date, $this->collect($date));
-
+        // 短路同 `run()`：沒設群組就不必查統計了
         if (!$this->supportGroup->isConfigured()) {
             return ['sent' => false, 'reason' => self::SKIP_NO_GROUP];
         }
+
+        $date = now()->subDay()->toDateString();
+        $text = (string) config('constants.AUTO_REPLY.DAILY_REPORT.TEST_PREFIX')
+            . $this->buildText($date, $this->collect($date));
 
         return $this->send($text)
             ? ['sent' => true, 'reason' => null]

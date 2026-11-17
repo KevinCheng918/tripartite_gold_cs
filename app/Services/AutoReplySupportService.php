@@ -909,17 +909,16 @@ class AutoReplySupportService
 
         $actions = config('constants.AUTO_REPLY.ACTION');
         $statuses = config('constants.AUTO_REPLY.TICKET_STATUS');
+
         /*
          * ⚠ 每一個分支都要寫 `close_action` —— 每日統計完全靠它分類
          * （`status` 分不出來，理由見 `constants.AUTO_REPLY.CLOSE_ACTION`）。
          * 漏寫的那條路會變成「未分類」，而那一欄平常應該是 0。
          */
-        $closeActions = config('constants.AUTO_REPLY.CLOSE_ACTION');
-
         if ($action === $actions['IGNORE']) {
             $this->ticketRepository->update($ticket, [
                 'status'       => $statuses['IGNORED'],
-                'close_action' => $closeActions['IGNORED'],
+                'close_action' => config('constants.AUTO_REPLY.CLOSE_ACTION.IGNORED'),
             ]);
             $this->editSupportMessage($messageId, '已忽略這張單，不會回覆客人也不會加入題庫。');
 
@@ -934,7 +933,7 @@ class AutoReplySupportService
                  * ⚠ **這就是需求方要抓的那一種**：客人拿到答案了，但題庫
                  * 一個字都沒長 —— 下次同樣的問題 AI 還是答不出來。
                  */
-                'close_action' => $closeActions['REPLY_ONLY'],
+                'close_action' => config('constants.AUTO_REPLY.CLOSE_ACTION.REPLY_ONLY'),
             ]);
             $this->editSupportMessage($messageId, $this->repliedText($ticket));
 
@@ -965,7 +964,7 @@ class AutoReplySupportService
              */
             $this->ticketRepository->update($ticket, [
                 'status'       => $statuses['REPLIED'],
-                'close_action' => $closeActions['REPLY_ONLY'],
+                'close_action' => config('constants.AUTO_REPLY.CLOSE_ACTION.REPLY_ONLY'),
             ]);
 
             $this->editSupportMessage(
@@ -1014,10 +1013,9 @@ class AutoReplySupportService
          * 還是 null。按①之後不可能再走到這裡（`isAnswerDelivered()` 會先擋），
          * 所以這個判斷不會誤判。
          */
-        $closeActions = config('constants.AUTO_REPLY.CLOSE_ACTION');
-        $closeAction = (int) $ticket->close_action === (int) $closeActions['REPLY_ONLY']
-            ? $closeActions['REPLY_AND_SAVE']
-            : $closeActions['SAVE_ONLY'];
+        $closeAction = (int) $ticket->close_action === (int) config('constants.AUTO_REPLY.CLOSE_ACTION.REPLY_ONLY')
+            ? config('constants.AUTO_REPLY.CLOSE_ACTION.REPLY_AND_SAVE')
+            : config('constants.AUTO_REPLY.CLOSE_ACTION.SAVE_ONLY');
 
         $item = $this->saveToQuickReply($ticket, $categoryId, $closeAction);
 

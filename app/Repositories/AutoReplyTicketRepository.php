@@ -4,6 +4,7 @@ namespace App\Repositories;
 
 use App\Models\AutoReplyTicket;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Carbon;
 
 /**
  * 自動回覆求助單 Repository
@@ -16,7 +17,15 @@ class AutoReplyTicketRepository
         // ⚠ ask_chat_id 不能漏：少撈它會讓 Service 的 chat 比對永遠不相符，
         //   而症狀是「引用回覆完全沒反應」，不會報錯（2026-11-10 事故的那一欄）
         'ask_message_id', 'ask_chat_id', 'answer', 'answered_by', 'answered_at',
-        'remind_count', 'last_reminded_at', 'status', 'quick_reply_item_id',
+        'remind_count', 'last_reminded_at', 'status',
+        /*
+         * ⚠ close_action 同樣不能漏：`handleCategoryChosen()` 靠它分辨這張單
+         * 是從②「回覆並加入題庫」來的、還是④「只加入題庫」來的。沒撈到就
+         * 永遠是 null ⇒ ②會被記成「只新增題目」，而那正是這個欄位要分開的
+         * 兩件事（同 ask_chat_id 那一欄的坑，而且一樣不會報錯）。
+         */
+        'close_action',
+        'quick_reply_item_id',
         'created_at',
     ];
 
@@ -341,10 +350,26 @@ class AutoReplyTicketRepository
     }
 
     /**
-     * 某一段期間開的單，依「最後怎麼處理的」分組
+     * 一段期間的起訖時間（含頭尾整天）
      *
-     * ⚠ 用 `whereBetween` 而不是 `whereDate`：後者等於 `DATE(created_at) = ?`，
+     * ⚠ 用區間而不是 `whereDate()`：後者等於 `DATE(created_at) = ?`，
      * 欄位被函式包住就吃不到 `(created_at, close_action)` 那個索引。
+     * 比照 `AutoReplyTicketRemindRepository::rangeOf()`。
+     *
+     * @param string $startDate Y-m-d
+     * @param string $endDate   Y-m-d（含當天）
+     * @return array [起, 訖]
+     */
+    private function rangeOf($startDate, $endDate)
+    {
+        return [
+            Carbon::parse($startDate)->startOfDay(),
+            Carbon::parse($endDate)->endOfDay(),
+        ];
+    }
+
+    /**
+     * 某一段期間開的單，依「最後怎麼處理的」分組
      *
      * ⚠ **還沒結案的（`close_action` 是 null）不會出現在結果裡** ——
      * MySQL 的 `GROUP BY` 會把 null 當成一組，但那一組的意思是
@@ -360,10 +385,7 @@ class AutoReplyTicketRepository
         return AutoReplyTicket::query()
             ->selectRaw('close_action, COUNT(*) AS total')
             ->whereNotNull('close_action')
-            ->whereBetween('created_at', [
-                "{$startDate} 00:00:00",
-                "{$endDate} 23:59:59",
-            ])
+            ->whereBetween('created_at', $this->rangeOf($startDate, $endDate))
             ->groupBy('close_action')
             ->get();
     }
@@ -383,10 +405,7 @@ class AutoReplyTicketRepository
     {
         return AutoReplyTicket::query()
             ->whereNull('close_action')
-            ->whereBetween('created_at', [
-                "{$startDate} 00:00:00",
-                "{$endDate} 23:59:59",
-            ])
+            ->whereBetween('created_at', $this->rangeOf($startDate, $endDate))
             ->count();
     }
 
@@ -414,10 +433,7 @@ class AutoReplyTicketRepository
         return AutoReplyTicket::query()
             ->selectRaw('answered_by, COUNT(*) AS total')
             ->where('close_action', $action)
-            ->whereBetween('created_at', [
-                "{$startDate} 00:00:00",
-                "{$endDate} 23:59:59",
-            ])
+            ->whereBetween('created_at', $this->rangeOf($startDate, $endDate))
             ->groupBy('answered_by')
             ->orderByDesc('total')
             ->get();
