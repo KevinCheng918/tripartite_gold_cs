@@ -113,6 +113,8 @@ class ShiftHandoverReviewService
         $handover = $this->handoverRepository->find($handoverId);
 
         if (blank($handover)) {
+            Log::warning('交接紀錄不見了，漏項沒有盤成', ['handover_id' => $handoverId]);
+
             return false;
         }
 
@@ -123,14 +125,29 @@ class ShiftHandoverReviewService
          */
         $split = $this->splitNotes($this->collect($handover));
         $candidates = (array) Arr::get($split, 'items', []);
-        $covered = $this->askCoverage($handoverText, $candidates);
+
+        /*
+         * ⚠ **「沒東西要比」與「比不出來」要分開。**
+         *
+         * 那一班真的什麼事都沒發生時，候選只剩最後那句固定問話 ——
+         * 這時 `$covered` 也是空的，但原因是沒東西可比，不是模型掛掉。
+         * 混在一起的話，選單會印「這次沒辦法自動比對交接內容」，
+         * 而那是在對一個好好交接完的人說謊。
+         */
+        $askable = $this->askableIndexes($candidates);
+        $covered = blank($askable) ? [] : $this->askCoverage($handoverText, $askable, $candidates);
         $gaps = $this->persist($handover, $candidates, $covered);
 
         if (blank($gaps)) {
             return false;
         }
 
-        return $this->sendMenu($handover, $gaps, blank($covered), (array) Arr::get($split, 'notes', []));
+        return $this->sendMenu(
+            $handover,
+            $gaps,
+            filled($askable) && blank($covered),
+            (array) Arr::get($split, 'notes', [])
+        );
     }
 
     /**
@@ -307,12 +324,13 @@ class ShiftHandoverReviewService
             ];
         }
 
-        return $this->withMore(
-            $items,
-            (int) $this->ticketRepository->countUnclosedBetween($start, $end),
-            $limit,
-            $sourceType
-        );
+        /*
+         * ⚠ **沒撈滿上限就不必查總數** —— 撈到的就是全部，那一次 COUNT
+         * 是白打的（三個來源各一次）。`countOf()` 只在撈滿時才問 DB。
+         */
+        return $this->withMore($items, $limit, $sourceType, function () use ($start, $end) {
+            return (int) $this->ticketRepository->countUnclosedBetween($start, $end);
+        });
     }
 
     /**
@@ -345,12 +363,9 @@ class ShiftHandoverReviewService
             ];
         }
 
-        return $this->withMore(
-            $items,
-            (int) $this->followupRepository->countOpenBetween($start, $end),
-            $limit,
-            $sourceType
-        );
+        return $this->withMore($items, $limit, $sourceType, function () use ($start, $end) {
+            return (int) $this->followupRepository->countOpenBetween($start, $end);
+        });
     }
 
     /**
@@ -382,12 +397,9 @@ class ShiftHandoverReviewService
             ];
         }
 
-        return $this->withMore(
-            $items,
-            (int) $this->reminderRepository->countPendingCreatedBetween($start, $end),
-            $limit,
-            $sourceType
-        );
+        return $this->withMore($items, $limit, $sourceType, function () use ($start, $end) {
+            return (int) $this->reminderRepository->countPendingCreatedBetween($start, $end);
+        });
     }
 
     /**
@@ -396,14 +408,25 @@ class ShiftHandoverReviewService
      * ⚠ **不能默默砍掉。** 清單看起來完整但其實被截斷的話，
      * 下一班會以為那就是全部（同其他通知「不要靜默截斷」的原則）。
      *
-     * @param array $items
-     * @param int   $total 同條件下的總數
-     * @param int   $limit
-     * @param int   $sourceType
+     * ⚠ `$countOf` 是 **closure 而不是算好的數字**：沒撈滿上限時根本不必
+     * 問總數（撈到的就是全部），這樣三個來源各省一次 COUNT。
+     *
+     * ⚠ PHP 7.4 沒有 arrow function，呼叫端一律用 `function () use (...)`。
+     *
+     * @param array    $items
+     * @param int      $limit
+     * @param int      $sourceType
+     * @param callable $countOf 回傳同條件下的總數（只在撈滿時才會被呼叫）
      * @return array
      */
-    private function withMore(array $items, $total, $limit, $sourceType)
+    private function withMore(array $items, $limit, $sourceType, callable $countOf)
     {
+        if (count($items) < $limit) {
+            return $items;
+        }
+
+        $total = (int) $countOf();
+
         if ($total <= $limit) {
             return $items;
         }
@@ -431,15 +454,14 @@ class ShiftHandoverReviewService
      * 少了過濾只是多問幾項，漏掉才是真的出事。
      *
      * @param string $handoverText
+     * @param array  $askable    要比對的候選索引（呼叫端算好，空的不會進來）
      * @param array  $candidates
-     * @return array<int, bool> 以候選的索引為 key
+     * @return array<int, bool> 以候選的索引為 key；空陣列 ＝ 比不出來
      */
-    private function askCoverage($handoverText, array $candidates)
+    private function askCoverage($handoverText, array $askable, array $candidates)
     {
-        $askable = $this->askableIndexes($candidates);
-
-        // 短路：沒有可比對的項目（只剩固定問句）就不必叫模型
-        if (blank($askable) || blank(trim((string) $handoverText))) {
+        // 短路：他一個字都沒打（純貼圖之類）就不必叫模型，那一定全部沒提到
+        if (blank(trim((string) $handoverText))) {
             return [];
         }
 
@@ -464,9 +486,31 @@ class ShiftHandoverReviewService
         }
 
         $covered = [];
+        $unknown = [];
 
         foreach ((array) Arr::get($result, 'items', []) as $row) {
-            $covered[(int) Arr::get($row, 'index')] = (bool) Arr::get($row, 'covered');
+            $index = (int) Arr::get($row, 'index');
+
+            /*
+             * ⚠ **模型回的編號要驗過才能用。** 它可能回一個不存在的編號
+             * （清單外的、或自己重編過的）—— 照單全收的話，那個 key 會對到
+             * 另一個候選，把「其實沒交接到」的事標成已交接而**整項消失**。
+             * 這是會讓事情靜靜漏掉的那種錯，所以寧可丟掉可疑的那一筆。
+             */
+            if (!in_array($index, $askable, true)) {
+                $unknown[] = $index;
+
+                continue;
+            }
+
+            $covered[$index] = (bool) Arr::get($row, 'covered');
+        }
+
+        if (filled($unknown)) {
+            Log::warning('交接漏項比對回了清單外的編號，已忽略', [
+                'unknown' => $unknown,
+                'askable' => $askable,
+            ]);
         }
 
         return $covered;
@@ -618,10 +662,7 @@ class ShiftHandoverReviewService
     private function buildMenuText(ShiftHandover $handover, $gaps, $noAi, array $notes)
     {
         $from = $this->shiftName($handover);
-
-        $text = $noAi
-            ? strtr($this->text('NO_AI_HEADER'), ['{from}' => $from])
-            : strtr($this->text('HEADER'), ['{count}' => $gaps->count(), '{from}' => $from]);
+        $text = $this->menuHeader($gaps, $noAi, $from);
 
         foreach ($gaps as $gap) {
             $text .= $this->gapLine($gap);
@@ -629,6 +670,46 @@ class ShiftHandoverReviewService
 
         // 「另外還有 N 件」擺在清單最後：它是整批的補充，不屬於任何一項
         return $text . implode('', $notes);
+    }
+
+    /**
+     * 選單的開頭那一句
+     *
+     * 三種情況要講三種話，講錯任何一種都是在對人說謊：
+     *
+     * | 情況 | 開頭 |
+     * |---|---|
+     * | 比對過，有漏的 | 「有 N 件事看起來沒寫進交接」 |
+     * | 比對過，**全都交接到了** | 「都交接到了 👍，最後確認一件事」 |
+     * | 沒比對成（模型掛掉） | 「這一班發生過這些事」＋說明沒比對 |
+     *
+     * ⚠ 第二種不能沿用第一種：那時清單上只剩最後那句固定問話，
+     * 說「有 1 件事沒寫進交接」等於指著一個**問句**說他漏了，
+     * 而他其實每一件都寫到了。
+     *
+     * @param \Illuminate\Support\Collection $gaps
+     * @param bool   $noAi
+     * @param string $from
+     * @return string
+     */
+    private function menuHeader($gaps, $noAi, $from)
+    {
+        if ($noAi) {
+            return strtr($this->text('NO_AI_HEADER'), ['{from}' => $from]);
+        }
+
+        $real = $gaps->filter(function ($gap) {
+            return !$gap->isManagerAsk();
+        });
+
+        if (blank($real)) {
+            return strtr($this->text('ALL_COVERED_HEADER'), ['{from}' => $from]);
+        }
+
+        return strtr($this->text('HEADER'), [
+            '{count}' => $real->count(),
+            '{from}'  => $from,
+        ]);
     }
 
     /**
@@ -674,25 +755,36 @@ class ShiftHandoverReviewService
         $actions = (array) config('constants.HANDOVER_REVIEW.ACTION');
         $id = (int) $handover->id;
 
+        $fill = (string) Arr::get($actions, 'FILL');
+        $fillAll = (string) Arr::get($actions, 'FILL_ALL');
+        $skip = (string) Arr::get($actions, 'SKIP');
+
         $buttons = [];
 
         foreach ($gaps as $gap) {
+            $seq = (int) $gap->seq;
+
             $buttons[] = [
-                'text'          => strtr($this->text('BUTTON_FILL'), ['{seq}' => $gap->seq]),
-                'callback_data' => "{$prefix}:" . Arr::get($actions, 'FILL') . ":{$id}:{$gap->seq}",
+                'text'          => strtr($this->text('BUTTON_FILL'), ['{seq}' => $seq]),
+                'callback_data' => "{$prefix}:{$fill}:{$id}:{$seq}",
             ];
         }
 
         $rows = array_chunk($buttons, 3);
 
+        /*
+         * ⚠ 這兩顆的 seq 固定帶 0：它們不指向某一項，但 `callback_data`
+         * 的格式要一致 —— 少一段的話分派端 `array_slice` 出來的陣列長度
+         * 會不一樣，解析就得分兩種情況。
+         */
         $rows[] = [
             [
                 'text'          => $this->text('BUTTON_FILL_ALL'),
-                'callback_data' => "{$prefix}:" . Arr::get($actions, 'FILL_ALL') . ":{$id}:0",
+                'callback_data' => "{$prefix}:{$fillAll}:{$id}:0",
             ],
             [
                 'text'          => $this->text('BUTTON_SKIP'),
-                'callback_data' => "{$prefix}:" . Arr::get($actions, 'SKIP') . ":{$id}:0",
+                'callback_data' => "{$prefix}:{$skip}:{$id}:0",
             ],
         ];
 
