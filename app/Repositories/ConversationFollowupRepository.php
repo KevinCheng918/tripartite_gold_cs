@@ -197,6 +197,46 @@ class ConversationFollowupRepository
     }
 
     /**
+     * 某一段時間開的、現在還掛著的（交接漏項盤點用）
+     *
+     * ⚠ 吃的是 **`Carbon` 區間**而不是日期字串：交接盤點看的是
+     * 「上一班的回訊時段」，不是整天。
+     *
+     * ⚠ 狀態用 `openStatuses()` —— 已經有結果的不必交接。
+     *
+     * @param \Illuminate\Support\Carbon $start
+     * @param \Illuminate\Support\Carbon $end
+     * @param int                        $limit
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getOpenBetween($start, $end, $limit)
+    {
+        return ConversationFollowup::query()
+            ->select(self::COLUMNS)
+            ->with('group')
+            ->whereIn('status', $this->openStatuses())
+            ->whereBetween('created_at', [$start, $end])
+            ->orderBy('created_at')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * 同一個條件下總共有幾筆（用來補「另外還有 N 件」）
+     *
+     * @param \Illuminate\Support\Carbon $start
+     * @param \Illuminate\Support\Carbon $end
+     * @return int
+     */
+    public function countOpenBetween($start, $end)
+    {
+        return ConversationFollowup::query()
+            ->whereIn('status', $this->openStatuses())
+            ->whereBetween('created_at', [$start, $end])
+            ->count();
+    }
+
+    /**
      * 某一段期間新開了幾筆，依來源分組
      *
      * @param string $startDate Y-m-d

@@ -55,6 +55,46 @@ class ScheduledReminderRepository
     }
 
     /**
+     * 某一段時間排下去、到現在還沒發的提醒（交接漏項盤點用）
+     *
+     * 下一班要知道「等一下會有東西跳出來」，而那是上一班排的。
+     *
+     * ⚠ 比的是 **`created_at`（什麼時候排的）而不是 `remind_at`（什麼時候發）**：
+     * 這一項回答的是「這一班做了什麼」，而上一班排的提醒多半就是要在
+     * 下一班才跳出來 —— 用 `remind_at` 篩的話，正好把它們全部排除掉。
+     *
+     * @param \Illuminate\Support\Carbon $start
+     * @param \Illuminate\Support\Carbon $end
+     * @param int                        $limit
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getPendingCreatedBetween($start, $end, $limit)
+    {
+        return ScheduledReminder::query()
+            ->select(self::COLUMNS)
+            ->where('status', config('constants.REMINDER.STATUS.PENDING'))
+            ->whereBetween('created_at', [$start, $end])
+            ->orderBy('remind_at')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * 同一個條件下總共有幾筆（用來補「另外還有 N 件」）
+     *
+     * @param \Illuminate\Support\Carbon $start
+     * @param \Illuminate\Support\Carbon $end
+     * @return int
+     */
+    public function countPendingCreatedBetween($start, $end)
+    {
+        return ScheduledReminder::query()
+            ->where('status', config('constants.REMINDER.STATUS.PENDING'))
+            ->whereBetween('created_at', [$start, $end])
+            ->count();
+    }
+
+    /**
      * 某個話題裡還沒發的提醒（清單指令用）
      *
      * ⚠ 用 `chat_id` ＋ `message_thread_id` 一起篩，不是只看話題 ——

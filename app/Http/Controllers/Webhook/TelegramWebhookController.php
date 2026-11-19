@@ -11,6 +11,7 @@ use App\Services\CreditAlertResendService;
 use App\Services\ScheduledBroadcastCommandService;
 use App\Services\TaskCreateCommandService;
 use App\Services\ScheduledReminderService;
+use App\Services\ShiftHandoverReviewService;
 use App\Services\ShiftHandoverService;
 use App\Services\StationCreditCommandService;
 use App\Services\TelegramBotService;
@@ -41,6 +42,7 @@ class TelegramWebhookController extends Controller
     private $alertResendService;
     private $botService;
     private $handoverService;
+    private $handoverReviewService;
 
     public function __construct(
         TelegramChatService $chatService,
@@ -55,7 +57,8 @@ class TelegramWebhookController extends Controller
         CreditAlertCommandService $alertCommandService,
         CreditAlertResendService $alertResendService,
         TelegramBotService $botService,
-        ShiftHandoverService $handoverService
+        ShiftHandoverService $handoverService,
+        ShiftHandoverReviewService $handoverReviewService
     ) {
         $this->chatService = $chatService;
         $this->supportService = $supportService;
@@ -83,6 +86,8 @@ class TelegramWebhookController extends Controller
         $this->botService = $botService;
         // 交接話題有人發言就記一筆（旁觀記錄，不消耗訊息）
         $this->handoverService = $handoverService;
+        // 交接漏項選單的三種按鈕（前綴 hr:）
+        $this->handoverReviewService = $handoverReviewService;
     }
 
     /**
@@ -233,6 +238,24 @@ class TelegramWebhookController extends Controller
             $this->broadcastCommandService->handleCallback(
                 array_slice(explode(':', $data), 1),
                 Arr::get($callback, 'message.message_id')
+            );
+
+            return;
+        }
+
+        /*
+         * 交接漏項選單的【N 補上】【全部補上】【都不用】。
+         *
+         * ⚠ service 裡會再驗一次「按的人是不是打交接的本人」——
+         * 下一班按「補上」等於他在替上一班承諾。
+         */
+        if ($prefix === (string) config('constants.HANDOVER_REVIEW.CALLBACK')) {
+            $this->botService->answerCallbackQuery(Arr::get($callback, 'id'));
+
+            $this->handoverReviewService->handleCallback(
+                array_slice(explode(':', $data), 1),
+                Arr::get($callback, 'message.message_id'),
+                (array) Arr::get($callback, 'from', [])
             );
 
             return;

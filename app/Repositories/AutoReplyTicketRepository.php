@@ -369,6 +369,48 @@ class AutoReplyTicketRepository
     }
 
     /**
+     * 某一段時間開的、到現在還沒結案的單（交接漏項盤點用）
+     *
+     * ⚠ 這支吃的是 **`Carbon` 區間**而不是日期字串：交接盤點看的是
+     * 「上一班的回訊時段」（例如 08:00–14:00），不是整天 ——
+     * 其他統計那幾支吃 `Y-m-d` 是因為它們本來就以日為單位。
+     *
+     * ⚠ **已結案的不撈**：那一班自己處理掉的事不需要交接，
+     * 列出來只會讓清單變長，而長清單沒有人看。
+     *
+     * @param \Illuminate\Support\Carbon $start
+     * @param \Illuminate\Support\Carbon $end
+     * @param int                        $limit
+     * @return Collection
+     */
+    public function getUnclosedBetween($start, $end, $limit)
+    {
+        return AutoReplyTicket::query()
+            ->select(self::COLUMNS)
+            ->with('group')
+            ->whereNull('close_action')
+            ->whereBetween('created_at', [$start, $end])
+            ->orderBy('created_at')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * 同一個條件下總共有幾張（用來補「另外還有 N 件」）
+     *
+     * @param \Illuminate\Support\Carbon $start
+     * @param \Illuminate\Support\Carbon $end
+     * @return int
+     */
+    public function countUnclosedBetween($start, $end)
+    {
+        return AutoReplyTicket::query()
+            ->whereNull('close_action')
+            ->whereBetween('created_at', [$start, $end])
+            ->count();
+    }
+
+    /**
      * 某一段期間開的單，依「最後怎麼處理的」分組
      *
      * ⚠ **還沒結案的（`close_action` 是 null）不會出現在結果裡** ——

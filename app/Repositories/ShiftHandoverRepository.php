@@ -36,6 +36,23 @@ class ShiftHandoverRepository
     }
 
     /**
+     * 用 id 取一筆（漏項盤點的 Job 與按鈕都靠這支還原交接）
+     *
+     * ⚠ 帶 `fromShift`：盤點與補充交接的文案都要印班別名稱，
+     * 少了這行每一則都會各查一次班別。
+     *
+     * @param int $id
+     * @return ShiftHandover|null
+     */
+    public function find($id)
+    {
+        return ShiftHandover::query()
+            ->select(self::COLUMNS)
+            ->with('fromShift')
+            ->find($id);
+    }
+
+    /**
      * 更新一筆
      *
      * @param ShiftHandover $handover

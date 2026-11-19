@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\HandoverReviewJob;
 use App\Models\ShiftHandover;
 use App\Repositories\ShiftAssignmentRepository;
 use App\Repositories\ShiftHandoverRepository;
@@ -827,6 +828,18 @@ class ShiftHandoverService
             (int) Arr::get($message, 'message_id'),
             self::NOTICE_TYPE
         );
+
+        /*
+         * 盤點他漏掉什麼，用選單問要不要補（`ShiftHandoverReviewService`）。
+         *
+         * ⚠ **丟背景**：比對要叫模型，幾秒到十幾秒，而這裡還在 webhook 裡
+         * —— 同步等下去 Telegram 會逾時重送，整段交接會再跑一次。
+         *
+         * ⚠ **只在第一次交接時觸發**：走到這裡代表 `findPendingForShifts()`
+         * 剛撈到一筆未完成的，他之後補充的第二句不會再進來 ——
+         * 否則話題會被一組又一組的選單洗版。
+         */
+        HandoverReviewJob::dispatch($handover->id, (string) Arr::get($message, 'text', ''));
 
         return true;
     }
