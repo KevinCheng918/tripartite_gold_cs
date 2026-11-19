@@ -869,6 +869,16 @@ class AutoReplySupportService
                         'mark_replied' => $isLast,
                         'signature'    => $isLast ? config('constants.AUTO_REPLY.SIGNATURE') : null,
                         'is_auto'      => true,
+                        /*
+                         * ⚠ 引用客人問的那一則（需求方 2026-11-19）：
+                         * 他可能連問了兩件事，而這張單只回答其中一件 ——
+                         * 不掛上去他分不出這是在回哪一個。
+                         *
+                         * 只掛第一則（答案長會分段，每則都引用會重複三四次）；
+                         * `message_id` 可能是 null（訊息有 7 天 TTL），
+                         * `sendReply()` 那時會當作沒引用。
+                         */
+                        'reply_to_id'  => $index === 0 ? $ticket->message_id : null,
                     ]
                 );
             } catch (\Exception $e) {
@@ -1177,6 +1187,14 @@ class AutoReplySupportService
                     'mark_replied' => true,
                     'signature'    => config('constants.AUTO_REPLY.SIGNATURE'),
                     'is_auto'      => true,
+                    /*
+                     * ⚠ 引用客人問的那一則（需求方 2026-11-19）。
+                     *
+                     * 這條路尤其需要：同仁的答案可能是幾十分鐘後才送出去的，
+                     * 中間客人早就又說了別的話 —— 不掛在原本那一則上，
+                     * 他要往回捲很久才知道這是在回什麼。
+                     */
+                    'reply_to_id'  => $ticket->message_id,
                 ]
             );
 

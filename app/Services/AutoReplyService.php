@@ -244,7 +244,7 @@ class AutoReplyService
             'code'       => Arr::get($diagnose, 'code'),
         ]);
 
-        $this->send($group, $customerText, true);
+        $this->send($group, $customerText, true, $messageId);
 
         return true;
     }
@@ -492,7 +492,7 @@ class AutoReplyService
                 'text'     => mb_substr((string) $text, 0, 100),
             ]);
 
-            $this->replyWithItem($group, $decision['item'], $decision['opening']);
+            $this->replyWithItem($group, $decision['item'], $decision['opening'], $messageId);
 
             return;
         }
@@ -505,13 +505,13 @@ class AutoReplyService
                 'text'     => $text,
             ]);
 
-            $this->replyAskInfo($group, $decision['item'], $decision['opening']);
+            $this->replyAskInfo($group, $decision['item'], $decision['opening'], $messageId);
 
             return;
         }
 
         if ($decision['action'] === $actions['REPLY']) {
-            $this->replyOpeningOnly($group, $decision['opening']);
+            $this->replyOpeningOnly($group, $decision['opening'], $messageId);
 
             return;
         }
@@ -676,12 +676,13 @@ class AutoReplyService
      * @param TelegramGroup $group
      * @param object        $item
      * @param string|null   $opening
+     * @param int|null      $replyToId 客人那則的後台 id（回覆要引用他問的那一則）
      * @return void
      */
-    private function replyAskInfo(TelegramGroup $group, $item, $opening)
+    private function replyAskInfo(TelegramGroup $group, $item, $opening, $replyToId = null)
     {
         // 跟命中答案一樣：承接句 + 題庫原文，不包外殼
-        $this->send($group, $this->joinOpening($opening, $item->answer), false);
+        $this->send($group, $this->joinOpening($opening, $item->answer), false, $replyToId);
         $this->markAsked($group);
         $this->telegramRepository->updateAutoReplyState($group, $item->id);
     }
@@ -783,9 +784,10 @@ class AutoReplyService
      * @param TelegramGroup              $group
      * @param \App\Models\QuickReplyItem $item
      * @param string|null                $opening
+     * @param int|null                   $replyToId 客人那則的後台 id（回覆要引用他問的那一則）
      * @return void
      */
-    private function replyWithItem(TelegramGroup $group, $item, $opening)
+    private function replyWithItem(TelegramGroup $group, $item, $opening, $replyToId = null)
     {
         /*
          * 送出去的就是「承接句 + 題庫原文」，不再包話術外殼。
@@ -807,7 +809,7 @@ class AutoReplyService
         }
 
         // 命中答案沒有冷卻 —— 客人重複問同一件事，就重複回答
-        $this->send($group, $this->joinOpening($opening, $this->resolveAnswer($item)), true);
+        $this->send($group, $this->joinOpening($opening, $this->resolveAnswer($item)), true, $replyToId);
         $this->telegramRepository->updateAutoReplyState($group, $item->id);
     }
 
@@ -849,6 +851,11 @@ class AutoReplyService
      * 補點訊息本身就是完整的答案（日期、匯率、換算、匯款資訊），
      * 不需要前導句。要加招呼語的話請加在繳款設定的補點訊息公版開頭，
      * 那是客服寫得了、看得到的地方。
+     *
+     * @param TelegramGroup $group
+     * ⚠ **這條路不會引用客人那則** —— 補點訊息是帶圖的，而 `sendPhoto()`
+     * 沒有 `reply_to_message_id`（見 `sendWithImage()`）。內容本身夠獨特
+     * （有金額、有繳款圖），不會跟別則混淆。
      *
      * @param TelegramGroup $group
      * @return bool 有沒有發出去
@@ -908,6 +915,9 @@ class AutoReplyService
      * ⚠ 刻意**不經過 splitter** —— 補點訊息公版本來就是設計成一則，
      * 而分段之後圖只能掛在其中一則上，文字與圖就被拆開了。
      *
+     * ⚠ **這一支不支援引用客人那則**，理由見下面 `reply_to_id` 的註解
+     * （`sendPhoto()` 沒有那個參數）。所以呼叫端不必、也不要傳。
+     *
      * @param TelegramGroup $group
      * @param string        $content
      * @param string|null   $imageUrl
@@ -926,6 +936,19 @@ class AutoReplyService
                     'signature'    => config('constants.AUTO_REPLY.SIGNATURE'),
                     'is_auto'      => true,
                     'image_url'    => $imageUrl,
+                    /*
+                     * ⚠ **這裡刻意不傳 `reply_to_id`。**
+                     *
+                     * `sendReply()` 帶圖時走的是 `sendPhoto()`，而那一支
+                     * （連同它內部會分流到的 `postMultipart()` /
+                     * `sendDocument()`）**沒有 `reply_to_message_id` 這個參數** ——
+                     * 傳了會被靜默丟掉，而「看程式碼以為有引用、實際上沒有」
+                     * 比不傳更糟。
+                     *
+                     * 帶圖的自動回覆只有匯率補點這一種，內容獨特（有金額、
+                     * 有繳款圖），不會跟別則混淆，所以這一版先不處理。
+                     * 真的要做就得連 Bot API 那三支一起加參數。
+                     */
                 ]
             );
         } catch (\Exception $e) {
@@ -967,9 +990,10 @@ class AutoReplyService
      *
      * @param TelegramGroup $group
      * @param string        $opening
+     * @param int|null      $replyToId 客人那則的後台 id（回覆要引用他問的那一則）
      * @return void
      */
-    private function replyOpeningOnly(TelegramGroup $group, $opening)
+    private function replyOpeningOnly(TelegramGroup $group, $opening, $replyToId = null)
     {
         /*
          * ⚠ 這條路**不會開求助單** —— 寒暄本來就不需要同仁處理。
@@ -983,7 +1007,7 @@ class AutoReplyService
             'opening'  => $opening,
         ]);
 
-        $this->send($group, $opening, true);
+        $this->send($group, $opening, true, $replyToId);
         $this->telegramRepository->updateAutoReplyState($group, null);
     }
 
@@ -1072,7 +1096,12 @@ class AutoReplyService
          * 那是開空頭支票：沒有任何同仁會看到那個問題，客人卻在等。
          * 上面那個 `return` 就是為了這件事。
          */
-        $this->send($group, $this->buildWaitText($question, $opening), true);
+        /*
+         * ⚠ 「稍等」尤其需要引用：客人連發兩個不同的請求時，兩則「已轉專員
+         * 處理」長得幾乎一樣（需求方 2026-11-19 附截圖），不掛在他問的那一則
+         * 上，他根本分不出哪則回哪個。
+         */
+        $this->send($group, $this->buildWaitText($question, $opening), true, $messageId);
     }
 
     /**
@@ -1161,12 +1190,27 @@ class AutoReplyService
     /**
      * 送出訊息
      *
+     * ⚠⚠ **一律引用客人那則**（需求方 2026-11-19 附截圖）：客人連發兩個
+     * 不同的請求（「請協助刪除 3 和 6」「請協助刪除 4」）時，我們也回了兩則
+     * 「已轉專員處理」—— 兩則長得幾乎一樣，**客人根本分不出哪則回哪個**。
+     *
+     * 不論是稍等、題庫答案還是追問，都要掛在他問的那一則上。
+     *
+     * ⚠ **只有第一則掛引用**：答案長的時候會分成好幾則送，每則都引用同一句
+     * 會讓那段引用重複三四次，反而難讀。後面幾則緊接在第一則之後，
+     * 本來就看得出是同一串。
+     *
+     * ⚠ `reply_to_id` 吃的是**後台訊息 id**（`telegram_message.id`），
+     * `sendReply()` 會自己換成 Telegram 的 message_id；換不到就當作沒引用
+     * （訊息有 7 天 TTL，舊的會被清掉）。
+     *
      * @param TelegramGroup $group
      * @param string        $content
      * @param bool          $markReplied 是否算已回覆（只有真的答了才算）
+     * @param int|null      $replyToId   客人那則的後台 id
      * @return void
      */
-    private function send(TelegramGroup $group, $content, $markReplied)
+    private function send(TelegramGroup $group, $content, $markReplied, $replyToId = null)
     {
         if (blank($content)) {
             Log::warning('自動回覆話術模板為空，略過送出', ['group_id' => $group->id]);
@@ -1192,6 +1236,8 @@ class AutoReplyService
                         'mark_replied' => $markReplied && $isLast,
                         'signature'    => $isLast ? config('constants.AUTO_REPLY.SIGNATURE') : null,
                         'is_auto'      => true,
+                        // 引用只掛第一則，理由見方法註解
+                        'reply_to_id'  => $index === 0 ? $replyToId : null,
                     ]
                 );
             } catch (\Exception $e) {
