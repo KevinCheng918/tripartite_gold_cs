@@ -4,6 +4,11 @@
 @section('icon', 'comments')
 @section('subtitle', trans('telegram_chat.subtitle'))
 
+@section('css')
+    <link rel="stylesheet"
+          href="{{ asset('css/telegram-chat-image-editor.css') }}?v={{ filemtime(public_path('css/telegram-chat-image-editor.css')) }}">
+@endsection
+
 @section('content')
 
     <div id="telegram-chat-app"
@@ -43,6 +48,8 @@
     <script src="{{ asset('js/telegram-chat/reactions.js') }}?v={{ filemtime(public_path('js/telegram-chat/reactions.js')) }}"></script>
     <script src="{{ asset('js/telegram-chat/swipe-reply.js') }}?v={{ filemtime(public_path('js/telegram-chat/swipe-reply.js')) }}"></script>
     <script src="{{ asset('js/telegram-chat/emoji.js') }}?v={{ filemtime(public_path('js/telegram-chat/emoji.js')) }}"></script>
+    {{-- 必須排在 input.js 之前：點圖片時要看得到 T.openImageEditor --}}
+    <script src="{{ asset('js/telegram-chat/image-editor.js') }}?v={{ filemtime(public_path('js/telegram-chat/image-editor.js')) }}"></script>
     <script src="{{ asset('js/telegram-chat/input.js') }}?v={{ filemtime(public_path('js/telegram-chat/input.js')) }}"></script>
     <script src="{{ asset('js/telegram-chat/quick-reply.js') }}?v={{ filemtime(public_path('js/telegram-chat/quick-reply.js')) }}"></script>
     {{-- 必須排在 main.js 之前：renderHeader 實際執行時要看得到 T.openIgnorePanel --}}

@@ -21,7 +21,35 @@ return [
     'btn_attachment'     => '档案',
     'btn_cancel'         => '取消',
     'send_file_title'    => '传送档案',
+    'send_image_title'   => '传送图片',
     'send_file_caption'  => '说明文字（选填）',
+    'btn_add_more'       => '新增',
+    'btn_edit_image'     => '编辑图片',
+    'edit_image_hint'    => '点图片可以裁切、涂鸦、遮住不该给客人看的部分',
+
+    /*
+     * 传图前的编辑器。
+     *
+     * ⚠ `editor_*` 由 image-editor.js 以字符串组出 key（工具栏是循环产生的），
+     * grep 不到字面，**不要当成没用到删掉**。
+     */
+    'editor_title'       => '编辑图片',
+    'editor_crop'        => '裁切',
+    'editor_rotate'      => '旋转',
+    'editor_pen'         => '画笔',
+    'editor_arrow'       => '箭头',
+    'editor_rect'        => '方框',
+    'editor_text'        => '文字',
+    'editor_mosaic'      => '马赛克',
+    'editor_blackout'    => '涂黑',
+    'editor_undo'        => '复原',
+    'editor_reset'       => '重设',
+    'editor_done'        => '完成',
+    'editor_crop_apply'  => '套用裁切',
+    'editor_crop_cancel' => '取消裁切',
+    'editor_text_placeholder' => '输入文字后按 Enter',
+    'editor_width'       => '粗细',
+    'editor_flatten_hint' => '裁切或旋转之后，前面画的东西就固定了，无法再复原',
     'btn_file'           => '文件',
     'btn_remove_image'   => '移除',
     'drop_hint'          => '放开以加入附件',
@@ -120,6 +148,8 @@ return [
         'assign_success'   => '指派成功',
         'reaction_failed'  => '表情回应发送失败',
         'image_too_large'  => '图片超过 5MB，无法传送',
+        'edited_too_large' => '编辑后的图片太大，请先裁切一部分再试',
+        'editor_failed'    => '图片编辑器开启失败',
         'image_invalid'    => '只能粘贴图片',
         'file_sending'     => '传送中',
         'qr_load_failed'   => '快速回复选单载入失败',

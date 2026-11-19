@@ -158,7 +158,17 @@ class TicketReportService
             'open'     => (int) $this->ticketRepository->countOpen(),
             'actions'  => $actions,
             'unknown'  => $this->unknownCount($actions),
-            'by_who'   => $this->replyOnlyByWho($date),
+            /*
+             * 要點名的兩種（需求方指定）：
+             *
+             * - 直接打字回覆 ＝ 沒讓題庫長大的那一種，看 `answered_by`
+             * - 同仁按忽略 ＝ 看 `closed_by`（**按忽略的人沒有作答**，
+             *   `answered_by` 是空的）
+             */
+            'by_who'   => [
+                (int) config('constants.AUTO_REPLY.CLOSE_ACTION.REPLY_ONLY') => $this->namesOf($date, 'answered'),
+                (int) config('constants.AUTO_REPLY.CLOSE_ACTION.IGNORED') => $this->namesOf($date, 'closed'),
+            ],
         ];
     }
 
@@ -215,11 +225,14 @@ class TicketReportService
             ]);
         }
 
+        /*
+         * ⚠ `{grew}/{closed}` 2026-11-20 從文案拿掉（需求方）——
+         * 這裡的替換也一起刪，留著會讓人以為模板裡還有那兩個位置。
+         * 數字本身仍在 `collect()` 的回傳裡，後台要做頁面時拿得到。
+         */
         return strtr((string) Arr::get($report, 'SUMMARY'), [
             '{opened}' => (int) Arr::get($stat, 'opened'),
             '{rate}'   => (int) Arr::get($stat, 'rate'),
-            '{grew}'   => (int) Arr::get($stat, 'grew'),
-            '{closed}' => (int) Arr::get($stat, 'closed'),
         ]);
     }
 
@@ -261,11 +274,14 @@ class TicketReportService
     }
 
     /**
-     * 「直接打字回覆」底下那行名字
+     * 某一行底下「是誰做的」，一個人一行
      *
-     * ⚠ **只有這一種要點名。** 需求方的動機是找出「只回客人、不建題庫」的人，
-     * 其他幾種要嘛題庫有長、要嘛本來就沒有人經手。全部都印名字會變成
-     * 每天一張點名表，那不是這則通知的用途。
+     * ⚠ **一個人一行**（需求方 2026-11-20）：原本是「@a 1、@b 1、@c 1」
+     * 擠成一句，三個人以上就讀不出來了。
+     *
+     * ⚠ **只有兩種要點名**：「直接打字回覆」（沒讓題庫長大的那一種）與
+     * 「同仁按忽略」。其他幾種要嘛題庫有長、要嘛本來就沒有人經手 ——
+     * 全部都印名字會變成每天一張點名表，那不是這則通知的用途。
      *
      * @param array $report
      * @param array $stat
@@ -274,52 +290,73 @@ class TicketReportService
      */
     private function byWhoLine(array $report, array $stat, $action)
     {
-        if ($action !== (int) config('constants.AUTO_REPLY.CLOSE_ACTION.REPLY_ONLY')) {
-            return '';
-        }
-
-        $names = (array) Arr::get($stat, 'by_who');
+        $names = (array) Arr::get($stat, "by_who.{$action}", []);
 
         if (blank($names)) {
             return '';
         }
 
-        $parts = [];
+        $text = '';
 
         foreach ($names as $row) {
-            $parts[] = strtr((string) Arr::get($report, 'BY_WHO_ONE'), [
+            $text .= strtr((string) Arr::get($report, 'BY_WHO_ONE'), [
                 '{name}'  => (string) Arr::get($row, 'name'),
                 '{count}' => (int) Arr::get($row, 'count'),
             ]);
         }
 
-        return strtr((string) Arr::get($report, 'BY_WHO'), [
-            '{names}' => implode('、', $parts),
-        ]);
+        return $text;
     }
 
     /**
-     * 「直接打字回覆」那些單是誰經手的
+     * 那一天某一種處理方式是誰經手的
      *
-     * ⚠ `answered_by` 存的是 Telegram 顯示名稱，拿不到名字時用「未具名」——
-     * 整列丟掉的話這一行的人數會跟上面那行的總數對不起來，看的人會以為算錯。
+     * ⚠ **兩種來源不能互換**：`answered` 看 `answered_by`（誰作答），
+     * `closed` 看 `closed_by`（誰按下結案）—— 按忽略的人沒有作答，
+     * 拿 `answered_by` 去查會全部是空的。
+     *
+     * ⚠ 名字拿不到時用「未具名」而不是整列丟掉：丟掉的話這幾行加起來
+     * 會跟上面那行的總數對不起來，看的人會以為算錯。
      *
      * @param string $date
+     * @param string $source `answered`（誰作答）或 `closed`（誰結案）
      * @return array<int, array{name:string, count:int}>
      */
-    private function replyOnlyByWho($date)
+    private function namesOf($date, $source)
     {
+        if ($source === 'closed') {
+            $rows = $this->ticketRepository->countByClosedBy(
+                $date,
+                $date,
+                config('constants.AUTO_REPLY.CLOSE_ACTION.IGNORED')
+            );
+
+            return $this->toNames($rows, 'closed_by');
+        }
+
         $rows = $this->ticketRepository->countByAnsweredBy(
             $date,
             $date,
             config('constants.AUTO_REPLY.CLOSE_ACTION.REPLY_ONLY')
         );
 
+        return $this->toNames($rows, 'answered_by');
+    }
+
+    /**
+     * 查詢結果換成 name / count
+     *
+     * @param \Illuminate\Support\Collection $rows
+     * @param string                         $column
+     * @return array<int, array{name:string, count:int}>
+     */
+    private function toNames($rows, $column)
+    {
         $names = [];
 
         foreach ($rows as $row) {
             $names[] = [
-                'name'  => filled($row->answered_by) ? (string) $row->answered_by : '未具名',
+                'name'  => filled($row->{$column}) ? (string) $row->{$column} : '未具名',
                 'count' => (int) $row->total,
             ];
         }

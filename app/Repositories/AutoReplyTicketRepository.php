@@ -25,6 +25,7 @@ class AutoReplyTicketRepository
          * 兩件事（同 ask_chat_id 那一欄的坑，而且一樣不會報錯）。
          */
         'close_action',
+        'closed_by',
         'quick_reply_item_id',
         'created_at',
     ];
@@ -291,10 +292,11 @@ class AutoReplyTicketRepository
      * 會把前一個蓋掉（例如把「已加入題庫」蓋回「客服已自行處理」）。
      * 用回傳筆數判斷誰先到：0 就代表別人已經處理過了。
      *
-     * @param int $id
+     * @param int         $id
+     * @param string|null $operator 後台操作者的暱稱（報表要列「是誰處理的」）
      * @return int 實際更新幾筆（0 = 這張單已經不在未處理狀態）
      */
-    public function markHandledById($id)
+    public function markHandledById($id, $operator = null)
     {
         return AutoReplyTicket::query()
             ->where('id', $id)
@@ -302,6 +304,7 @@ class AutoReplyTicketRepository
             ->update([
                 'status'       => config('constants.AUTO_REPLY.TICKET_STATUS.IGNORED'),
                 'close_action' => config('constants.AUTO_REPLY.CLOSE_ACTION.ADMIN_MARKED'),
+                'closed_by'    => $operator,
                 'updated_at'   => now(),
             ]);
     }
@@ -325,10 +328,11 @@ class AutoReplyTicketRepository
      *
      * 客服自己人工回覆客人之後，這些單就不該再自動轉出去。
      *
-     * @param int $groupId
+     * @param int         $groupId
+     * @param string|null $operator 回覆客人的那位客服（報表要列「是誰處理的」）
      * @return int 影響筆數
      */
-    public function ignoreOpenByGroup($groupId)
+    public function ignoreOpenByGroup($groupId, $operator = null)
     {
         $open = [
             config('constants.AUTO_REPLY.TICKET_STATUS.PENDING'),
@@ -346,6 +350,7 @@ class AutoReplyTicketRepository
                  * 每日統計把它算在「回了客人，但題庫沒長」那一段。
                  */
                 'close_action' => config('constants.AUTO_REPLY.CLOSE_ACTION.CS_REPLIED'),
+                'closed_by'    => $operator,
             ]);
     }
 
@@ -477,6 +482,30 @@ class AutoReplyTicketRepository
             ->where('close_action', $action)
             ->whereBetween('created_at', $this->rangeOf($startDate, $endDate))
             ->groupBy('answered_by')
+            ->orderByDesc('total')
+            ->get();
+    }
+
+    /**
+     * 某一段期間、某一種處理方式的單是**誰結掉的**
+     *
+     * ⚠ 跟 `countByAnsweredBy()` 是兩回事，不要合併：那一支問的是
+     * 「誰作答」（`answered_by`），這一支問的是「誰按了結案」（`closed_by`）——
+     * **按忽略的人沒有作答**，`answered_by` 是空的（需求方 2026-11-20
+     * 要的就是這個數字）。
+     *
+     * @param \Illuminate\Support\Carbon|string $startDate
+     * @param \Illuminate\Support\Carbon|string $endDate
+     * @param int                               $action `constants.AUTO_REPLY.CLOSE_ACTION` 的值
+     * @return \Illuminate\Support\Collection<object{closed_by:string|null, total:int}>
+     */
+    public function countByClosedBy($startDate, $endDate, $action)
+    {
+        return AutoReplyTicket::query()
+            ->selectRaw('closed_by, COUNT(*) AS total')
+            ->where('close_action', $action)
+            ->whereBetween('created_at', $this->rangeOf($startDate, $endDate))
+            ->groupBy('closed_by')
             ->orderByDesc('total')
             ->get();
     }

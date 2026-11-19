@@ -19,8 +19,7 @@
     // Font Awesome 的圖形只佔約 0.8em，不放大看起來會比文字小一截
     var ICON_FONT_SIZE = '1.15em';
 
-    // 待傳送的附件（截圖與一般檔案），按下發送才會真的送到客戶群組
-    var pendingFiles = [];
+    // 待傳送的附件（截圖與一般檔案）住在傳送視窗裡，見 `stagedFiles`
 
     /*
      * 關閉自動回覆的 modal 是不是按「確定」關掉的。
@@ -153,9 +152,9 @@
         });
 
         // 鎖住時把待傳附件清掉，否則解鎖後可能送出早就過時的截圖
-        if (locked && pendingFiles.length > 0) {
-            pendingFiles = [];
-            renderPendingFiles();
+        if (locked && stagedFiles.length > 0) {
+            stagedFiles = [];
+            hideBsModal(document.getElementById('modal-tg-send-file'));
         }
 
         if (locked && T.closeEmojiPicker) { T.closeEmojiPicker(); }
@@ -451,7 +450,8 @@
         if (!inputArea) { return; }
 
         // 切換群組時清空，避免附件或引用誤帶到別的對話
-        pendingFiles = [];
+        stagedFiles = [];
+        hideBsModal(document.getElementById('modal-tg-send-file'));
         quotedId = null;
 
         // 自動回覆是每個對話各自獨立的，切群組要重新套用
@@ -469,7 +469,8 @@
         inputArea.style.display = 'block';
         inputArea.innerHTML =
             '<div id="tg-quote-bar" class="px-3 pt-2" style="display:none"></div>' +
-            '<div id="tg-pending-images" class="px-3 pt-2 flex-wrap gap-2 align-items-center" style="display:none"></div>' +
+            // ⚠ 待傳縮圖列已移除（2026-11-20）：附件一律在「傳送圖片」視窗裡
+            //   管理，兩套並存會讓「我的圖到底在哪」變成要想一下的問題
             '<div id="tg-upload-progress" class="px-3 pt-2" style="display:none"></div>' +
             '<div id="tg-input-error" class="px-3 pt-2 text-danger" style="display:none;font-size:0.8125rem"></div>' +
             // 功能鈕獨立一列並帶文字說明，輸入框才有整列寬度
@@ -562,7 +563,6 @@
             autoToggle.addEventListener('change', function () { handleAutoReplyToggle(autoToggle); });
         }
 
-        renderPendingFiles();
         hideUploadProgress();
         applyAutoReplyLock();
     };
@@ -809,9 +809,16 @@
             return;
         }
 
-        pendingFiles.push(file);
+        /*
+         * 貼上與拖曳進來的也開傳送視窗（2026-11-20 改版，跟 Telegram 一樣）。
+         *
+         * 以前這些會堆在輸入框上方的小縮圖列，跟「從按鈕選檔」那條路的
+         * 確認視窗是兩套 —— 新視窗本身就是「多張圖 ＋ 一段說明」的容器，
+         * 功能完全涵蓋，所以縮圖列整個收掉。
+         */
+        stagedFiles.push(file);
         showInputError('');
-        renderPendingFiles();
+        openSendModal();
     }
 
     /**
@@ -824,88 +831,6 @@
         if (bytes < 1024 * 1024) { return Math.max(1, Math.round(bytes / 1024)) + ' KB'; }
 
         return (bytes / 1024 / 1024).toFixed(1) + ' MB';
-    }
-
-    /**
-     * 待送區的圖片縮圖
-     *
-     * @param {File} file
-     * @returns {HTMLElement}
-     */
-    function pendingImageNode(file) {
-        var img = document.createElement('img');
-        img.src = URL.createObjectURL(file);
-        img.style.cssText = 'width:56px;height:56px;object-fit:cover;border-radius:0.375rem;border:1px solid rgba(0,0,0,0.1)';
-        img.onload = function () { URL.revokeObjectURL(img.src); };
-
-        return img;
-    }
-
-    /**
-     * 待送區的檔案卡片：非圖片沒有縮圖可看，改顯示圖示 + 檔名 + 大小
-     *
-     * @param {File} file
-     * @returns {HTMLElement}
-     */
-    function pendingFileNode(file) {
-        var card = document.createElement('div');
-        card.className = 'd-flex align-items-center gap-2 px-2';
-        card.style.cssText = 'height:56px;max-width:220px;border-radius:0.375rem;border:1px solid rgba(0,0,0,0.1);background:rgba(0,0,0,0.03)';
-
-        var icon = document.createElement('i');
-        icon.className = 'fas fa-file-alt text-muted';
-
-        var text = document.createElement('div');
-        text.style.cssText = 'min-width:0;font-size:0.75rem;line-height:1.3';
-
-        var name = document.createElement('div');
-        name.className = 'text-truncate';
-        name.textContent = file.name;
-        name.title = file.name;
-
-        var size = document.createElement('div');
-        size.className = 'text-muted';
-        size.textContent = formatSize(file.size);
-
-        text.appendChild(name);
-        text.appendChild(size);
-        card.appendChild(icon);
-        card.appendChild(text);
-
-        return card;
-    }
-
-    function renderPendingFiles() {
-        var container = document.getElementById('tg-pending-images');
-        if (!container) { return; }
-
-        if (!pendingFiles.length) {
-            container.style.display = 'none';
-            container.innerHTML = '';
-            return;
-        }
-
-        container.style.display = 'flex';
-        container.innerHTML = '';
-        pendingFiles.forEach(function (file, index) {
-            var wrapper = document.createElement('div');
-            wrapper.className = 'position-relative';
-
-            wrapper.appendChild(isImageFile(file) ? pendingImageNode(file) : pendingFileNode(file));
-
-            var removeBtn = document.createElement('button');
-            removeBtn.type = 'button';
-            removeBtn.className = 'btn-close position-absolute top-0 end-0 bg-white rounded-circle';
-            removeBtn.style.cssText = 'font-size:0.5rem;padding:0.2rem';
-            removeBtn.title = T.i18n.btn_remove_image || '移除';
-            removeBtn.addEventListener('click', function () {
-                pendingFiles.splice(index, 1);
-                renderPendingFiles();
-            });
-
-            wrapper.appendChild(removeBtn);
-            container.appendChild(wrapper);
-        });
     }
 
     /**
@@ -976,12 +901,10 @@
         // 最後一道防線：按鈕與輸入框雖然已被停用，快速回覆選單等路徑仍可能呼叫到這裡
         if (T.autoReplyOn) { return; }
 
-        // 有待傳送的附件時，改走附件流程（文字會當成第一個的 caption）
-        if (pendingFiles.length) {
-            sendPendingFiles();
-            return;
-        }
-
+        /*
+         * ⚠ 這裡不再處理附件（2026-11-20 改版）：附件連同它的說明文字
+         * 都在傳送視窗裡按「發送」送出，輸入框只管純文字。
+         */
         var textarea = document.getElementById('tg-reply-text');
         var sendBtn = document.getElementById('btn-tg-send');
         var content = textarea.value.trim();
@@ -1024,112 +947,319 @@
     function sendAttachment(file) {
         if (!T.selectedGroupId) { return; }
 
-        // 超過上限先擋下來，不必等使用者填完說明才發現送不出去
-        if (isImageFile(file)) {
-            if (file.size > MAX_IMAGE_BYTES) {
-                showInputError(T.i18n.msg.image_too_large || '圖片超過 5MB，無法傳送');
-                return;
-            }
-        } else if (file.size > MAX_FILE_BYTES) {
-            showInputError(fileTooLargeMessage());
-            return;
-        }
-
-        showInputError('');
-        openSendFileModal(file);
+        addPendingFile(file);
     }
 
-    // 等待確認送出的檔案
-    var stagedFile = null;
+    /** 等待確認送出的那幾個檔案（傳送視窗裡列的就是它） */
+    var stagedFiles = [];
 
     /**
-     * 傳送確認視窗：圖片顯示縮圖、其他只顯示檔名與大小，可另外填說明文字
+     * 傳送視窗：一次管好幾張圖，點圖可以編輯
      *
-     * @param {File} file
+     * 需求方 2026-11-20 指定照 Telegram 那個版面做：圖片本身就是按鈕
+     * （點下去進編輯器），右上角浮著換一張與刪除，底下一段共用的說明文字。
+     *
+     * ⚠ **編輯完不直接送**，一定要退回這裡再看一眼 ——
+     * 送到客戶群組是收不回來的。
      */
-    function openSendFileModal(file) {
-        stagedFile = file;
+    function openSendModal() {
+        if (!stagedFiles.length) { return; }
 
         var modalEl = document.getElementById('modal-tg-send-file');
         if (!modalEl) {
             document.body.insertAdjacentHTML('beforeend',
+                // modal-fullscreen-sm-down：手機撐滿，電腦維持置中視窗（需求方要兩邊同一套版面）
                 '<div class="modal fade" id="modal-tg-send-file" tabindex="-1">' +
-                '<div class="modal-dialog modal-dialog-scrollable">' +
+                '<div class="modal-dialog modal-dialog-scrollable modal-dialog-centered modal-fullscreen-sm-down">' +
                 '<div class="modal-content">' +
                 '<div class="modal-header py-2">' +
-                '<h5 class="modal-title" style="font-size:0.9375rem">' + T.escapeHtml(T.i18n.send_file_title || '傳送檔案') + '</h5>' +
+                '<h5 class="modal-title" id="tg-send-title" style="font-size:0.9375rem"></h5>' +
                 '<button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>' +
                 '<div class="modal-body">' +
-                '<div id="tg-send-file-preview" class="text-center mb-3"></div>' +
+                '<div class="tg-send-hint" id="tg-send-hint"></div>' +
+                '<div id="tg-send-file-preview"></div>' +
                 '<label class="form-label" style="font-size:0.8125rem">' + T.escapeHtml(T.i18n.send_file_caption || '說明文字') + '</label>' +
                 '<textarea id="tg-send-file-caption" class="form-control" rows="2" maxlength="1024"></textarea>' +
                 '</div>' +
-                '<div class="modal-footer py-2">' +
+                '<div class="modal-footer py-2 justify-content-between">' +
+                '<button type="button" class="btn btn-link btn-sm text-decoration-none p-0" id="btn-tg-send-add">' +
+                '<i class="fas fa-plus me-1"></i>' + T.escapeHtml(T.i18n.btn_add_more || '新增') + '</button>' +
+                '<div class="d-flex gap-2">' +
                 '<button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">' + T.escapeHtml(T.i18n.btn_cancel || '取消') + '</button>' +
                 '<button type="button" class="btn btn-primary btn-sm" id="btn-tg-send-file-ok">' +
                 '<i class="fas fa-paper-plane me-1"></i>' + T.escapeHtml(T.i18n.btn_send || '發送') + '</button>' +
-                '</div></div></div></div>');
+                '</div></div></div></div></div>');
 
             modalEl = document.getElementById('modal-tg-send-file');
             document.getElementById('btn-tg-send-file-ok').addEventListener('click', confirmSendFile);
+            document.getElementById('btn-tg-send-add').addEventListener('click', pickMoreFiles);
 
-            // 關閉時清掉暫存，避免下次開啟殘留上一個檔案
+            // 關閉時清掉暫存，避免下次開啟殘留上一批
             modalEl.addEventListener('hidden.bs.modal', function () {
-                stagedFile = null;
+                stagedFiles = [];
                 document.getElementById('tg-send-file-preview').innerHTML = '';
                 document.getElementById('tg-send-file-caption').value = '';
             });
         }
 
-        renderStagedPreview(file);
-        document.getElementById('tg-send-file-caption').value = '';
-        showBsModal('modal-tg-send-file');
-    }
+        renderStagedList();
 
-    /**
-     * 圖片給縮圖，其他檔案只給檔名與大小 ——
-     * pdf、doc 這類沒辦法在這裡預覽內容，硬塞一個框只是浪費空間
-     *
-     * @param {File} file
-     */
-    function renderStagedPreview(file) {
-        var $box = $('#tg-send-file-preview').empty();
-
-        if (isImageFile(file)) {
-            var img = document.createElement('img');
-            img.src = URL.createObjectURL(file);
-            img.style.cssText = 'max-width:100%;max-height:260px;border-radius:0.375rem';
-            img.onload = function () { URL.revokeObjectURL(img.src); };
-            $box.append(img);
-        } else {
-            $box.append($('<div class="d-inline-flex align-items-center gap-2 px-3 py-2">')
-                .css({ border: '1px solid #dee2e6', borderRadius: '0.375rem', background: 'rgba(0,0,0,0.03)' })
-                .append($('<i class="fas fa-file-alt fa-2x text-muted">'))
-                .append($('<div class="text-start" style="min-width:0">')
-                    .append($('<div class="text-truncate" style="max-width:220px;font-size:0.875rem">').text(file.name))
-                    .append($('<div class="text-muted" style="font-size:0.75rem">').text(formatSize(file.size)))));
+        // 已經開著的時候（例如按了「新增」）不要重設說明文字
+        if (!modalEl.classList.contains('show')) {
+            document.getElementById('tg-send-file-caption').value = '';
+            showBsModal('modal-tg-send-file');
         }
     }
 
     /**
+     * 「新增」：再挑一個檔案加進來
+     *
+     * ⚠ 用完就把 input 移掉 —— 留著的話下次選同一個檔案不會觸發 change
+     * （值沒變），使用者會以為按了沒反應。
+     */
+    function pickMoreFiles() {
+        var picker = document.createElement('input');
+        picker.type = 'file';
+        picker.style.display = 'none';
+
+        picker.addEventListener('change', function () {
+            var file = picker.files && picker.files[0];
+            picker.remove();
+
+            if (!file || !withinLimit(file)) { return; }
+
+            stagedFiles.push(isImageFile(file) ? namedImage(file) : file);
+            renderStagedList();
+        });
+
+        document.body.appendChild(picker);
+        picker.click();
+    }
+
+    /**
+     * 大小有沒有超過上限
+     *
+     * @param {File} file
+     * @returns {boolean}
+     */
+    function withinLimit(file) {
+        if (isImageFile(file)) {
+            if (file.size <= MAX_IMAGE_BYTES) { return true; }
+
+            showModalError(T.i18n.msg.image_too_large || '圖片超過 5MB，無法傳送');
+
+            return false;
+        }
+
+        if (file.size <= MAX_FILE_BYTES) { return true; }
+
+        showModalError(fileTooLargeMessage());
+
+        return false;
+    }
+
+    /**
+     * 畫出待送清單：圖片可以點，其他檔案只給檔名與大小
+     *
+     * ⚠ pdf、doc 這類沒辦法在這裡預覽內容，硬塞一個框只是浪費空間，
+     * 而且它們也沒有東西可編輯。
+     */
+    function renderStagedList() {
+        var box = document.getElementById('tg-send-file-preview');
+        if (!box) { return; }
+
+        // 一張圖都沒了就把視窗收掉，不要留一個空視窗給人按發送
+        if (!stagedFiles.length) {
+            hideBsModal(document.getElementById('modal-tg-send-file'));
+
+            return;
+        }
+
+        var hasImage = stagedFiles.some(isImageFile);
+
+        document.getElementById('tg-send-title').textContent = hasImage
+            ? (T.i18n.send_image_title || '傳送圖片')
+            : (T.i18n.send_file_title || '傳送檔案');
+
+        document.getElementById('tg-send-hint').textContent = hasImage
+            ? (T.i18n.edit_image_hint || '')
+            : '';
+
+        box.innerHTML = '';
+        stagedFiles.forEach(function (file, index) {
+            box.appendChild(isImageFile(file) ? imageCard(file, index) : fileCard(file, index));
+        });
+    }
+
+    /**
+     * 一張圖的卡片：圖本身可點（編輯），右上角換一張／刪除
+     *
+     * @param {File}   file
+     * @param {number} index
+     * @returns {HTMLElement}
+     */
+    function imageCard(file, index) {
+        var card = document.createElement('div');
+        card.className = 'tg-send-item';
+
+        var img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        img.title = T.i18n.btn_edit_image || '編輯圖片';
+        // 釋放掉 object URL，不然開幾十張就是幾十份留在記憶體裡
+        img.onload = function () { URL.revokeObjectURL(img.src); };
+        img.addEventListener('click', function () { editImageAt(index); });
+
+        card.appendChild(img);
+        var tools = itemTools(index);
+        if (tools) { card.appendChild(tools); }
+
+        return card;
+    }
+
+    /**
+     * 非圖片的卡片
+     *
+     * @param {File}   file
+     * @param {number} index
+     * @returns {HTMLElement}
+     */
+    function fileCard(file, index) {
+        var card = document.createElement('div');
+        card.className = 'tg-send-item';
+
+        var inner = document.createElement('div');
+        inner.className = 'tg-send-item-file';
+        inner.innerHTML =
+            '<i class="fas fa-file-alt fa-2x text-muted"></i>' +
+            '<div style="min-width:0">' +
+            '<div class="text-truncate" style="font-size:0.875rem">' + T.escapeHtml(file.name) + '</div>' +
+            '<div class="text-muted" style="font-size:0.75rem">' + T.escapeHtml(formatSize(file.size)) + '</div>' +
+            '</div>';
+
+        card.appendChild(inner);
+        var tools = itemTools(index);
+        if (tools) { card.appendChild(tools); }
+
+        return card;
+    }
+
+    /**
+     * 右上角的移除鈕
+     *
+     * ⚠ **只有一張的時候整組不印**（需求方 2026-11-20）：那時「換一張」與
+     * 「移除」都等於「關掉視窗重來」—— 旁邊就有取消鈕，多兩顆只是擋住圖。
+     *
+     * ⚠ **「換一張」整個拿掉了**，多張時也沒有：要換那一張，刪掉再按「新增」
+     * 就是同一件事，而且少一顆按鈕少一個要解釋的東西。
+     *
+     * @param {number} index
+     * @returns {HTMLElement|null}
+     */
+    function itemTools(index) {
+        if (stagedFiles.length < 2) { return null; }
+
+        var tools = document.createElement('div');
+        tools.className = 'tg-send-item-tools';
+
+        var remove = document.createElement('button');
+        remove.type = 'button';
+        remove.title = T.i18n.btn_remove_image || '移除';
+        remove.innerHTML = '<i class="fas fa-trash"></i>';
+        remove.addEventListener('click', function () {
+            stagedFiles.splice(index, 1);
+            renderStagedList();
+        });
+
+        tools.appendChild(remove);
+
+        return tools;
+    }
+
+    /**
+     * 點圖片：開編輯器，完成後換掉那一張
+     *
+     * @param {number} index
+     */
+    function editImageAt(index) {
+        var file = stagedFiles[index];
+        if (!file) { return; }
+
+        /*
+         * ⚠ **不要靜靜 return。** 第一版寫成「編輯器不在就不做事」，
+         * 而編輯器剛好因為掛錯全域物件而不存在 —— 結果是點圖片完全沒反應，
+         * 沒有任何線索。載不到就要講。
+         */
+        if (!T.openImageEditor) {
+            showModalError(T.i18n.msg.editor_failed || '圖片編輯器開啟失敗');
+
+            return;
+        }
+
+        T.openImageEditor(file, function (edited) {
+            stagedFiles[index] = edited;
+            renderStagedList();
+        }, showModalError);
+    }
+
+    /**
+     * 視窗裡的錯誤訊息（不是 alert）
+     *
+     * @param {string} message
+     */
+    function showModalError(message) {
+        var hint = document.getElementById('tg-send-hint');
+        if (!hint) { return; }
+
+        hint.textContent = message;
+        hint.classList.add('text-danger');
+    }
+
+    /**
      * 按下傳送：關掉視窗後才開始上傳，進度條顯示在輸入區
+     *
+     * ⚠ **逐個序列送出而非平行**，客戶端看到的順序才會跟這裡列的一致。
+     * ⚠ 說明文字只掛第一個 —— 沿用改版前的規則，也跟 Telegram 一致。
      */
     function confirmSendFile() {
-        var file = stagedFile;
-        if (!file) { return; }
+        var queue = stagedFiles.slice();
+        if (!queue.length) { return; }
 
         var caption = $('#tg-send-file-caption').val().trim();
         hideBsModal(document.getElementById('modal-tg-send-file'));
 
-        showUploadProgress(file.name, 1, 1);
-        uploadAttachment(file, caption, updateUploadProgress)
+        var sentCount = 0;
+        var chain = Promise.resolve();
+
+        queue.forEach(function (file, index) {
+            chain = chain.then(function () {
+                showUploadProgress(file.name, index + 1, queue.length);
+
+                return uploadAttachment(file, index === 0 ? caption : '', updateUploadProgress)
+                    .then(function (result) {
+                        sentCount = index + 1;
+
+                        return result;
+                    });
+            });
+        });
+
+        chain
             .then(function () {
                 hideUploadProgress();
                 T.loadMessages(T.selectedGroupId);
             })
             .catch(function (error) {
                 hideUploadProgress();
-                showInputError(errorMessage(error, sendFailedMessage(file)));
+                showInputError(errorMessage(error, sendFailedMessage(queue[sentCount])));
+
+                /*
+                 * 已經送出去的不重送，把失敗那筆與其後沒送的留著 ——
+                 * 他可以直接再按一次，而不是重新挑一遍檔案。
+                 */
+                stagedFiles = queue.slice(sentCount);
+                T.loadMessages(T.selectedGroupId);
+
+                if (stagedFiles.length) { openSendModal(); }
             });
     }
 
@@ -1198,66 +1328,6 @@
 
             xhr.send(formData);
         });
-    }
-
-    /**
-     * 依序送出待傳送的附件，文字只掛在第一個當 caption。
-     * 逐個序列送出而非平行，確保客戶端看到的順序與加入的順序一致。
-     */
-    function sendPendingFiles() {
-        var textarea = document.getElementById('tg-reply-text');
-        var sendBtn = document.getElementById('btn-tg-send');
-        var caption = textarea ? textarea.value.trim() : '';
-        var queue = pendingFiles.slice();
-
-        setSending(true);
-        showInputError('');
-
-        var sentCount = 0;
-        var chain = Promise.resolve();
-        queue.forEach(function (file, index) {
-            chain = chain.then(function () {
-                showUploadProgress(file.name, index + 1, queue.length);
-
-                return uploadAttachment(file, index === 0 ? caption : '', updateUploadProgress).then(function (result) {
-                    sentCount = index + 1;
-
-                    return result;
-                });
-            });
-        });
-
-        chain
-            .then(function () {
-                pendingFiles = [];
-                renderPendingFiles();
-                if (textarea) {
-                    textarea.value = '';
-                    textarea.style.height = '';
-                }
-                hideUploadProgress();
-                setSending(false);
-                if (textarea) { textarea.focus(); }
-                T.loadMessages(T.selectedGroupId);
-            })
-            .catch(function (error) {
-                hideUploadProgress();
-                setSending(false);
-                showInputError(errorMessage(error, sendFailedMessage(queue[sentCount])));
-                // 已成功送出的不重送，保留失敗那筆與其後未送的，讓使用者可再按一次
-                pendingFiles = queue.slice(sentCount);
-                renderPendingFiles();
-                T.loadMessages(T.selectedGroupId);
-            });
-
-        function setSending(sending) {
-            if (textarea) { textarea.disabled = sending; }
-            if (!sendBtn) { return; }
-            sendBtn.disabled = sending;
-            sendBtn.innerHTML = sending
-                ? '<i class="fas fa-spinner fa-spin" style="font-size:0.875rem"></i>'
-                : '<i class="fas fa-paper-plane" style="font-size:0.875rem"></i>';
-        }
     }
 
     /**

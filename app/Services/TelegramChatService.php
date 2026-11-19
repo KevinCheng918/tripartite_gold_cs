@@ -862,7 +862,8 @@ class TelegramChatService
         // 客服自己人工回覆了，就不該再把同一個問題轉到內部支援群組。
         // 自動回覆自己送出的訊息不算 —— 否則會把它剛開的那張單關掉
         if (!$isAuto) {
-            $this->ticketRepository->ignoreOpenByGroup($group->id);
+            // 記下是誰回的 —— 每日統計要在「客服在對話窗回掉」底下列出是誰、幾張
+            $this->ticketRepository->ignoreOpenByGroup($group->id, $nickname);
         }
 
         /*
@@ -1887,7 +1888,10 @@ class TelegramChatService
              */
             if (filled($senderId)) {
                 $this->telegramRepository->markMessagesReplied($group->id);
-                $this->ticketRepository->ignoreOpenByGroup($group->id);
+                $this->ticketRepository->ignoreOpenByGroup(
+                    $group->id,
+                    $sender ? $sender->nickname : null
+                );
             }
 
             return true;
@@ -1963,7 +1967,7 @@ class TelegramChatService
          * 這一支沒有 `is_auto`：唯一的呼叫端是客服在輸入區上傳檔案，
          * 不會有系統自動送檔的情況。
          */
-        $this->ticketRepository->ignoreOpenByGroup($group->id);
+        $this->ticketRepository->ignoreOpenByGroup($group->id, $nickname);
 
         // 廣播失敗不影響已送出的訊息，前端還有輪詢可以補上
         try {

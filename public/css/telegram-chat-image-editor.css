@@ -1,0 +1,310 @@
+/**
+ * 傳圖前的圖片編輯器（image-editor.js）＋ 傳送圖片視窗的圖卡
+ *
+ * 詳見 .claude/knowledge/features/chat-image-editor.md
+ */
+
+/* ---------------------------------------------------------------
+   編輯器：全螢幕蓋版
+   --------------------------------------------------------------- */
+
+.tg-editor {
+    position: fixed;
+    inset: 0;
+    /* 要蓋過 Bootstrap modal（1055）—— 編輯器是從傳送視窗裡叫出來的 */
+    z-index: 1090;
+    display: flex;
+    flex-direction: column;
+    background: #101014;
+    color: #fff;
+}
+
+/* 編輯器開著的時候底下不要捲動（手機上尤其明顯） */
+body.tg-editor-open {
+    overflow: hidden;
+}
+
+.tg-editor-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: #18181d;
+    flex-shrink: 0;
+}
+
+.tg-editor-top {
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tg-editor-bottom {
+    flex-wrap: wrap;
+    justify-content: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tg-editor-title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+}
+
+.tg-editor-btn {
+    border: 0;
+    background: transparent;
+    color: #fff;
+    font-size: 0.875rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.375rem;
+    cursor: pointer;
+}
+
+.tg-editor-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.tg-editor-primary {
+    color: #4aa3ff;
+    font-weight: 600;
+}
+
+/* 畫布區：圖置中，留白讓邊緣的筆畫不貼著螢幕 */
+.tg-editor-stage {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem;
+    overflow: hidden;
+}
+
+.tg-editor-canvas-wrap {
+    position: relative;
+    max-width: 100%;
+    max-height: 100%;
+    line-height: 0;
+}
+
+.tg-editor-canvas-wrap canvas {
+    max-width: 100%;
+    /* stage 的 padding 是 0.75rem ×2 */
+    max-height: calc(100vh - 11rem);
+    width: auto;
+    height: auto;
+    border-radius: 0.25rem;
+}
+
+/* 上層疊在底層上，兩張一定要對齊 */
+#tg-editor-overlay {
+    position: absolute;
+    inset: 0;
+    /*
+     * ⚠ touch-action: none 不能拿掉 —— 沒有的話手指一畫，
+     * 整個頁面會跟著捲動，而筆跡只會畫出一小段。
+     */
+    touch-action: none;
+    cursor: crosshair;
+}
+
+.tg-editor-error {
+    position: absolute;
+    left: 50%;
+    bottom: 1rem;
+    transform: translateX(-50%);
+    max-width: 90%;
+    padding: 0.5rem 0.875rem;
+    border-radius: 0.5rem;
+    background: rgba(220, 53, 69, 0.95);
+    color: #fff;
+    font-size: 0.8125rem;
+    text-align: center;
+}
+
+/* ---------------------------------------------------------------
+   工具列
+   --------------------------------------------------------------- */
+
+.tg-editor-tools,
+.tg-editor-colors,
+.tg-editor-widths,
+.tg-editor-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+/* 分隔：同一列裡的幾組工具要看得出是分開的 */
+.tg-editor-colors,
+.tg-editor-widths,
+.tg-editor-actions {
+    padding-left: 0.5rem;
+    margin-left: 0.25rem;
+    border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.tg-editor-tool {
+    width: 2.25rem;
+    height: 2.25rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: #fff;
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.tg-editor-tool:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.tg-editor-tool.tg-editor-active {
+    background: #0a84ff;
+}
+
+.tg-editor-color {
+    width: 1.5rem;
+    height: 1.5rem;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-radius: 50%;
+    padding: 0;
+    cursor: pointer;
+}
+
+.tg-editor-color.tg-editor-active {
+    border-color: #fff;
+    /* 選中的那顆用外框撐大，不要改尺寸造成整列跳動 */
+    box-shadow: 0 0 0 2px #0a84ff;
+}
+
+.tg-editor-width {
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.tg-editor-width span {
+    display: block;
+    background: #fff;
+    border-radius: 50%;
+}
+
+.tg-editor-width.tg-editor-active {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.tg-editor-hint {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.55);
+    text-align: center;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* 文字工具的浮動輸入框 */
+.tg-editor-text-input {
+    position: fixed;
+    z-index: 1100;
+    min-width: 10rem;
+    padding: 0.25rem 0.5rem;
+    border: 2px solid #0a84ff;
+    border-radius: 0.375rem;
+    background: rgba(0, 0, 0, 0.8);
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+/* 手機：工具太多會擠成兩三列，給它捲動而不是換行堆高 */
+@media (max-width: 575.98px) {
+    .tg-editor-bottom {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        justify-content: flex-start;
+    }
+
+    .tg-editor-canvas-wrap canvas {
+        max-height: calc(100vh - 12rem);
+    }
+}
+
+/* ---------------------------------------------------------------
+   傳送圖片視窗裡的圖卡
+   --------------------------------------------------------------- */
+
+.tg-send-item {
+    position: relative;
+    margin-bottom: 0.75rem;
+}
+
+/*
+ * ⚠ **每張圖在視窗裡一樣大**（需求方 2026-11-20）：照原尺寸的話，
+ * 一張 4000px 的截圖會把整個視窗撐得又長又醜，而這裡只是「確認是這張沒錯」。
+ *
+ * `contain` 而不是 `cover`：預覽要看得到**整張**，裁切是編輯器裡的事。
+ * 要看細節就點進去放大。
+ */
+.tg-send-item img {
+    display: block;
+    width: 100%;
+    height: 240px;
+    object-fit: contain;
+    background: rgba(0, 0, 0, 0.04);
+    border-radius: 0.5rem;
+    cursor: pointer;
+}
+
+@media (max-width: 575.98px) {
+    .tg-send-item img {
+        height: 200px;
+    }
+}
+
+/* 右上角的替換／刪除，疊在圖上（比照 Telegram） */
+.tg-send-item-tools {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    border-radius: 0.5rem;
+    background: rgba(0, 0, 0, 0.45);
+}
+
+.tg-send-item-tools button {
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: #fff;
+    font-size: 0.8125rem;
+    cursor: pointer;
+}
+
+.tg-send-item-tools button:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* 非圖片的檔案：沒有縮圖可點，只給檔名與大小 */
+.tg-send-item-file {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.5rem;
+}
+
+.tg-send-hint {
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color, #6c757d);
+    margin-bottom: 0.5rem;
+}

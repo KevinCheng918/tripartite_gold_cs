@@ -31,6 +31,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $last_reminded_at
  * @property int         $status              見 constants.AUTO_REPLY.TICKET_STATUS
  * @property int|null    $close_action        最後怎麼處理的，見 constants.AUTO_REPLY.CLOSE_ACTION
+ * @property string|null $closed_by           誰把它結掉的（顯示名稱）；只有人工結案的三種會有
  * @property int|null    $quick_reply_item_id 加入題庫後的題目 id
  */
 class AutoReplyTicket extends Model

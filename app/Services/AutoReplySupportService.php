@@ -651,7 +651,8 @@ class AutoReplySupportService
         $this->botService->answerCallbackQuery($callback['id']);
 
         if ($prefix === config('constants.AUTO_REPLY.CALLBACK.ACTION')) {
-            $this->handleAction($parts, $messageId);
+            // 按忽略的要記下是誰按的（需求方 2026-11-20），所以 from 要帶進去
+            $this->handleAction($parts, $messageId, (array) Arr::get($callback, 'from', []));
 
             return;
         }
@@ -903,9 +904,10 @@ class AutoReplySupportService
      *
      * @param array    $parts     [action, ticket_id]
      * @param int|null $messageId 按鈕所在的訊息
+     * @param array    $from      按按鈕的 Telegram 身分（記「誰按了忽略」用）
      * @return void
      */
-    private function handleAction(array $parts, $messageId)
+    private function handleAction(array $parts, $messageId, array $from = [])
     {
         $action = (string) Arr::get($parts, 0, '');
         $ticket = $this->ticketRepository->find((int) Arr::get($parts, 1, 0));
@@ -929,6 +931,13 @@ class AutoReplySupportService
             $this->ticketRepository->update($ticket, [
                 'status'       => $statuses['IGNORED'],
                 'close_action' => config('constants.AUTO_REPLY.CLOSE_ACTION.IGNORED'),
+                /*
+                 * ⚠ 記下是誰按的（需求方 2026-11-20）。
+                 *
+                 * `answered_by` 答不了這件事 —— 按忽略的人沒有作答，那一欄
+                 * 是空的。每日統計要在「同仁按忽略」底下列出是誰、幾張。
+                 */
+                'closed_by'    => $this->telegramNameOf($from),
             ]);
             $this->editSupportMessage($messageId, '已忽略這張單，不會回覆客人也不會加入題庫。');
 
@@ -1309,6 +1318,29 @@ class AutoReplySupportService
         return $rows;
     }
 
+    /**
+     * 把 Telegram 的 from 組成報表上印得出來的名字
+     *
+     * ⚠ **優先用 `@username`**：顯示名稱可以隨時改（而且常常是表情符號），
+     * username 才是那個人在群組裡被認得的樣子。沒填 username 的人才退回
+     * 顯示名稱 —— 總比印一串看不懂的數字 id 好。
+     *
+     * @param array $from
+     * @return string|null
+     */
+    private function telegramNameOf(array $from)
+    {
+        $username = (string) Arr::get($from, 'username', '');
+
+        if (filled($username)) {
+            return "@{$username}";
+        }
+
+        $name = trim(Arr::get($from, 'first_name', '') . ' ' . Arr::get($from, 'last_name', ''));
+
+        return filled($name) ? $name : null;
+    }
+
     // ---------------------------------------------------------------
     //  後台操作
     // ---------------------------------------------------------------
@@ -1342,7 +1374,7 @@ class AutoReplySupportService
          * 0 筆不是失敗 —— 是剛剛有人在 Telegram 按了按鈕。
          * 狀態條件寫在 update 的 where 裡，理由見 `markHandledById()`。
          */
-        if ($this->ticketRepository->markHandledById($ticketId) < 1) {
+        if ($this->ticketRepository->markHandledById($ticketId, $name) < 1) {
             throw new \RuntimeException(trans('report.msg.ticket_done'));
         }
 

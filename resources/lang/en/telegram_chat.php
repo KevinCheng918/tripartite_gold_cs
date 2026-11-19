@@ -21,7 +21,36 @@ return [
     'btn_attachment'     => 'File',
     'btn_cancel'         => 'Cancel',
     'send_file_title'    => 'Send file',
+    'send_image_title'   => 'Send photo',
     'send_file_caption'  => 'Caption (optional)',
+    'btn_add_more'       => 'Add',
+    'btn_edit_image'     => 'Edit photo',
+    'edit_image_hint'    => 'Tap the photo to crop, draw, or hide anything the customer should not see',
+
+    /*
+     * The editor shown before sending a photo.
+     *
+     * ⚠ `editor_*` keys are built as strings in image-editor.js (the toolbar is
+     * generated in a loop), so they never appear literally — **do not delete
+     * them as unused**.
+     */
+    'editor_title'       => 'Edit photo',
+    'editor_crop'        => 'Crop',
+    'editor_rotate'      => 'Rotate',
+    'editor_pen'         => 'Pen',
+    'editor_arrow'       => 'Arrow',
+    'editor_rect'        => 'Box',
+    'editor_text'        => 'Text',
+    'editor_mosaic'      => 'Blur',
+    'editor_blackout'    => 'Black out',
+    'editor_undo'        => 'Undo',
+    'editor_reset'       => 'Reset',
+    'editor_done'        => 'Done',
+    'editor_crop_apply'  => 'Apply crop',
+    'editor_crop_cancel' => 'Cancel crop',
+    'editor_text_placeholder' => 'Type, then press Enter',
+    'editor_width'       => 'Size',
+    'editor_flatten_hint' => 'Cropping or rotating locks in what you have drawn so far — it cannot be undone afterwards',
     'btn_file'           => 'Files',
     'btn_remove_image'   => 'Remove',
     'drop_hint'          => 'Drop to attach',
@@ -122,6 +151,8 @@ return [
         'assign_success'   => 'Assigned successfully',
         'reaction_failed'  => 'Failed to send reaction',
         'image_too_large'  => 'Image exceeds 5MB and cannot be sent',
+        'edited_too_large' => 'The edited image is too large — crop part of it and try again',
+        'editor_failed'    => 'Could not open the image editor',
         'image_invalid'    => 'Only images can be pasted',
         'file_sending'     => 'Sending',
         'qr_load_failed'   => 'Failed to load quick replies',

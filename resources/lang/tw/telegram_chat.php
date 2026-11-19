@@ -22,7 +22,36 @@ return [
     'btn_attachment'     => '檔案',
     'btn_cancel'         => '取消',
     'send_file_title'    => '傳送檔案',
+    'send_image_title'   => '傳送圖片',
     'send_file_caption'  => '說明文字（選填）',
+    'btn_add_more'       => '新增',
+    'btn_edit_image'     => '編輯圖片',
+    'edit_image_hint'    => '點圖片可以裁切、塗鴉、遮住不該給客人看的部分',
+
+    /*
+     * 傳圖前的編輯器。
+     *
+     * ⚠ `editor_*` 由 image-editor.js 以字串組出 key（工具列是迴圈產生的），
+     * grep 不到字面，**不要當成沒用到刪掉**。
+     */
+    'editor_title'       => '編輯圖片',
+    'editor_crop'        => '裁切',
+    'editor_rotate'      => '旋轉',
+    'editor_pen'         => '畫筆',
+    'editor_arrow'       => '箭頭',
+    'editor_rect'        => '方框',
+    'editor_text'        => '文字',
+    'editor_mosaic'      => '馬賽克',
+    'editor_blackout'    => '塗黑',
+    'editor_undo'        => '復原',
+    'editor_reset'       => '重設',
+    'editor_done'        => '完成',
+    'editor_crop_apply'  => '套用裁切',
+    'editor_crop_cancel' => '取消裁切',
+    'editor_text_placeholder' => '輸入文字後按 Enter',
+    'editor_width'       => '粗細',
+    // 裁切與旋轉會把目前的標註固定下來，之後復原不回去 —— 這句要先講
+    'editor_flatten_hint' => '裁切或旋轉之後，前面畫的東西就固定了，無法再復原',
     'btn_file'           => '文件',
     'btn_remove_image'   => '移除',
     'drop_hint'          => '放開以加入附件',
@@ -121,6 +150,8 @@ return [
         'assign_success'   => '指派成功',
         'reaction_failed'  => '表情回應發送失敗',
         'image_too_large'  => '圖片超過 5MB，無法傳送',
+        'edited_too_large' => '編輯後的圖片太大，請先裁切一部分再試',
+        'editor_failed'    => '圖片編輯器開啟失敗',
         'image_invalid'    => '只能貼上圖片',
         'file_sending'     => '傳送中',
         'qr_load_failed'   => '快速回覆選單載入失敗',
