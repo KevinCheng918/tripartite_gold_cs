@@ -1,4 +1,4 @@
-# 交接漏項盤點：AI 比對交接內容，沒寫到的用選單問要不要補（v3.92 已實作，migration 待跑）
+# 交接漏項盤點：AI 比對交接內容，沒寫到的用選單問要不要補（v3.92，已驗證）
 
 > 需求方 2026-11-19：「各班交接，我要多一個功能，整理上一個班有的問題，
 > 然後 AI 比對有沒有交接到，詢問沒有寫到的要不要補上，用選單方式。」
@@ -254,10 +254,28 @@
    **這剛好驗到退路是對的**（記了 warning、沒有整個不發），但判斷準不準要上線才知道。
 2. **Telegram 實際送出**：本機沒有設定內部支援群組。
 
-### ⚠ 上線前要確認：`QUEUE_CONNECTION` 不能是 `sync`
+### ⚠ 佇列：本機 `sync`、線上 `database`
 
-本機是 `sync`。那樣 `HandoverReviewJob` 會**在 webhook 裡同步跑**，
-而比對要叫模型十幾秒 —— Telegram 會逾時重送，整段交接流程跑第二次。
+本機 `.env` 是 `QUEUE_CONNECTION=sync`（那樣 Job 會在 webhook 裡同步跑，
+等模型十幾秒 ⇒ Telegram 逾時重送），線上是 `database`（需求方 2026-11-20 確認），
+所以線上沒有這個問題。
+
+### ⚠⚠ Job 的 `timeout` 必須小於 `retry_after`
+
+`config('queue.connections.database.retry_after')` 是 **90 秒**。
+佇列在那之後會認定 Job 卡住而**重新派發一份** —— 同一次交接兩份同時跑，
+兩份都叫模型，然後其中一份的 `insertMany()` 撞上
+`(handover_id, seq)` 的 unique 而丟例外。
+`existsForHandover()` 擋得住「跑完之後的重送」，**擋不住這種併發**。
+
+所以 `HandoverReviewJob::$timeout` 從 180 改成 **80**。
+裡面最慢的是模型，而 CLI 自己有 60 秒逾時（`config('auto_reply.timeout')`）。
+
+> ⚠ **既有的兩支 Job 也踩在這條線上**：`AutoReplyJob` 與 `FollowupDetectJob`
+> 的 `timeout` 都是 **120 > 90**。它們平常跑不到 90 秒所以沒出事，
+> 但模型一慢就會被重派 —— 而 `AutoReplyJob` **會發訊息給客戶**，
+> 重派等於客人收到兩份答案。
+> 這不是這個功能引入的，修法見文末。
 
 ## 待釐清
 
@@ -266,3 +284,27 @@
 2. **要不要讓下一班的人也能按？** 目前只有打交接的本人按得動
    （按鈕會驗 `from.id` 對不對得上 `handed_by_user_id`）——
    下一班按「補上」會變成他在替上一班承諾。
+
+## ⚠⚠ 待決定（不是這個功能的 bug，但同一條線上）
+
+`retry_after`（90）比 `AutoReplyJob`／`FollowupDetectJob` 的 `timeout`（120）
+還短。只要模型慢到 90 秒，佇列就會重派一份 ——
+
+- `AutoReplyJob` **會發訊息給客戶** ⇒ 客人收到兩份答案
+- `FollowupDetectJob` 會開待追蹤事項 ⇒ 同一句話開兩筆
+
+兩支都是 `tries = 1`，但 `tries` 擋的是「失敗後重試」，擋不住
+「佇列以為你卡住而再派一份」。
+
+一行修法（**沒有改任何 Job 的行為**，只是讓佇列更有耐心）：
+
+```php
+// config/queue.php
+'retry_after' => 300,   // 要大於所有 Job 裡最長的 timeout
+```
+
+⚠ 改完要 `php artisan optimize` **並重啟 queue worker**
+（worker 會把設定讀在記憶體裡，不重啟的話還是用舊值）。
+
+⚠ 代價：真的卡死的 Job 要等 5 分鐘才會被放棄。本專案所有 Job 都是
+`tries = 1`，所以那只是「晚一點被記成失敗」，不會多跑一次。

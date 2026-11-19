@@ -31,8 +31,20 @@ class HandoverReviewJob implements ShouldQueue
     /** @var int 不重試，理由見類別註解 */
     public $tries = 1;
 
-    /** @var int 秒。比對要等模型，比一般 Job 久 */
-    public $timeout = 180;
+    /**
+     * 秒。
+     *
+     * ⚠⚠ **必須小於 `config('queue.connections.database.retry_after')`（90）。**
+     * 佇列在 `retry_after` 秒後會認定這個 Job 卡住而**重新派發一份**，
+     * 於是同一次交接會有兩份同時在跑 —— 兩份都叫模型（白燒一次額度），
+     * 然後其中一份的 `insertMany()` 撞上 `(handover_id, seq)` 的 unique
+     * 而丟例外。`existsForHandover()` 擋得住「跑完之後的重送」，
+     * 擋不住這種併發。
+     *
+     * 80 秒夠用：裡面最慢的是模型，而 CLI 自己有 60 秒的逾時
+     * （`config('auto_reply.timeout')`），其餘是幾次查詢與一則 Telegram。
+     */
+    public $timeout = 80;
 
     /** @var int 交接紀錄 id */
     protected $handoverId;
