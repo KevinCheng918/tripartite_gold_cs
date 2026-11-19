@@ -109,6 +109,23 @@ class ShiftHandoverGapRepository
     }
 
     /**
+     * 把這一次交接盤出來的項目整批刪掉
+     *
+     * ⚠ **只在「選單沒送出去」時用。** 有紀錄就代表問過了
+     * （`existsForHandover()` 靠它擋重跑）—— 訊息發不出去卻把紀錄留著的話，
+     * 這張交接會變成「永遠問不到、也永遠不會再問」的孤兒。
+     *
+     * @param int $handoverId
+     * @return int 刪掉幾筆
+     */
+    public function deleteByHandover($handoverId)
+    {
+        return ShiftHandoverGap::query()
+            ->where('shift_handover_id', $handoverId)
+            ->delete();
+    }
+
+    /**
      * 整批改狀態
      *
      * @param array $ids

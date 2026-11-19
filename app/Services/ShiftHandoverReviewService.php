@@ -142,12 +142,32 @@ class ShiftHandoverReviewService
             return false;
         }
 
-        return $this->sendMenu(
+        $sent = $this->sendMenu(
             $handover,
             $gaps,
             filled($askable) && blank($covered),
             (array) Arr::get($split, 'notes', [])
         );
+
+        /*
+         * ⚠ **送不出去就把紀錄收回來。**
+         *
+         * 「有紀錄」＝「問過了」（`existsForHandover()` 靠它擋重跑）——
+         * 訊息沒送出去卻留著紀錄的話，這張交接會變成
+         * **永遠問不到、也永遠不會再問**的孤兒：選單不存在，所以沒有人
+         * 按得到；而下一次重跑又會被擋下。
+         *
+         * 刪掉之後狀態才一致：有紀錄 ⇔ 選單真的在話題裡。
+         */
+        if (!$sent) {
+            $this->gapRepository->deleteByHandover((int) $handover->id);
+            Log::warning('交接漏項選單沒送出去，已把剛寫入的紀錄收回', [
+                'handover_id' => $handover->id,
+                'gaps'        => $gaps->count(),
+            ]);
+        }
+
+        return $sent;
     }
 
     /**
