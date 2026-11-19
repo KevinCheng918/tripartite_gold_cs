@@ -42,7 +42,8 @@ return [
     'editor_rect'        => 'Box',
     'editor_text'        => 'Text',
     'editor_mosaic'      => 'Blur',
-    'editor_blackout'    => 'Black out',
+    // ⚠ Fills with the currently selected colour, not always black
+    'editor_blackout'    => 'Cover',
     'editor_undo'        => 'Undo',
     'editor_reset'       => 'Reset',
     'editor_done'        => 'Done',

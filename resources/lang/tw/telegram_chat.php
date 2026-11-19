@@ -42,7 +42,8 @@ return [
     'editor_rect'        => '方框',
     'editor_text'        => '文字',
     'editor_mosaic'      => '馬賽克',
-    'editor_blackout'    => '塗黑',
+    // ⚠ 填的是目前選的顏色，不是固定黑色 —— 所以不叫「塗黑」
+    'editor_blackout'    => '遮色塊',
     'editor_undo'        => '復原',
     'editor_reset'       => '重設',
     'editor_done'        => '完成',

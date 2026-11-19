@@ -1019,29 +1019,39 @@
         }
     }
 
+    /** 「新增」用的檔案選擇器。重用同一個，理由見 `pickMoreFiles()` */
+    var morePicker = null;
+
     /**
      * 「新增」：再挑一個檔案加進來
      *
-     * ⚠ 用完就把 input 移掉 —— 留著的話下次選同一個檔案不會觸發 change
-     * （值沒變），使用者會以為按了沒反應。
+     * ⚠ **重用同一個 input，而且每次開啟前清掉 value**：
+     *
+     * - 每次都 `createElement` 的話，**使用者按了取消就不會觸發 change**，
+     *   那個 input 會永遠留在 DOM 裡 —— 按十次就留十個
+     * - 不清 `value` 的話，連續挑**同一個檔案**不會觸發 change
+     *   （值沒變），使用者會以為按了沒反應
      */
     function pickMoreFiles() {
-        var picker = document.createElement('input');
-        picker.type = 'file';
-        picker.style.display = 'none';
+        if (!morePicker) {
+            morePicker = document.createElement('input');
+            morePicker.type = 'file';
+            morePicker.style.display = 'none';
 
-        picker.addEventListener('change', function () {
-            var file = picker.files && picker.files[0];
-            picker.remove();
+            morePicker.addEventListener('change', function () {
+                var file = morePicker.files && morePicker.files[0];
 
-            if (!file || !withinLimit(file)) { return; }
+                if (!file || !withinLimit(file)) { return; }
 
-            stagedFiles.push(isImageFile(file) ? namedImage(file) : file);
-            renderStagedList();
-        });
+                stagedFiles.push(isImageFile(file) ? namedImage(file) : file);
+                renderStagedList();
+            });
 
-        document.body.appendChild(picker);
-        picker.click();
+            document.body.appendChild(morePicker);
+        }
+
+        morePicker.value = '';
+        morePicker.click();
     }
 
     /**
@@ -1089,9 +1099,14 @@
             ? (T.i18n.send_image_title || '傳送圖片')
             : (T.i18n.send_file_title || '傳送檔案');
 
-        document.getElementById('tg-send-hint').textContent = hasImage
-            ? (T.i18n.edit_image_hint || '')
-            : '';
+        /*
+         * ⚠ **紅字要拿掉**：`showModalError()` 會把這一行染紅，而這裡只換
+         * 文字的話，紅色會一直留著 —— 下次開啟視窗時那句「點圖片可以裁切」
+         * 會變成一句紅色的假警告。
+         */
+        var hint = document.getElementById('tg-send-hint');
+        hint.classList.remove('text-danger');
+        hint.textContent = hasImage ? (T.i18n.edit_image_hint || '') : '';
 
         box.innerHTML = '';
         stagedFiles.forEach(function (file, index) {

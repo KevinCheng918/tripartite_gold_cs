@@ -164,11 +164,11 @@ class TicketReportService
              * - 直接打字回覆 ＝ 沒讓題庫長大的那一種，看 `answered_by`
              * - 同仁按忽略 ＝ 看 `closed_by`（**按忽略的人沒有作答**，
              *   `answered_by` 是空的）
+             *
+             * ⚠ **那一種一張都沒有就不要查**：上面那次 GROUP BY 已經知道
+             * 張數了，再去查「是誰做的」一定是空的 —— 沒事的日子會白打兩次。
              */
-            'by_who'   => [
-                (int) config('constants.AUTO_REPLY.CLOSE_ACTION.REPLY_ONLY') => $this->namesOf($date, 'answered'),
-                (int) config('constants.AUTO_REPLY.CLOSE_ACTION.IGNORED') => $this->namesOf($date, 'closed'),
-            ],
+            'by_who'   => $this->whoDidIt($date, $actions),
         ];
     }
 
@@ -306,6 +306,31 @@ class TicketReportService
         }
 
         return $text;
+    }
+
+    /**
+     * 要點名的那兩種各是誰做的
+     *
+     * ⚠ **張數是 0 就不查**：`countByActionInRange()` 已經知道有幾張了，
+     * 再去查「是誰做的」只會拿到空陣列 —— 沒事的日子會白打兩次 DB。
+     *
+     * @param string $date
+     * @param array  $actions close_action => 張數
+     * @return array<int, array> close_action => [{name, count}]
+     */
+    private function whoDidIt($date, array $actions)
+    {
+        $replyOnly = (int) config('constants.AUTO_REPLY.CLOSE_ACTION.REPLY_ONLY');
+        $ignored = (int) config('constants.AUTO_REPLY.CLOSE_ACTION.IGNORED');
+
+        return [
+            $replyOnly => (int) Arr::get($actions, $replyOnly, 0) > 0
+                ? $this->namesOf($date, 'answered')
+                : [],
+            $ignored => (int) Arr::get($actions, $ignored, 0) > 0
+                ? $this->namesOf($date, 'closed')
+                : [],
+        ];
     }
 
     /**
