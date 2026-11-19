@@ -453,6 +453,8 @@
         stagedFiles = [];
         hideBsModal(document.getElementById('modal-tg-send-file'));
         quotedId = null;
+        // 上一個對話的成員 id 套到別的群組是叫不到人的
+        if (T.clearMentions) { T.clearMentions(); }
 
         // 自動回覆是每個對話各自獨立的，切群組要重新套用
         var current = (T.groupsData || []).filter(function (g) { return g.id === T.selectedGroupId; })[0];
@@ -538,6 +540,9 @@
                 typingTimer = setTimeout(function () { typingTimer = null; }, 3000);
             }
         });
+
+        // 打 @ 叫人（實作在 mention.js）。要在下面的 Enter 送出之前綁，理由見那支
+        if (T.bindMention) { T.bindMention(textarea); }
 
         // Enter 送出（IME 安全）
         var imeActive = false;
@@ -913,11 +918,21 @@
         textarea.disabled = true;
         if (sendBtn) { sendBtn.disabled = true; sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin" style="font-size:0.875rem"></i>'; }
 
+        /*
+         * 把 `@顯示名稱` 換成 Telegram 的 text_mention 連結（沒有 username
+         * 的人只能這樣叫）。換不到就原樣送出 —— 理由見 `applyMentions()`。
+         *
+         * ⚠ **先備份再套用**：套用會把待處理清單清空，送出失敗時要還原，
+         * 否則客服按第二次就變成純文字、人叫不到。
+         */
+        var savedMentions = T.pendingMentions ? T.pendingMentions() : [];
+        var payload = T.applyMentions ? T.applyMentions(content) : content;
+
         T.apiFetch('/admin/telegram-chat/ajax-reply', {
             method: 'POST',
             body: JSON.stringify({
                 group_id: T.selectedGroupId,
-                content: content,
+                content: payload,
                 reply_to_id: quotedId,
             }),
         })
@@ -934,6 +949,8 @@
             .catch(function (error) {
                 textarea.disabled = false;
                 if (sendBtn) { sendBtn.disabled = false; sendBtn.innerHTML = '<i class="fas fa-paper-plane" style="font-size:0.875rem"></i>'; }
+                // 沒送出去，待套用的 mention 要還原 —— 否則重送會變成純文字
+                if (T.restoreMentions) { T.restoreMentions(savedMentions); }
                 alert(error.message || T.i18n.msg.reply_failed);
             });
     }

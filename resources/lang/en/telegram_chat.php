@@ -24,6 +24,17 @@ return [
     'send_image_title'   => 'Send photo',
     'send_file_caption'  => 'Caption (optional)',
     'btn_add_more'       => 'Add',
+
+    /*
+     * Typing `@` to mention someone.
+     *
+     * ⚠ "(by name)" marks people **without a Telegram username** — they can
+     * only be reached through a user-id link, and the agent will wonder why
+     * that row has no @handle.
+     */
+    'mention_no_username' => '(by name)',
+    'mention_staff'       => 'us',
+    'mention_unknown'     => '(unknown member)',
     'btn_edit_image'     => 'Edit photo',
     'edit_image_hint'    => 'Tap the photo to crop, draw, or hide anything the customer should not see',
 

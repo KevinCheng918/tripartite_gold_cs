@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Events\TelegramTyping;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\TelegramChat\MentionCandidateRequest;
 use App\Http\Requests\TelegramChat\ReplyRequest;
 use App\Http\Requests\TelegramChat\SendFileRequest;
 use App\Http\Requests\TelegramChat\ToggleAutoReplyRequest;
 use App\Http\Requests\TelegramChat\ToggleIgnoreMemberRequest;
 use App\Http\Resources\GroupMemberResource;
+use App\Http\Resources\MentionCandidateResource;
 use App\Http\Resources\StaffIgnoreResource;
 use App\Http\Resources\TelegramMessageResource;
 use App\Services\AutoReplyResumeService;
@@ -19,6 +21,7 @@ use App\Services\SharedFileService;
 use App\Services\StaffIgnoreService;
 use App\Services\TelegramChatService;
 use App\Services\TelegramGroupMemberService;
+use App\Services\TelegramMentionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
@@ -40,6 +43,7 @@ class TelegramChatController extends Controller
     private $memberService;
     private $staffIgnoreService;
     private $resumeService;
+    private $mentionService;
 
     public function __construct(
         TelegramChatService $chatService,
@@ -49,7 +53,8 @@ class TelegramChatController extends Controller
         AutoReplyService $autoReplyService,
         TelegramGroupMemberService $memberService,
         StaffIgnoreService $staffIgnoreService,
-        AutoReplyResumeService $resumeService
+        AutoReplyResumeService $resumeService,
+        TelegramMentionService $mentionService
     ) {
         $this->chatService = $chatService;
         $this->sharedFileService = $sharedFileService;
@@ -59,6 +64,8 @@ class TelegramChatController extends Controller
         $this->memberService = $memberService;
         $this->staffIgnoreService = $staffIgnoreService;
         $this->resumeService = $resumeService;
+        // 打 @ 的候選名單（只看這個對話的名冊）
+        $this->mentionService = $mentionService;
     }
 
     /**
@@ -126,6 +133,27 @@ class TelegramChatController extends Controller
 
             return response()->json(['message' => trans('telegram_chat.msg.auto_reply_failed')], 500);
         }
+    }
+
+    /**
+     * 打 `@` 時的候選成員
+     *
+     * ⚠ **只列這個對話名冊裡的人**（需求方 2026-11-19：「不在群組內的
+     * 不用列，因為列了也沒用」）。判斷「怎麼叫得到他」在 Service，
+     * 這裡只負責接參數與回傳。
+     *
+     * @param MentionCandidateRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxMentionCandidates(MentionCandidateRequest $request)
+    {
+        $params = $request->validated();
+
+        return response()->json([
+            'candidates' => MentionCandidateResource::collection(
+                $this->mentionService->candidates($params)
+            ),
+        ]);
     }
 
     /**

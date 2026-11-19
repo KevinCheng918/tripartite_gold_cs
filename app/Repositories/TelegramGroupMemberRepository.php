@@ -121,6 +121,53 @@ class TelegramGroupMemberRepository
     }
 
     /**
+     * 打 `@` 時可以挑的人（名冊搜尋）
+     *
+     * ⚠ **叫不到的人不撈**：`username` 與 `telegram_user_id` 兩個都沒有的那種
+     * （手動加進名冊、又從來沒發言過）送出去也變不成 mention，
+     * 列在選單裡只會讓客服以為人已經叫到了。
+     *
+     * ⚠ **忽略名單上的人照樣要列**：那份名單管的是「要不要自動回覆他」，
+     * 跟「客服想不想點他名字」是兩回事。
+     *
+     * ⚠ 排序用 `last_seen_at` 由新到舊 —— 現在在講話的人，
+     * 比半年前出現過一次的有用得多。手動加入的沒有發言時間，排在最後。
+     *
+     * @param int         $groupId
+     * @param string|null $keyword `@` 後面打的字；空的就列最近的
+     * @param int         $limit
+     * @return Collection
+     */
+    public function searchForMention($groupId, $keyword, $limit)
+    {
+        $query = TelegramGroupMember::query()
+            ->select(self::COLUMNS)
+            ->where('telegram_group_id', $groupId)
+            ->where(function ($callable) {
+                $callable->whereNotNull('username')->orWhereNotNull('telegram_user_id');
+            });
+
+        if (filled($keyword)) {
+            /*
+             * ⚠ `%` 與 `_` 要跳脫：客服打 `@50%` 的話，沒跳脫的 `%` 會變成
+             * 萬用字元而把整份名冊撈出來。
+             */
+            $like = '%' . addcslashes($keyword, '%_\\') . '%';
+
+            $query->where(function ($callable) use ($like) {
+                $callable->where('username', 'like', $like)
+                    ->orWhere('display_name', 'like', $like);
+            });
+        }
+
+        return $query
+            ->orderByRaw('last_seen_at IS NULL')
+            ->orderByDesc('last_seen_at')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
      * 依 Telegram 使用者 ID 查詢
      *
      * @param int $groupId

@@ -17,6 +17,15 @@ return [
     'TELEGRAM_USERNAME_REGEX' => 'regex:/^@?[A-Za-z0-9_]{5,32}$/',
 
     /*
+     * 打 `@` 搜尋成員時的關鍵字長度上限。
+     *
+     * ⚠ 刻意**不套上面那條 username 規則**：客服可能在打中文顯示名稱，
+     * 而名冊的 `display_name` 本來就不是 username 格式。只限長度，
+     * 避免有人把一整段話當成搜尋條件送進來。
+     */
+    'MENTION_KEYWORD_MAX' => 64,
+
+    /*
      * Telegram 群組的 chat_id。
      *
      * 群組是**負數**，所以不能用 integer 規則（會把負號擋掉），得用 regex。

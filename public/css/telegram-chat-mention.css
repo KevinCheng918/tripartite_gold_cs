@@ -1,0 +1,68 @@
+/**
+ * 對話視窗打 `@` 叫人的選單（mention.js）
+ *
+ * 詳見 .claude/knowledge/features/chat-mention.md
+ */
+
+/*
+ * ⚠ 浮在輸入框**上方**（用 `bottom` 定位）：下方是送出鈕，
+ * 選單蓋住它很容易在挑人的時候誤按送出。
+ */
+.tg-mention-box {
+    position: fixed;
+    /* 比 Bootstrap modal 低、比頁面內容高 —— 它只是輸入框的附屬選單 */
+    z-index: 1060;
+    display: none;
+    max-height: 15rem;
+    overflow-y: auto;
+    padding: 0.25rem;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.5rem;
+    background: var(--bs-body-bg, #fff);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.18);
+}
+
+.tg-mention-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.375rem 0.5rem;
+    border: 0;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: inherit;
+    font-size: 0.875rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.tg-mention-item:hover,
+.tg-mention-item.tg-mention-active {
+    background: rgba(13, 110, 253, 0.12);
+}
+
+.tg-mention-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 帳號靠右、灰字 —— 要挑人時看的是名字，帳號只是輔助 */
+.tg-mention-tag {
+    flex-shrink: 0;
+    color: var(--bs-secondary-color, #6c757d);
+    font-size: 0.75rem;
+}
+
+/* 「我們」的標記：客服要一眼分得出同仁與客人 */
+.tg-mention-staff {
+    flex-shrink: 0;
+    padding: 0 0.375rem;
+    border-radius: 0.75rem;
+    background: rgba(13, 110, 253, 0.15);
+    color: #0d6efd;
+    font-size: 0.6875rem;
+}

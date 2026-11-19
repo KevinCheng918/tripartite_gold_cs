@@ -24,6 +24,16 @@ return [
     'send_image_title'   => '传送图片',
     'send_file_caption'  => '说明文字（选填）',
     'btn_add_more'       => '新增',
+
+    /*
+     * 打 `@` 叫人。
+     *
+     * ⚠ 「（用名字叫）」是给**没有 Telegram 帐号**的人看的 —— 那种人要用
+     * user id 做成链接才叫得到，客服会好奇为什么他没有 @xxx。
+     */
+    'mention_no_username' => '（用名字叫）',
+    'mention_staff'       => '我们',
+    'mention_unknown'     => '（不明成员）',
     'btn_edit_image'     => '编辑图片',
     'edit_image_hint'    => '点图片可以裁切、涂鸦、遮住不该给客人看的部分',
 

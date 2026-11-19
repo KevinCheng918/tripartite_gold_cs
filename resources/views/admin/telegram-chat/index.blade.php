@@ -11,6 +11,8 @@
          比照 shared-file 與 task-board，樣式表載在 content 開頭。 --}}
     <link rel="stylesheet"
           href="{{ asset('css/telegram-chat-image-editor.css') }}?v={{ filemtime(public_path('css/telegram-chat-image-editor.css')) }}">
+    <link rel="stylesheet"
+          href="{{ asset('css/telegram-chat-mention.css') }}?v={{ filemtime(public_path('css/telegram-chat-mention.css')) }}">
 
     <div id="telegram-chat-app"
          {{-- JSON_HEX_APOS：語系若出現單引號（英文縮寫），會提早結束這個 data 屬性 --}}
@@ -51,6 +53,8 @@
     <script src="{{ asset('js/telegram-chat/emoji.js') }}?v={{ filemtime(public_path('js/telegram-chat/emoji.js')) }}"></script>
     {{-- 必須排在 input.js 之前：點圖片時要看得到 T.openImageEditor --}}
     <script src="{{ asset('js/telegram-chat/image-editor.js') }}?v={{ filemtime(public_path('js/telegram-chat/image-editor.js')) }}"></script>
+    {{-- 同樣要排在 input.js 之前：輸入區建好時要能呼叫 T.bindMention --}}
+    <script src="{{ asset('js/telegram-chat/mention.js') }}?v={{ filemtime(public_path('js/telegram-chat/mention.js')) }}"></script>
     <script src="{{ asset('js/telegram-chat/input.js') }}?v={{ filemtime(public_path('js/telegram-chat/input.js')) }}"></script>
     <script src="{{ asset('js/telegram-chat/quick-reply.js') }}?v={{ filemtime(public_path('js/telegram-chat/quick-reply.js')) }}"></script>
     {{-- 必須排在 main.js 之前：renderHeader 實際執行時要看得到 T.openIgnorePanel --}}

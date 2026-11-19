@@ -163,6 +163,8 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-shared-files', [TelegramChatController::class, 'ajaxSharedFiles'])->name('ajax-shared-files');
         Route::post('/ajax-send-document', [TelegramChatController::class, 'ajaxSendDocument'])->middleware('can:telegram_chat.reply')->name('ajax-send-document');
         Route::get('/ajax-quick-replies', [TelegramChatController::class, 'ajaxQuickReplies'])->middleware('can:telegram_chat.reply')->name('ajax-quick-replies');
+        // 打 @ 的候選名單。權限沿用 reply —— 能回覆的人才需要叫人，不另開 keyword
+        Route::get('/ajax-mention-candidates', [TelegramChatController::class, 'ajaxMentionCandidates'])->middleware('can:telegram_chat.reply')->name('ajax-mention-candidates');
         Route::post('/ajax-toggle-auto-reply', [TelegramChatController::class, 'ajaxToggleAutoReply'])->middleware('can:telegram_chat.reply')->name('ajax-toggle-auto-reply');
         Route::get('/ajax-ignore-members', [TelegramChatController::class, 'ajaxIgnoreMembers'])->middleware('can:telegram_chat.ignore_manage')->name('ajax-ignore-members');
         Route::post('/ajax-toggle-ignore', [TelegramChatController::class, 'ajaxToggleIgnore'])->middleware('can:telegram_chat.ignore_manage')->name('ajax-toggle-ignore');
