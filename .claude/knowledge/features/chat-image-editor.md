@@ -251,3 +251,53 @@ if (!file || !T.openImageEditor) { return; }   // ← 錯誤在這裡被吞掉
 
 `height: 240px` ＋ `object-fit: contain`（手機 200px）。
 **`contain` 不是 `cover`**：預覽要看得到整張，裁切是編輯器裡的事。
+
+## ⚠⚠ 第二個「完全沒反應」：CSS 放錯 section
+
+改掉全域物件名稱之後，需求方回報**還是沒反應**。用瀏覽器實際查才看到：
+`telegram-chat-image-editor.css` **根本沒載入**，編輯器因此是 `position: static`、
+長在頁面最底下（`y: 855`）—— DOM 在、函式有跑，就是看不到。
+
+原因：我用 `@section('css')`，而**layout 的 `@yield('css')` 位在 `<style>`
+標籤裡面** —— `<link>` 塞進 `<style>` 當然失效。
+
+⚠ 這件事 `shared-file/index.blade.php` 的註解早就寫過了：
+
+> layout 的 `@yield('css')` 位在 `<style>` 標籤內，放 `<link>` 會失效，
+> 因此與 task-board 一樣把樣式表載在 content 開頭
+
+照慣例改成在 `@section('content')` 開頭載入就好了。
+**既有頁面的註解是有人踩過的坑，動手前該先看。**
+
+## 視窗長寬高固定（需求方 2026-11-20：「不要又要滑動」）
+
+整個 modal 變成固定高度的 flex 欄：
+
+| 區塊 | 行為 |
+|---|---|
+| `.modal-dialog` | `max-width: 560px`、`height: 80vh`（手機交給 `modal-fullscreen-sm-down`） |
+| `.modal-body` | `display: flex; flex-direction: column; min-height: 0; overflow: hidden` |
+| `#tg-send-file-preview` | `flex: 1 1 auto; min-height: 0; overflow-y: auto` |
+| 單張圖 | `.tg-send-item:only-child` 撐滿整個圖片區，`object-fit: contain` |
+| 多張圖 | 每張固定 200px，上下排列，超過才捲 |
+
+⚠ **`min-height: 0` 不能省**：沒有它 flex 子元素不會縮，圖片照樣把 body 撐開。
+
+⚠ **拿掉了 `modal-dialog-scrollable`**：那個 class 會讓 Bootstrap 自己管
+`modal-body` 的捲動，跟這套 flex 版面打架。
+
+## 瀏覽器實測（2026-11-20，`http://tripartite_gold_cs`）
+
+| 驗了什麼 | 結果 |
+|---|---|
+| 編輯器開啟、工具列八個工具 | OK |
+| 畫筆 | 筆跡與拖曳軌跡吻合 ⇒ **座標換算正確** |
+| 馬賽克 | 區域糊掉，**連先畫的紅線一起糊** ⇒ 疊在當下畫面上的順序是對的 |
+| 裁切 | 選框、四角手把、框外變暗；拖手把後套用 1200×900 → 797×467 |
+| 完成輸出 | 關閉編輯器並回傳 `File`（`test.png`、`image/png`） |
+| **點 modal 裡的圖片** | 開啟編輯器（這就是需求方回報壞掉的那條路） |
+| 編輯完回到視窗 | 預覽換成編輯後的圖（紅線在） |
+| 單張圖 | 填滿圖片區、沒有多餘按鈕、不需捲動 |
+| 兩張圖 | 各 200px、各自有刪除鈕、視窗高度不變 |
+
+⚠ 全程**沒有按過發送**，最後用取消鈕關閉；沒有任何訊息送到客戶群組。

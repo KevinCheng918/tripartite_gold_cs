@@ -968,9 +968,17 @@
         var modalEl = document.getElementById('modal-tg-send-file');
         if (!modalEl) {
             document.body.insertAdjacentHTML('beforeend',
-                // modal-fullscreen-sm-down：手機撐滿，電腦維持置中視窗（需求方要兩邊同一套版面）
+                /*
+                 * modal-fullscreen-sm-down：手機撐滿，電腦維持置中視窗
+                 * （需求方要兩邊同一套版面）。
+                 *
+                 * ⚠ **刻意不用 `modal-dialog-scrollable`**：那個 class 會讓
+                 * Bootstrap 自己管 modal-body 的捲動，跟 CSS 裡「圖片區吃掉
+                 * 剩餘空間」的 flex 版面打架。捲動由 `#tg-send-file-preview`
+                 * 自己負責，而且只有多張圖時才會出現。
+                 */
                 '<div class="modal fade" id="modal-tg-send-file" tabindex="-1">' +
-                '<div class="modal-dialog modal-dialog-scrollable modal-dialog-centered modal-fullscreen-sm-down">' +
+                '<div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">' +
                 '<div class="modal-content">' +
                 '<div class="modal-header py-2">' +
                 '<h5 class="modal-title" id="tg-send-title" style="font-size:0.9375rem"></h5>' +

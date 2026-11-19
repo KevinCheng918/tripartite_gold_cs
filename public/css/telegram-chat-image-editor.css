@@ -244,25 +244,65 @@ body.tg-editor-open {
 }
 
 /*
- * ⚠ **每張圖在視窗裡一樣大**（需求方 2026-11-20）：照原尺寸的話，
- * 一張 4000px 的截圖會把整個視窗撐得又長又醜，而這裡只是「確認是這張沒錯」。
+ * ⚠⚠ **視窗長寬高固定，圖片塞在裡面**（需求方 2026-11-20：「不要又要滑動」）。
  *
- * `contain` 而不是 `cover`：預覽要看得到**整張**，裁切是編輯器裡的事。
- * 要看細節就點進去放大。
+ * 作法是把整個 modal 變成固定高度的 flex 欄：圖片區吃掉剩下的空間、
+ * 說明文字與按鈕永遠釘在下面。不這樣做的話，一張 4000px 的截圖會把視窗
+ * 撐到比螢幕還長 —— 要看說明文字還得先捲過整張圖。
  */
+#modal-tg-send-file .modal-dialog {
+    max-width: 560px;
+    height: 80vh;
+}
+
+#modal-tg-send-file .modal-content {
+    height: 100%;
+}
+
+#modal-tg-send-file .modal-body {
+    display: flex;
+    flex-direction: column;
+    /* min-height: 0 是必要的：沒有它，flex 子元素不會縮，圖片還是會把 body 撐開 */
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* 圖片區吃掉剩餘空間。只有多張圖時才會真的出現捲軸 */
+#tg-send-file-preview {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
 .tg-send-item img {
     display: block;
     width: 100%;
-    height: 240px;
+    /*
+     * 單張時填滿整個圖片區（`.tg-send-item` 也是 100% 高）；
+     * `contain` 而不是 `cover` —— 預覽要看得到**整張**，裁切是編輯器裡的事。
+     */
+    height: 100%;
     object-fit: contain;
     background: rgba(0, 0, 0, 0.04);
     border-radius: 0.5rem;
     cursor: pointer;
 }
 
+/* 只有一張時整塊撐滿；多張時每張固定高度，上下排列可捲 */
+.tg-send-item:only-child {
+    height: 100%;
+    margin-bottom: 0;
+}
+
+.tg-send-item:not(:only-child) img {
+    height: 200px;
+}
+
 @media (max-width: 575.98px) {
-    .tg-send-item img {
-        height: 200px;
+    /* 手機是 modal-fullscreen-sm-down，高度交給它，不要再鎖 80vh */
+    #modal-tg-send-file .modal-dialog {
+        height: 100%;
+        max-width: none;
     }
 }
 

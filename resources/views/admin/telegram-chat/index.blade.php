@@ -4,12 +4,13 @@
 @section('icon', 'comments')
 @section('subtitle', trans('telegram_chat.subtitle'))
 
-@section('css')
+@section('content')
+
+    {{-- ⚠ layout 的 @yield('css') 位在 <style> 標籤**內**，放 <link> 會整個失效
+         （第一版踩到：編輯器變成沒有樣式的 static 區塊，長在頁面最底下看不到）。
+         比照 shared-file 與 task-board，樣式表載在 content 開頭。 --}}
     <link rel="stylesheet"
           href="{{ asset('css/telegram-chat-image-editor.css') }}?v={{ filemtime(public_path('css/telegram-chat-image-editor.css')) }}">
-@endsection
-
-@section('content')
 
     <div id="telegram-chat-app"
          {{-- JSON_HEX_APOS：語系若出現單引號（英文縮寫），會提早結束這個 data 屬性 --}}
