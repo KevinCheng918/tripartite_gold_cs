@@ -208,3 +208,34 @@ GET /admin/telegram-chat/ajax-mention-candidates?group_id=&keyword=
 
 ⚠ **還沒驗到的：Telegram 那一端收到的樣子。** 要真的發一則帶 mention 的
 訊息到群組，才看得出 text_mention 有沒有生效、對方有沒有收到通知。
+
+## 按 PROMPTS.md 稽核（2026-11-20）
+
+架構層全部符合：Controller 只接參數 → Service → Resource、用 `$params` 包裝；
+Service 不碰 HTTP；DB 只在 Repository；有 Request ＋ `config/rules.php`、
+有 Resource；Ajax route 有 `ajax-` 前綴；CSS／JS 分離；語系 tw → cn → en 同步。
+效能：`select` 指定欄位、單次查詢無 N+1。安全：沒有寫入所以不需要交易。
+
+⚠ **權限沒有新增 keyword 是對的**：`config/permissionMap.php` 只列 keyword
+不列 route，而這支沿用 `telegram_chat.reply`（能回覆的人才需要叫人）。
+
+修了三處：
+
+1. ⚠ **`T.escapeHtml()` 早就存在，我又寫了一份。** mention.js 改用共用的。
+   ⚠ 但 **image-editor.js 不能改**：那支有把文字塞進 `title="…"` 屬性的
+   地方，而共用版走 `textContent → innerHTML` **不轉引號** ——
+   名稱裡一個 `"` 就會把屬性切斷。那支保留自己的版本，並把理由寫進註解
+   （不然下一個人會以為是忘了統一）。
+2. ⚠ **連結格式兩邊各一份**：`constants.php` 的 `LINK_FORMAT` 根本沒人讀，
+   真正在用的是 `mention.js` 裡那一份。**兩份同一件事只會讓人改了一邊
+   以為生效了** —— 砍掉 config 那份，並把「URL 不能有 `&`」的警告
+   搬到真正組字串的地方。
+3. ⚠ **`keyword.max` 借用了「此欄位為必填」**：這裡是太長，不是沒填。
+   文不對題的錯誤訊息比沒有訊息更難查。新增
+   `msg.mention_keyword_too_long`（三份語系）。
+
+### ⚠ 順手補上的：名字要轉義
+
+`applyMentions()` 組的是 HTML，而 `label` 是**從 Telegram 來的外部資料** ——
+有人把顯示名稱設成 `<b>老闆</b>` 的話，不轉義就會變成真的粗體送給客人。
+實測 `<b>BOSS</b>` 會被轉成 `&lt;b&gt;BOSS&lt;/b&gt;`，連結本身照常產生。

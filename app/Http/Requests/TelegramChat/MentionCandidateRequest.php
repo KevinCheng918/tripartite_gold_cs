@@ -31,7 +31,11 @@ class MentionCandidateRequest extends FormRequest
         return [
             'group_id.required' => trans('telegram_chat.msg.group_not_found'),
             'group_id.integer'  => trans('telegram_chat.msg.group_not_found'),
-            'keyword.max'       => trans('telegram_chat.msg.required'),
+            /*
+             * ⚠ 不要借用「此欄位為必填」那一句 —— 這裡是**太長**，
+             * 訊息文不對題比沒有訊息更難查。
+             */
+            'keyword.max'       => trans('telegram_chat.msg.mention_keyword_too_long'),
         ];
     }
 }

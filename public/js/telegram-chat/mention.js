@@ -334,6 +334,11 @@
     T.applyMentions = function (text) {
         if (!pending.length) { return text; }
 
+        /*
+         * ⚠ **URL 裡不能出現 `&`**：`TelegramBotService::escapeHtml()` 還原
+         * `a` 標籤用的正則是 `[^&]*?`，屬性裡有 `&` 就整個還原失敗 ——
+         * 客人會收到一串裸的 HTML。目前只有一個參數，剛好過。
+         */
         var format = '<a href="tg://user?id={id}">{label}</a>';
         var result = text;
 
@@ -343,7 +348,14 @@
 
             if (at < 0) { return; }
 
-            var link = format.replace('{id}', one.id).replace('{label}', escapeHtml(one.label));
+            /*
+             * ⚠ 名字要轉義：它是**從 Telegram 來的外部資料**，有人把顯示名稱
+             * 設成 `<b>老闆</b>` 的話，不轉義就會變成真的粗體送出去。
+             *
+             * 這裡用共用的 `T.escapeHtml()`（只轉 `&<>`）就夠 ——
+             * 名字放的是標籤**內容**，不是屬性值。
+             */
+            var link = format.replace('{id}', one.id).replace('{label}', T.escapeHtml(one.label));
             result = result.slice(0, at) + link + result.slice(at + token.length);
         });
 
@@ -401,13 +413,4 @@
         }, true);
     };
 
-    /**
-     * @param {string} text
-     * @returns {string}
-     */
-    function escapeHtml(text) {
-        return String(text == null ? '' : text).replace(/[&<>]/g, function (char) {
-            return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[char];
-        });
-    }
 })(window, document);

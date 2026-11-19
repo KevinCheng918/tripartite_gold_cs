@@ -164,6 +164,7 @@ return [
         'reaction_failed'  => 'Failed to send reaction',
         'image_too_large'  => 'Image exceeds 5MB and cannot be sent',
         'edited_too_large' => 'The edited image is too large — crop part of it and try again',
+        'mention_keyword_too_long' => 'That search text is too long',
         'editor_failed'    => 'Could not open the image editor',
         'image_invalid'    => 'Only images can be pasted',
         'file_sending'     => 'Sending',

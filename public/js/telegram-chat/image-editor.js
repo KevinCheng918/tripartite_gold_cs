@@ -1040,6 +1040,13 @@
     }
 
     /**
+     * HTML 轉義
+     *
+     * ⚠ **不能用共用的 `T.escapeHtml()`**：那支走 `textContent` → `innerHTML`，
+     * 只轉 `&<>`，**不轉引號**。而這裡有把文字塞進
+     * `title="…"` 屬性的地方 —— 名稱裡出現一個 `"` 就會把屬性切斷、
+     * 後面整段 HTML 跑掉。所以這支自己轉，連引號一起。
+     *
      * @param {string} text
      * @returns {string}
      */

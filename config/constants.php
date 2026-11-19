@@ -71,16 +71,12 @@ return [
             'MAX_CANDIDATES' => 8,
 
             /*
-             * 沒有 username 的人要用這個格式叫（text_mention）。
+             * ⚠ **text_mention 的連結格式在前端**（`mention.js`），不在這裡。
              *
-             * ⚠ `TelegramBotService::escapeHtml()` 會把 `a` 標籤還原成真的
-             * HTML，所以這串直接寫進訊息內容就送得出去。
-             *
-             * ⚠ **不要在 URL 裡加第二個參數**：那支還原用的正則是
-             * `[^&]*?`，屬性裡出現 `&` 就會整個還原失敗，變成客人看到
-             * 一串裸 HTML。
+             * 第一版兩邊各放一份，而後端這份根本沒人讀 —— 兩份同一件事只會
+             * 讓人改了一邊以為生效了。組那串 HTML 的是前端（送出前替換），
+             * 所以格式跟著它走。
              */
-            'LINK_FORMAT' => '<a href="tg://user?id={id}">{label}</a>',
         ],
 
         /*

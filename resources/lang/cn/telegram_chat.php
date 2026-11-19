@@ -160,6 +160,7 @@ return [
         'reaction_failed'  => '表情回应发送失败',
         'image_too_large'  => '图片超过 5MB，无法传送',
         'edited_too_large' => '编辑后的图片太大，请先裁切一部分再试',
+        'mention_keyword_too_long' => '搜索的字太长了',
         'editor_failed'    => '图片编辑器开启失败',
         'image_invalid'    => '只能粘贴图片',
         'file_sending'     => '传送中',

@@ -162,6 +162,7 @@ return [
         'reaction_failed'  => '表情回應發送失敗',
         'image_too_large'  => '圖片超過 5MB，無法傳送',
         'edited_too_large' => '編輯後的圖片太大，請先裁切一部分再試',
+        'mention_keyword_too_long' => '搜尋的字太長了',
         'editor_failed'    => '圖片編輯器開啟失敗',
         'image_invalid'    => '只能貼上圖片',
         'file_sending'     => '傳送中',
