@@ -258,3 +258,20 @@ username 才是那個人在群組裡被認得的樣子。
 
 ⚠ 舊單一律 null、不回填 —— 誰按的這件事從來沒被記下來過，猜不出來；
 報表上會顯示成「未具名」。
+
+### migration 跑完後的驗證（2026-11-20，交易內最後 rollback）
+
+| 驗了什麼 | 結果 |
+|---|---|
+| `closed_by` 欄位 ＋ 有沒有進 `COLUMNS` | 都有（沒進 `COLUMNS` 的話 `find()` 會讀到 null） |
+| 後台標「客服已自行處理」 | `close_action=7`、`closed_by=小陳` |
+| 客服在對話窗回掉（整群收單） | 同一批**每一張**都寫到了 `closed_by=Amy` |
+| 按鈕忽略那條路的欄位寫入 | `close_action=6`、`closed_by=@mei72163` |
+| `countByClosedBy()` 分組 | 三種動作各自分得開 |
+
+`telegramNameOf()` 三種輸入：有 username → `@mei72163`；
+只有姓名 → `小 陳`；什麼都沒有 → `null`（報表顯示「未具名」）。
+
+⚠ 第 4 項特別驗過，是因為**欄位沒建好時 Laravel 會把未知欄位靜靜丟掉**
+（`isGuarded()` 查資料表實際欄位）—— 那時 `closed_by` 會全部是 null
+而且不報錯。

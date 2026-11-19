@@ -1325,6 +1325,11 @@ class AutoReplySupportService
      * username 才是那個人在群組裡被認得的樣子。沒填 username 的人才退回
      * 顯示名稱 —— 總比印一串看不懂的數字 id 好。
      *
+     * ⚠ **順序跟 `TelegramChatService::buildSenderName()` 刻意相反**
+     * （那支是姓名優先、username 當退路），不是漏改：那支是給訊息列表顯示
+     * 「誰說的」，親切的名字比較好讀；這支是報表上的點名，要的是一個
+     * **找得到人、而且不會隔天就變樣**的識別。
+     *
      * @param array $from
      * @return string|null
      */
