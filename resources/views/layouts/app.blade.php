@@ -491,7 +491,10 @@
                             <label class="form-label" for="profile-session-timeout">{{ trans('profile.field_session_timeout') }}</label>
                             <select id="profile-session-timeout" class="form-select" name="session_timeout">
                                 @foreach(config('constants.USER.SESSION_TIMEOUT.OPTIONS') as $minutes)
-                                    <option value="{{ $minutes }}" @selected((int) Auth::user()->session_timeout === (int) $minutes)>
+                                    {{-- ⚠ 不能用 @selected()／@checked()：那是 Laravel 9 的 Blade 指令，
+                                         這個專案是 8.83 —— 寫了不會被解析，整串會原樣印進選單裡 --}}
+                                    <option value="{{ $minutes }}"
+                                            {{ (int) Auth::user()->session_timeout === (int) $minutes ? 'selected' : '' }}>
                                         @if($minutes === 0)
                                             {{ trans('profile.session_timeout_never') }}
                                         @elseif($minutes % 60 === 0)

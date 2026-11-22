@@ -164,3 +164,24 @@
 - 「欄位不存在時 `(int) null = 0`」本機實測過
 - ⚠ **還沒端到端跑過**：要等 migration 跑完才能驗
   「設定存得進去」「閒置真的會登出」「踢人真的會把對方踢掉」
+
+### ⚠⚠ 這個專案是 Laravel 8，不能用 `@selected()`／`@checked()`
+
+第一版下拉用了 `@selected(...)` —— 那是 **Laravel 9** 才有的 Blade 指令。
+8.83 不認得它，於是**整串原樣印進選單裡**：
+
+```
+session_timeout === (int) $minutes)> 不登出
+```
+
+改回傳統寫法：
+
+```blade
+<option value="{{ $minutes }}"
+        {{ (int) Auth::user()->session_timeout === (int) $minutes ? 'selected' : '' }}>
+```
+
+⚠ 版本就寫在 `CLAUDE.md` 與 `PROMPTS.md` 的第一張表（Laravel v8.83.29），
+**動手前該先看**。同一類的還有 `@checked()`、`@disabled()`、`@required()`、
+`@readonly()` —— 全都是 Laravel 9 才有的，這個專案一個都不能用。
+（已 grep 過，其他地方沒有誤用。）
