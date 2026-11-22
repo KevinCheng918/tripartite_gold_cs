@@ -141,6 +141,8 @@ return [
     'msg' => [
         'kicked'       => 'An administrator signed you out. Please sign in again.',
         'kick_success' => '":name" has been signed out',
+        // Fallback when the API returns no message (no name, or it reads oddly)
+        'kick_done'    => 'Signed out',
         'kick_failed'  => 'Could not sign that account out — please try again',
         'kick_self'    => 'You cannot sign yourself out here',
         'not_found'    => 'Account not found',

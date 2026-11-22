@@ -780,7 +780,11 @@ $(function () {
              * ⚠ **不要 reload**：踢人不會改變這一頁看得到的任何資料
              * （`force_logout_at` 沒有顯示在列表上），重整只是讓人多等一次。
              */
-            showMessage(res.message || @json(trans('account.msg.kick_success', ['name' => ''])));
+            /*
+             * ⚠ fallback 不要用帶 `:name` 的那句 —— 名字是空的時候會變成
+             * 「已把「」踢出登入」。後端一定會回 message，這裡只是保險。
+             */
+            showMessage(res.message || @json(trans('account.msg.kick_done')));
         }).fail(function (xhr) {
             showMessage((xhr.responseJSON && xhr.responseJSON.message) || @json(trans('account.msg.kick_failed')));
         }).always(function () {

@@ -598,7 +598,9 @@
         <div class="modal-dialog modal-sm">
             <div class="modal-content">
                 <div class="modal-body text-center py-4">
-                    <p class="mb-1 fw-bold">{{ trans('auth.expired_title') }}</p>
+                    {{-- ⚠ 標題可被覆寫：被管理者踢出登入時原因不是「過期」，
+                         照原文案顯示會讓人以為只是逾時（見 AuthGuard.notify） --}}
+                    <p class="mb-1 fw-bold" id="auth-expired-title">{{ trans('auth.expired_title') }}</p>
                     <p class="mb-3 text-muted" style="font-size:0.875rem">{{ trans('auth.expired_hint') }}</p>
                     <a href="{{ route('login') }}" class="btn btn-primary">{{ trans('auth.expired_action') }}</a>
                 </div>
@@ -774,6 +776,12 @@
                     if (nickname) {
                         $('.header-user-info .widget-heading').text(nickname);
                     }
+                    /*
+                     * ⚠ 把新的閒置設定寫回 meta —— common.js 的倒數每次檢查
+                     * 都重讀它。不更新的話，改完設定要**重新整理才會生效**，
+                     * 而使用者不會知道要重整。
+                     */
+                    $('meta[name="session-timeout"]').attr('content', data.session_timeout);
                 },
                 error: function (xhr) {
                     var body = xhr.responseJSON || {};

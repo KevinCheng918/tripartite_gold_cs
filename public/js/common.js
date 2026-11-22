@@ -479,12 +479,19 @@
         /**
          * 提示並準備導向登入頁
          *
+         * @param {string} [reason] 覆寫標題用。**被管理者踢出登入**時原因
+         *                          不是「登入已過期」—— 照原文案顯示會讓人
+         *                          以為只是逾時，而管理者是刻意把他請下線的。
          * @returns {void}
          */
-        notify: function () {
+        notify: function (reason) {
             if (expiredNotified) { return; }
 
             expiredNotified = true;
+
+            var title = document.getElementById('auth-expired-title');
+
+            if (reason && title) { title.textContent = reason; }
 
             // 先關掉畫面上其他 Modal：留著的話會疊兩層 backdrop，
             // 而且那些視窗上的按鈕按了也沒用
@@ -546,7 +553,15 @@
      */
     if (window.jQuery) {
         window.jQuery(document).ajaxError(function (event, xhr) {
-            if (window.AuthGuard.isExpired(xhr)) { window.AuthGuard.notify(); }
+            if (!window.AuthGuard.isExpired(xhr)) { return; }
+
+            /*
+             * 後端有給原因就用它（被踢出登入時是「您已被管理者登出」）——
+             * 一律顯示「登入已過期」的話，被踢的人會以為只是逾時。
+             */
+            var body = xhr.responseJSON || {};
+
+            window.AuthGuard.notify(body.message);
         });
     }
 
@@ -610,22 +625,31 @@
      *
      * 詳見 .claude/knowledge/features/session-timeout-and-kick.md
      */
-    var idleConfig = document.querySelector('meta[name="session-timeout"]');
-    var idleMinutes = idleConfig ? parseInt(idleConfig.content, 10) : 0;
+    if (window.location.pathname.indexOf('/admin') === 0) {
+        startIdleWatch();
+    }
 
-    if (idleMinutes > 0 && window.location.pathname.indexOf('/admin') === 0) {
-        startIdleWatch(idleMinutes);
+    /**
+     * 目前設定的閒置分鐘數（0 = 不登出）
+     *
+     * ⚠ **每次檢查都重讀 meta，不要在啟動時讀一次就記住**：使用者在個人設定
+     * 改完之後那一頁不會重新載入 —— 記住舊值的話，他得先重整才生效，
+     * 而他不會知道要重整。改完設定那段 JS 會順手更新這個 meta。
+     *
+     * @returns {number}
+     */
+    function idleLimitMinutes() {
+        var meta = document.querySelector('meta[name="session-timeout"]');
+
+        return meta ? (parseInt(meta.content, 10) || 0) : 0;
     }
 
     /**
      * 盯著「真人最後一次動」是什麼時候
-     *
-     * @param {number} minutes
      */
-    function startIdleWatch(minutes) {
+    function startIdleWatch() {
         var checkMeta = document.querySelector('meta[name="session-timeout-check"]');
         var checkSeconds = checkMeta ? parseInt(checkMeta.content, 10) : 60;
-        var limit = minutes * 60 * 1000;
         var lastActive = Date.now();
 
         /*
@@ -640,7 +664,12 @@
         });
 
         setInterval(function () {
-            if (Date.now() - lastActive < limit) { return; }
+            var minutes = idleLimitMinutes();
+
+            // 選「不登出」就什麼都不做（等於現況）
+            if (minutes < 1) { return; }
+
+            if (Date.now() - lastActive < minutes * 60 * 1000) { return; }
 
             logoutIdle();
         }, checkSeconds * 1000);
