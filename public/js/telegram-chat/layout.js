@@ -9,6 +9,13 @@
      * 渲染主框架（Architect chat-layout 風格）
      */
     T.renderLayout = function () {
+        /*
+         * ⚠ 先解鎖再畫：`tg-chat-locked` 會讓 `body` 不能捲，萬一殘留
+         * （例如上一次是在對話中離開的）整個頁面都動不了。
+         * 重畫版面＝回到「還沒選對話」的狀態，本來就該是解鎖的。
+         */
+        document.body.classList.remove('tg-chat-locked');
+
         T.root.innerHTML =
             '<div class="app-inner-layout app-inner-layout-page chat-layout">' +
             '<div class="app-inner-layout__wrapper row g-0">' +
@@ -39,6 +46,49 @@
             '</div>' +
             '</div>';
     };
+
+    /**
+     * 手機版「正在對話中」的開關
+     *
+     * ⚠ **`body` 也要跟著加 class**（2026-11-22）：手機上聊天區是滿版的
+     * `position: fixed`，背景沒有任何東西需要看 —— 但只要頁面還能捲，
+     * 手指滑在訊息上卻動到背景的情況就會發生（需求方回報「滑著滑著就
+     * 變成滑外面」）。鎖住 `body` 是最後一道，前面兩道在 `custom.css`。
+     *
+     * ⚠ 離開對話一定要解鎖，不然整個後台的其他頁面都捲不動了。
+     *
+     * @param {boolean} chatting
+     */
+    function setChatting(chatting) {
+        var chatLayout = document.querySelector('.chat-layout');
+
+        if (chatLayout) { chatLayout.classList.toggle('tg-chatting', chatting); }
+
+        document.body.classList.toggle('tg-chat-locked', chatting);
+
+        if (chatting) { closeMobileSidebar(); }
+    }
+
+    /**
+     * 收起手機版的主選單
+     *
+     * 需求方 2026-11-22：「手機版……如果有打開 sidebar，我點旁邊的對話，
+     * 進入後，要自動收合 sidebar。」
+     *
+     * ⚠ **按鈕的 `is-active` 要一起拿掉**：開合狀態是「容器的 class」與
+     * 「漢堡按鈕的 class」兩個各記一份（Architect 的 `app.js` 是 toggle
+     * 兩者）—— 只清容器的話，按鈕會停在「已展開」的樣子，
+     * 下次按它等於再 toggle 一次，選單反而打不開。
+     */
+    function closeMobileSidebar() {
+        var container = document.querySelector('.app-container');
+
+        if (container) { container.classList.remove('sidebar-mobile-open'); }
+
+        document.querySelectorAll('.mobile-toggle-nav.is-active').forEach(function (btn) {
+            btn.classList.remove('is-active');
+        });
+    }
 
     // 安全逾時：broadcast 可能丟失（Pusher 斷線、worker 在送出結束事件前就被砍），
     // 少了這道，提示會一直掛在畫面上，客服會以為系統壞了
@@ -200,8 +250,7 @@
                 T.syncAutoReplyIndicator();
 
                 // 手機版切到聊天
-                var chatLayout = document.querySelector('.chat-layout');
-                if (chatLayout) { chatLayout.classList.add('tg-chatting'); }
+                setChatting(true);
             });
         });
     }
@@ -250,10 +299,7 @@
         // 手機版返回按鈕
         var backBtn = document.getElementById('btn-tg-back');
         if (backBtn) {
-            backBtn.addEventListener('click', function () {
-                var chatLayout = document.querySelector('.chat-layout');
-                if (chatLayout) { chatLayout.classList.remove('tg-chatting'); }
-            });
+            backBtn.addEventListener('click', function () { setChatting(false); });
         }
 
         // 刪除對話按鈕

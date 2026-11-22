@@ -108,8 +108,23 @@
 
 /* ---- 聊天 RWD（手機版） ---- */
 @media (max-width: 767.98px) {
+    /*
+     * ⚠⚠ **高度要歸零**（2026-11-22 修）。
+     *
+     * 需求方回報：手機上滑對話「會變成滑到外面的上下滑動」。
+     *
+     * 根源在這裡 —— 上面那條全域規則給 wrapper
+     * `height: calc(100vh - 220px)`，而手機版的 sidebar 與 content
+     * 都是 `position: fixed`（**不佔空間**）⇒ wrapper 變成一塊
+     * 跟螢幕差不多高的**空白佔位**，整個頁面因此比視窗還長、可以捲。
+     *
+     * 使用者以為自己在滑訊息，其實滑的是底下那塊空白。
+     */
     .chat-layout .app-inner-layout__wrapper {
         flex-direction: column !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
     }
     /* 覆蓋 Architect 預設的 display:none，固定全屏 */
     .chat-layout .app-inner-layout__sidebar.app-inner-layout__sidebar {
@@ -131,6 +146,8 @@
         flex: 1 !important;
         overflow-y: auto !important;
         -webkit-overflow-scrolling: touch;
+        /* 對話列表同理：捲到底再滑不要去動背景 */
+        overscroll-behavior: contain;
         /* 手機瀏覽器的底部工具列會蓋住 bottom:0 的區域，最後一筆對話捲到底也看不到。
            多留一段捲動空間，並用 safe-area 讓 iPhone 的 home indicator 也不擋。 */
         padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important;
@@ -141,6 +158,18 @@
         flex: none !important;
         display: none !important;
     }
+    /*
+     * ⚠ 在對話裡的時候，整個頁面本來就不該能捲 —— 聊天區是滿版的
+     * `position: fixed`，背景沒有任何東西需要看。
+     *
+     * 這是第三道（前兩道是 wrapper 歸零與 `overscroll-behavior`）：
+     * 就算哪天又有別的元素把頁面撐高，這一行也會讓背景動不了。
+     * class 由 `layout.js` 跟著 `tg-chatting` 一起加／拿掉。
+     */
+    body.tg-chat-locked {
+        overflow: hidden !important;
+    }
+
     /* 選了群組後：隱藏列表、顯示聊天 */
     .chat-layout.tg-chatting .app-inner-layout__sidebar.app-inner-layout__sidebar {
         display: none !important;
@@ -167,6 +196,14 @@
         min-height: 0 !important;
         overflow-y: auto !important;
         -webkit-overflow-scrolling: touch;
+        /*
+         * ⚠ **捲到頂／底時不要把捲動交棒給外層**（scroll chaining）。
+         *
+         * 沒有這一行的話，訊息捲到最上面再往下滑，瀏覽器會改捲整個頁面
+         * —— 使用者的手指明明在訊息上，動的卻是背景。
+         * 這是需求方說「滑著滑著就卡住、變成滑外面」的第二個原因。
+         */
+        overscroll-behavior: contain;
     }
     .chat-layout.tg-chatting .app-inner-layout__bottom-pane {
         flex-shrink: 0 !important;
