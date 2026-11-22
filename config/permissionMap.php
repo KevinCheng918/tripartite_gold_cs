@@ -30,6 +30,14 @@ return [
             'account.create' => 'permission.account.create',
             'account.update' => 'permission.account.update',
             'account.assign_permission' => 'permission.account.assign_permission',
+            /*
+             * 踢出登入（需求方 2026-11-22）。
+             *
+             * ⚠ **刻意跟 `account.update` 分開**：改別人的暱稱、狀態是
+             * 「動設定」，把正在回客人訊息的人當場踢下線是「中斷他的工作」
+             * —— 他手上沒送出的內容會直接不見。該由管理者單獨指派。
+             */
+            'account.kick' => 'permission.account.kick',
             'login_log.view' => 'permission.login_log.view',
         ],
     ],

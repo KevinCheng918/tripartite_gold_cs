@@ -5,6 +5,10 @@
     {{-- viewport-fit=cover：讓 env(safe-area-inset-*) 生效，否則在 iPhone 上一律回傳 0 --}}
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    {{-- 閒置自動登出：倒數在前端（只有瀏覽器知道真人有沒有動），
+         0 = 不登出。設定在個人設定頁，選項見 constants.USER.SESSION_TIMEOUT --}}
+    <meta name="session-timeout" content="{{ (int) Auth::user()->session_timeout }}">
+    <meta name="session-timeout-check" content="{{ (int) config('constants.USER.SESSION_TIMEOUT.CHECK_SECONDS') }}">
     <title>@yield('title', config('app.name'))</title>
     <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
     <link rel="apple-touch-icon" href="{{ asset('img/pwa-apple-icon.png') }}">
@@ -480,6 +484,26 @@
                             <label class="form-label" for="profile-password">{{ trans('profile.field_password') }}（{{ trans('profile.password_hint') }}）</label>
                             <input id="profile-password" type="password" class="form-control" name="password" minlength="8" autocomplete="new-password">
                         </div>
+
+                        {{-- 閒置多久自動登出（需求方 2026-11-22）。
+                             選項與預設都在 constants.USER.SESSION_TIMEOUT，不在這裡寫死 --}}
+                        <div class="mb-3">
+                            <label class="form-label" for="profile-session-timeout">{{ trans('profile.field_session_timeout') }}</label>
+                            <select id="profile-session-timeout" class="form-select" name="session_timeout">
+                                @foreach(config('constants.USER.SESSION_TIMEOUT.OPTIONS') as $minutes)
+                                    <option value="{{ $minutes }}" @selected((int) Auth::user()->session_timeout === (int) $minutes)>
+                                        @if($minutes === 0)
+                                            {{ trans('profile.session_timeout_never') }}
+                                        @elseif($minutes % 60 === 0)
+                                            {{ trans('profile.session_timeout_hours', ['value' => $minutes / 60]) }}
+                                        @else
+                                            {{ trans('profile.session_timeout_minutes', ['value' => $minutes]) }}
+                                        @endif
+                                    </option>
+                                @endforeach
+                            </select>
+                            <div class="form-text">{{ trans('profile.session_timeout_hint') }}</div>
+                        </div>
                         <div class="text-end">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('shift.modal_cancel') }}</button>
                             <button type="submit" class="btn btn-primary">{{ trans('shift.modal_confirm') }}</button>
@@ -727,6 +751,12 @@
             if (password) { data.password = password; }
             // 一律送出（含空字串）：要能把帳號清掉，清掉就是不再被 tag
             data.telegram_username = $('#profile-telegram-username').val().trim();
+
+            /*
+             * 閒置自動登出。⚠ **0 也要送**（那是「不登出」）——
+             * 用「有值才送」的寫法會讓人改不回不登出。
+             */
+            data.session_timeout = parseInt($('#profile-session-timeout').val(), 10) || 0;
 
             $.ajax({
                 url: '/admin/profile/ajax-update',

@@ -91,6 +91,16 @@ class LoginController extends Controller
         Auth::login($user, $request->boolean('remember'));
         $request->session()->regenerate();
 
+        /*
+         * 記下這次登入的時間 —— 「踢出登入」靠它判斷
+         * （`CheckForceLogout`：`force_logout_at > login_at` 就登出）。
+         *
+         * ⚠ **一定要在 `regenerate()` 之後寫**：regenerate 會換掉 session id，
+         * 寫在前面的話這個值會跟著舊 session 一起被丟掉，
+         * 結果是每個人都看起來「沒有登入時間」而被誤踢。
+         */
+        $request->session()->put('login_at', now()->toDateTimeString());
+
         $this->loginLogService->record([
             'user_id'    => $user->id,
             'account'    => $params['account'],
@@ -139,9 +149,25 @@ class LoginController extends Controller
      */
     public function logout(Request $request)
     {
+        /*
+         * 是不是「閒置太久自動登出」的（前端倒數到點時帶 `?reason=idle`）。
+         *
+         * ⚠ **要在 invalidate 之前讀** —— session 清掉之後 request 還在，
+         * 但習慣上先把要用的東西拿出來，免得之後有人把順序調換。
+         */
+        $isIdle = $request->query('reason') === 'idle';
+
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+
+        /*
+         * ⚠ **一定要說一聲**：使用者回頭看到登入頁，如果沒有任何訊息，
+         * 他會以為系統把他踢掉或當掉了 —— 而這其實是他自己設定的。
+         */
+        if ($isIdle) {
+            return redirect()->route('login')->withErrors(['account' => trans('profile.msg.idle_logout')]);
+        }
 
         return redirect()->route('login');
     }

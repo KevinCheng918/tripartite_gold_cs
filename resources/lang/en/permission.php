@@ -33,6 +33,8 @@ return [
         'update' => 'Update account',
         'delete' => 'Delete account',
         'assign_permission' => 'Assign permissions',
+        // Kept separate from "edit account": this interrupts what they are doing
+        'kick' => 'Force sign-out',
     ],
     'shift' => [
         'view' => 'View shifts',

@@ -132,7 +132,18 @@ return [
         7 => 'Sun',
     ],
 
+    // Force sign-out (2026-11-22)
+    'btn_kick'         => 'Force sign-out',
+    'kick_confirm'     => 'Sign ":name" out of all sessions?',
+    // ⚠ This sentence matters: anything they are typing will be lost
+    'kick_confirm_hint' => 'They will be sent back to the login page immediately and anything they are typing will be lost. They can sign in again themselves.',
+
     'msg' => [
+        'kicked'       => 'An administrator signed you out. Please sign in again.',
+        'kick_success' => '":name" has been signed out',
+        'kick_failed'  => 'Could not sign that account out — please try again',
+        'kick_self'    => 'You cannot sign yourself out here',
+        'not_found'    => 'Account not found',
         'telegram_code_issued'    => 'Code generated, valid for :minutes minutes',
         'telegram_code_failed'    => 'Could not generate the code, please try again later',
         'telegram_code_forbidden' => 'You do not have permission to generate a code for another account',

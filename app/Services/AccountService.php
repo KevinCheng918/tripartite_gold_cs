@@ -8,6 +8,7 @@ use App\Repositories\UserRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * 帳號管理 Service
@@ -135,6 +136,17 @@ class AccountService
             $attributes['telegram_username'] = filled($username) ? $username : null;
         }
 
+        /*
+         * 閒置多久自動登出（個人設定）。
+         *
+         * ⚠ 用 `array_key_exists` 而不是 `filled`：**0 是合法值**（不登出），
+         * 用 filled 判斷的話永遠存不進去 —— 想從「30 分鐘」改回「不登出」
+         * 的人會發現設定按了沒反應。
+         */
+        if (array_key_exists('session_timeout', $params)) {
+            $attributes['session_timeout'] = (int) $params['session_timeout'];
+        }
+
         $attributes = array_merge($attributes, $this->workModeAttributes($params));
 
         $updated = DB::transaction(function () use ($user, $attributes) {
@@ -248,5 +260,44 @@ class AccountService
 
         // 存進去的是「沒勾的」—— 這張表是黑名單
         $this->noticeMuteRepository->replaceForUser($user->id, array_values(array_diff($all, $enabledKeys)));
+    }
+
+    /**
+     * 踢出登入：讓這個帳號目前所有的登入立刻失效
+     *
+     * ⚠ 做法是**記一個時間點**而不是刪 session：`SESSION_DRIVER=file`，
+     * session 檔名是 session id，從 user_id 找不到對應的檔案。
+     * 判斷在 `CheckForceLogout`（`force_logout_at > session 的 login_at`）。
+     *
+     * ⚠ **不需要清掉這一欄**：那個人重新登入時 `login_at` 會比它新，
+     * 自然就過得去。
+     *
+     * ⚠ **踢自己會把自己踢掉** —— 呼叫端要擋（帳號列表本來就不列自己）。
+     *
+     * @param int    $userId
+     * @param string $operator 誰踢的（只寫 log，不存欄位）
+     * @return User
+     */
+    public function kick($userId, $operator)
+    {
+        $user = $this->userRepository->find($userId);
+
+        if (blank($user)) {
+            throw new \RuntimeException(trans('account.msg.not_found'));
+        }
+
+        $updated = $this->userRepository->update($user, ['force_logout_at' => now()]);
+
+        /*
+         * ⚠ **一定要留 log**：被踢的人只會看到自己突然回到登入頁，
+         * 而他之後一定會問「是誰踢的、為什麼」。沒有這一行就答不出來。
+         */
+        Log::info('帳號被踢出登入', [
+            'user_id'  => $user->id,
+            'account'  => $user->account,
+            'operator' => $operator,
+        ]);
+
+        return $updated;
     }
 }

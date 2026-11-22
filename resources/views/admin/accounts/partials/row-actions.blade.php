@@ -61,6 +61,25 @@
         </button>
     </div>
 
+    {{-- 踢出登入（需求方 2026-11-22）。
+
+         ⚠ **自己一段、權限也自己一個 keyword**（`account.kick`）：
+         上面那幾顆是「改設定」，這一顆是**中斷對方正在做的事** ——
+         他正在打的客人訊息會直接不見。
+
+         ⚠ 圖示用 text-danger（同「解除綁定」的理由：後果是不可逆的），
+         但整顆不換色系 —— custom.css 只替 outline-secondary 補齊了
+         淺／深兩種模式的 hover。 --}}
+    @can('account.kick')
+        <div class="btn-group btn-group-sm" role="group" aria-label="{{ trans('account.btn_kick') }}">
+            <button class="btn btn-outline-secondary btn-icon btn-transition js-kick"
+                    data-id="{{ $account->id }}"
+                    data-name="{{ $account->nickname }}">
+                <i class="fas fa-sign-out-alt btn-icon-wrapper text-danger"></i>{{ trans('account.btn_kick') }}
+            </button>
+        </div>
+    @endcan
+
     {{-- 通知開關跟 Telegram 綁定是同一件事的兩面（綁了才收得到、收哪幾種在這裡選），
          但權限跟著 account.update 走，所以單獨一段 --}}
     @can('account.update')

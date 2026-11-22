@@ -77,6 +77,14 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/permissions/{user}', [AccountController::class, 'permissionsPage'])->middleware('can:account.assign_permission')->name('permissions');
         Route::get('/ajax-login-log/{user}', [AccountController::class, 'ajaxLoginLog'])->middleware('can:account.view')->name('ajax-login-log');
         /*
+         * 踢出登入（需求方 2026-11-22）。
+         *
+         * ⚠ **刻意不用 `account.update`**：改別人的暱稱、狀態是一回事，
+         * 把正在回客人訊息的人**當場踢下線**是另一回事 —— 他手上沒送出的
+         * 內容會直接不見。該由管理者單獨指派。
+         */
+        Route::post('/ajax-kick', [AccountController::class, 'ajaxKick'])->middleware('can:account.kick')->name('ajax-kick');
+        /*
          * 這個帳號要收哪些私訊。沿用 account.update —— 跟改暱稱、改狀態一樣
          * 是「動別人的帳號設定」，不另開 keyword。
          */

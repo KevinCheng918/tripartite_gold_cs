@@ -15,8 +15,21 @@ return [
     'telegram_bind_action'     => 'Generate code',
     'telegram_bind_hint'       => 'Generates a code — paste it to the support bot on Telegram to finish linking. Roster and task card messages only arrive once linked.',
 
+    /*
+     * Idle auto-logout (2026-11-22).
+     *
+     * ⚠ The hint must make clear this counts **idle** time — not "log out
+     * N minutes after signing in".
+     */
+    'field_session_timeout'   => 'Log me out after idling',
+    'session_timeout_hint'    => 'Counts only while you do nothing at all (no clicks, no typing). Choose "Never" to keep things as they are. This is a convenience setting, not a security control.',
+    'session_timeout_never'   => 'Never',
+    'session_timeout_minutes' => ':value minutes',
+    'session_timeout_hours'   => ':value hours',
+
     'msg' => [
         'update_success'      => 'Profile updated',
+        'idle_logout'         => 'Signed out after a long period of inactivity',
         'update_failed'       => 'Failed to update profile',
         'full_width_password' => 'Password contains full-width or unsupported characters (including spaces). Use half-width letters, numbers and symbols.',
     ],

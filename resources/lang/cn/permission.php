@@ -33,6 +33,8 @@ return [
         'update' => '编辑账号',
         'delete' => '删除账号',
         'assign_permission' => '设定账号权限',
+        // 跟「编辑账号」分开：这个会中断对方正在做的事
+        'kick' => '踢出登入',
     ],
     'shift' => [
         'view' => '查看排班',

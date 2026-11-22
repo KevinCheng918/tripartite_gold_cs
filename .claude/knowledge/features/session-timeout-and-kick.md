@@ -1,4 +1,4 @@
-# 自選閒置登出時間 ＋ 後台踢人下線（規劃中，待確認）
+# 自選閒置登出時間 ＋ 後台踢人下線（v3.98 已實作，**migration 待跑**）
 
 > 需求方 2026-11-22：「我個人設定這邊想要有一個自選登出的間隔時間，現在好像
 > 都是用 laravel session time，也可以選完全不登出，然後我後台的帳號管理要有
@@ -113,3 +113,54 @@
    秒數對不起來反而更怪。
 3. **被踢的人正在打字怎麼辦？** 沒有辦法救 —— 那是踢人這個動作的本質。
    所以按鈕要有二次確認，並在確認框寫明「他正在打的訊息會不見」。
+
+## 實作後的補充（v3.98）
+
+### 檔案
+
+| 檔案 | 內容 |
+|---|---|
+| `database/migrations/…_add_session_fields_to_user_table.php` | `session_timeout`（分鐘，**預設 0 = 不登出**）、`force_logout_at` |
+| `app/Http/Middleware/CheckForceLogout.php` | 比 `force_logout_at` 與 session 的 `login_at` |
+| `app/Http/Kernel.php` | 掛在 `web` 群組**最後**（要讀 session） |
+| `app/Http/Controllers/Auth/LoginController.php` | 登入時寫 `login_at`；登出帶 `?reason=idle` 時給提示 |
+| `app/Services/AccountService.php` | `kick()`；`update()` 收 `session_timeout` |
+| `app/Http/Requests/Account/KickRequest.php` | 擋踢自己 |
+| `app/Http/Requests/Account/UpdateProfileRequest.php` | `session_timeout` 用 `in:` 限定在選項裡 |
+| `resources/views/layouts/app.blade.php` | 兩個 meta ＋ 個人設定的下拉 |
+| `public/js/common.js` | 閒置偵測與倒數 |
+| `resources/views/admin/accounts/partials/row-actions.blade.php`、`index.blade.php` | 踢出按鈕與確認視窗 |
+
+### ⚠ 幾個容易寫錯的地方
+
+1. **`login_at` 要寫在 `session()->regenerate()` 之後** —— regenerate 會換掉
+   session id，寫在前面的話那個值會跟著舊 session 被丟掉，結果是**每個人
+   都看起來「沒有登入時間」而被誤踢**。
+2. **舊 session 沒有 `login_at` 時要判定為「該踢」**。反過來設計的話，
+   管理者按了踢出卻踢不掉這個功能上線前就登入著的人 —— 而那正是最可能
+   需要踢的對象。
+3. **`session_timeout` 用 `array_key_exists` 而不是 `filled`**：
+   **0 是合法值**（不登出），用 filled 判斷的話永遠存不進去 ——
+   想從「30 分鐘」改回「不登出」的人會發現按了沒反應。
+4. **驗證用 `in:` 限定在選項裡**，不要只驗 integer：這一欄會被前端拿去
+   倒數，塞一個 1 分鐘進來等於讓那個人一直被登出。
+5. **捲動不算「有在動」**：只聽 `pointerdown` / `keydown` / `touchstart`。
+   手機上輕碰、甚至頁面自己載入內容都會觸發 scroll，那會讓倒數永遠重來。
+6. **閒置到點要用 POST 打真正的登出**，不能只把頁面導走 —— session 還在的話，
+   下一個用這台電腦的人按上一頁就進得來，那正是這個設定要防的事。
+
+### ⚠ migration 還沒跑也不會把後台弄壞
+
+`layouts/app.blade.php` 每一頁都會讀 `Auth::user()->session_timeout`。
+欄位還不存在時 Eloquent 回 `null` ⇒ `(int) null` 是 `0` ⇒ 不登出（＝現況）。
+**本機實測確認過**，不是推論。
+
+⚠ 但**個人設定存不進去**（Laravel 的 `isGuarded()` 會把未知欄位靜靜丟掉），
+所以上線時 migration 還是要先跑。
+
+## 驗證到哪
+
+- 後端全檔 `php -l`、`common.js` `node --check` 都過
+- 「欄位不存在時 `(int) null = 0`」本機實測過
+- ⚠ **還沒端到端跑過**：要等 migration 跑完才能驗
+  「設定存得進去」「閒置真的會登出」「踢人真的會把對方踢掉」

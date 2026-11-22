@@ -37,6 +37,13 @@ class Kernel extends HttpKernel
             \Illuminate\View\Middleware\ShareErrorsFromSession::class,
             \App\Http\Middleware\VerifyCsrfToken::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            /*
+             * 被管理者踢出登入的人，下一個請求就登出。
+             *
+             * ⚠ 放在 `web` 群組最後（`StartSession` 之後）—— 它要讀 session
+             * 裡的 `login_at`。沒登入的請求會在第一行就短路掉。
+             */
+            \App\Http\Middleware\CheckForceLogout::class,
         ],
 
         'api' => [

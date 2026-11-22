@@ -30,6 +30,8 @@ use Laravel\Sanctum\HasApiTokens;
  * @property string|null $work_end_time     固定班的下班時間 HH:mm:ss，<= 上班時間代表跨日
  * @property string|null $work_days         固定班的上班日，逗號分隔的 1-7（1=週一）
  * @property bool        $show_in_shift     固定班是否顯示在排班紀錄
+ * @property int         $session_timeout   閒置幾分鐘自動登出；0=不登出
+ * @property \Carbon\Carbon|null $force_logout_at 這個時間之前的登入一律失效（踢出登入）
  * @property string|null $deleted_at        軟刪除時間
  */
 class User extends Authenticatable
@@ -49,6 +51,9 @@ class User extends Authenticatable
         'equipments'  => 'array',
         'work_mode'     => 'integer',
         'show_in_shift' => 'boolean',
+        // 閒置幾分鐘自動登出；0 = 不登出（＝ 現況，見 CheckForceLogout）
+        'session_timeout' => 'integer',
+        'force_logout_at' => 'datetime',
     ];
 
     /**

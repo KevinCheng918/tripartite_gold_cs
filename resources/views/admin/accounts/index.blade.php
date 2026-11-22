@@ -587,6 +587,26 @@
         </div>
     </div>
 
+    {{-- 踢出登入確認。
+
+         ⚠ **一定要二次確認、而且要寫明後果**：被踢的人正在打的訊息會不見，
+         那是這個動作的本質，救不回來 —— 按的人該先知道。 --}}
+    <div class="modal fade" id="modal-kick" tabindex="-1">
+        <div class="modal-content-wrapper modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-body py-4">
+                    <input type="hidden" id="kick-user-id">
+                    <p class="mb-2" id="kick-confirm-text"></p>
+                    <p class="text-muted mb-0" style="font-size:0.875rem">{{ trans('account.kick_confirm_hint') }}</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ trans('account.action_cancel') }}</button>
+                    <button type="button" class="btn btn-danger" id="btn-confirm-kick">{{ trans('account.btn_kick') }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 @endsection
 
 @section('scripts')
@@ -730,6 +750,39 @@ $(function () {
             location.reload();
         }).fail(function (xhr) {
             showMessage((xhr.responseJSON && xhr.responseJSON.message) || @json(trans('account.msg.telegram_unbind_failed')));
+        }).always(function () {
+            $btn.prop('disabled', false);
+        });
+    });
+
+    // ===== 踢出登入 =====
+    $('.js-kick').on('click', function () {
+        var $btn = $(this);
+        $('#kick-user-id').val($btn.data('id'));
+        // 名字放進整句話裡（「確定要把「小陳」踢出登入嗎？」），不是單獨一個名字
+        $('#kick-confirm-text').text(@json(trans('account.kick_confirm')).replace(':name', $btn.data('name')));
+        showBsModal('modal-kick');
+    });
+
+    $('#btn-confirm-kick').on('click', function () {
+        var $btn = $(this);
+        $btn.prop('disabled', true);
+
+        $.ajax({
+            url: '/admin/accounts/ajax-kick',
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': csrfToken },
+            contentType: 'application/json',
+            data: JSON.stringify({ user_id: parseInt($('#kick-user-id').val(), 10) })
+        }).done(function (res) {
+            hideBsModal('modal-kick');
+            /*
+             * ⚠ **不要 reload**：踢人不會改變這一頁看得到的任何資料
+             * （`force_logout_at` 沒有顯示在列表上），重整只是讓人多等一次。
+             */
+            showMessage(res.message || @json(trans('account.msg.kick_success', ['name' => ''])));
+        }).fail(function (xhr) {
+            showMessage((xhr.responseJSON && xhr.responseJSON.message) || @json(trans('account.msg.kick_failed')));
         }).always(function () {
             $btn.prop('disabled', false);
         });

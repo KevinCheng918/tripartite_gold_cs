@@ -131,7 +131,18 @@ return [
     ],
 
     // 驗證與操作訊息
+    // 踢出登入（需求方 2026-11-22）
+    'btn_kick'         => '踢出登入',
+    'kick_confirm'     => '確定要把「:name」踢出登入嗎？',
+    // ⚠ 一定要講這句：踢人會讓對方正在打的內容消失，按的人要先知道
+    'kick_confirm_hint' => '他會立刻被導回登入頁，正在打的訊息會不見。他之後仍可以自己重新登入。',
+
     'msg' => [
+        'kicked'       => '您已被管理者登出，請重新登入',
+        'kick_success' => '已把「:name」踢出登入',
+        'kick_failed'  => '踢出登入失敗，請稍後再試',
+        'kick_self'    => '不能踢自己',
+        'not_found'    => '找不到這個帳號',
         'telegram_code_issued'    => '綁定碼已產生，:minutes 分鐘內有效',
         'telegram_code_failed'    => '產生綁定碼失敗，請稍後再試',
         'telegram_code_forbidden' => '您沒有權限為其他帳號產生綁定碼',

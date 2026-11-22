@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Account\AssignPermissionRequest;
+use App\Http\Requests\Account\KickRequest;
 use App\Http\Requests\Account\StoreAccountRequest;
 use App\Http\Requests\Account\UpdateAccountRequest;
 use App\Http\Requests\Account\UpdateNoticeRequest;
@@ -149,6 +150,43 @@ class AccountController extends Controller
             Log::error('個人資訊修改失敗', ['error' => $e->getMessage(), 'user_id' => Auth::id()]);
 
             return response()->json(['message' => trans('profile.msg.update_failed')], 500);
+        }
+    }
+
+    /**
+     * Ajax 踢出登入
+     *
+     * ⚠ 這會**中斷對方正在做的事**（正在打的客人訊息會不見）——
+     * 所以前端要二次確認，而這裡只負責記下時間點，
+     * 真正的登出在 `CheckForceLogout`（對方的下一個請求）。
+     *
+     * @param KickRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxKick(KickRequest $request)
+    {
+        $params = $request->validated();
+
+        try {
+            $user = $this->accountService->kick(
+                (int) Arr::get($params, 'user_id'),
+                (string) Auth::user()->nickname
+            );
+
+            return response()->json([
+                'message' => trans('account.msg.kick_success', ['name' => $user->nickname]),
+            ]);
+        } catch (\RuntimeException $e) {
+            // 帳號不見了 —— 不是系統錯誤，訊息直接給使用者看
+            return response()->json(['message' => $e->getMessage()], 422);
+        } catch (\Exception $e) {
+            Log::error('踢出登入失敗', [
+                'error'    => $e->getMessage(),
+                'user_id'  => Arr::get($params, 'user_id'),
+                'operator' => Auth::id(),
+            ]);
+
+            return response()->json(['message' => trans('account.msg.kick_failed')], 500);
         }
     }
 

@@ -590,4 +590,83 @@
             if (!document.hidden) { ping(); }
         });
     }
+
+    // ---------------------------------------------------------------
+    //  閒置自動登出（個人設定自選）
+    // ---------------------------------------------------------------
+
+    /*
+     * 需求方 2026-11-22：「個人設定這邊想要有一個自選登出的間隔時間……
+     * 也可以選完全不登出。」
+     *
+     * ⚠⚠ **為什麼倒數在前端**：只有瀏覽器知道「真人有沒有動」。
+     * 後端看到的每一個請求都可能是程式發的 —— 上面那個 15 分鐘的心跳、
+     * 對話頁每 30 秒的輪詢 —— 用「最後一個請求的時間」判斷的話，
+     * 只要分頁開著就永遠不會過期。
+     *
+     * ⚠ 所以這是**便利設定，不是安全機制**：倒數在前端，懂的人可以繞過。
+     * 真正的界線仍然是關掉分頁後的 `SESSION_LIFETIME`，以及管理者的
+     * 「踢出登入」。這句話也寫在設定旁邊的說明裡。
+     *
+     * 詳見 .claude/knowledge/features/session-timeout-and-kick.md
+     */
+    var idleConfig = document.querySelector('meta[name="session-timeout"]');
+    var idleMinutes = idleConfig ? parseInt(idleConfig.content, 10) : 0;
+
+    if (idleMinutes > 0 && window.location.pathname.indexOf('/admin') === 0) {
+        startIdleWatch(idleMinutes);
+    }
+
+    /**
+     * 盯著「真人最後一次動」是什麼時候
+     *
+     * @param {number} minutes
+     */
+    function startIdleWatch(minutes) {
+        var checkMeta = document.querySelector('meta[name="session-timeout-check"]');
+        var checkSeconds = checkMeta ? parseInt(checkMeta.content, 10) : 60;
+        var limit = minutes * 60 * 1000;
+        var lastActive = Date.now();
+
+        /*
+         * ⚠ **只認真人的動作**。捲動（scroll）刻意不算 —— 手機上輕碰畫面、
+         * 甚至頁面自己載入內容都會觸發，那會讓倒數永遠重來。
+         *
+         * `passive: true`：這幾個事件很密集，不加的話瀏覽器得等我們決定
+         * 要不要 preventDefault 才能捲動。
+         */
+        ['pointerdown', 'keydown', 'touchstart'].forEach(function (name) {
+            document.addEventListener(name, function () { lastActive = Date.now(); }, { passive: true });
+        });
+
+        setInterval(function () {
+            if (Date.now() - lastActive < limit) { return; }
+
+            logoutIdle();
+        }, checkSeconds * 1000);
+    }
+
+    /**
+     * 閒置到點：登出並回登入頁
+     *
+     * ⚠ **要用 POST 打真正的登出**，不能只是把頁面導走 —— session 還在的話，
+     * 下一個開這台電腦的人按上一頁就進得來，那正是這個設定要防的事。
+     *
+     * ⚠ 導回去時帶一個記號，登入頁才能說「太久沒操作，已自動登出」；
+     * 什麼都不講的話，使用者會以為系統無緣無故把他踢出來。
+     */
+    function logoutIdle() {
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/logout?reason=idle';
+
+        var token = document.createElement('input');
+        token.type = 'hidden';
+        token.name = '_token';
+        token.value = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+
+        form.appendChild(token);
+        document.body.appendChild(form);
+        form.submit();
+    }
 })();

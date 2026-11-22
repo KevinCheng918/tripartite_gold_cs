@@ -26,6 +26,18 @@ class UpdateProfileRequest extends FormRequest
             'nickname'          => 'sometimes|string|max:100',
             'password'          => ['sometimes', 'nullable', config('rules.USER_PASSWORD_REGEX')],
             'telegram_username' => ['sometimes', 'nullable', 'string', 'max:50', config('rules.TELEGRAM_USERNAME_REGEX')],
+            /*
+             * 閒置多久自動登出。
+             *
+             * ⚠ **用 `in:` 限定在選項裡**，不要只驗 integer —— 這一欄之後
+             * 會被前端拿去倒數，塞一個 1 分鐘進來等於讓那個人一直被登出。
+             * 選項只有一份，在 `constants.USER.SESSION_TIMEOUT.OPTIONS`。
+             */
+            'session_timeout' => [
+                'sometimes',
+                'integer',
+                'in:' . implode(',', (array) config('constants.USER.SESSION_TIMEOUT.OPTIONS')),
+            ],
         ];
     }
 
