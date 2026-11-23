@@ -191,6 +191,31 @@
     .chat-layout.tg-chatting .app-inner-layout__top-pane {
         flex-shrink: 0 !important;
     }
+
+    /*
+     * ⚠⚠ **手機版的聊天 header 不可以是 sticky**（2026-11-23 需求方回報：
+     * 「header 跑下來了」—— 它出現在畫面中間，上面還露出一行訊息）。
+     *
+     * `#tg-header` 有一條全域的 `position: sticky; top: 0`（給桌機用的，
+     * 那時捲動的是 `.app-main__inner`）。但手機版的聊天區是
+     * **`position: fixed`** ——
+     *
+     *   · sticky 的位移是看**最近的捲動容器**（`.app-main__inner`）
+     *   · 而它的 containing block 是 fixed 父層（相對 viewport、不跟著捲）
+     *
+     * 兩者對不上的時候，瀏覽器會把 header 往下推一段「它以為被捲掉的距離」
+     * —— 聊天區本身不動，於是 header 就卡在中間，上面空出來的地方
+     * 露出底下的訊息。
+     *
+     * ⚠ 手機版**根本不需要 sticky**：聊天區是 fixed ＋ flex column，
+     * header 是第一個子元素，本來就固定在最上面。
+     *
+     * ⚠ 桌機維持 sticky 不動 —— 那裡捲的確實是 `.app-main__inner`，
+     * 而聊天區不是 fixed，兩者一致。
+     */
+    .chat-layout.tg-chatting #tg-header {
+        position: static !important;
+    }
     .chat-layout.tg-chatting .chat-wrapper {
         flex: 1 1 0 !important;
         min-height: 0 !important;

@@ -87,3 +87,47 @@ viewport，所以 media query 套不上去。改成**直接讀 CSSOM** 確認四
 
 驗過：模擬「已展開」狀態後點對話 ⇒ 兩個 class 都被清掉，
 `tg-chatting` 與 `tg-chat-locked` 照常生效。
+
+## ⚠⚠ 後續：手機版 header 跑到畫面中間（2026-11-23）
+
+> 需求方：「我現在手機版的 Telegram 聊天視窗的 header 跑下來了。」
+> 截圖：聊天 header（返回鍵、群組名、刪除對話）出現在畫面中間，
+> **上面還露出一行訊息**。確認是「一進去就這樣、沒滑過」，Safari 瀏覽器。
+
+### 成因：sticky 的捲動容器與它的 fixed 父層對不上
+
+`#tg-header` 有一條全域的 `position: sticky; top: 0`（給桌機用的）。
+而手機版的聊天區 `.app-inner-layout__content` 是 **`position: fixed`**。
+
+| | 參考的是誰 |
+|---|---|
+| sticky 的位移計算 | 最近的**捲動容器** = `.app-main__inner`（`overflow-y: auto`） |
+| header 的 containing block | **fixed 父層**（相對 viewport，不跟著捲） |
+
+兩者對不上時，瀏覽器會把 header 往下推一段「它以為被捲掉的距離」——
+聊天區本身不動，於是 header 卡在中間，空出來的地方露出底下的訊息。
+
+### 修法：手機版讓它 static
+
+```css
+@media (max-width: 767.98px) {
+    .chat-layout.tg-chatting #tg-header { position: static !important; }
+}
+```
+
+⚠ 手機版**根本不需要 sticky**：聊天區是 fixed ＋ flex column，
+header 是第一個子元素，本來就固定在最上面。
+
+⚠ **桌機維持 sticky 不動** —— 那裡捲的確實是 `.app-main__inner`，
+而聊天區不是 fixed，兩者一致。已確認桌機的 computed style 仍是 sticky。
+
+### ⚠ 本機重現不出來，這是推論
+
+`.app-main__inner` 在本機的捲動量是 0（而且前一次修正把 wrapper 壓成
+0 高之後更難製造），所以**沒有在本機看到 header 真的跑掉**。
+上面那段是從「sticky ＋ fixed 父層 ＋ 另一個捲動容器」這個結構推出來的，
+修法本身則是確定安全的（手機版那個 sticky 本來就是多餘的）。
+
+⚠ **要請需求方在手機上確認**。如果還是會跑，下一個要查的是
+`.app-main__inner` 的捲動量 —— 手機版對話是滿版 fixed，
+那個容器的捲動對它沒有意義，可以考慮在 `tg-chatting` 時一起鎖住。
