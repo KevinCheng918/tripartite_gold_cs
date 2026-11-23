@@ -535,10 +535,24 @@ class TelegramChatService
         $replyToSender = null;
         $replyToText = null;
         Log::info('Telegram 訊息收到', ['has_reply' => isset($message['reply_to_message']), 'msg_id' => $telegramMessageId]);
+        /*
+         * 客人引用的那一則**是不是我方發的**。
+         *
+         * ⚠ 人工回覆與自動回覆都是透過同一支 Bot 送出去的，所以
+         * 「`from.id` ＝ 目前這支 Bot」就代表客人指著的是我方的話。
+         *
+         * ⚠ 要用 `getBotId()` 而不是設定檔裡的預設 token —— 上面
+         * `switchBotToken()` 已經切到這個群組所屬的 Bot 了，拿預設的比
+         * 會讓非預設 Bot 的群組全部判成「不是我方的」。
+         */
+        $replyToOurs = false;
+
         if (isset($message['reply_to_message'])) {
             $replyMsg = $message['reply_to_message'];
             $replyToSender = $this->buildSenderName($replyMsg['from'] ?? []);
             $replyToText = $replyMsg['text'] ?? ($replyMsg['caption'] ?? '');
+            $replyToOurs = filled($this->botService->getBotId())
+                && (string) Arr::get($replyMsg, 'from.id') === (string) $this->botService->getBotId();
             // 截取前 200 字元
             if (mb_strlen($replyToText) > 200) {
                 $replyToText = mb_substr($replyToText, 0, 200) . '...';
@@ -643,7 +657,29 @@ class TelegramChatService
              * 這段才有意義的前提是真的有佇列。
              */
             $delay = (int) config('auto_reply.burst_delay');
-            $job = AutoReplyJob::dispatch($group->id, $autoReplyText, $msg->id);
+
+            /*
+             * ⚠⚠ **客人引用的那一則要跟著送進去。**
+             *
+             * 2026-11-23 線上實例：13:11 同仁主動問「超商通道設定上還順利嗎」，
+             * 客人 **23:52** 引用那一則回「明天設定」—— 小幫手回了
+             * 「這部分已經請專員為您確認」。
+             *
+             * 原因不是模型笨，是**它什麼都沒看到**：脈絡只撈 15 分鐘內
+             * （`auto_reply.context.minutes`），隔了 11 小時的那則問話
+             * 根本不在裡面，模型手上就只有「明天設定」四個字。
+             *
+             * 而客人其實已經明確指著我們那一則了 —— 這段文字我們一直有存
+             * （`reply_to_text`），只是從來沒送給模型。
+             *
+             * ⚠ 引用**不受 15 分鐘限制**：客人指著哪一則，那一則就是他的
+             * 上下文，隔多久都一樣。
+             */
+            $job = AutoReplyJob::dispatch($group->id, $autoReplyText, $msg->id, [
+                'text'   => (string) $replyToText,
+                'sender' => (string) $replyToSender,
+                'ours'   => $replyToOurs,
+            ]);
 
             if ($delay > 0) {
                 $job->delay(now()->addSeconds($delay));

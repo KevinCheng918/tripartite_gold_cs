@@ -96,12 +96,13 @@ class AutoReplyService
     /**
      * 處理一則客人訊息
      *
-     * @param int         $groupId
-     * @param string      $text      客人的話
-     * @param int|null    $messageId 客人那則訊息的後台 id（開求助單用）
+     * @param int      $groupId
+     * @param string   $text      客人的話
+     * @param int|null $messageId 客人那則訊息的後台 id（開求助單用）
+     * @param array    $quote     他引用的那一則 {text: string, sender: string, ours: bool}
      * @return void
      */
-    public function handle($groupId, $text, $messageId = null)
+    public function handle($groupId, $text, $messageId = null, array $quote = [])
     {
         $group = $this->telegramRepository->findGroup($groupId);
 
@@ -134,7 +135,10 @@ class AutoReplyService
 
         // 脈絡取「這一輪之前」的 —— 這一輪的已經合併進 $question 了，
         // 再放進脈絡只是同樣的內容送兩次
-        $history = $this->buildHistory($group->id, $messageId, $run->pluck('id')->all());
+        $history = $this->withQuote(
+            $this->buildHistory($group->id, $messageId, $run->pluck('id')->all()),
+            $quote
+        );
 
         /*
          * ⚠ **開單紀錄要擋在題庫比對之前。**
@@ -341,6 +345,60 @@ class AutoReplyService
         }
 
         return $this->trimHistory($lines);
+    }
+
+    /**
+     * 把客人引用的那一則接到脈絡最前面
+     *
+     * ⚠⚠ **這一則不受 `auto_reply.context.minutes` 限制，是刻意的。**
+     *
+     * 2026-11-23 線上實例：13:11 同仁主動問「超商通道設定上還順利嗎」，
+     * 客人 **23:52** 引用那一則回「明天設定」—— 小幫手回了
+     * 「這部分已經請專員為您確認」，整個答非所問。
+     *
+     * 原因不是模型笨，是**它什麼都沒看到**：脈絡只撈 15 分鐘內，
+     * 隔了 11 小時的那則問話根本不在裡面，模型手上就只有
+     * 「明天設定」四個字 —— 不可能判斷得出那是在回答我們。
+     * 而客人其實已經明確指著我們那一則了。
+     *
+     * 客人指著哪一則，那一則就是他的上下文，**隔多久都一樣**。
+     *
+     * ⚠ 已經在脈絡裡的就不要再貼一次（他引用的是幾分鐘前那則時會重複）。
+     *
+     * @param array<int, string> $history
+     * @param array              $quote text / sender / ours
+     * @return array<int, string>
+     */
+    private function withQuote(array $history, array $quote)
+    {
+        $text = trim((string) Arr::get($quote, 'text'));
+
+        if (blank($text)) {
+            return $history;
+        }
+
+        foreach ($history as $line) {
+            if (mb_strpos($line, $text) !== false) {
+                return $history;
+            }
+        }
+
+        /*
+         * ⚠ **「這是我方說的」要講出來。** 只貼內容的話模型仍得自己猜
+         * 那句話是誰說的 —— 而「客人在回答我方的提問」與「客人在追問
+         * 另一個客人說的話」，該給的反應完全不同。
+         */
+        $who = (bool) Arr::get($quote, 'ours')
+            ? '我方'
+            : trim('客人 ' . (string) Arr::get($quote, 'sender'));
+
+        // 換行壓成空白，一則佔一行（同 buildHistory 的理由）
+        array_unshift(
+            $history,
+            "（客人這一則是在回覆下面這一則）{$who}：" . preg_replace('/\s+/u', ' ', $text)
+        );
+
+        return $history;
     }
 
     /**

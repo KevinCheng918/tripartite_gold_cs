@@ -42,15 +42,28 @@ class AutoReplyJob implements ShouldQueue
     protected $messageId;
 
     /**
+     * 客人引用的那一則（他指著哪一句在講話）
+     *
+     * ⚠ **不從 DB 撈、要用傳的**：是不是我方發的，只有 webhook 那一刻
+     * 比得出來（`reply_to_message.from.id` 對上目前這支 Bot），
+     * 存進 `telegram_message` 的只有引用的文字與暱稱。
+     *
+     * @var array{text: string, sender: string, ours: bool}
+     */
+    protected $quote;
+
+    /**
      * @param int      $groupId
      * @param string   $text
      * @param int|null $messageId
+     * @param array    $quote text / sender / ours
      */
-    public function __construct($groupId, $text, $messageId = null)
+    public function __construct($groupId, $text, $messageId = null, array $quote = [])
     {
         $this->groupId = $groupId;
         $this->text = $text;
         $this->messageId = $messageId;
+        $this->quote = $quote;
     }
 
     /**
@@ -81,7 +94,17 @@ class AutoReplyJob implements ShouldQueue
         $progressService->start($this->groupId);
 
         try {
-            $autoReplyService->handle($this->groupId, $this->text, $this->messageId);
+            $autoReplyService->handle(
+                $this->groupId,
+                $this->text,
+                $this->messageId,
+                /*
+                 * ⚠ 舊版派進佇列的 Job 沒有這個屬性，反序列化之後會是 null ——
+                 * 升版的那一刻佇列裡還有在飛的 Job，不轉成陣列會丟
+                 * 「Argument must be of type array, null given」。
+                 */
+                (array) $this->quote
+            );
         } finally {
             // 不管成功、失敗、丟例外都要收掉 —— 少了 finally，
             // Claude 一失敗畫面就會卡在「AI 回覆中」直到 TTL 過期
