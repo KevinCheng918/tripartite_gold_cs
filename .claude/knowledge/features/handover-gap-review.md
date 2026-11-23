@@ -533,3 +533,154 @@ callback。
 
 ⚠ 查過了，**其他功能沒有同一個毛病**（`RESULT_GONE`／`NOT_OWNER`
 這兩個 key 只有這一支在用）。
+
+---
+
+## v4.05：他補上的內容要被接住，而且要催到補完
+
+> 需求方 2026-11-23：「這邊有補在最後一句了，但是 AI 沒回了，
+> 是回覆錯地方嗎，還是什麼問題。」
+> →「**應該是都要回話，有區分話題了，人工沒回錯的話，
+> 系統不應該回錯才對。**」
+
+### ⚠⚠ 在這之前整條線是斷的
+
+```
+系統：「@他 麻煩把交代的內容補一句在這個話題」
+他：  「4.若水跟DM:APK目前使用狀態是否有問題」
+系統： （一片安靜）
+```
+
+`shift_handover_gap` 只記了「他**說**要補」，**沒記他補了什麼，
+也不知道他到底補了沒**。所以：
+
+- 他補完之後話題一片安靜 —— 看起來像壞掉（需求方就是這樣回報的）
+- ⚠⚠ **答了「有，我補上」卻忘記補，沒有任何人會發現** ——
+  而那正是這個功能本身要解決的那種事
+
+那時我回答「那個話題裡機器人是刻意不回話的」—— 講得不完整。
+`AutoReplySupportService::handleSupportMessage()` 的 `isTicketTopic()`
+是 2026-11-11 為了擋「交接訊息的 message_id 撞到舊求助單」加的，
+但**那個洞靠話題判斷本身就堵住了**；現在的結果是
+「因為它不是求助單，所以什麼都不做」，而交接話題有自己該做的事。
+
+### 怎麼認出「這句話是在補哪一題」
+
+需求方選的是「**引用盤點訊息才算**」：
+
+| 他引用的 | 對應到 |
+|---|---|
+| 某一題 | 那一題（`shift_handover_gap.ask_message_id`） |
+| 開場／總結 | 這一輪**第一個「說要補但還沒補」**的題目 |
+| 其他（交接事項本身、同仁討論） | **不處理**，照常往下走 |
+
+⚠ **不限定引用的話**，話題裡的交接事項、下一班的交接、同仁之間的討論
+全都會被誤記成某一題的補充。
+
+⚠ **需要 migration**：v4.00 把開場／題目／總結送出去之後，
+回傳的 `message_id` 直接丟掉了 —— 沒存就反查不回來。
+
+```
+shift_handover_gap  + ask_message_id（索引）/ filled_note / filled_at
+                    + remind_count / last_reminded_at
+shift_handover      + review_opening_message_id（索引）
+                    + review_summary_message_id（索引）
+```
+
+⚠⚠ **`status` 與「補了沒」是兩件事，不要互相取代。**
+`status = FILLED` 只代表他**按了**「要補上」；`filled_at` 才是他**真的補了**。
+混在一起的話「答應了卻忘記補」就永遠問不出來。
+（`ShiftHandoverGap::needsFill()` 問的正是兩者的差集。）
+
+### 催到補完為止（需求方選的）
+
+⚠⚠ **這跟「漏項只問一次」不衝突** —— 兩者問的是不同的事：
+
+| | 催不催 | 為什麼 |
+|---|---|---|
+| 要不要補（`[要補上]`／`[不用補]`） | **只問一次** | 判斷題，他可能真的覺得不必交接 |
+| 說了要補卻沒補 | **催到補完** | 他已經答應了，這是未完成的事 |
+
+- 間隔 `HANDOVER_REVIEW.REMIND_INTERVAL`（30 分鐘，填 0 不催）
+- 第 `ESCALATE_AT`（3）次起連主管一起 tag，沿用交接本身那套名單
+- 催的那一則**引用那一題**，所以看得出在催什麼
+- ⚠ 文案要寫「第 N 次提醒」：第 3 次被 tag 進來的主管才分得出
+  這是剛發生的，還是已經催很久了
+- ⚠ **不論 tag 不 tag 得到人，`remind_count` 都要推進** ——
+  不推的話這一筆每分鐘都會被重試（求助單、待追蹤、交接本身都踩過）
+
+⚠ **沒有停點**（需求方選的）。要留意的是：離職或長期忘記的人，
+那一筆會一直催下去。第 3 次就會連主管一起 tag，所以會很快浮上檯面，
+但**這仍然是這次改動要觀察的地方**。
+
+### ⚠ 還沒作答的題目不收
+
+他引用了一題、但那一題還沒按按鈕時，回一句請他先按，**不收內容**。
+
+收下去會變成「資料上補好了、畫面上還掛著按鈕在問」——
+兩邊對不起來，下一班看了只會更亂。
+
+### 改了哪些檔
+
+| 檔案 | 動作 |
+|---|---|
+| `database/migrations/…_add_fill_tracking_to_shift_handover_gap_table.php` | 🆕 七個欄位、三個索引 |
+| `app/Models/ShiftHandoverGap.php` | `casts`、🆕 `needsFill()`、關聯帶 `fromShift` |
+| `app/Repositories/ShiftHandoverGapRepository.php` | `COLUMNS` ⚠、`findByAskMessageId()`／`firstUnfilled()`／`getUnfilledDue()`／`appendFilledNote()`／`markReminded()`／`markAskMessageId()` |
+| `app/Repositories/ShiftHandoverRepository.php` | `COLUMNS` ⚠、`findByReviewMessageId()` |
+| `app/Services/ShiftHandoverReviewService.php` | 送出時存 message_id；🆕 `handleTopicReply()`／`gapFor()`／`recordFill()`／`remindUnfilled()`／`remindOne()` |
+| `app/Http/Controllers/Webhook/TelegramWebhookController.php` | 交接話題的引用先給這一支（**會消耗訊息**） |
+| `app/Console/Commands/ShiftHandoverRemindCommand.php` | 多呼叫一支催補（⚠ 兩個總開關要各自判斷） |
+| `config/constants.php` | `REMIND_INTERVAL`／`ESCALATE_AT`／四句文案 |
+
+⚠ **webhook 那一道會消耗訊息**（認得就 `return`），跟 `detect()` 不一樣 ——
+那句話是補交接內容，不是在回答某張求助單，讓它往下走只會被誤判。
+
+⚠ 不會跟求助單搶：求助卡與盤點訊息都在同一個支援群組，
+**message_id 在同一個 chat 裡唯一**，所以反查不可能撞在一起。
+
+### ⚠ 實測抓到：交接人自己就是主管時，第 3 次會 tag 他兩次
+
+```
+第 3 次 → @owner_tg @owner_tg @boss1 @boss2 麻煩引用這一則把內容補上來
+```
+
+`getManagersForMention()` 撈的是 `level <= LEADER` 的人，而**交接的人
+自己就是主管的情況很常見**（小團隊、組長輪班）。修法是
+`withoutOwner()` 先把他剔掉。
+
+⚠ **比 `id` 不比 Telegram 帳號**：帳號可能沒填（那時 `mentionOf()`
+會退成暱稱），比字串會漏掉。
+
+### v4.05 驗證到哪（2026-11-24，migration 跑完後，全程交易內 rollback）
+
+**收補充**
+
+| 情境 | 結果 |
+|---|---|
+| 引用**第 1 題**補內容 | 記到第 1 題、回「收到，已經記到第 1 題底下」、**引用他那一則** |
+| 同一題**再補一次** | **接在後面**（兩句都在），不是蓋掉 |
+| 引用**總結** | 記到第一個還欠著的題目（主管交代那一題），稱呼用固定的「主管／老闆交代事項」而不是空的 `title` |
+| 引用**還沒按按鈕**的題目 | 回「請先按按鈕」，**內容沒有被收走** |
+| 引用**無關的訊息**（別人的交接事項） | 回 `false`、**不回話**（不會吃掉求助單的作答） |
+| 沒有引用／有引用但沒文字 | 回 `false` |
+
+⓪ 先確認 `COLUMNS` 讀得回新欄位 —— 這個專案踩過四次的坑。
+
+**催補**（5 筆，間隔 30 分、第 3 次帶主管）
+
+| 筆 | 狀態 | 該催嗎 | 結果 |
+|---|---|---|---|
+| A | 要補、沒補、沒催過 | ✅ | 催了，第 1 次 |
+| B | 要補、**已經補了** | ❌ | 沒催，`remind_count` 沒動 |
+| C | **不用補** | ❌ | 沒催 |
+| D | 要補、**25 分鐘前剛催過** | ❌ | 沒催 |
+| E | 要補、催過 2 次且已到期 | ✅ | 催了，**第 3 次**、帶主管 |
+
+- 催的那一則**引用那一題**（`ask_message_id`）
+- 馬上再跑一次 → **0 筆**（間隔擋住了）
+- 第 2 次**不帶**主管、第 3 次帶，且交接人自己不重複
+
+**端到端**：`review()` 存下開場與題目的 message_id → 答「有，我補上」
+存下總結的 message_id → 引用總結補內容 → `needsFill()` 從 yes 變 no
+→ 不再被催。

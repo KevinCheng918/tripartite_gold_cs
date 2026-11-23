@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\ShiftHandoverReviewService;
 use App\Services\ShiftHandoverService;
 use Illuminate\Console\Command;
 
@@ -31,23 +32,34 @@ class ShiftHandoverRemindCommand extends Command
      * @param ShiftHandoverService $handoverService
      * @return int
      */
-    public function handle(ShiftHandoverService $handoverService)
+    public function handle(ShiftHandoverService $handoverService, ShiftHandoverReviewService $reviewService)
     {
-        if (!$handoverService->isEnabled()) {
-            $this->warn('交接提醒未啟用（通知設定頁可關閉／開啟）');
-
-            return 0;
+        /*
+         * ⚠⚠ **兩件事要各自判斷、不要一起短路。**
+         *
+         * 「交接提醒」與「漏項補充催促」有**各自的總開關**
+         * （`SHIFT_HANDOVER_TOPIC` vs `HANDOVER_REVIEW.ENABLED`），
+         * 共用一個 `return` 會讓關掉其中一個把另一個也關掉 ——
+         * 而那不會報錯，只會安靜地不動作。
+         */
+        if ($handoverService->isEnabled() && filled($handoverService->topicIds())) {
+            $count = $handoverService->run();
+            $this->info("已送出 {$count} 則交接訊息");
+        } else {
+            $this->warn('交接提醒未啟用，或還沒在「通知設定 → 話題分流」勾交接話題');
         }
 
-        if (blank($handoverService->topicIds())) {
-            $this->error('還沒在「通知設定 → 話題分流」勾交接話題，功能不會動作');
+        /*
+         * 說了「要補上」卻還沒補的，催一輪（需求方 2026-11-23 選「催到補完」）。
+         *
+         * ⚠ 這一支自己會短路（總開關、間隔設 0、沒有到期的項目都直接回 0），
+         * 所以每分鐘呼叫的成本是一次設定讀取。
+         */
+        $filled = $reviewService->remindUnfilled();
 
-            return 0;
+        if ($filled > 0) {
+            $this->info("已催 {$filled} 筆交接補充");
         }
-
-        $count = $handoverService->run();
-
-        $this->info("已送出 {$count} 則交接訊息");
 
         return 0;
     }

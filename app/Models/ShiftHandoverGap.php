@@ -38,6 +38,10 @@ class ShiftHandoverGap extends Model
         'covered'           => 'boolean',
         'status'            => 'integer',
         'seq'               => 'integer',
+        'ask_message_id'    => 'integer',
+        'filled_at'         => 'datetime',
+        'remind_count'      => 'integer',
+        'last_reminded_at'  => 'datetime',
     ];
 
     /**
@@ -47,8 +51,13 @@ class ShiftHandoverGap extends Model
      */
     public function handover(): BelongsTo
     {
+        /*
+         * ⚠ 要帶 `fromShift`：催補與確認的文案都要印班別名稱
+         * （`shiftName()`），少了這行每一筆都會各查一次班別。
+         */
         return $this->belongsTo(ShiftHandover::class, 'shift_handover_id')
-            ->select(['id', 'from_shift_id', 'handed_by_user_id', 'handed_by_name', 'handed_message_id']);
+            ->select(['id', 'from_shift_id', 'handed_by_user_id', 'handed_by_name', 'handed_message_id'])
+            ->with('fromShift');
     }
 
     /**
@@ -72,5 +81,21 @@ class ShiftHandoverGap extends Model
     public function isPending()
     {
         return $this->status === (int) config('constants.HANDOVER_REVIEW.STATUS.PENDING');
+    }
+
+    /**
+     * 他說要補、但還沒真的補
+     *
+     * ⚠⚠ **`status` 與「補了沒」是兩件事，不要互相取代。**
+     * `FILLED` 只代表他**按了**「要補上」；`filled_at` 才是他**真的補了**。
+     * 混在一起的話，「答應了卻忘記補」就永遠問不出來 ——
+     * 而那正是這個功能最該抓到的事。
+     *
+     * @return bool
+     */
+    public function needsFill()
+    {
+        return $this->status === (int) config('constants.HANDOVER_REVIEW.STATUS.FILLED')
+            && blank($this->filled_at);
     }
 }

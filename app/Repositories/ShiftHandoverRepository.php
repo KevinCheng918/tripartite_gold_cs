@@ -13,9 +13,14 @@ use Illuminate\Database\Eloquent\Collection;
 class ShiftHandoverRepository
 {
     /** @var array 欄位 */
+    /*
+     * ⚠⚠ **新增欄位時這裡一定要跟著加**（漏加不報錯，那一欄會永遠是 null）。
+     * 這個專案已經踩過四次，見 `ShiftHandoverGapRepository::COLUMNS` 的註解。
+     */
     private const COLUMNS = [
         'id', 'date', 'from_shift_id', 'to_shift_id', 'window_start', 'window_end',
         'handed_at', 'handed_by_user_id', 'handed_by_name', 'handed_message_id',
+        'review_opening_message_id', 'review_summary_message_id',
         'remind_count', 'last_reminded_at', 'notified_next_at', 'status',
     ];
 
@@ -44,6 +49,34 @@ class ShiftHandoverRepository
      * @param int $id
      * @return ShiftHandover|null
      */
+    /**
+     * 用「漏項盤點的開場或總結訊息」反查
+     *
+     * 同仁引用那兩則來補交代事項時用的 —— 它們不屬於任何一題，
+     * 所以只能反查到整次交接，再由呼叫端挑「第一個還欠著的」。
+     *
+     * ⚠ 兩欄都要比：需求方最自然的動作是引用**總結**那一則，
+     * 但引用開場也該認得。
+     *
+     * @param int $messageId Telegram 的 message_id
+     * @return ShiftHandover|null
+     */
+    public function findByReviewMessageId($messageId)
+    {
+        if ((int) $messageId < 1) {
+            return null;
+        }
+
+        return ShiftHandover::query()
+            ->select(self::COLUMNS)
+            ->with('fromShift')
+            ->where(function ($query) use ($messageId) {
+                $query->where('review_opening_message_id', (int) $messageId)
+                    ->orWhere('review_summary_message_id', (int) $messageId);
+            })
+            ->first();
+    }
+
     public function find($id)
     {
         return ShiftHandover::query()

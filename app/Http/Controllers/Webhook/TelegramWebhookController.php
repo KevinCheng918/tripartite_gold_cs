@@ -155,6 +155,22 @@ class TelegramWebhookController extends Controller
                 $this->handoverService->detect($payload);
 
                 /*
+                 * 同仁引用漏項盤點那幾則訊息發言 ＝ 他在補那一題的內容
+                 * （需求方 2026-11-23：「應該是都要回話，有區分話題了，
+                 * 人工沒回錯的話，系統不應該回錯才對」）。
+                 *
+                 * ⚠ **這一支會消耗訊息**（認得就 return），跟上面那支不一樣
+                 * —— 那句話是補交接內容，不是在回答某張求助單，
+                 * 讓它繼續往下走只會被誤判。
+                 *
+                 * ⚠ 擺在求助單之前：它自己會先用「引用的那則認不認得」
+                 * 過濾，認不得就立刻回 false，成本是一次索引查詢。
+                 */
+                if ($this->handoverReviewService->handleTopicReply($payload)) {
+                    return response()->json(['ok' => true]);
+                }
+
+                /*
                  * 匯率報價與求助單都靠「引用回覆」運作，所以要先問匯率那邊
                  * 認不認得被引用的那則訊息。認得就由它處理完直接結束，
                  * 不認得才往求助單走。

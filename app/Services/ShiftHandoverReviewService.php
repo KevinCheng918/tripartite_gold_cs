@@ -379,6 +379,325 @@ class ShiftHandoverReviewService
     }
 
     // ---------------------------------------------------------------
+    //  他在話題裡補上內容
+    // ---------------------------------------------------------------
+
+    /**
+     * 同仁引用盤點訊息發言 ＝ 他在補那一題的內容
+     *
+     * > 需求方 2026-11-23：「這邊有補在最後一句了，但是 AI 沒回了，
+     * > 是回覆錯地方嗎，還是什麼問題。」
+     * > →「應該是都要回話，有區分話題了，人工沒回錯的話，
+     * > 系統不應該回錯才對。」
+     *
+     * ⚠⚠ **在這之前整條線是斷的**：答完「有，我補上」之後，他補的那句話
+     * 沒有被任何地方接住 —— 系統不知道他補了什麼，也不知道他補了沒。
+     *
+     * ⚠ **只認「引用盤點訊息」**（需求方選的）：話題裡還有交接事項本身、
+     * 下一班的交接、同仁之間的討論 —— 不限定引用的話，那些全都會被
+     * 誤記成某一題的補充。
+     *
+     * @param array $payload Telegram Update
+     * @return bool 這則訊息被當成補充處理掉了嗎（true ＝ 不要再往下走）
+     */
+    public function handleTopicReply($payload)
+    {
+        // 短路：設定層先判，連 payload 都不必拆
+        if (!$this->isEnabled()) {
+            return false;
+        }
+
+        $message = (array) Arr::get($payload, 'message', []);
+        $quotedId = (int) Arr::get($message, 'reply_to_message.message_id', 0);
+        $note = trim((string) Arr::get($message, 'text', ''));
+
+        /*
+         * ⚠ 話題群組裡**每一則訊息都帶 `reply_to_message`**（指向話題的
+         * 建立訊息），所以光有引用不代表什麼 —— 真正的過濾是下面那兩次反查。
+         * 這裡先擋掉沒有引用、沒有文字的，省掉查詢。
+         */
+        if ($quotedId < 1 || blank($note)) {
+            return false;
+        }
+
+        $gap = $this->gapFor($quotedId);
+
+        if (blank($gap)) {
+            return false;
+        }
+
+        return $this->recordFill($gap, $note, $message);
+    }
+
+    /**
+     * 他引用的那一則對應到哪一題
+     *
+     * 兩種引用都要認：
+     *
+     * | 他引用的 | 對應到 |
+     * |---|---|
+     * | 某一題 | 那一題 |
+     * | 開場／總結 | 這一輪**第一個「說要補但還沒補」**的題目 |
+     *
+     * ⚠ 開場與總結不屬於任何一題，所以只能挑一個 —— 挑最早欠著的那個，
+     * 因為總結列出來的順序就是那樣，他多半是照著順序補。
+     *
+     * @param int $quotedId
+     * @return ShiftHandoverGap|null
+     */
+    private function gapFor($quotedId)
+    {
+        $gap = $this->gapRepository->findByAskMessageId($quotedId);
+
+        if (filled($gap)) {
+            return $gap;
+        }
+
+        $handover = $this->handoverRepository->findByReviewMessageId($quotedId);
+
+        if (blank($handover)) {
+            return null;
+        }
+
+        return $this->gapRepository->firstUnfilled((int) $handover->id);
+    }
+
+    /**
+     * 記下他補的內容，並回他一句
+     *
+     * @param ShiftHandoverGap $gap
+     * @param string           $note
+     * @param array            $message Telegram message（要引用他那一則回覆）
+     * @return bool
+     */
+    private function recordFill(ShiftHandoverGap $gap, $note, array $message)
+    {
+        /*
+         * ⚠ **還沒作答的題目不要收。** 那一題的訊息還掛著按鈕，
+         * 收下去會變成「資料上補好了，但畫面上還在問」——
+         * 兩邊對不起來，下一班看了只會更亂。請他先按按鈕。
+         */
+        if ($gap->isPending()) {
+            $this->replyInTopic($message, $this->text('FILL_NOT_ANSWERED'));
+
+            return true;
+        }
+
+        $this->gapRepository->appendFilledNote($gap, $note);
+
+        Log::info('交接漏項收到補充內容', [
+            'handover_id' => $gap->shift_handover_id,
+            'seq'         => $gap->seq,
+            'chars'       => mb_strlen($note),
+        ]);
+
+        $this->replyInTopic($message, strtr($this->text('FILL_RECEIVED'), [
+            '{seq}'   => (int) $gap->seq,
+            '{title}' => $this->gapLabel($gap),
+        ]));
+
+        return true;
+    }
+
+    /**
+     * 這一題在回覆裡怎麼稱呼
+     *
+     * ⚠ 主管交代那一題的 `title` 是空的（它不是從任何一張表撈出來的），
+     * 直接印會變成「已記到『』底下」。
+     *
+     * @param ShiftHandoverGap $gap
+     * @return string
+     */
+    private function gapLabel(ShiftHandoverGap $gap)
+    {
+        if ($gap->isManagerAsk()) {
+            return $this->text('MANAGER_LABEL');
+        }
+
+        return (string) $gap->title;
+    }
+
+    /**
+     * 在交接話題回一句，並引用他那一則
+     *
+     * ⚠ **一定要引用**：話題裡同時有好幾題、好幾班的交接，
+     * 不引用就看不出這句「收到」是在回應哪一句補充。
+     *
+     * @param array  $message
+     * @param string $text
+     * @return void
+     */
+    private function replyInTopic(array $message, $text)
+    {
+        $this->supportGroup->send(
+            $text,
+            null,
+            (int) Arr::get($message, 'message_id', 0),
+            self::NOTICE_TYPE
+        );
+    }
+
+    // ---------------------------------------------------------------
+    //  催他補
+    // ---------------------------------------------------------------
+
+    /**
+     * 說了要補卻還沒補的，催一輪
+     *
+     * > 需求方 2026-11-23 選的是「**催到補完為止**」。
+     *
+     * ⚠⚠ 這跟「漏項只問一次」不衝突，兩者問的是不同的事：
+     *
+     * | | 催不催 | 為什麼 |
+     * |---|---|---|
+     * | 要不要補（`[要補上]`／`[不用補]`） | **只問一次** | 判斷題，他可能真的覺得不必交接 |
+     * | 說了要補卻沒補 | **催到補完** | 他已經答應了，這是未完成的事 |
+     *
+     * ⚠ 第 N 次起連主管一起 tag（沿用交接本身那套 `ESCALATE_AT`）。
+     *
+     * @return int 這一輪催了幾筆
+     */
+    public function remindUnfilled()
+    {
+        // 短路：設定層先判，不必碰 DB
+        if (!$this->isEnabled()) {
+            return 0;
+        }
+
+        $interval = (int) config('constants.HANDOVER_REVIEW.REMIND_INTERVAL');
+
+        if ($interval < 1) {
+            return 0;
+        }
+
+        $due = $this->gapRepository->getUnfilledDue($interval);
+
+        if (blank($due)) {
+            return 0;
+        }
+
+        $escalateAt = (int) config('constants.HANDOVER_REVIEW.ESCALATE_AT');
+        // ⚠ 主管名單整輪只查一次 —— 逐筆查就是 N 倍查詢
+        $managers = $this->userRepository->getManagersForMention();
+        $sent = 0;
+
+        foreach ($due as $gap) {
+            if ($this->remindOne($gap, $escalateAt, $managers)) {
+                $sent++;
+            }
+        }
+
+        return $sent;
+    }
+
+    /**
+     * 催一筆
+     *
+     * ⚠ **不論 tag 不 tag 得到人，`remind_count` 都要往前推進** ——
+     * 不推的話這一筆每分鐘都會被重試（求助單、待追蹤、交接本身都踩過）。
+     *
+     * @param ShiftHandoverGap $gap
+     * @param int              $escalateAt
+     * @param \Illuminate\Support\Collection $managers
+     * @return bool
+     */
+    private function remindOne(ShiftHandoverGap $gap, $escalateAt, $managers)
+    {
+        $handover = $gap->handover;
+
+        if (blank($handover)) {
+            // 交接紀錄被刪了，這一筆催不出意義 —— 直接收掉，不要每分鐘重試
+            $this->gapRepository->markReminded($gap, (int) $gap->remind_count + 1);
+            Log::warning('交接漏項要催補，但交接紀錄不見了', ['gap_id' => $gap->id]);
+
+            return false;
+        }
+
+        $seq = (int) $gap->remind_count + 1;
+        $mention = $this->mentionOf($handover);
+
+        // 催到第 N 次還沒補，連主管一起 tag
+        if ($seq >= $escalateAt) {
+            $others = $this->withoutOwner($managers, $handover);
+
+            if (filled($others)) {
+                $mention .= ' ' . $this->buildMentions($others);
+            }
+        }
+
+        $this->supportGroup->send(
+            strtr($this->text('FILL_REMIND'), [
+                '{mention}' => $mention,
+                '{from}'    => $this->shiftName($handover),
+                '{seq}'     => (int) $gap->seq,
+                '{title}'   => $this->gapLabel($gap),
+                '{times}'   => $seq,
+            ]),
+            null,
+            (int) $gap->ask_message_id > 0
+                ? (int) $gap->ask_message_id
+                : (int) $handover->handed_message_id,
+            self::NOTICE_TYPE
+        );
+
+        $this->gapRepository->markReminded($gap, $seq);
+
+        Log::info('交接漏項催補已送出', [
+            'handover_id' => $handover->id,
+            'seq'         => $gap->seq,
+            'times'       => $seq,
+        ]);
+
+        return true;
+    }
+
+    /**
+     * 主管名單裡把交接人自己剔掉
+     *
+     * ⚠⚠ **交接的人自己就是主管的情況很常見**（小團隊、組長輪班）。
+     * 不剔掉的話第 3 次提醒會變成「@他 @他 @別的主管」—— 同一個人
+     * 被 tag 兩次，看起來像系統壞掉。實測就是這樣抓到的。
+     *
+     * ⚠ 比 `id` 不比 Telegram 帳號：帳號可能沒填（那時
+     * `mentionOf()` 會退成暱稱），比字串會漏掉。
+     *
+     * @param \Illuminate\Support\Collection $managers
+     * @param ShiftHandover                  $handover
+     * @return \Illuminate\Support\Collection
+     */
+    private function withoutOwner($managers, ShiftHandover $handover)
+    {
+        $owner = $this->ownerOf($handover);
+
+        if (blank($owner)) {
+            return $managers;
+        }
+
+        $ownerId = (int) $owner->id;
+
+        return $managers->filter(function ($user) use ($ownerId) {
+            return (int) $user->id !== $ownerId;
+        })->values();
+    }
+
+    /**
+     * 把主管名單組成 mention
+     *
+     * ⚠ 用 `mentionLine()`（吃 username 陣列）—— 它自己會處理
+     * `@` 前綴與空值。`getManagersForMention()` 已經濾掉沒填帳號的，
+     * 所以這裡不必再濾一次。
+     *
+     * @param \Illuminate\Support\Collection $users
+     * @return string
+     */
+    private function buildMentions($users)
+    {
+        return (string) TelegramUsernamePresenter::mentionLine(
+            $users->pluck('telegram_username')->all()
+        );
+    }
+
+    // ---------------------------------------------------------------
     //  蒐集候選
     // ---------------------------------------------------------------
 
@@ -815,7 +1134,18 @@ class ShiftHandoverReviewService
             self::NOTICE_TYPE
         );
 
-        if (filled(Arr::get((array) $result, 'result'))) {
+        $messageId = (int) Arr::get((array) $result, 'result.message_id');
+
+        if ($messageId > 0) {
+            /*
+             * ⚠ **要把 message_id 留下來。** 同仁補交代事項時最自然的動作
+             * 是引用開場或總結那一則（需求方 2026-11-23 的截圖就是這樣）——
+             * 沒存就認不出那句話是在補什麼，只能當成閒聊丟掉。
+             */
+            $this->handoverRepository->update($handover, [
+                'review_opening_message_id' => $messageId,
+            ]);
+
             return true;
         }
 
@@ -916,7 +1246,12 @@ class ShiftHandoverReviewService
             self::NOTICE_TYPE
         );
 
-        if (filled(Arr::get((array) $result, 'result'))) {
+        $messageId = (int) Arr::get((array) $result, 'result.message_id');
+
+        if ($messageId > 0) {
+            // 引用這一題來補內容時要反查得到（理由同 `sendOpening()`）
+            $this->gapRepository->markAskMessageId((int) $gap->id, $messageId);
+
             return true;
         }
 
@@ -1151,7 +1486,14 @@ class ShiftHandoverReviewService
             self::NOTICE_TYPE
         );
 
-        if (filled(Arr::get((array) $result, 'result'))) {
+        $messageId = (int) Arr::get((array) $result, 'result.message_id');
+
+        if ($messageId > 0) {
+            // 引用總結來補內容是最常見的動作（理由同 `sendOpening()`）
+            $this->handoverRepository->update($handover, [
+                'review_summary_message_id' => $messageId,
+            ]);
+
             return true;
         }
 
