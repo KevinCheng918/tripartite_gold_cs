@@ -26,7 +26,15 @@ class KickRequest extends FormRequest
                 'required',
                 'integer',
                 'exists:user,id',
-                'different:' . Auth::id(),
+                /*
+                 * ⚠⚠ **不能用 `different:`** —— 那一條比的是「跟**另一個欄位**
+                 * 的值不同」，`different:5` 會去找名為 `5` 的欄位，找不到就
+                 * **直接通過**。第一版這樣寫，結果踢自己完全沒被擋
+                 * （實測時真的把自己踢下線了）。
+                 *
+                 * `not_in:` 比的才是值。
+                 */
+                'not_in:' . Auth::id(),
             ],
         ];
     }
@@ -34,9 +42,9 @@ class KickRequest extends FormRequest
     public function messages()
     {
         return [
-            'user_id.required'  => trans('account.msg.not_found'),
-            'user_id.exists'    => trans('account.msg.not_found'),
-            'user_id.different' => trans('account.msg.kick_self'),
+            'user_id.required' => trans('account.msg.not_found'),
+            'user_id.exists'   => trans('account.msg.not_found'),
+            'user_id.not_in'   => trans('account.msg.kick_self'),
         ];
     }
 }

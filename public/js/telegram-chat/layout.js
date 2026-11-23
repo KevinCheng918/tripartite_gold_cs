@@ -64,6 +64,20 @@
 
         if (chatLayout) { chatLayout.classList.toggle('tg-chatting', chatting); }
 
+        /*
+         * ⚠ **鎖住 body 之前先捲回頂端。**
+         *
+         * iOS Safari 上，頁面已經捲動過再把 `body` 設成 `overflow: hidden`
+         * 時，`position: fixed` 的元素會跟著那段捲動量一起偏移。
+         * 捲回 0 再鎖就不會有偏移量 —— 聊天區本來就是滿版的，
+         * 頁面捲到哪裡對它沒有意義。
+         *
+         * ⚠ 這**不是** 2026-11-23「header 跑到畫面中間」那個回報的成因
+         * （需求方確認是「一進去就這樣、沒滑過」）—— 那個還在查。
+         * 這一行是順手補上的防禦，不要因為問題還在就把它拿掉。
+         */
+        if (chatting) { window.scrollTo(0, 0); }
+
         document.body.classList.toggle('tg-chat-locked', chatting);
 
         if (chatting) { closeMobileSidebar(); }

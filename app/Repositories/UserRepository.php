@@ -29,7 +29,12 @@ class UserRepository
      * 少了 `work_mode`，`isFixedWorkMode()` 會安靜地一律回 false ——
      * 固定班的人打卡又變回「什麼都算不出來」，而且不會有任何錯誤。
      */
-    private const LIST_COLUMNS = ['id', 'account', 'nickname', 'telegram_nickname', 'telegram_username', 'telegram_user_id', 'telegram_dm_ready', 'status', 'level', 'project_ids', 'hired_at', 'equipments', 'created_at', 'work_mode', 'work_start_time', 'work_end_time', 'work_days', 'show_in_shift'];
+    /*
+     * ⚠ **新增欄位時這裡要一起加**。`find()` 走 `select(LIST_COLUMNS)`，
+     * 漏掉的欄位讀回來永遠是 `null` —— 而且**不會報錯**。
+     * 這個坑在 2026-11-10（`ask_chat_id`）與 11-20（`close_action`）各踩過一次。
+     */
+    private const LIST_COLUMNS = ['id', 'account', 'nickname', 'telegram_nickname', 'telegram_username', 'telegram_user_id', 'telegram_dm_ready', 'status', 'level', 'project_ids', 'hired_at', 'equipments', 'created_at', 'work_mode', 'work_start_time', 'work_end_time', 'work_days', 'show_in_shift', 'session_timeout', 'force_logout_at'];
 
     /**
      * 這一次請求撈過的「可指派成專案負責人的帳號」
