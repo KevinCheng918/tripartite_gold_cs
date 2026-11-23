@@ -145,6 +145,43 @@ class SettingService
     }
 
     /**
+     * 測這台機器上的 CLI 讀不讀得到圖片
+     *
+     * ⚠ 這是圖片判讀功能動工前的技術前提（需求方 2026-11-24）：
+     * 其他幾支 CLI 呼叫都是 `--allowedTools ''`，**從來沒走過給工具那條路**
+     * —— 走不通的話整個功能要換做法（改打 Messages API 傳 base64）。
+     *
+     * ⚠ 沿用憑證測試的形狀（`testCredential()`）：沒設定過就不要去跑 CLI，
+     * 那只會得到一個看不懂的失敗原因。
+     *
+     * @param bool $isFallback true＝用備援 API Key 測
+     * @return array ok／reason／configured／expected／got
+     */
+    public function testImageRead($isFallback = false)
+    {
+        $key = $isFallback
+            ? AppSettingService::KEY_FALLBACK_API_KEY
+            : AppSettingService::KEY_CLAUDE_TOKEN;
+
+        $credential = (string) $this->appSettingService->get($key);
+
+        if (blank($credential)) {
+            return ['ok' => false, 'reason' => null, 'configured' => false, 'expected' => '', 'got' => null];
+        }
+
+        $result = $this->matcher->checkImageRead($credential, $isFallback);
+
+        return [
+            'ok'         => (bool) Arr::get($result, 'ok'),
+            'reason'     => Arr::get($result, 'reason'),
+            'configured' => true,
+            // 前端要印「圖上是 123456、它回了 654321」才看得出是哪一種失敗
+            'expected'   => (string) Arr::get($result, 'expected'),
+            'got'        => Arr::get($result, 'got'),
+        ];
+    }
+
+    /**
      * @return array
      */
     private function claudeSection()

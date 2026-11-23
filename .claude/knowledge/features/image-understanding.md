@@ -216,17 +216,37 @@ prompt 要寫死這一條。
 2. **對話截圖裡出現別的客服說錯的話**，AI 要不要主動標記？
    預設：**這一版不做**，只如實描述。
 
-## ⚠⚠ 動工前要先確認的技術前提
+## ✅ 動工前的兩個技術前提 —— 都解決了（2026-11-24）
 
-1. **`--allowedTools Read` 在 `-p` 非互動模式下會不會被權限擋住。**
-   laradock 容器沒有裝 `claude` CLI，所以**只能在有 CLI 的機器上實測**。
-   不通的話就得改走 Anthropic Messages API 傳 base64 —— 那等於在這個
-   專案裡開第二條呼叫模型的路，**要先問過需求方**。
+### 1. `--allowedTools Read` 在 `-p` 非互動模式下通不通 → **通**
 
-2. **`config/queue.php` 的 `retry_after`（90）。**
-   `AutoReplyJob` 的 `timeout` 已經是 **120 > 90**，佇列會認定卡住而
-   **重派一份**（客人收到兩份答案）。這件事 11-20 就記下來了、還沒改，
-   而這個功能會再加一支會跑模型的 Job —— **只會更容易踩到**。
+做法是在 AI 引擎設定頁加一顆**「測試讀圖」**按鈕（需求方 2026-11-24：
+「一樣在 AI 引擎那邊用一個測試按鈕，如果不通，我再來確認哪一種方案」）。
+
+實測結果：**✓ 讀得到圖**。CLI 真的用 `Read` 開了檔案、
+而且正確回答出圖上那串**當場產生的隨機六位數**。
+
+⚠⚠ **測試圖一定要是當場產生的隨機碼。** 固定的測試圖分辨不出
+「它真的讀了圖」與「它從檔名或前後文猜到的」—— 而那正是要確認的事。
+`ClaudeCodeMatcher::writeCodeImage()` 用 GD 當場畫一張。
+
+⚠⚠ **我一開始判錯了，原因寫在這裡免得再犯：**
+我在 `docker-compose exec workspace` 裡跑，得到 `claude: not found`，
+就寫下「本機驗不到」。但 **workspace 沒有 CLI、php-fpm 有**
+（`/usr/local/bin/claude`，2.1.278）—— 這件事
+[[dev-environment]] 2026-10-11 就記過了，是我沒照著做。
+
+**要驗 AI 那一側，就走 php-fpm（也就是走 HTTP／按設定頁的按鈕），
+不要用 `exec workspace`。**
+
+### 2. `config/queue.php` 的 `retry_after` → **已改**
+
+原本 90，而 `AutoReplyJob`／`FollowupDetectJob` 的 `timeout` 是 120 ——
+佇列會認定卡住而**重派一份**（客人收到兩份答案）。
+2026-11-24 改成 **300**（目前最長的 timeout 是 120，留足餘裕）。
+
+⚠ 之後新增 Job 時，**timeout 不可以超過 300**。
+⚠ 改完要 `php artisan optimize` 並**重啟 queue worker**（常駐程序）。
 
 ---
 

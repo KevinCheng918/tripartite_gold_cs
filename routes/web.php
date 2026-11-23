@@ -234,6 +234,8 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::put('/ajax-update-fallback', [SettingController::class, 'ajaxUpdateFallback'])->middleware('can:setting.manage')->name('ajax-update-fallback');
         // 測試現在存著的憑證。會真的呼叫一次 CLI，所以綁 manage 而不是 view
         Route::post('/ajax-test-credential', [SettingController::class, 'ajaxTestCredential'])->middleware('can:setting.manage')->name('ajax-test-credential');
+        // 圖片判讀的前置測試：這台機器上的 CLI 給不給 Read 工具、讀不讀得懂圖
+        Route::post('/ajax-test-image-read', [SettingController::class, 'ajaxTestImageRead'])->middleware('can:setting.manage')->name('ajax-test-image-read');
     });
 
     // 站台管理

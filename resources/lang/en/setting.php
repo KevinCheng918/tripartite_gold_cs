@@ -61,8 +61,9 @@ return [
 
     'action_save'    => 'Save',
     'action_saving'  => 'Saving...',
-    'action_test'    => 'Test connection',
-    'action_testing' => 'Testing...',
+    'action_test'       => 'Test connection',
+    'action_testing'    => 'Testing...',
+    'action_test_image' => 'Test image reading',
 
     'msg' => [
         // The four outcomes of a connection test
@@ -71,6 +72,13 @@ return [
         'test_failed_reason' => '✗ Not usable: :reason',
         'test_not_set'      => 'No credential configured yet',
         'test_type_invalid' => 'Invalid credential type',
+
+        // Image-reading test. The three failures each mean a different next step.
+        'image_test_ok'     => '✓ Images can be read. Image understanding will work.',
+        'image_test_wrong'  => '✗ Could not read the digits (image showed :expected, it answered ":got") — this machine can open the image but cannot recognise it',
+        'image_test_failed' => '✗ Images cannot be read. Image understanding will not work on this machine.',
+        'image_test_reason' => '✗ Images cannot be read: :reason',
+        'image_test_error'  => 'Image reading test failed to run',
 
         'saved'         => 'Saved',
         'save_failed'   => 'Save failed',

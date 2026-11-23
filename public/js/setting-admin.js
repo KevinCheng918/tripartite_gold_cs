@@ -353,10 +353,90 @@
         });
     }
 
+    /**
+     * 測這台機器讀不讀得到圖片，把結果寫在按鈕旁邊
+     *
+     * ⚠ 結果的三種失敗要分開講，因為它們代表完全不同的下一步：
+     *
+     * | 回來的樣子 | 意思 | 下一步 |
+     * |---|---|---|
+     * | `ok` | 讀得到 | 圖片判讀可以做 |
+     * | `reason` 有值 | CLI 根本沒跑成（工具被擋、沒裝、憑證不對） | 要換做法或修環境 |
+     * | `got` 有值但不含那串數字 | 跑起來了、但認不出圖上的字 | 模型視覺不行 |
+     *
+     * 合成一句「測試失敗」會讓人完全不知道該往哪裡查。
+     *
+     * ⚠ 後端一律回 200（同 `testCredential()`）：讀不到圖不是請求失敗，
+     * 是這支要回答的答案本身。
+     *
+     * @param {HTMLElement} button
+     * @returns {void}
+     */
+    function testImageRead(button) {
+        var type = button.dataset.type;
+        var target = document.getElementById(type + '-image-test-result');
+        var original = button.innerHTML;
+
+        button.disabled = true;
+        button.textContent = i18n.action_testing;
+        target.className = 'text-muted';
+        target.textContent = i18n.action_testing;
+
+        apiFetch('/admin/setting/ajax-test-image-read', {
+            method: 'POST',
+            body: JSON.stringify({ type: type })
+        }).then(function (body) {
+            if (!body.configured) {
+                target.className = 'text-muted';
+                target.textContent = i18n.msg.test_not_set;
+
+                return;
+            }
+
+            if (body.ok) {
+                target.className = 'text-success';
+                target.textContent = i18n.msg.image_test_ok;
+
+                return;
+            }
+
+            target.className = 'text-danger';
+
+            if (body.reason) {
+                target.textContent = i18n.msg.image_test_reason.replace(':reason', body.reason);
+
+                return;
+            }
+
+            // 跑起來了但認不出圖上的字 —— 把兩邊都印出來，一眼看得出差多少
+            if (body.got) {
+                target.textContent = i18n.msg.image_test_wrong
+                    .replace(':expected', body.expected)
+                    .replace(':got', body.got);
+
+                return;
+            }
+
+            target.textContent = i18n.msg.image_test_failed;
+        }).catch(function (body) {
+            target.className = 'text-danger';
+            target.textContent = errorMessage(body, i18n.msg.image_test_failed);
+        }).then(function () {
+            button.disabled = false;
+            button.innerHTML = original;
+        });
+    }
+
     function bindForms() {
         document.querySelectorAll('.js-test-credential').forEach(function (button) {
             button.addEventListener('click', function () {
                 testCredential(button);
+            });
+        });
+
+        document.querySelectorAll('.js-test-image-read').forEach(function (button) {
+            button.addEventListener('click', function () {
+                testImageRead(button);
             });
         });
 

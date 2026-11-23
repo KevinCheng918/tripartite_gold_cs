@@ -85,6 +85,175 @@ class ClaudeCodeMatcher implements AutoReplyMatcher
     }
 
     /**
+     * 測這台機器上的 CLI **讀不讀得到圖片**
+     *
+     * > 這是圖片判讀功能動工前要先確認的事（需求方 2026-11-24：
+     * > 「一樣在 AI 引擎那邊用一個測試按鈕，如果不通，我再來確認哪一種方案」）。
+     *
+     * ⚠⚠ **要測的是「`--allowedTools Read` 在 `-p` 非互動模式會不會被擋」。**
+     * 其他幾支 CLI 呼叫全都是 `--allowedTools ''`（完全不給工具），
+     * 所以這條路從來沒被走過 —— 走不通的話整個圖片判讀都要換做法
+     * （改打 Messages API 傳 base64）。
+     *
+     * ⚠⚠ **一定要用當場產生的隨機碼。** 固定的測試圖沒有辦法分辨
+     * 「它真的讀了圖」與「它從檔名／前後文猜出來」—— 而那正是這次要確認的。
+     *
+     * ⚠ 圖放在 `storage/app/`（CLI 的工作目錄）底下，用相對路徑餵給它；
+     * 不論成功失敗都要刪掉。
+     *
+     * @param string $credential
+     * @param bool   $isFallback true＝用備援 API Key 測
+     * @return array{ok: bool, reason: string|null, expected: string, got: string|null}
+     */
+    public function checkImageRead($credential, $isFallback = false)
+    {
+        if (blank($credential)) {
+            return ['ok' => false, 'reason' => null, 'expected' => '', 'got' => null];
+        }
+
+        // 六位數字：夠長到猜不到，又短到模型不會抄錯
+        $code = (string) mt_rand(100000, 999999);
+        $name = 'imgtest_' . $code . '_' . mt_rand(1000, 9999) . '.png';
+        $path = storage_path("app/{$name}");
+
+        if (!$this->writeCodeImage($path, $code)) {
+            return [
+                'ok'       => false,
+                'reason'   => 'GD 不可用，產不出測試圖',
+                'expected' => $code,
+                'got'      => null,
+            ];
+        }
+
+        try {
+            return $this->runImageRead($credential, $isFallback, $name, $code);
+        } finally {
+            // ⚠ 不論成功、失敗、丟例外都要刪 —— 留著會在 storage 裡越積越多
+            if (file_exists($path)) {
+                @unlink($path);
+            }
+        }
+    }
+
+    /**
+     * 畫一張寫著那組碼的圖
+     *
+     * ⚠ 用內建點陣字型（`imagestring`）而不是 TTF —— 不必依賴機器上
+     * 裝了哪些字型檔。放大到 5 號字再撐大畫布，模型才看得清楚。
+     *
+     * @param string $path
+     * @param string $code
+     * @return bool
+     */
+    private function writeCodeImage($path, $code)
+    {
+        if (!function_exists('imagecreatetruecolor')) {
+            return false;
+        }
+
+        $image = imagecreatetruecolor(360, 120);
+        $white = imagecolorallocate($image, 255, 255, 255);
+        $black = imagecolorallocate($image, 0, 0, 0);
+        imagefilledrectangle($image, 0, 0, 359, 119, $white);
+
+        /*
+         * 內建字型最大是 5 號（寬 9px），直接印在 360x120 上太小。
+         * 所以先印在小圖上再整張放大 —— 放大後的字夠粗，模型讀得準。
+         */
+        $small = imagecreatetruecolor(90, 30);
+        imagefilledrectangle($small, 0, 0, 89, 29, imagecolorallocate($small, 255, 255, 255));
+        imagestring($small, 5, 10, 8, $code, imagecolorallocate($small, 0, 0, 0));
+        imagecopyresized($image, $small, 0, 0, 0, 0, 360, 120, 90, 30);
+        imagedestroy($small);
+
+        // 邊框：讓模型看得出圖的範圍，也確認整張有被讀到
+        imagerectangle($image, 0, 0, 359, 119, $black);
+
+        $ok = imagepng($image, $path);
+        imagedestroy($image);
+
+        return (bool) $ok;
+    }
+
+    /**
+     * 真的跑一次「讀這張圖，把上面的數字告訴我」
+     *
+     * @param string $credential
+     * @param bool   $isFallback
+     * @param string $name 檔名（相對於 CLI 的工作目錄）
+     * @param string $code
+     * @return array{ok: bool, reason: string|null, expected: string, got: string|null}
+     */
+    private function runImageRead($credential, $isFallback, $name, $code)
+    {
+        $env = $this->buildEnv($isFallback
+            ? ['ANTHROPIC_API_KEY' => $credential, 'CLAUDE_CODE_OAUTH_TOKEN' => false]
+            : ['CLAUDE_CODE_OAUTH_TOKEN' => $credential, 'ANTHROPIC_API_KEY' => false]);
+
+        $command = [
+            config('auto_reply.cli_path'),
+            '-p', "請讀取 ./{$name} 這張圖片，把圖上面那串數字原樣回答我。只回那串數字，不要其他文字。",
+            '--output-format', 'json',
+            // ⚠⚠ 這一行就是這次要測的東西（其他呼叫都是 `''`）
+            '--allowedTools', 'Read',
+            '--disable-slash-commands',
+            '--setting-sources', '',
+        ];
+
+        try {
+            $process = new Process($command, storage_path('app'), $env, null, (float) config('auto_reply.timeout'));
+            $process->run();
+        } catch (\Exception $e) {
+            Log::error('圖片判讀測試執行失敗', ['fallback' => $isFallback, 'error' => $e->getMessage()]);
+
+            return ['ok' => false, 'reason' => $e->getMessage(), 'expected' => $code, 'got' => null];
+        }
+
+        $envelope = json_decode($process->getOutput(), true);
+        $answer = trim($this->envelopeMessage($envelope));
+
+        // 同 checkCredential()：憑證／權限不對時 CLI 仍可能以 exit 0 結束
+        if (!$process->isSuccessful() || (is_array($envelope) && !empty($envelope['is_error']))) {
+            $reason = blank($answer) ? trim($process->getErrorOutput()) : $answer;
+
+            Log::warning('圖片判讀測試未通過（CLI 回了錯誤）', [
+                'fallback' => $isFallback,
+                'reason'   => mb_substr($reason, 0, 200),
+                'stderr'   => mb_substr($process->getErrorOutput(), 0, 300),
+            ]);
+
+            return [
+                'ok'       => false,
+                'reason'   => mb_substr($reason, 0, 200),
+                'expected' => $code,
+                'got'      => null,
+            ];
+        }
+
+        /*
+         * ⚠ 用「有沒有包含那串數字」而不是整串相等：模型可能回
+         * 「123456」也可能回「圖片上的數字是 123456」。
+         * 這一步要確認的是**它真的讀到了**，不是它多講了幾個字。
+         */
+        if (filled($answer) && mb_strpos($answer, $code) !== false) {
+            return ['ok' => true, 'reason' => null, 'expected' => $code, 'got' => $answer];
+        }
+
+        Log::warning('圖片判讀測試未通過（讀不到圖上的數字）', [
+            'fallback' => $isFallback,
+            'expected' => $code,
+            'answer'   => mb_substr($answer, 0, 200),
+        ]);
+
+        return [
+            'ok'       => false,
+            'reason'   => null,
+            'expected' => $code,
+            'got'      => mb_substr($answer, 0, 200),
+        ];
+    }
+
+    /**
      * 驗證一把憑證能不能用
      *
      * 設定頁換 token 時用：**驗證通過才存**，驗不過就不動原本的，

@@ -85,6 +85,37 @@ class SettingController extends Controller
     }
 
     /**
+     * Ajax 測試這台機器上的 CLI 讀不讀得到圖片
+     *
+     * ⚠ 回應一律 200，理由同 `ajaxTestCredential()`：「讀不到圖」不是請求失敗，
+     * 是這支要回答的答案本身。
+     *
+     * ⚠ 沿用 `TestCredentialRequest`：要測主要還是備援，白名單與訊息都一樣，
+     * 另開一個一模一樣的驗證檔只會多一份要同步維護的東西。
+     *
+     * @param TestCredentialRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxTestImageRead(TestCredentialRequest $request)
+    {
+        $params = $request->validated();
+
+        try {
+            $result = $this->settingService->testImageRead(Arr::get($params, 'type') === 'fallback');
+
+            return response()->json($result);
+        } catch (\Exception $e) {
+            Log::error('圖片判讀測試失敗', [
+                'type'    => Arr::get($params, 'type'),
+                'user_id' => Auth::id(),
+                'error'   => $e->getMessage(),
+            ]);
+
+            return response()->json(['message' => trans('setting.msg.image_test_error')], 500);
+        }
+    }
+
+    /**
      * Ajax 更新 Claude 主要設定
      *
      * @param UpdateClaudeRequest $request

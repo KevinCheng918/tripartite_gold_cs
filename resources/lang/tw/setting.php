@@ -61,8 +61,9 @@ return [
 
     'action_save'    => '儲存',
     'action_saving'  => '儲存中...',
-    'action_test'    => '測試連線',
-    'action_testing' => '測試中...',
+    'action_test'       => '測試連線',
+    'action_testing'    => '測試中...',
+    'action_test_image' => '測試讀圖',
 
     'msg' => [
         // 測試連線的四種結果
@@ -71,6 +72,19 @@ return [
         'test_failed_reason' => '✗ 無法使用：:reason',
         'test_not_set'      => '尚未設定憑證',
         'test_type_invalid' => '要測試的憑證種類不正確',
+
+        /*
+         * 讀圖測試的四種結果。
+         *
+         * ⚠ 三種失敗要分開講 —— 它們代表完全不同的下一步：
+         * 工具被擋 ＝ 要換做法；看錯數字 ＝ 模型視覺不行；跑不起來 ＝ 環境問題。
+         */
+        'image_test_ok'     => '✓ 讀得到圖，圖片判讀可以用',
+        'image_test_wrong'  => '✗ 讀不出圖上的數字（圖上是 :expected，它回「:got」）—— 這台機器看得到圖但認不出內容',
+        'image_test_failed' => '✗ 讀不到圖，圖片判讀在這台機器上不能用',
+        'image_test_reason' => '✗ 讀不到圖：:reason',
+        // ⚠ 這個是**伺服器端丟例外**時用的，跟上面「讀不到圖」是兩回事
+        'image_test_error'  => '圖片判讀測試執行失敗',
 
         'saved'         => '已儲存',
         'save_failed'   => '儲存失敗',

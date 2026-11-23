@@ -41,6 +41,17 @@
                                 </button>
                                 <span id="claude-test-result" style="font-size:0.875rem"></span>
                             </div>
+                            {{--
+                                讀圖測試另起一行：它跟上面那顆測的是兩件事
+                                （上面測「憑證能不能用」，這顆測「這台機器讀不讀得到圖」），
+                                擠在同一行會讓人以為是同一個測試的兩種按法。
+                            --}}
+                            <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                                <button type="button" class="btn btn-outline-secondary js-manage-only js-test-image-read" data-type="claude">
+                                    <i class="fas fa-image me-1"></i>{{ trans('setting.action_test_image') }}
+                                </button>
+                                <span id="claude-image-test-result" style="font-size:0.875rem"></span>
+                            </div>
                         </form>
 
                         {{-- 取得流程。指令本身不進語系檔（不需要翻譯，也不該被翻壞） --}}
@@ -108,6 +119,10 @@ npm install -g @anthropic-ai/claude-code</code></pre>
                                     <i class="fas fa-plug me-1"></i>{{ trans('setting.action_test') }}
                                 </button>
                                 <span id="fallback-test-result" style="font-size:0.875rem"></span>
+                                <button type="button" class="btn btn-outline-secondary js-manage-only js-test-image-read" data-type="fallback">
+                                    <i class="fas fa-image me-1"></i>{{ trans('setting.action_test_image') }}
+                                </button>
+                                <span id="fallback-image-test-result" style="font-size:0.875rem"></span>
                             </div>
                         </form>
 

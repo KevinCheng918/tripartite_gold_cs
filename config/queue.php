@@ -28,6 +28,32 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | ⚠⚠ retry_after 必須大於所有 Job 的 timeout
+    |--------------------------------------------------------------------------
+    |
+    | `retry_after` 是「一個 Job 跑超過這麼久，佇列就認定它卡死，**把它再派
+    | 一份出去**」。所以它比任何一支 Job 的 `timeout` 短的話，那支 Job
+    | 只要跑得夠久就會**同時有兩份在跑** —— 而 `$tries = 1` 擋不住這個，
+    | 那一條擋的是「失敗後重試」，不是「佇列認定卡死而重派」。
+    |
+    | 線上的後果是具體的：
+    |   · `AutoReplyJob`     兩份都會發訊息 ⇒ **客人收到兩份答案**
+    |   · `FollowupDetectJob` 兩份都會開單 ⇒ 重複的待追蹤事項
+    |   · `HandoverReviewJob` 兩份都叫模型 ⇒ 撞 `(handover_id, seq)` 的 unique
+    |
+    | 原本是 **90**，而 `AutoReplyJob` 與 `FollowupDetectJob` 的 timeout
+    | 都是 **120** —— 平常跑不到 90 秒所以沒出事，但模型一慢就會踩到
+    | （2026-11-20 發現、2026-11-24 才改）。
+    |
+    | 目前最長的 timeout 是 120，設 **300** 留足餘裕；之後新增 Job 時，
+    | **timeout 不可以超過這個數字**。
+    |
+    | ⚠ 改完要 `php artisan optimize`，而且**一定要重啟 queue worker** ——
+    | worker 是常駐程序，不重啟的話它手上還是舊的設定。
+    |
+    */
     'connections' => [
 
         'sync' => [
@@ -38,7 +64,8 @@ return [
             'driver' => 'database',
             'table' => 'jobs',
             'queue' => 'default',
-            'retry_after' => 90,
+            // ⚠ 要大於所有 Job 的 timeout，理由見上面那段
+            'retry_after' => 300,
             'after_commit' => false,
         ],
 
@@ -46,7 +73,8 @@ return [
             'driver' => 'beanstalkd',
             'host' => 'localhost',
             'queue' => 'default',
-            'retry_after' => 90,
+            // ⚠ 要大於所有 Job 的 timeout，理由見上面那段
+            'retry_after' => 300,
             'block_for' => 0,
             'after_commit' => false,
         ],
@@ -66,7 +94,8 @@ return [
             'driver' => 'redis',
             'connection' => 'default',
             'queue' => env('REDIS_QUEUE', 'default'),
-            'retry_after' => 90,
+            // ⚠ 要大於所有 Job 的 timeout，理由見上面那段
+            'retry_after' => 300,
             'block_for' => null,
             'after_commit' => false,
         ],

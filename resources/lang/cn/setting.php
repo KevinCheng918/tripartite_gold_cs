@@ -61,8 +61,9 @@ return [
 
     'action_save'    => '保存',
     'action_saving'  => '保存中...',
-    'action_test'    => '测试连线',
-    'action_testing' => '测试中...',
+    'action_test'       => '测试连线',
+    'action_testing'    => '测试中...',
+    'action_test_image' => '测试读图',
 
     'msg' => [
         // 测试连线的四种结果
@@ -71,6 +72,13 @@ return [
         'test_failed_reason' => '✗ 无法使用：:reason',
         'test_not_set'      => '尚未设置凭证',
         'test_type_invalid' => '要测试的凭证种类不正确',
+
+        // 读图测试的四种结果（三种失败代表完全不同的下一步）
+        'image_test_ok'     => '✓ 读得到图，图片判读可以用',
+        'image_test_wrong'  => '✗ 读不出图上的数字（图上是 :expected，它回「:got」）—— 这台机器看得到图但认不出内容',
+        'image_test_failed' => '✗ 读不到图，图片判读在这台机器上不能用',
+        'image_test_reason' => '✗ 读不到图：:reason',
+        'image_test_error'  => '图片判读测试执行失败',
 
         'saved'         => '已保存',
         'save_failed'   => '保存失败',
