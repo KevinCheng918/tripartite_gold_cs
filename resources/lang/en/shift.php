@@ -18,6 +18,11 @@ return [
     'field_display_name' => 'Display Name',
     'field_start_time' => 'Start Time',
     'field_end_time' => 'End Time',
+
+    // Per-shift handover time. ⚠ The hint must say what "empty" means — it is not "no handover".
+    'field_handover_time'      => 'Handover time',
+    'field_handover_time_hint' => 'Leave empty to keep the current behaviour (when the next shift starts replying). Set a time and reminders will start from then.',
+    'field_handover_time_auto' => 'Auto',
     'field_is_active' => 'Active',
     'field_sort' => 'Sort',
     'shift_updated' => 'Shift updated',

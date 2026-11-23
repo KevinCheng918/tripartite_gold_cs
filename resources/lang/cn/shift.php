@@ -18,6 +18,11 @@ return [
     'field_display_name' => '班别名称',
     'field_start_time' => '开始时间',
     'field_end_time' => '结束时间',
+
+    // 班别自订的交接时间。⚠ 提示要讲明「留空＝沿用原本的推导」，不是不交接
+    'field_handover_time'      => '交接时间',
+    'field_handover_time_hint' => '留空＝沿用原本的时间（下一班开始回讯的时候）。填了就以这个时间为准，提醒会从这时候开始。',
+    'field_handover_time_auto' => '自动',
     'field_is_active' => '启用',
     'field_sort' => '排序',
     'shift_updated' => '班别已更新',

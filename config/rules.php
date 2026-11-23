@@ -8,6 +8,15 @@
  */
 
 return [
+    /*
+     * 班別自訂的交接時間（`HH:mm`）。
+     *
+     * ⚠ **一定要 `nullable`**：留空代表「沿用下一班回訊開始」這個原本的
+     * 推導，不是「不交接」。新增與編輯兩支都要用同一條，
+     * 不然會出現「編輯存得進去、新增存不進去」這種各寫各的狀況。
+     */
+    'SHIFT_HANDOVER_TIME' => 'nullable|date_format:H:i',
+
     'USER_ACCOUNT_REGEX'  => 'regex:/^[A-Za-z0-9\_]{4,20}$/',
     'USER_PASSWORD_REGEX' => 'regex:/^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{}|;:,.<>?\/?]{8,}$/',
 

@@ -120,6 +120,11 @@
                     <input id="create-reply-end-time" type="text" class="js-time-select" autocomplete="off">
                 </div>
             </div>
+            <div class="mb-3">
+                <label class="form-label" for="create-handover-time">{{ trans('shift.field_handover_time') }}</label>
+                <input id="create-handover-time" type="text" class="js-time-select" autocomplete="off">
+                <small class="form-text text-muted d-block">{{ trans('shift.field_handover_time_hint') }}</small>
+            </div>
             <div class="text-end mt-3">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('shift.modal_cancel') }}</button>
                 <button type="submit" class="btn btn-primary">{{ trans('shift.modal_confirm') }}</button>
@@ -238,6 +243,12 @@
                     <span>~</span>
                     <input id="edit-reply-end-time" type="text" class="js-time-select" autocomplete="off">
                 </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="edit-handover-time">{{ trans('shift.field_handover_time') }}</label>
+                <input id="edit-handover-time" type="text" class="js-time-select" autocomplete="off">
+                {{-- ⚠ 一定要講明「留空會怎樣」：留空不是「不交接」，是沿用原本的推導 --}}
+                <small class="form-text text-muted d-block">{{ trans('shift.field_handover_time_hint') }}</small>
             </div>
             <div class="text-end mt-3">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('shift.modal_cancel') }}</button>

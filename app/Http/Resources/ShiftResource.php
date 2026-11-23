@@ -33,6 +33,8 @@ class ShiftResource extends JsonResource
             'end_time'         => $this->end_time,
             'reply_start_time' => $this->reply_start_time,
             'reply_end_time'   => $this->reply_end_time,
+            // 這一班幾點交接。null ＝ 沿用「下一班回訊開始」那個推導
+            'handover_time'    => $this->handover_time,
             'is_active'    => $this->is_active,
             'sort'         => $this->sort,
         ];

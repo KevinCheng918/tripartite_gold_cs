@@ -376,19 +376,45 @@ class ShiftHandoverService
             $fromEnd += 1440;
         }
 
-        $toStart = $this->toMinutes($to->reply_start_time);
+        /*
+         * 窗口起點 ＝ **這一班自訂的交接時間**，沒設才退回「下一班回訊開始」
+         * （需求方 2026-11-24：「我想要可以自定義每一班的交接時間」）。
+         *
+         * ⚠⚠ **留空是「沿用推導」，不是「不交接」。** 這是新增的選項，
+         * 不能在沒有人設定的情況下改變既有行為 —— 上線當天所有班別都是
+         * 空的，那時必須跟改版前一模一樣。
+         *
+         * ⚠ 是**交出去的那一班**（`$from`）的欄位：「早班幾點交接」
+         * 問的是早班，這樣才對得上使用者的直覺。
+         */
+        $toStart = filled($from->handover_time)
+            ? $this->toMinutes($from->handover_time)
+            : $this->toMinutes($to->reply_start_time);
 
-        // 下一班的起點若在上一班起點之前，那是隔天的那一次
+        // 起點若在上一班起點之前，那是隔天的那一次
         if ($toStart <= $fromStart) {
             $toStart += 1440;
         }
 
         /*
-         * 下一班的起點要落在上一班的回訊區間內 —— 那段重疊就是交接窗口。
+         * 起點要落在上一班的回訊區間內 —— 那段重疊就是交接窗口。
          * 落在區間外代表兩班的回訊時間沒有重疊（中間有空窗），那種情況
          * 沒有「重疊的交接時間」可用，不建窗口。
+         *
+         * ⚠ 自訂的交接時間**也要過這一關**：填了一個落在回訊區間外的
+         * 時間（例如早班回訊 08–14 卻把交接填成 15:00），那一班就不會
+         * 有交接窗口 —— 所以設定頁要擋，見 `UpdateShiftRequest`。
          */
         if ($toStart <= $fromStart || $toStart > $fromEnd) {
+            if (filled($from->handover_time)) {
+                Log::warning('班別自訂的交接時間落在回訊區間外，這一班不會建交接窗口', [
+                    'shift_id'      => $from->id,
+                    'handover_time' => $from->handover_time,
+                    'reply_start'   => $from->reply_start_time,
+                    'reply_end'     => $from->reply_end_time,
+                ]);
+            }
+
             return null;
         }
 

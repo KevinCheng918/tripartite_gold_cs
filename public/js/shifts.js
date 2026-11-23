@@ -724,6 +724,24 @@
             });
     }
 
+    /**
+     * 班別的交接時間顯示文字
+     *
+     * ⚠⚠ **沒設定時不能只印「-」。** 那會讓人以為「這一班不交接」，
+     * 但實際上它仍然會交接 —— 只是沿用原本的推導（下一班回訊開始）。
+     * 所以要印出推導出來的那個時間，並標明它是自動的。
+     *
+     * @param {Object} shift
+     * @returns {string}
+     */
+    function handoverTimeText(shift) {
+        if (shift.handover_time) {
+            return shift.handover_time;
+        }
+
+        return '<span class="text-muted">' + (i18n.field_handover_time_auto || '自動') + '</span>';
+    }
+
     function renderShiftsTable(shifts) {
         var rows = shifts.map(function (shift) {
             return (
@@ -732,6 +750,7 @@
                 '<td>' + shift.start_time + '</td>' +
                 '<td>' + shift.end_time + '</td>' +
                 '<td>' + (shift.reply_start_time && shift.reply_end_time ? shift.reply_start_time + ' ~ ' + shift.reply_end_time : '-') + '</td>' +
+                '<td>' + handoverTimeText(shift) + '</td>' +
                 '<td>' + (shift.is_active ? '<span class="badge bg-success">' + i18n.field_is_active + '</span>' : '<span class="badge bg-secondary">-</span>') + '</td>' +
                 '<td><button class="btn btn-sm btn-outline-secondary js-edit-shift">' + i18n.modal_edit_shift_title + '</button></td>' +
                 '</tr>'
@@ -748,6 +767,7 @@
                 '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_start_time + '</span><span>' + shift.start_time + '</span></div>' +
                 '<div class="shift-card__row"><span class="shift-card__label">' + i18n.field_end_time + '</span><span>' + shift.end_time + '</span></div>' +
                 '<div class="shift-card__row"><span class="shift-card__label">回訊時間</span><span>' + (shift.reply_start_time && shift.reply_end_time ? shift.reply_start_time + ' ~ ' + shift.reply_end_time : '-') + '</span></div>' +
+                '<div class="shift-card__row"><span class="shift-card__label">' + (i18n.field_handover_time || '交接時間') + '</span><span>' + handoverTimeText(shift) + '</span></div>' +
                 '<div class="shift-card__actions"><button class="btn btn-sm btn-outline-secondary js-edit-shift">' + i18n.modal_edit_shift_title + '</button></div>' +
                 '</div>'
             );
@@ -763,6 +783,7 @@
             '<th>' + i18n.field_start_time + '</th>' +
             '<th>' + i18n.field_end_time + '</th>' +
             '<th>回訊時間</th>' +
+            '<th>' + (i18n.field_handover_time || '交接時間') + '</th>' +
             '<th>' + i18n.field_is_active + '</th>' +
             '<th></th>' +
             '</tr></thead><tbody>' + rows + '</tbody></table>' +
@@ -798,6 +819,7 @@
         TimeSelect.set('edit-end-time', shift.end_time);
         TimeSelect.set('edit-reply-start-time', shift.reply_start_time);
         TimeSelect.set('edit-reply-end-time', shift.reply_end_time);
+        TimeSelect.set('edit-handover-time', shift.handover_time);
         openModal('modal-edit-shift');
     }
 
@@ -1209,6 +1231,9 @@
             end_time: document.getElementById('edit-end-time').value,
             reply_start_time: document.getElementById('edit-reply-start-time').value || null,
             reply_end_time: document.getElementById('edit-reply-end-time').value || null,
+            // ⚠ 空字串要轉成 null：清空代表「沿用下一班回訊開始」，
+            // 送空字串過去會過不了 date_format 驗證
+            handover_time: document.getElementById('edit-handover-time').value || null,
         };
 
         apiFetch('/admin/shifts/ajax-update-shift/' + id, { method: 'PUT', body: JSON.stringify(data) })
@@ -1570,6 +1595,7 @@
                 end_time: document.getElementById('create-end-time').value,
                 reply_start_time: document.getElementById('create-reply-start-time').value || null,
                 reply_end_time: document.getElementById('create-reply-end-time').value || null,
+                handover_time: document.getElementById('create-handover-time').value || null,
             };
 
             apiFetch('/admin/shifts/ajax-store-shift', { method: 'POST', body: JSON.stringify(data) })
@@ -1965,6 +1991,31 @@
             .replace(':time', item.reviewed_at);
     }
 
+    /**
+     * 假別（特休／病假／事假）顯示用的字
+     *
+     * ⚠⚠ **跟 `typeText`（整天／時段）是兩件事，不要合併。**
+     * 那一個講的是「請多久」，這一個講的是「請什麼假」——
+     * 需求方 2026-11-24 要的是後者，而畫面上一直只有前者。
+     *
+     * ⚠ `unclassified` 是改版前的舊資料，申請表單上選不到它，
+     * 但清單裡會出現 —— 沒有對應的字會印出一個英文代碼。
+     *
+     * @param {string} type
+     * @returns {string}
+     */
+    function leaveTypeText(type) {
+        var map = {
+            annual: leaveI18n.leave_annual || '特休',
+            sick: leaveI18n.leave_sick || '病假',
+            personal: leaveI18n.leave_personal || '事假',
+            unclassified: leaveI18n.leave_unclassified || '未分類'
+        };
+
+        // 認不得的值原樣印出來，不要吃掉 —— 那代表有人加了新假別卻沒補這裡
+        return map[type] || type || '-';
+    }
+
     function renderLeaveList(containerId, list, showActions) {
         var container = document.getElementById(containerId);
         if (!container) { return; }
@@ -1983,6 +2034,7 @@
             return {
                 item: item, idx: idx, st: st,
                 dateText: dateText, typeText: typeText, timeText: timeText,
+                leaveTypeText: leaveTypeText(item.type),
                 reviewText: reviewText(item)
             };
         });
@@ -1991,6 +2043,8 @@
         var html = '<div class="d-none d-md-block"><div class="table-responsive"><table class="table table-hover table-striped align-middle mb-0"><thead class="table-light"><tr>';
         html += '<th>#</th><th>' + (leaveI18n.field_user || '申請人') + '</th>';
         html += '<th>' + (leaveI18n.field_date || '日期') + '</th>';
+        // 假別排在「類型」前面：先看「請什麼假」，再看「請多久」
+        html += '<th>' + (leaveI18n.field_leave_type || '假別') + '</th>';
         html += '<th>' + (leaveI18n.field_type || '類型') + '</th>';
         html += '<th>' + (leaveI18n.field_time || '時段') + '</th>';
         html += '<th>' + (leaveI18n.field_reason || '原因') + '</th>';
@@ -2004,6 +2058,7 @@
             html += '<td>' + (d.idx + 1) + '</td>';
             html += '<td><strong>' + item.user + '</strong></td>';
             html += '<td>' + d.dateText + '</td>';
+            html += '<td>' + d.leaveTypeText + '</td>';
             html += '<td>' + d.typeText + '</td>';
             html += '<td>' + d.timeText + '</td>';
             html += '<td>' + (item.reason || '-') + '</td>';
@@ -2038,7 +2093,8 @@
             html += '<div><strong style="font-size:1.0625rem">' + item.user + '</strong>';
             html += '<div class="text-muted" style="font-size:0.8125rem">' + d.dateText + '</div></div>';
             html += '<span class="badge ' + d.st.css + '">' + d.st.text + '</span></div>';
-            html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">類型</span><span>' + d.typeText + '</span></div>';
+            html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + (leaveI18n.field_leave_type || '假別') + '</span><span>' + d.leaveTypeText + '</span></div>';
+            html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">' + (leaveI18n.field_type || '類型') + '</span><span>' + d.typeText + '</span></div>';
             if (item.is_full_day !== 1) {
                 html += '<div class="d-flex justify-content-between mb-1" style="font-size:0.875rem"><span class="text-muted">時段</span><span>' + d.timeText + '</span></div>';
             }
@@ -2092,6 +2148,12 @@
                 html += '<table class="table table-sm text-start mt-2"><tbody>';
                 html += '<tr><th style="width:80px">申請人</th><td><strong>' + item.user + '</strong></td></tr>';
                 html += '<tr><th>日期</th><td>' + dateText + '</td></tr>';
+                /*
+                 * ⚠ 假別要出現在審核視窗裡：主管按「通過」之前，
+                 * 「他請的是特休還是事假」是最該看到的一件事
+                 * —— 特休會扣額度，另外兩種不會。
+                 */
+                html += '<tr><th>' + (leaveI18n.field_leave_type || '假別') + '</th><td><strong>' + leaveTypeText(item.type) + '</strong></td></tr>';
                 html += '<tr><th>類型</th><td>' + (item.is_full_day === 1 ? (leaveI18n.type_full_day || '整天') : item.start_time + ' ~ ' + item.end_time) + '</td></tr>';
                 html += '<tr><th>時長</th><td><strong>' + durationText + '</strong></td></tr>';
                 if (item.reason) { html += '<tr><th>原因</th><td>' + item.reason + '</td></tr>'; }

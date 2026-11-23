@@ -23,6 +23,17 @@ return [
     'field_display_name' => '班別名稱',
     'field_start_time' => '開始時間',
     'field_end_time' => '結束時間',
+
+    /*
+     * 班別自訂的交接時間（需求方 2026-11-24）。
+     *
+     * ⚠⚠ 提示文字一定要講明「留空會怎樣」—— 留空**不是不交接**，
+     * 是沿用原本的推導（下一班回訊開始）。少了這句，
+     * 看到空白的人會以為那一班沒有交接。
+     */
+    'field_handover_time'      => '交接時間',
+    'field_handover_time_hint' => '留空＝沿用原本的時間（下一班開始回訊的時候）。填了就以這個時間為準，提醒會從這時候開始。',
+    'field_handover_time_auto' => '自動',
     'field_is_active' => '啟用',
     'field_sort' => '排序',
     'shift_updated' => '班別已更新',

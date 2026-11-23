@@ -91,6 +91,8 @@ class ShiftController extends Controller
             'end_time'         => 'required|date_format:H:i',
             'reply_start_time' => 'nullable|date_format:H:i',
             'reply_end_time'   => 'nullable|date_format:H:i',
+            // ⚠ 跟 UpdateShiftRequest 共用同一條，不要各寫各的
+            'handover_time'    => config('rules.SHIFT_HANDOVER_TIME'),
         ]);
 
         try {

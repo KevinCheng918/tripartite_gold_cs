@@ -103,8 +103,10 @@ class ShiftService
             'display_name'     => $params['display_name'],
             'start_time'       => $params['start_time'],
             'end_time'         => $params['end_time'],
-            'reply_start_time' => $params['reply_start_time'] ?? null,
-            'reply_end_time'   => $params['reply_end_time'] ?? null,
+            'reply_start_time' => Arr::get($params, 'reply_start_time'),
+            'reply_end_time'   => Arr::get($params, 'reply_end_time'),
+            // 留空＝沿用「下一班回訊開始」那個推導，不是不交接
+            'handover_time'    => Arr::get($params, 'handover_time'),
             'is_active'        => true,
         ]);
     }
@@ -112,21 +114,27 @@ class ShiftService
     public function updateShift(Shift $shift, $params)
     {
         $attributes = array_filter([
-            'display_name' => $params['display_name'] ?? null,
-            'start_time'   => $params['start_time'] ?? null,
-            'end_time'     => $params['end_time'] ?? null,
+            // ⚠ 用 Arr::get 不用 `??`（專案通則）
+            'display_name' => Arr::get($params, 'display_name'),
+            'start_time'   => Arr::get($params, 'start_time'),
+            'end_time'     => Arr::get($params, 'end_time'),
             'is_active'    => array_key_exists('is_active', $params) ? $params['is_active'] : null,
             'sort'         => array_key_exists('sort', $params) ? $params['sort'] : null,
         ], function ($value) {
             return filled($value);
         });
 
-        // 回訊時間允許 null（清除），需獨立處理
-        if (array_key_exists('reply_start_time', $params)) {
-            $attributes['reply_start_time'] = $params['reply_start_time'];
-        }
-        if (array_key_exists('reply_end_time', $params)) {
-            $attributes['reply_end_time'] = $params['reply_end_time'];
+        /*
+         * 這幾欄**允許被清成 null**，所以不能走上面那個 `array_filter`
+         * （它會把 null 整個濾掉，於是「清除」這個動作永遠存不進去）。
+         *
+         * ⚠ 用 `array_key_exists` 而不是 `filled()` —— 差別正是
+         * 「沒有送這個欄位」與「送了但要清空」。
+         */
+        foreach (['reply_start_time', 'reply_end_time', 'handover_time'] as $nullable) {
+            if (array_key_exists($nullable, $params)) {
+                $attributes[$nullable] = Arr::get($params, $nullable);
+            }
         }
 
         return DB::transaction(function () use ($shift, $attributes) {

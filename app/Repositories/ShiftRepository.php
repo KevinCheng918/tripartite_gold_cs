@@ -12,8 +12,16 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class ShiftRepository
 {
-    /** @var array 列表查詢欄位 */
-    private const LIST_COLUMNS = ['id', 'name', 'display_name', 'start_time', 'end_time', 'reply_start_time', 'reply_end_time', 'is_active', 'sort'];
+    /*
+     * 列表查詢欄位。
+     *
+     * ⚠⚠ **新增欄位時這裡一定要跟著加**（漏加不報錯，那一欄永遠是 null）。
+     * 這個專案已經踩過五次，見 `ShiftHandoverGapRepository::COLUMNS` 的註解。
+     */
+    private const LIST_COLUMNS = [
+        'id', 'name', 'display_name', 'start_time', 'end_time',
+        'reply_start_time', 'reply_end_time', 'handover_time', 'is_active', 'sort',
+    ];
 
     /**
      * 取得所有啟用中的班別（依 sort 排序）
