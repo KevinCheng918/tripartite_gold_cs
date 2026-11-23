@@ -144,4 +144,34 @@ class ShiftHandoverGapRepository
             ->where('status', config('constants.HANDOVER_REVIEW.STATUS.PENDING'))
             ->update(['status' => $status]);
     }
+
+    /**
+     * 把答案退回「還沒答」
+     *
+     * 答完一題之後，下一題（或總結）送不出去時用這支把狀態還原，
+     * 他再按一次就是重試。
+     *
+     * ⚠⚠ **不能用 `markStatus($ids, PENDING)` 代替。** 那一支帶了
+     * `where('status', PENDING)` 的樂觀鎖，條件剛好把這個方向的轉移
+     * （FILLED／SKIPPED → PENDING）整個過濾掉 —— 更新 0 筆、不報錯。
+     * 第一版就是這樣寫的，實測顯示狀態完全沒退回去，那一輪盤點
+     * **永遠停在那一題**（按鈕再按會回「已經答過了」，下一題也不會出現）。
+     *
+     * @param array $ids
+     * @return int 影響筆數
+     */
+    public function revertToPending(array $ids)
+    {
+        if (blank($ids)) {
+            return 0;
+        }
+
+        $pending = (int) config('constants.HANDOVER_REVIEW.STATUS.PENDING');
+
+        return ShiftHandoverGap::query()
+            ->whereIn('id', $ids)
+            // 已經是「還沒答」的就不必動（也省掉一次無謂的寫入）
+            ->where('status', '<>', $pending)
+            ->update(['status' => $pending]);
+    }
 }

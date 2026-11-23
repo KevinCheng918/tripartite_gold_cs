@@ -18,10 +18,29 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 /**
- * 交接漏項盤點：AI 比對交接內容，沒寫到的用選單問要不要補
+ * 交接漏項盤點：AI 比對交接內容，沒寫到的**一題一題**問要不要補
  *
  * > 需求方 2026-11-19：「整理上一個班有的問題，然後 AI 比對有沒有交接到，
- * > 詢問沒有寫到的要不要補上，用選單方式。」
+ * > 詢問沒有寫到的要不要補上。」
+ *
+ * > 需求方 2026-11-23：「我不要用選項，我要用一個問題一個問題問，然後不要
+ * > 單一去變，我要留下紀錄：一個問題，問出來，由交接班的人去選擇，選完之後
+ * > 就補充到對話，繼續問下一題，這樣無論是下一班的人或是主管、老闆回過頭來看
+ * > 才知道斷在哪裡。」
+ *
+ * ⚠⚠ **所以流程是一問一答，話題本身就是那份紀錄：**
+ *
+ * ```
+ * 開場（這一班有 N 件看起來沒寫進交接，我一題一題問）
+ * 第 1 題 ──答──▶ 第 1 題 ＋「✅ 要補上」（按鈕撤掉，題目留著）
+ * 第 2 題 ──答──▶ 第 2 題 ＋「⏭ 不用補」
+ * 第 3 題  ← 還掛著按鈕 ＝ **斷在這裡**
+ * （全部答完才發總結）
+ * ```
+ *
+ * ⚠⚠ **不要改回整批選單**（「全部補上」「都不用」那種）。整批會把整件事
+ * 壓成一則「已補上 3 項」—— 哪一題怎麼決定的、答到第幾題就沒下文了，
+ * 全都看不出來。
  *
  * ⚠⚠ **跟 `ShiftHandoverService` 是兩件事。** 那一支確認「**有沒有打**」
  * （在交接話題發言就算完成，內容一個字都沒看），這一支看
@@ -102,7 +121,7 @@ class ShiftHandoverReviewService
 
         /*
          * ⚠ 已經盤過就不要再盤：佇列重送會讓同一個 Job 跑第二次，
-         * 那時話題會多出一組一模一樣的選單，而且編號會對到兩批資料。
+         * 那時話題會多出一輪一模一樣的題目，而且題號會對到兩批資料。
          */
         if ($this->gapRepository->existsForHandover($handoverId)) {
             Log::info('這次交接已經盤過漏項了，略過', ['handover_id' => $handoverId]);
@@ -142,26 +161,40 @@ class ShiftHandoverReviewService
             return false;
         }
 
-        $sent = $this->sendMenu(
+        /*
+         * 開場一則 ＋ 第一題一則，**之後每答一題才問下一題**
+         * （需求方 2026-11-23）。
+         *
+         * ⚠ 開場不能併進第一題：第一題答完要把答案接在它自己那一則後面，
+         * 那是在 `handleCallback()` 裡重組文字的 —— 那裡拿不到
+         * 「有沒有比對成」與「另外還有 N 件」這兩個只有這一趟知道的東西。
+         * 併進去的話，第一題一答完，開場那段資訊就被重組掉了。
+         */
+        $sent = $this->sendOpening(
             $handover,
             $gaps,
             filled($askable) && blank($covered),
             (array) Arr::get($split, 'notes', [])
-        );
+        ) && $this->sendQuestion($handover, $gaps->first(), $gaps->count());
 
         /*
          * ⚠ **送不出去就把紀錄收回來。**
          *
          * 「有紀錄」＝「問過了」（`existsForHandover()` 靠它擋重跑）——
          * 訊息沒送出去卻留著紀錄的話，這張交接會變成
-         * **永遠問不到、也永遠不會再問**的孤兒：選單不存在，所以沒有人
-         * 按得到；而下一次重跑又會被擋下。
+         * **永遠問不到、也永遠不會再問**的孤兒：題目不存在，所以沒有人
+         * 答得到；而下一次重跑又會被擋下。
          *
-         * 刪掉之後狀態才一致：有紀錄 ⇔ 選單真的在話題裡。
+         * 刪掉之後狀態才一致：有紀錄 ⇔ 題目真的在話題裡。
+         *
+         * ⚠ 開場送成功、第一題送失敗的話，開場那一則會留在話題裡 ——
+         * 刪不掉（Telegram 的刪訊息有時限，而且那段話本身沒有錯）。
+         * 下一次重跑會再發一組，話題裡會看到兩個開場。這是刻意選的：
+         * **多一則說明，好過整張交接再也問不到。**
          */
         if (!$sent) {
             $this->gapRepository->deleteByHandover((int) $handover->id);
-            Log::warning('交接漏項選單沒送出去，已把剛寫入的紀錄收回', [
+            Log::warning('交接漏項的開場或第一題沒送出去，已把剛寫入的紀錄收回', [
                 'handover_id' => $handover->id,
                 'gaps'        => $gaps->count(),
             ]);
@@ -171,7 +204,10 @@ class ShiftHandoverReviewService
     }
 
     /**
-     * 按鈕：補上 / 全部補上 / 都不用
+     * 按鈕：這一題「要補上」／「不用補」
+     *
+     * 答完就把答案接在那一題自己那一則後面（按鈕一起撤掉），
+     * 然後問下一題；沒有下一題就發總結。
      *
      * @param array $parts     callback_data 去掉前綴後的片段：[action, handover_id, seq]
      * @param int   $messageId 按鈕所在的訊息
@@ -191,7 +227,7 @@ class ShiftHandoverReviewService
         }
 
         /*
-         * ⚠ **只有打交接的本人按得動。** 下一班的人按「補上」等於他在
+         * ⚠ **只有打交接的本人按得動。** 下一班的人按「要補上」等於他在
          * 替上一班承諾 —— 而補上去的那句現況只有上一班答得出來。
          */
         if (!$this->isOwner($handover, $from)) {
@@ -200,27 +236,28 @@ class ShiftHandoverReviewService
             return;
         }
 
-        if ($action === (string) config('constants.HANDOVER_REVIEW.ACTION.SKIP')) {
-            $this->skipAll($handover, $messageId);
-
-            return;
-        }
-
-        if ($action === (string) config('constants.HANDOVER_REVIEW.ACTION.FILL_ALL')) {
-            $this->fill($handover, $this->gapRepository->getPendingByHandover($handoverId), $messageId);
-
-            return;
-        }
-
         $gap = $this->gapRepository->findBySeq($handoverId, (int) Arr::get($parts, 2, 0));
 
+        /*
+         * ⚠ 已經答過的要擋下來：兩個人同時按、或 Telegram 重送 callback 時，
+         * 不擋就會多問一次下一題（而第一次問的那一則還掛著按鈕）。
+         */
         if (blank($gap) || !$gap->isPending()) {
             $this->supportGroup->editMessage($messageId, $this->text('RESULT_GONE'));
 
             return;
         }
 
-        $this->fill($handover, collect([$gap]), $messageId);
+        $fill = (string) config('constants.HANDOVER_REVIEW.ACTION.FILL');
+
+        $this->answer(
+            $handover,
+            $gap,
+            $messageId,
+            $action === $fill
+                ? (int) config('constants.HANDOVER_REVIEW.STATUS.FILLED')
+                : (int) config('constants.HANDOVER_REVIEW.STATUS.SKIPPED')
+        );
     }
 
     // ---------------------------------------------------------------
@@ -265,8 +302,8 @@ class ShiftHandoverReviewService
      * 把「另外還有 N 件」那種補充說明從候選裡抽出來
      *
      * ⚠ 它們**不進 `shift_handover_gap`**：那張表是「要問他的清單」，
-     * 而這種說明沒有東西可以補 —— 讓它佔一個編號只會讓選單跳號
-     * （1、2、3、5），看起來像系統壞掉。
+     * 而這種說明沒有東西可以答 —— 讓它佔一個題號只會多出一題
+     * 問不出答案的題目（而他只能在那裡卡住）。
      *
      * @param array $candidates
      * @return array{items: array, notes: array<int, string>}
@@ -640,23 +677,22 @@ class ShiftHandoverReviewService
     }
 
     /**
-     * 發選單到交接話題
+     * 發開場那一則（不帶按鈕）
      *
      * ⚠ **引用他那則交接**（`handed_message_id`）：話題裡同時有好幾班的
-     * 交接時，不引用就看不出這組選單是在講哪一則。
+     * 交接時，不引用就看不出這一輪盤點是在講哪一則。
      *
      * @param ShiftHandover $handover
      * @param \Illuminate\Support\Collection $gaps
      * @param bool  $noAi  這次沒有比對過（模型掛掉或沒憑證）
-     * @param array $notes 「另外還有 N 件」那幾句，附在清單最後
+     * @param array $notes 「另外還有 N 件」那幾句，接在開場最後
      * @return bool
      */
-    private function sendMenu(ShiftHandover $handover, $gaps, $noAi, array $notes)
+    private function sendOpening(ShiftHandover $handover, $gaps, $noAi, array $notes)
     {
-        $text = $this->buildMenuText($handover, $gaps, $noAi, $notes);
         $result = $this->supportGroup->send(
-            $text,
-            $this->buildKeyboard($handover, $gaps),
+            $this->buildOpeningText($handover, $gaps, $noAi, $notes),
+            null,
             (int) $handover->handed_message_id,
             self::NOTICE_TYPE
         );
@@ -665,13 +701,13 @@ class ShiftHandoverReviewService
             return true;
         }
 
-        Log::warning('交接漏項選單未送達', ['handover_id' => $handover->id, 'response' => $result]);
+        Log::warning('交接漏項的開場未送達', ['handover_id' => $handover->id, 'response' => $result]);
 
         return false;
     }
 
     /**
-     * 選單的文字
+     * 開場的文字
      *
      * @param ShiftHandover $handover
      * @param \Illuminate\Support\Collection $gaps
@@ -679,136 +715,168 @@ class ShiftHandoverReviewService
      * @param array $notes
      * @return string
      */
-    private function buildMenuText(ShiftHandover $handover, $gaps, $noAi, array $notes)
+    private function buildOpeningText(ShiftHandover $handover, $gaps, $noAi, array $notes)
     {
-        $from = $this->shiftName($handover);
-        $text = $this->menuHeader($gaps, $noAi, $from);
+        $text = strtr($this->openingTemplate($gaps, $noAi), [
+            '{from}'    => $this->shiftName($handover),
+            '{mention}' => $this->mentionOf($handover),
+            '{count}'   => $this->realCount($gaps),
+        ]);
 
-        foreach ($gaps as $gap) {
-            $text .= $this->gapLine($gap);
-        }
-
-        // 「另外還有 N 件」擺在清單最後：它是整批的補充，不屬於任何一項
+        // 「另外還有 N 件」是整批的補充、不屬於任何一題，所以擺在開場最後
         return $text . implode('', $notes);
     }
 
     /**
-     * 選單的開頭那一句
+     * 開場講哪一句
      *
      * 三種情況要講三種話，講錯任何一種都是在對人說謊：
      *
-     * | 情況 | 開頭 |
+     * | 情況 | 開場 |
      * |---|---|
      * | 比對過，有漏的 | 「有 N 件事看起來沒寫進交接」 |
      * | 比對過，**全都交接到了** | 「都交接到了 👍，最後確認一件事」 |
      * | 沒比對成（模型掛掉） | 「這一班發生過這些事」＋說明沒比對 |
      *
-     * ⚠ 第二種不能沿用第一種：那時清單上只剩最後那句固定問話，
+     * ⚠ 第二種不能沿用第一種：那時只剩最後那句固定問話，
      * 說「有 1 件事沒寫進交接」等於指著一個**問句**說他漏了，
      * 而他其實每一件都寫到了。
      *
      * @param \Illuminate\Support\Collection $gaps
-     * @param bool   $noAi
-     * @param string $from
+     * @param bool $noAi
      * @return string
      */
-    private function menuHeader($gaps, $noAi, $from)
+    private function openingTemplate($gaps, $noAi)
     {
         if ($noAi) {
-            return strtr($this->text('NO_AI_HEADER'), ['{from}' => $from]);
+            return $this->text('OPENING_NO_AI');
         }
 
-        $real = $gaps->filter(function ($gap) {
-            return !$gap->isManagerAsk();
-        });
-
-        if (blank($real)) {
-            return strtr($this->text('ALL_COVERED_HEADER'), ['{from}' => $from]);
+        if ($this->realCount($gaps) < 1) {
+            return $this->text('OPENING_ALL_COVERED');
         }
 
-        return strtr($this->text('HEADER'), [
-            '{count}' => $real->count(),
-            '{from}'  => $from,
-        ]);
+        return $this->text('OPENING');
     }
 
     /**
-     * 選單上的一行
+     * 真正算「漏掉」的題數
      *
+     * ⚠ 最後那句「主管／老闆有沒有交代」**不算漏項** —— 它每一次都會問，
+     * 算進去會變成對一個好好交接完的人說「這一班有 1 件事沒寫進交接」。
+     *
+     * @param \Illuminate\Support\Collection $gaps
+     * @return int
+     */
+    private function realCount($gaps)
+    {
+        return $gaps->filter(function ($gap) {
+            return !$gap->isManagerAsk();
+        })->count();
+    }
+
+    /**
+     * 問一題（一題一則訊息）
+     *
+     * @param ShiftHandover $handover
+     * @param ShiftHandoverGap|null $gap
+     * @param int $total
+     * @return bool
+     */
+    private function sendQuestion(ShiftHandover $handover, $gap, $total)
+    {
+        if (blank($gap)) {
+            Log::warning('交接漏項沒有題目可以問', ['handover_id' => $handover->id]);
+
+            return false;
+        }
+
+        $result = $this->supportGroup->send(
+            $this->buildQuestionText($handover, $gap, $total),
+            $this->questionKeyboard($handover, $gap),
+            (int) $handover->handed_message_id,
+            self::NOTICE_TYPE
+        );
+
+        if (filled(Arr::get((array) $result, 'result'))) {
+            return true;
+        }
+
+        Log::warning('交接漏項的題目未送達', [
+            'handover_id' => $handover->id,
+            'seq'         => $gap->seq,
+            'response'    => $result,
+        ]);
+
+        return false;
+    }
+
+    /**
+     * 一題的文字
+     *
+     * ⚠⚠ **這一支必須是「同一列資料 → 同一段文字」。** 答完之後要把答案
+     * 接在那一則後面，而那是**重新組一次題目文字**再加答案去編輯的
+     * （`editMessageText` 要整則重送，Telegram 沒有「接一段上去」的 API）。
+     * 這裡摻進任何「只有發問那一刻才知道」的東西，一答完就會被重組掉。
+     *
+     * @param ShiftHandover $handover
      * @param ShiftHandoverGap $gap
+     * @param int $total
      * @return string
      */
-    private function gapLine(ShiftHandoverGap $gap)
+    private function buildQuestionText(ShiftHandover $handover, ShiftHandoverGap $gap, $total)
     {
+        $replace = [
+            '{seq}'     => (int) $gap->seq,
+            '{total}'   => (int) $total,
+            '{title}'   => (string) $gap->title,
+            '{detail}'  => (string) $gap->detail,
+            '{mention}' => $this->mentionOf($handover),
+        ];
+
         if ($gap->isManagerAsk()) {
-            return strtr($this->text('MANAGER_ASK'), ['{seq}' => $gap->seq]);
+            return strtr($this->text('QUESTION_MANAGER'), $replace);
         }
 
-        // 來源只給得出標題時，編號那行照印、說明那行省掉（不要印一行空白）
-        if (blank($gap->detail)) {
-            return strtr($this->text('LINE_NO_DETAIL'), [
-                '{seq}'   => $gap->seq,
-                '{title}' => $gap->title,
-            ]);
-        }
+        // 來源只給得出標題時，說明那行省掉（不要印一行空白）
+        $template = blank($gap->detail) ? 'QUESTION_NO_DETAIL' : 'QUESTION';
 
-        return strtr($this->text('LINE'), [
-            '{seq}'    => $gap->seq,
-            '{title}'  => $gap->title,
-            '{detail}' => $gap->detail,
-        ]);
+        return strtr($this->text($template), $replace);
     }
 
     /**
-     * 按鈕
+     * 一題的兩顆按鈕
      *
      * ⚠ `callback_data` 只有 64 bytes，所以只帶
      * `hr:<action>:<handover_id>:<seq>` —— 內容按下去再去表裡撈。
      *
      * @param ShiftHandover $handover
-     * @param \Illuminate\Support\Collection $gaps
+     * @param ShiftHandoverGap $gap
      * @return array
      */
-    private function buildKeyboard(ShiftHandover $handover, $gaps)
+    private function questionKeyboard(ShiftHandover $handover, ShiftHandoverGap $gap)
     {
         $prefix = (string) config('constants.HANDOVER_REVIEW.CALLBACK');
         $actions = (array) config('constants.HANDOVER_REVIEW.ACTION');
         $id = (int) $handover->id;
+        $seq = (int) $gap->seq;
 
         $fill = (string) Arr::get($actions, 'FILL');
-        $fillAll = (string) Arr::get($actions, 'FILL_ALL');
         $skip = (string) Arr::get($actions, 'SKIP');
 
-        $buttons = [];
+        // 主管交代那一題問的是「有沒有」，按鈕要跟著換字
+        $manager = $gap->isManagerAsk();
 
-        foreach ($gaps as $gap) {
-            $seq = (int) $gap->seq;
-
-            $buttons[] = [
-                'text'          => strtr($this->text('BUTTON_FILL'), ['{seq}' => $seq]),
+        return [[
+            [
+                'text'          => $this->text($manager ? 'BUTTON_MANAGER_FILL' : 'BUTTON_FILL'),
                 'callback_data' => "{$prefix}:{$fill}:{$id}:{$seq}",
-            ];
-        }
-
-        $rows = array_chunk($buttons, 3);
-
-        /*
-         * ⚠ 這兩顆的 seq 固定帶 0：它們不指向某一項，但 `callback_data`
-         * 的格式要一致 —— 少一段的話分派端 `array_slice` 出來的陣列長度
-         * 會不一樣，解析就得分兩種情況。
-         */
-        $rows[] = [
-            [
-                'text'          => $this->text('BUTTON_FILL_ALL'),
-                'callback_data' => "{$prefix}:{$fillAll}:{$id}:0",
             ],
             [
-                'text'          => $this->text('BUTTON_SKIP'),
-                'callback_data' => "{$prefix}:{$skip}:{$id}:0",
+                'text'          => $this->text($manager ? 'BUTTON_MANAGER_SKIP' : 'BUTTON_SKIP'),
+                'callback_data' => "{$prefix}:{$skip}:{$id}:{$seq}",
             ],
-        ];
-
-        return $rows;
+        ]];
     }
 
     // ---------------------------------------------------------------
@@ -816,112 +884,209 @@ class ShiftHandoverReviewService
     // ---------------------------------------------------------------
 
     /**
-     * 補上這幾項：系統貼事實，再請他補一句現況
+     * 記下這一題的答案 → 問下一題（沒有下一題就發總結）→ 把答案接在這一則後面
      *
-     * ⚠ **系統只貼客觀事實**（需求方 2026-11-19 選的做法）：判斷留給人。
-     * 所以每一則都要 tag 他補一句，不能貼完就當作交接完整了。
+     * ⚠⚠ **這三步的順序是刻意的。**
+     *
+     * 下一題（或總結）送不出去時要**把這一題的狀態退回「還沒答」** ——
+     * 不退就卡死：這一則的按鈕再按會回「已經答過了」，而下一題永遠不會
+     * 出現，整輪盤點停在這裡而且沒有人救得了。退回去之後他再按一次
+     * 就是重試。
+     *
+     * ⚠ 編輯這一則放最後：那一步只是把答案「寫成紀錄」，失敗的代價最小
+     * （按鈕還掛著，但再按會得到「已經答過了」）。
      *
      * @param ShiftHandover $handover
-     * @param \Illuminate\Support\Collection $gaps
-     * @param int $messageId
+     * @param ShiftHandoverGap $gap
+     * @param int $messageId 這一題所在的訊息
+     * @param int $status    見 constants.HANDOVER_REVIEW.STATUS
      * @return void
      */
-    private function fill(ShiftHandover $handover, $gaps, $messageId)
+    private function answer(ShiftHandover $handover, ShiftHandoverGap $gap, $messageId, $status)
     {
-        // 已經按過的不要再貼一次（「全部補上」跟逐項按可能交錯）
-        $gaps = $gaps->filter(function ($gap) {
-            return $gap->isPending();
+        $handoverId = (int) $handover->id;
+        $this->gapRepository->markStatus([(int) $gap->id], $status);
+
+        /*
+         * 標記完才撈，而且**只撈一次**：總結要印的是答完之後的狀態，
+         * 題數與下一題也都從同一份結果算，不要為了各自再跑一趟查詢。
+         */
+        $all = $this->gapRepository->getByHandover($handoverId);
+        $next = $all->first(function ($row) {
+            return $row->isPending();
         });
 
-        if (blank($gaps)) {
-            $this->supportGroup->editMessage($messageId, $this->text('RESULT_GONE'));
+        $sent = filled($next)
+            ? $this->sendQuestion($handover, $next, $all->count())
+            : $this->sendSummary($handover, $all);
+
+        if (!$sent) {
+            /*
+             * ⚠ 一定要用 `revertToPending()`，**不能用
+             * `markStatus($ids, PENDING)`** —— 那一支的樂觀鎖條件
+             * （`where status = PENDING`）剛好把這個方向的轉移過濾掉，
+             * 更新 0 筆而且不報錯。第一版這樣寫，實測整輪就卡在這一題。
+             */
+            $this->gapRepository->revertToPending([(int) $gap->id]);
+            Log::warning('交接漏項的下一題沒送出去，這一題的答案已退回，讓他可以再按一次', [
+                'handover_id' => $handoverId,
+                'seq'         => $gap->seq,
+                'status'      => $status,
+            ]);
 
             return;
         }
 
-        $this->gapRepository->markStatus(
-            $gaps->pluck('id')->all(),
-            config('constants.HANDOVER_REVIEW.STATUS.FILLED')
-        );
-
         $this->supportGroup->editMessage(
             $messageId,
-            strtr($this->text('RESULT_FILLED'), ['{count}' => $gaps->count()])
+            $this->buildAnsweredText($handover, $gap, $all->count(), $status)
         );
+    }
 
-        $this->supportGroup->send(
-            $this->buildFilledText($handover, $gaps),
+    /**
+     * 答完之後那一則的全文：題目 ＋ 答案
+     *
+     * ⚠⚠ **題目要留著。** 只印答案的話，下一班捲回話題看到的是一串
+     * 「✅ 要補上」「⏭ 不用補」—— 完全看不出那是在答什麼。
+     * 需求方 2026-11-23 要的「回過頭來看才知道斷在哪裡」就是指這個。
+     *
+     * @param ShiftHandover $handover
+     * @param ShiftHandoverGap $gap
+     * @param int $total
+     * @param int $status
+     * @return string
+     */
+    private function buildAnsweredText(ShiftHandover $handover, ShiftHandoverGap $gap, $total, $status)
+    {
+        $filled = (int) $status === (int) config('constants.HANDOVER_REVIEW.STATUS.FILLED');
+
+        return $this->buildQuestionText($handover, $gap, $total)
+            . $this->text('ANSWERED_SEP')
+            . strtr($this->text($this->answerKey($gap, $filled)), [
+                '{mention}' => $this->mentionOf($handover),
+            ]);
+    }
+
+    /**
+     * 答案那一句用哪個 key
+     *
+     * @param ShiftHandoverGap $gap
+     * @param bool $filled 答的是「要補上」
+     * @return string
+     */
+    private function answerKey(ShiftHandoverGap $gap, $filled)
+    {
+        if ($gap->isManagerAsk()) {
+            return $filled ? 'ANSWER_MANAGER_FILL' : 'ANSWER_MANAGER_SKIP';
+        }
+
+        return $filled ? 'ANSWER_FILL' : 'ANSWER_SKIP';
+    }
+
+    /**
+     * 全部答完 → 發一則總結
+     *
+     * ⚠ 這一則是給**下一班跟主管**看的：逐題的訊息散在話題裡，
+     * 要一眼看出「哪幾件要補、哪幾件不補」還是得有這一則。
+     *
+     * ⚠ **不再追沒補的那幾件。** 漏項是判斷題，他可能真的覺得那幾件
+     * 不必交接 —— 交接本身會催到完成是因為「沒有也會打沒有」，
+     * 這裡沒有那個前提。
+     *
+     * @param ShiftHandover $handover
+     * @param \Illuminate\Support\Collection $all
+     * @return bool
+     */
+    private function sendSummary(ShiftHandover $handover, $all)
+    {
+        $result = $this->supportGroup->send(
+            $this->buildSummaryText($handover, $all),
             null,
             (int) $handover->handed_message_id,
             self::NOTICE_TYPE
         );
+
+        if (filled(Arr::get((array) $result, 'result'))) {
+            return true;
+        }
+
+        Log::warning('交接漏項的總結未送達', ['handover_id' => $handover->id, 'response' => $result]);
+
+        return false;
     }
 
     /**
-     * 補充交接那一則的內容
+     * 總結的文字
      *
      * @param ShiftHandover $handover
-     * @param \Illuminate\Support\Collection $gaps
+     * @param \Illuminate\Support\Collection $all
      * @return string
      */
-    private function buildFilledText(ShiftHandover $handover, $gaps)
+    private function buildSummaryText(ShiftHandover $handover, $all)
     {
-        $from = $this->shiftName($handover);
-        $mention = $this->mentionOf($handover);
+        $status = (array) config('constants.HANDOVER_REVIEW.STATUS');
+        $fills = $this->ofStatus($all, Arr::get($status, 'FILLED'));
+
+        $text = strtr($this->text('SUMMARY_HEADER'), [
+            '{from}'  => $this->shiftName($handover),
+            '{total}' => $all->count(),
+        ])
+            . $this->summarySection($fills, 'SUMMARY_FILL')
+            . $this->summarySection($this->ofStatus($all, Arr::get($status, 'SKIPPED')), 'SUMMARY_SKIP');
 
         /*
-         * 只有「主管交代」那一項時，系統貼不出任何事實（口頭交代根本看不到），
-         * 所以整則換成問他一句。
+         * ⚠ 一件都不用補的時候**不要印最後那句** ——
+         * 那會變成叫他去補一份空清單。
          */
-        if ($gaps->count() === 1 && $gaps->first()->isManagerAsk()) {
-            return strtr($this->text('FILLED_MANAGER'), [
-                '{from}'    => $from,
-                '{mention}' => $mention,
-            ]);
+        if (blank($fills)) {
+            return $text;
         }
 
-        $text = strtr($this->text('FILLED_HEADER'), ['{from}' => $from]);
-
-        foreach ($gaps as $gap) {
-            if ($gap->isManagerAsk()) {
-                /*
-                 * ⚠ 用不帶編號的那一句：選單上的「5.」貼進交接內容裡
-                 * 會變成一個沒有上下文的編號，下一班看不懂那是什麼。
-                 */
-                $text .= $this->text('MANAGER_LINE');
-
-                continue;
-            }
-
-            $text .= strtr($this->text('FILLED_LINE'), [
-                '{title}'  => $gap->title,
-                '{detail}' => (string) $gap->detail,
-            ]);
-        }
-
-        return $text . strtr($this->text('FILLED_ASK'), ['{mention}' => $mention]);
+        return $text . strtr($this->text('SUMMARY_ASK'), [
+            '{mention}' => $this->mentionOf($handover),
+        ]);
     }
 
     /**
-     * 都不用：整批記起來，選單換成結果
+     * 總結裡的一段（「要補上 N 件」底下那幾行）
      *
-     * ⚠ **不再追。** 漏項是判斷題，他可能真的覺得那幾件不必交接 ——
-     * 交接本身催到完成是因為「沒有也會打沒有」，這裡沒有那個前提。
-     *
-     * @param ShiftHandover $handover
-     * @param int $messageId
-     * @return void
+     * @param \Illuminate\Support\Collection $gaps
+     * @param string $headerKey
+     * @return string
      */
-    private function skipAll(ShiftHandover $handover, $messageId)
+    private function summarySection($gaps, $headerKey)
     {
-        $pending = $this->gapRepository->getPendingByHandover((int) $handover->id);
+        if (blank($gaps)) {
+            return '';
+        }
 
-        $this->gapRepository->markStatus(
-            $pending->pluck('id')->all(),
-            config('constants.HANDOVER_REVIEW.STATUS.SKIPPED')
-        );
+        $text = strtr($this->text($headerKey), ['{count}' => $gaps->count()]);
 
-        $this->supportGroup->editMessage($messageId, $this->text('RESULT_SKIPPED'));
+        foreach ($gaps as $gap) {
+            /*
+             * ⚠ 主管交代那一題印固定的一句：它的 `title` 是空的
+             * （那一題不是從任何一張表撈出來的），直接印會變成一行空白的「•」。
+             */
+            $text .= $gap->isManagerAsk()
+                ? $this->text('SUMMARY_MANAGER_LINE')
+                : strtr($this->text('SUMMARY_LINE'), ['{title}' => $gap->title]);
+        }
+
+        return $text;
+    }
+
+    /**
+     * 挑出某一種處置的項目
+     *
+     * @param \Illuminate\Support\Collection $all
+     * @param int $status
+     * @return \Illuminate\Support\Collection
+     */
+    private function ofStatus($all, $status)
+    {
+        return $all->filter(function ($gap) use ($status) {
+            return (int) $gap->status === (int) $status;
+        });
     }
 
     // ---------------------------------------------------------------

@@ -244,10 +244,10 @@ class TelegramWebhookController extends Controller
         }
 
         /*
-         * 交接漏項選單的【N 補上】【全部補上】【都不用】。
+         * 交接漏項**逐題**問的【要補上】【不用補】。
          *
          * ⚠ service 裡會再驗一次「按的人是不是打交接的本人」——
-         * 下一班按「補上」等於他在替上一班承諾。
+         * 下一班按「要補上」等於他在替上一班承諾。
          */
         if ($prefix === (string) config('constants.HANDOVER_REVIEW.CALLBACK')) {
             $this->botService->answerCallbackQuery(Arr::get($callback, 'id'));
