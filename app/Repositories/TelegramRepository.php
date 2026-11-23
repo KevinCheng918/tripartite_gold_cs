@@ -422,15 +422,20 @@ class TelegramRepository
      * @param int      $groupId
      * @param int|array|null $excludeId 不算脈絡的 id（可給陣列：客人這一輪的那幾則）
      * @param int      $limit
-     * @param int      $minutes   只看這段時間內的；更早的多半是別的問題
+     * @param int      $hours     最多往回翻這麼久（只是硬上限，不是相關性判斷）
      * @return Collection 依時間正序（舊 → 新）
      */
-    public function getRecentMessages($groupId, $excludeId, $limit, $minutes)
+    public function getRecentMessages($groupId, $excludeId, $limit, $hours)
     {
         $query = TelegramMessage::query()
             ->select(['id', 'direction', 'sender_name', 'content', 'media_type', 'created_at'])
             ->where('telegram_group_id', $groupId)
-            ->where('created_at', '>=', now()->subMinutes($minutes));
+            /*
+             * ⚠ 這條線**不是拿來判斷「還相不相關」的**，只是擋住
+             * 「翻到好幾天前」（需求方 2026-11-24）。真正限制長度的是
+             * `limit` 則數；相不相關由模型自己看「多久以前」去判斷。
+             */
+            ->where('created_at', '>=', now()->subHours($hours));
 
         /*
          * ⚠️ 一定要判斷有沒有值：`id <> NULL` 在 SQL 裡恆為 NULL，

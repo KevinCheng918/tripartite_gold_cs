@@ -85,7 +85,7 @@ class AutoReplyJob implements ShouldQueue
          * **連 AI 都不呼叫**，省一次 CLI。
          *
          * 答案的完整性不受影響：最後那則回覆時，脈絡本來就會帶上前面幾則
-         * （`auto_reply.context`，前 6 則／15 分鐘），所以不需要把文字合併。
+         * （`auto_reply.context`，前 6 則），所以不需要把文字合併。
          */
         if ($this->supersededBy($telegramRepository, '開始前')) {
             return;

@@ -128,7 +128,7 @@ class AutoReplyService
             $group->id,
             $messageId,
             $this->contextSetting('limit'),
-            $this->contextSetting('minutes')
+            $this->contextSetting('run_minutes')
         );
 
         $question = $this->mergeRun($run, $text);
@@ -311,11 +311,28 @@ class AutoReplyService
          */
         $skip = filled($excludeIds) ? $excludeIds : [$messageId];
 
+        /*
+         * ⚠⚠ **不要再用「只看最近 15 分鐘」切脈絡**（需求方 2026-11-24：
+         * 「對話脈絡不應該侷限寫死 15 分鐘，應該要看他是否有引用哪句話，
+         * 或是前一段訊息在講什麼，往回去看，不然都有一種笨笨的
+         * 判斷力不好的感覺」）。
+         *
+         * 2026-11-23 線上實例就是這樣掉的：13:11 同仁人工問
+         * 「超商通道設定上還順利嗎」，客人 **23:52** 才回「明天設定」——
+         * 隔了 11 小時，15 分鐘那條線把那則問話整個切掉，
+         * **模型手上只剩「明天設定」四個字**，接著必然轉人工。
+         *
+         * ⚠ 那一案客人**並沒有引用**（他直接打字回的），所以
+         * `withQuote()` 救不到 —— 真正要修的是這條時間線。
+         *
+         * 現在傳進去的是 `max_hours`（24 小時），而它**不是相關性判斷**，
+         * 只是擋住「翻到好幾天前」。長度仍然由 `limit` 則數控制。
+         */
         $messages = $this->telegramRepository->getRecentMessages(
             $groupId,
             $skip,
             $limit,
-            $this->contextSetting('minutes')
+            $this->contextSetting('max_hours')
         );
 
         $inbound = config('constants.TELEGRAM.DIRECTION.INBOUND');
@@ -339,29 +356,77 @@ class AutoReplyService
             // 換行全部壓成空白：一則佔一行，模型才分得出哪裡是一則的開始
             $content = preg_replace('/\s+/u', ' ', $content);
 
+            /*
+             * ⚠⚠ **每一則都要標「多久以前」。**
+             *
+             * 拿掉 15 分鐘那條線之後，脈絡裡可能混著「2 分鐘前」與
+             * 「8 小時前」的訊息 —— 不標的話模型會把它們一視同仁，
+             * 可能拿早上那件事去解釋現在這句話。
+             *
+             * ⚠ 相關性**交給模型判斷**，不要我們硬切：它看得到
+             * 「這是 8 小時前的事」就會自己掂量要不要採用，而我們切的
+             * 那一刀永遠會切錯一邊（15 分鐘就是切錯的那一刀）。
+             */
+            $when = $this->agoLabel($message->created_at);
+
             $lines[] = $message->direction === $inbound
-                ? "客人 {$message->sender_name}：{$content}"
-                : "客服：{$content}";
+                ? "（{$when}）客人 {$message->sender_name}：{$content}"
+                : "（{$when}）客服：{$content}";
         }
 
         return $this->trimHistory($lines);
     }
 
     /**
+     * 「多久以前」
+     *
+     * ⚠ **自己算，不要用 `diffForHumans()`** —— 那一支吃 app locale，
+     * 吐出來的字會隨設定變（英文環境會變成 "11 hours ago"），
+     * 而這段文字是要送進模型的，不該跟後台語系綁在一起。
+     *
+     * @param \Illuminate\Support\Carbon|null $at
+     * @return string
+     */
+    private function agoLabel($at)
+    {
+        if (blank($at)) {
+            return '時間不明';
+        }
+
+        $minutes = (int) $at->diffInMinutes(now());
+
+        if ($minutes < 1) {
+            return '剛剛';
+        }
+
+        if ($minutes < 60) {
+            return "{$minutes} 分鐘前";
+        }
+
+        $hours = intdiv($minutes, 60);
+
+        if ($hours < 24) {
+            return "{$hours} 小時前";
+        }
+
+        return intdiv($hours, 24) . ' 天前';
+    }
+
+    /**
      * 把客人引用的那一則接到脈絡最前面
      *
-     * ⚠⚠ **這一則不受 `auto_reply.context.minutes` 限制，是刻意的。**
-     *
-     * 2026-11-23 線上實例：13:11 同仁主動問「超商通道設定上還順利嗎」，
-     * 客人 **23:52** 引用那一則回「明天設定」—— 小幫手回了
-     * 「這部分已經請專員為您確認」，整個答非所問。
-     *
-     * 原因不是模型笨，是**它什麼都沒看到**：脈絡只撈 15 分鐘內，
-     * 隔了 11 小時的那則問話根本不在裡面，模型手上就只有
-     * 「明天設定」四個字 —— 不可能判斷得出那是在回答我們。
-     * 而客人其實已經明確指著我們那一則了。
-     *
+     * ⚠⚠ **這一則不受任何時間限制，是刻意的。**
      * 客人指著哪一則，那一則就是他的上下文，**隔多久都一樣**。
+     *
+     * ⚠ 2026-11-23 那個線上案例（同仁 13:11 問「超商通道設定上還順利嗎」、
+     * 客人 23:52 回「明天設定」、小幫手回「已經請專員為您確認」）
+     * **不是靠這一支修的** —— 需求方確認客人那則是**直接打字回的、
+     * 沒有引用**。那一案真正的成因是脈絡寫死 15 分鐘
+     * （見 `buildHistory()`）。
+     *
+     * 這一支補的是另一半：客人**真的有引用**時，那段文字我們一直有存
+     * （`telegram_message.reply_to_text`），卻只拿來給後台對話窗顯示，
+     * 從來沒送給模型。
      *
      * ⚠ 已經在脈絡裡的就不要再貼一次（他引用的是幾分鐘前那則時會重複）。
      *
