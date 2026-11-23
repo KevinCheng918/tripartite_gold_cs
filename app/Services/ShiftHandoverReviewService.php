@@ -139,8 +139,8 @@ class ShiftHandoverReviewService
 
         /*
          * 「另外還有 N 件」那種補充說明要先抽出來：它不是一件具體的事，
-         * **不該佔選單編號**（佔了就會出現 1、2、3、5 這種跳號，看起來像壞掉），
-         * 也不該被送去比對。
+         * **不該佔一個題號** —— 佔了就會多出一題**問不出答案的題目**
+         * （沒有東西可以補，他只能卡在那裡），也不該被送去比對。
          */
         $split = $this->splitNotes($this->collect($handover));
         $candidates = (array) Arr::get($split, 'items', []);
@@ -236,7 +236,36 @@ class ShiftHandoverReviewService
             return;
         }
 
-        $gap = $this->gapRepository->findBySeq($handoverId, (int) Arr::get($parts, 2, 0));
+        $seq = (int) Arr::get($parts, 2, 0);
+        $status = $this->statusOfAction($action);
+
+        /*
+         * ⚠⚠ **認不出來的按鈕不能當成「不用補」。**
+         *
+         * 第一版寫成「是 FILL 就補、否則就是 SKIP」，於是任何雜訊都會把
+         * 那一題標成**他說不用補** —— 而他其實什麼都沒選。
+         *
+         * ⚠ 這不是理論問題：**改版的那一刻，話題裡還留著上一版發出去的
+         * 選單**，`[全部補上]`（action `a`）跟 `[都不用]` 都按得下去。
+         *
+         * 兩種都要擋：
+         * - action 不是 `FILL`／`SKIP`（舊版的 `a`、被改過的 callback）
+         * - **`seq < 1`** —— 新版題號從 1 起算，舊版那兩顆整批按鈕不指向
+         *   任何一項、固定帶 0。放它往下走會查不到題目，然後回一句
+         *   「這一題已經答過了」，而那是在講一件沒發生過的事。
+         */
+        if (blank($status) || $seq < 1) {
+            Log::warning('交接漏項收到認不出來的按鈕（可能是改版前的舊選單）', [
+                'handover_id' => $handoverId,
+                'action'      => $action,
+                'seq'         => $seq,
+            ]);
+            $this->supportGroup->editMessage($messageId, $this->text('ACTION_GONE'));
+
+            return;
+        }
+
+        $gap = $this->gapRepository->findBySeq($handoverId, $seq);
 
         /*
          * ⚠ 已經答過的要擋下來：兩個人同時按、或 Telegram 重送 callback 時，
@@ -248,16 +277,32 @@ class ShiftHandoverReviewService
             return;
         }
 
-        $fill = (string) config('constants.HANDOVER_REVIEW.ACTION.FILL');
+        $this->answer($handover, $gap, $messageId, (int) $status);
+    }
 
-        $this->answer(
-            $handover,
-            $gap,
-            $messageId,
-            $action === $fill
-                ? (int) config('constants.HANDOVER_REVIEW.STATUS.FILLED')
-                : (int) config('constants.HANDOVER_REVIEW.STATUS.SKIPPED')
-        );
+    /**
+     * 按鈕動作 → 要寫進去的處置
+     *
+     * ⚠ 認不出來的回 null，呼叫端負責擋掉 —— **不要給預設值**，
+     * 那會把雜訊靜靜地記成一個他沒做過的決定。
+     *
+     * @param string $action
+     * @return int|null 見 constants.HANDOVER_REVIEW.STATUS
+     */
+    private function statusOfAction($action)
+    {
+        $actions = (array) config('constants.HANDOVER_REVIEW.ACTION');
+        $status = (array) config('constants.HANDOVER_REVIEW.STATUS');
+
+        if ($action === (string) Arr::get($actions, 'FILL')) {
+            return (int) Arr::get($status, 'FILLED');
+        }
+
+        if ($action === (string) Arr::get($actions, 'SKIP')) {
+            return (int) Arr::get($status, 'SKIPPED');
+        }
+
+        return null;
     }
 
     // ---------------------------------------------------------------
@@ -905,7 +950,28 @@ class ShiftHandoverReviewService
     private function answer(ShiftHandover $handover, ShiftHandoverGap $gap, $messageId, $status)
     {
         $handoverId = (int) $handover->id;
-        $this->gapRepository->markStatus([(int) $gap->id], $status);
+
+        /*
+         * ⚠⚠ **一定要看 `markStatus()` 的回傳筆數。**
+         *
+         * 那一支帶了 `where('status', PENDING)` 的樂觀鎖，就是為了擋
+         * 「撈出來到更新之間被另一顆按鈕處理掉」—— 但不看回傳值的話
+         * 那道鎖等於沒寫：
+         *
+         * 兩個 callback 同時進來（他連按兩下、或 Telegram 重送）時，
+         * 兩邊都會通過前面的 `isPending()`，接著 A 更新到 1 筆、
+         * B 更新到 **0 筆** —— 而 B 若照常往下跑，就會**把同一題再問一次**，
+         * 話題裡出現兩則一樣的題目、兩顆都按得下去。
+         */
+        if ($this->gapRepository->markStatus([(int) $gap->id], $status) < 1) {
+            Log::info('交接漏項這一題剛好被另一次按鈕處理掉了，這一次不往下走', [
+                'handover_id' => $handoverId,
+                'seq'         => $gap->seq,
+            ]);
+            $this->supportGroup->editMessage($messageId, $this->text('RESULT_GONE'));
+
+            return;
+        }
 
         /*
          * 標記完才撈，而且**只撈一次**：總結要印的是答完之後的狀態，
