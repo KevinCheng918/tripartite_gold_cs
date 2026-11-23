@@ -74,6 +74,22 @@ class ShiftHandoverGapRepository
     }
 
     /**
+     * 這一次交接盤出來幾題
+     *
+     * ⚠ **不要用 `getByHandover()->count()` 代替** —— 那會把整批列
+     * 撈回來只為了數個數。只需要題號的分母（「第 2 題（共 N 題）」）時用這支。
+     *
+     * @param int $handoverId
+     * @return int
+     */
+    public function countByHandover($handoverId)
+    {
+        return ShiftHandoverGap::query()
+            ->where('shift_handover_id', $handoverId)
+            ->count();
+    }
+
+    /**
      * 選單上的第 N 項
      *
      * ⚠ 一定要**兩個條件一起比**：`seq` 只在同一次交接裡唯一

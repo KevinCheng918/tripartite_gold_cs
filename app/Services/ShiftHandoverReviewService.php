@@ -226,16 +226,6 @@ class ShiftHandoverReviewService
             return;
         }
 
-        /*
-         * ⚠ **只有打交接的本人按得動。** 下一班的人按「要補上」等於他在
-         * 替上一班承諾 —— 而補上去的那句現況只有上一班答得出來。
-         */
-        if (!$this->isOwner($handover, $from)) {
-            $this->supportGroup->editMessage($messageId, $this->text('NOT_OWNER'));
-
-            return;
-        }
-
         $seq = (int) Arr::get($parts, 2, 0);
         $status = $this->statusOfAction($action);
 
@@ -267,17 +257,100 @@ class ShiftHandoverReviewService
 
         $gap = $this->gapRepository->findBySeq($handoverId, $seq);
 
-        /*
-         * ⚠ 已經答過的要擋下來：兩個人同時按、或 Telegram 重送 callback 時，
-         * 不擋就會多問一次下一題（而第一次問的那一則還掛著按鈕）。
-         */
-        if (blank($gap) || !$gap->isPending()) {
+        if (blank($gap)) {
             $this->supportGroup->editMessage($messageId, $this->text('RESULT_GONE'));
 
             return;
         }
 
+        /*
+         * ⚠ 已經答過的要擋下來：他連按兩下、或 Telegram 重送 callback 時，
+         * 不擋就會多問一次下一題（而第一次問的那一則還掛著按鈕）。
+         *
+         * ⚠⚠ 但**擋的方式不能是把那一則換成一句「已經答過了」** ——
+         * 見 `restoreAnswered()`。
+         */
+        if (!$gap->isPending()) {
+            $this->restoreAnswered($handover, $handoverId, $seq, $messageId);
+
+            return;
+        }
+
+        /*
+         * ⚠ **只有打交接的本人按得動。** 下一班的人按「要補上」等於他在
+         * 替上一班承諾 —— 而補上去的那句現況只有上一班答得出來。
+         *
+         * ⚠⚠ **不可以把題目換掉。** 第一版直接把整則改成
+         * 「這是請交接的人自己決定的」—— **題目跟按鈕都不見了，
+         * 本人從此答不了這一題，整輪就停在這裡**。
+         * 下一班的人好奇按一下就能毀掉一題，而他完全不知道自己做了什麼。
+         *
+         * 改成把題目原樣重貼、**按鈕留著**，後面接一句說明誰該答。
+         * 重貼的文字跟誰按都無關，所以按幾次都一樣。
+         */
+        if (!$this->isOwner($handover, $from)) {
+            $total = $this->gapRepository->countByHandover($handoverId);
+
+            $this->supportGroup->editMessage(
+                $messageId,
+                $this->buildQuestionText($handover, $gap, $total)
+                    . strtr($this->text('NOT_OWNER'), ['{mention}' => $this->mentionOf($handover)]),
+                $this->questionKeyboard($handover, $gap)
+            );
+
+            return;
+        }
+
         $this->answer($handover, $gap, $messageId, (int) $status);
+    }
+
+    /**
+     * 把那一則還原成「題目 ＋ 已經記下的答案」
+     *
+     * ⚠⚠ **重按一顆已經答過的按鈕，不可以把那一則的內容蓋掉。**
+     * 第一版回的是一句乾的「這一題已經答過了。」—— 整則被取代，
+     * **題目跟答案都不見了**，而那一則就是這個功能唯一的紀錄
+     * （需求方 2026-11-23 要的「回過頭來看才知道斷在哪裡」）。
+     *
+     * ⚠ 這條路一定會被走到：**網路不好時按兩下是很正常的事** ——
+     * 第一次的編輯還沒傳回他的畫面，按鈕看起來還在。Telegram 自己也會
+     * 重送 callback。
+     *
+     * 重組出來的文字跟另一次寫進去的**一模一樣**（都是
+     * `buildAnsweredText()` 吃同一列資料），所以按幾次結果都相同。
+     *
+     * @param ShiftHandover $handover
+     * @param int $handoverId
+     * @param int $seq
+     * @param int $messageId
+     * @return void
+     */
+    private function restoreAnswered(ShiftHandover $handover, $handoverId, $seq, $messageId)
+    {
+        // 重新撈一次：要的是**另一次已經寫進去**的那個處置
+        $fresh = $this->gapRepository->findBySeq($handoverId, $seq);
+
+        if (blank($fresh) || $fresh->isPending()) {
+            $this->supportGroup->editMessage($messageId, $this->text('RESULT_GONE'));
+
+            return;
+        }
+
+        Log::info('交接漏項這一題已經答過了，把那一則還原成紀錄', [
+            'handover_id' => $handoverId,
+            'seq'         => $seq,
+            'status'      => $fresh->status,
+        ]);
+
+        $this->supportGroup->editMessage(
+            $messageId,
+            $this->buildAnsweredText(
+                $handover,
+                $fresh,
+                $this->gapRepository->countByHandover($handoverId),
+                (int) $fresh->status
+            )
+        );
     }
 
     /**
@@ -967,8 +1040,14 @@ class ShiftHandoverReviewService
             Log::info('交接漏項這一題剛好被另一次按鈕處理掉了，這一次不往下走', [
                 'handover_id' => $handoverId,
                 'seq'         => $gap->seq,
+                'status'      => $status,
             ]);
-            $this->supportGroup->editMessage($messageId, $this->text('RESULT_GONE'));
+
+            /*
+             * ⚠ 搶輸的這一邊**也不能把那一則蓋掉**：它要還原成贏的那一邊
+             * 寫進去的紀錄，不是一句「已經答過了」。理由同 `restoreAnswered()`。
+             */
+            $this->restoreAnswered($handover, $handoverId, (int) $gap->seq, $messageId);
 
             return;
         }
