@@ -173,10 +173,12 @@ class ShiftHandoverGapRepository
         $existing = trim((string) $gap->filled_note);
         $merged = blank($existing) ? trim($note) : $existing . "\n" . trim($note);
 
-        return $gap->forceFill([
+        // ⚠ 用 `update()` 不用 `forceFill()`：model 的 `$guarded` 只有 `id`，
+        // 這兩欄本來就填得進去，繞過 guard 沒有必要也掩蓋了意圖
+        return $gap->update([
             'filled_note' => $merged,
             'filled_at'   => now(),
-        ])->save();
+        ]);
     }
 
     /**
@@ -191,10 +193,10 @@ class ShiftHandoverGapRepository
      */
     public function markReminded(ShiftHandoverGap $gap, $seq)
     {
-        return $gap->forceFill([
+        return $gap->update([
             'remind_count'     => (int) $seq,
             'last_reminded_at' => now(),
-        ])->save();
+        ]);
     }
 
     /**

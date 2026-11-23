@@ -684,3 +684,43 @@ shift_handover      + review_opening_message_id（索引）
 **端到端**：`review()` 存下開場與題目的 message_id → 答「有，我補上」
 存下總結的 message_id → 引用總結補內容 → `needsFill()` 從 yes 變 no
 → 不再被催。
+
+### 稽核再修掉的三件（v4.06，按 PROMPTS.md 逐項對照）
+
+1. ⚠⚠ **沒先確認是交接話題就去查 DB**（第 2 節 short-circuit）。
+
+   `handleTopicReply()` 第一版只靠「引用的那則反查得到嗎」過濾 ——
+   但**話題群組裡每一則訊息都帶 `reply_to_message`**（指向話題的建立
+   訊息），所以支援群組裡**每一句閒聊、每一次求助單作答**都會先白白
+   跑兩次索引反查。
+
+   ⚠ `AutoReplySupportService::isTicketTopic()` 的註解寫的就是同一件事
+   （「擺在查 DB 之前是刻意的」），而我把這一支擺在它前面，
+   等於把那道防線繞過去了。
+
+   改成先比 `message_thread_id` 是不是交接話題
+   —— 那一步只讀設定快取（`AppSettingService::all()` 有快取）。
+
+2. ⚠ **主管名單在進迴圈前被無條件查一次**（同上）。
+   絕大多數輪次沒有任何一筆到得了 `ESCALATE_AT`，那次查詢是白打的。
+   改成 `managers()` 延後到真的要升級時才查，並用 memo 保證整輪只查一次。
+   ⚠ memo 用 `array_key_exists` 判斷查過沒，不是 `filled()` ——
+   空集合也要記住，否則每一筆都會再確認一次「還是沒有」。
+
+3. `appendFilledNote()`／`markReminded()` 用了 `forceFill()`：
+   model 的 `$guarded` 只有 `id`，這幾欄本來就填得進去 ——
+   繞過 guard 沒有必要，也掩蓋了意圖。改 `update()`。
+
+驗證（交易內 rollback，用 `DB::enableQueryLog()` 數查詢次數）：
+
+| 情境 | 結果 |
+|---|---|
+| 引用的訊息**不在交接話題**（求助單話題的作答） | 回 false，**0 次查詢** |
+| 主區發言（沒有 `message_thread_id`） | 回 false，**0 次查詢** |
+| 在交接話題、引用那一題 | 正常收下並回話 |
+| 引用總結、但這一輪沒有欠著的 | 回 false、**不回話** |
+| 催補：沒有任何一筆到第 3 次 | **沒有查主管名單** |
+| 催補：有一筆到第 3 次 | 主管名單**只查 1 次** |
+
+⚠ 數查詢時要只比對主管名單那一句（`level <= ?`）——
+`ownerOf()` 查交接人是本來就該查的，混在一起會誤判。

@@ -80,6 +80,17 @@ class ShiftHandoverReviewService
      */
     private $owners = [];
 
+    /**
+     * 這一次請求查過的主管名單
+     *
+     * ⚠ 催補一輪可能有好幾筆到達 `ESCALATE_AT`，名單對每一筆都一樣 ——
+     * 逐筆查就是 N 倍查詢。而**真的到得了那個次數的輪次很少**，
+     * 所以也不該在進迴圈前無條件查（見 `managers()`）。
+     *
+     * @var array<string, \Illuminate\Support\Collection>
+     */
+    private $managers = [];
+
     public function __construct(
         ShiftHandoverRepository $handoverRepository,
         ShiftHandoverGapRepository $gapRepository,
@@ -411,12 +422,28 @@ class ShiftHandoverReviewService
         $quotedId = (int) Arr::get($message, 'reply_to_message.message_id', 0);
         $note = trim((string) Arr::get($message, 'text', ''));
 
-        /*
-         * ⚠ 話題群組裡**每一則訊息都帶 `reply_to_message`**（指向話題的
-         * 建立訊息），所以光有引用不代表什麼 —— 真正的過濾是下面那兩次反查。
-         * 這裡先擋掉沒有引用、沒有文字的，省掉查詢。
-         */
+        // 純字串判斷，最便宜，擺最前面
         if ($quotedId < 1 || blank($note)) {
+            return false;
+        }
+
+        /*
+         * ⚠⚠ **一定要先確認是交接話題，才可以去查 DB。**
+         *
+         * 話題群組裡**每一則訊息都帶 `reply_to_message`**（指向話題的
+         * 建立訊息），所以上面那一道幾乎擋不掉任何東西 ——
+         * 少了這一道，支援群組裡**每一句閒聊、每一次求助單作答**
+         * 都會先白白跑兩次反查。
+         *
+         * `AutoReplySupportService::isTicketTopic()` 的註解寫的是同一件事，
+         * 而第一版我把這一支擺在它前面，等於把那道防線繞過去了。
+         *
+         * ⚠ 這一步只讀快取（`AppSettingService::all()` 有快取），
+         * 符合「config／cache 判斷先於 DB 查詢」。
+         */
+        $threadId = (int) Arr::get($message, 'message_thread_id', 0);
+
+        if ($threadId < 1 || !in_array($threadId, $this->supportGroup->topicIdsFor(self::NOTICE_TYPE), true)) {
             return false;
         }
 
@@ -577,17 +604,36 @@ class ShiftHandoverReviewService
         }
 
         $escalateAt = (int) config('constants.HANDOVER_REVIEW.ESCALATE_AT');
-        // ⚠ 主管名單整輪只查一次 —— 逐筆查就是 N 倍查詢
-        $managers = $this->userRepository->getManagersForMention();
         $sent = 0;
 
         foreach ($due as $gap) {
-            if ($this->remindOne($gap, $escalateAt, $managers)) {
+            if ($this->remindOne($gap, $escalateAt)) {
                 $sent++;
             }
         }
 
         return $sent;
+    }
+
+    /**
+     * 主管名單（整支程式只查一次）
+     *
+     * ⚠⚠ **要延後到真的有人催到第 N 次才查。** 第一版是進迴圈前
+     * 無條件查一次 —— 但絕大多數輪次裡沒有任何一筆到得了 `ESCALATE_AT`，
+     * 那一次查詢就是白打的。
+     *
+     * ⚠ 用 `array_key_exists` 判斷查過沒，不是 `filled()` ——
+     * 查不到（空集合）也要記住，否則每一筆都會再查一次確認「還是沒有」。
+     *
+     * @return \Illuminate\Support\Collection
+     */
+    private function managers()
+    {
+        if (!array_key_exists('all', $this->managers)) {
+            $this->managers['all'] = $this->userRepository->getManagersForMention();
+        }
+
+        return $this->managers['all'];
     }
 
     /**
@@ -598,10 +644,9 @@ class ShiftHandoverReviewService
      *
      * @param ShiftHandoverGap $gap
      * @param int              $escalateAt
-     * @param \Illuminate\Support\Collection $managers
      * @return bool
      */
-    private function remindOne(ShiftHandoverGap $gap, $escalateAt, $managers)
+    private function remindOne(ShiftHandoverGap $gap, $escalateAt)
     {
         $handover = $gap->handover;
 
@@ -616,9 +661,9 @@ class ShiftHandoverReviewService
         $seq = (int) $gap->remind_count + 1;
         $mention = $this->mentionOf($handover);
 
-        // 催到第 N 次還沒補，連主管一起 tag
+        // 催到第 N 次還沒補，連主管一起 tag（名單延後到這裡才查）
         if ($seq >= $escalateAt) {
-            $others = $this->withoutOwner($managers, $handover);
+            $others = $this->withoutOwner($this->managers(), $handover);
 
             if (filled($others)) {
                 $mention .= ' ' . $this->buildMentions($others);
