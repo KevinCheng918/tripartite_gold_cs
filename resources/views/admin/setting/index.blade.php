@@ -119,6 +119,9 @@ npm install -g @anthropic-ai/claude-code</code></pre>
                                     <i class="fas fa-plug me-1"></i>{{ trans('setting.action_test') }}
                                 </button>
                                 <span id="fallback-test-result" style="font-size:0.875rem"></span>
+                            </div>
+                            {{-- 另起一行，理由同上面主要憑證那一區 --}}
+                            <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
                                 <button type="button" class="btn btn-outline-secondary js-manage-only js-test-image-read" data-type="fallback">
                                     <i class="fas fa-image me-1"></i>{{ trans('setting.action_test_image') }}
                                 </button>

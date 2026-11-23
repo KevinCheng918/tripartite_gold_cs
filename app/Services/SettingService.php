@@ -65,7 +65,8 @@ class SettingService
      */
     public function updateClaude($params, $userId = null)
     {
-        $token = isset($params['token']) ? trim((string) $params['token']) : '';
+        // ⚠ 用 Arr::get 不用 isset 三元（專案通則；沒帶這個 key 時一樣得到空字串）
+        $token = trim((string) Arr::get($params, 'token'));
 
         if (filled($token)) {
             if (!$this->matcher->verifyCredential($token, false)) {
@@ -90,7 +91,8 @@ class SettingService
      */
     public function updateFallback($params, $userId = null)
     {
-        $apiKey = isset($params['api_key']) ? trim((string) $params['api_key']) : '';
+        // ⚠ 同上，用 Arr::get
+        $apiKey = trim((string) Arr::get($params, 'api_key'));
 
         if (filled($apiKey)) {
             if (!$this->matcher->verifyCredential($apiKey, true)) {
