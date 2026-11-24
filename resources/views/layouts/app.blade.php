@@ -570,16 +570,18 @@
                 <div class="modal-body p-0">
                     @foreach(config('changelog', []) as $idx => $log)
                     <details class="changelog-item border-bottom{{ $idx === 0 ? ' changelog-latest' : '' }}" @if($idx === 0) open @endif>
-                        {{-- ⚠ list-style 要關掉：預設的三角形在 Safari 與 Chrome 長得不一樣，
-                             自己畫一個才會兩邊一致（也才轉得動） --}}
-                        <summary class="d-flex align-items-center px-4 py-3" style="cursor:pointer;list-style:none;user-select:none">
-                            <i class="fas fa-chevron-right changelog-caret me-2 text-muted" style="font-size:0.75rem;transition:transform 0.15s"></i>
-                            <span class="badge me-2" style="background:#d4af37;color:#fff;font-size:0.75rem">{{ $log['version'] }}</span>
+                        {{-- ⚠ 可點樣式與箭頭旋轉都在 public/css/custom.css（`#modal-changelog summary`）——
+                             那裡還要關掉 Safari 的預設三角，兩邊各寫一份會改了一邊沒改另一邊 --}}
+                        <summary class="d-flex align-items-center px-4 py-3">
+                            <i class="fas fa-chevron-right changelog-caret me-2 text-muted"></i>
+                            {{-- ⚠ 陣列取值用 data_get 不用 $log['x']（專案通則）——
+                                 少一個 key 時這裡會是空字串，不會整頁 500 --}}
+                            <span class="badge me-2" style="background:#d4af37;color:#fff;font-size:0.75rem">{{ data_get($log, 'version') }}</span>
                             {{-- ⚠ 標題要能縮：版號與日期是固定寬度，手機上標題太長會把日期擠出畫面 --}}
-                            <span class="fw-bold text-truncate" style="font-size:1rem">{{ $log['title'] }}</span>
-                            <span class="ms-auto ps-2 text-muted text-nowrap" style="font-size:0.8125rem">{{ $log['date'] }}</span>
+                            <span class="fw-bold text-truncate" style="font-size:1rem">{{ data_get($log, 'title') }}</span>
+                            <span class="ms-auto ps-2 text-muted text-nowrap" style="font-size:0.8125rem">{{ data_get($log, 'date') }}</span>
                         </summary>
-                        <div class="changelog-content text-muted px-4 pb-3" style="font-size:0.875rem;white-space:pre-line;line-height:1.8">{{ $log['content'] }}</div>
+                        <div class="changelog-content text-muted px-4 pb-3" style="font-size:0.875rem;white-space:pre-line;line-height:1.8">{{ data_get($log, 'content') }}</div>
                     </details>
                     @endforeach
                 </div>

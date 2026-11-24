@@ -713,11 +713,17 @@ a:hover { color: #85640a; }
  * —— 只寫前者的話 Safari 仍然會畫它自己的那個三角形，
  * 變成畫面上有兩個箭頭（而且一個轉、一個不轉）。
  */
-#modal-changelog summary { list-style: none; }
+#modal-changelog summary {
+    list-style: none;
+    cursor: pointer;
+    /* 連點兩下展開／收合時不要把標題整段選起來 */
+    user-select: none;
+}
 #modal-changelog summary::-webkit-details-marker { display: none; }
 #modal-changelog summary::marker { content: ''; }
 
 /* 展開時箭頭轉 90 度 —— 不用換圖，也不會有圖還沒載入的空窗 */
+#modal-changelog .changelog-caret { font-size: 0.75rem; transition: transform 0.15s; }
 #modal-changelog details[open] > summary .changelog-caret { transform: rotate(90deg); }
 
 /*
