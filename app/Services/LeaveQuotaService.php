@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\LeaveRequest;
 use App\Models\User;
+use App\Repositories\LeaveCancelRequestRepository;
 use App\Repositories\LeaveRequestRepository;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
@@ -31,9 +32,19 @@ class LeaveQuotaService
 {
     private $leaveRepository;
 
-    public function __construct(LeaveRequestRepository $leaveRepository)
-    {
+    /**
+     * ⚠ TEMP-CANCEL-KEEP-QUOTA：只有 `keptCancelledMinutesIn()` 用得到它。
+     *
+     * @var \App\Repositories\LeaveCancelRequestRepository
+     */
+    private $cancelRepository;
+
+    public function __construct(
+        LeaveRequestRepository $leaveRepository,
+        LeaveCancelRequestRepository $cancelRepository
+    ) {
         $this->leaveRepository = $leaveRepository;
+        $this->cancelRepository = $cancelRepository;
     }
 
     /**
@@ -63,11 +74,25 @@ class LeaveQuotaService
         $entitled = (int) round($days * $dayMinutes);
         $carryOver = $this->carryOverMinutes($user, $period, $dayMinutes);
 
+        /*
+         * 已用 ＝ 已通過的 ＋ **撤銷了但當初選擇不還額度的**。
+         *
+         * ⚠⚠ **TEMP-CANCEL-KEEP-QUOTA** —— 第二段是需求方 2026-11-24 那個
+         * 勾選框的另一半。勾選框拿掉之後不會再有新資料進來，但**既有的
+         * 那幾筆仍然要照舊行為**，所以這一段不要跟著刪。
+         *
+         * ⚠ 撤假**還在等審**的期間，那張單仍然是「已通過」，所以照常被
+         * 第一段算到 —— 這是對的：撤假還沒通過就不該先把額度還他。
+         */
         $used = $this->minutesIn(
             $user,
             Arr::get($period, 'start'),
             Arr::get($period, 'end'),
             LeaveRequest::STATUS_APPROVED
+        ) + $this->keptCancelledMinutesIn(
+            $user,
+            Arr::get($period, 'start'),
+            Arr::get($period, 'end')
         );
 
         $pending = $this->minutesIn(
@@ -288,6 +313,57 @@ class LeaveQuotaService
      * @param int    $status
      * @return int
      */
+    /**
+     * 「已撤銷、但當初選擇不還額度」的那幾張假單，在這段期間裡的分鐘數
+     *
+     * ⚠⚠ **TEMP-CANCEL-KEEP-QUOTA**
+     *
+     * 需求方 2026-11-24 的勾選框不打勾時，那張假單雖然撤銷了，
+     * **仍然算他用掉了這段特休**。所以已用時數要把它們加回來。
+     *
+     * ⚠ **短路兩次**：這個期間內根本沒有撤銷過的特休假時（絕大多數人），
+     * 第一次查完就回 0，不會去碰撤假那張表。
+     *
+     * ⚠ 勾選框之後會拿掉，但**這一支不要跟著刪** ——
+     * 既有那幾筆仍然要照舊行為計算，刪了會讓他們的額度突然多出來。
+     *
+     * @param User   $user
+     * @param Carbon $start
+     * @param Carbon $end
+     * @return int
+     */
+    private function keptCancelledMinutesIn(User $user, Carbon $start, Carbon $end)
+    {
+        $cancelled = $this->leaveRepository->getAnnualByUserAndRange(
+            (int) $user->id,
+            $start->toDateString(),
+            $end->toDateString(),
+            LeaveRequest::STATUS_CANCELLED
+        );
+
+        if (blank($cancelled)) {
+            return 0;
+        }
+
+        $keptIds = $this->cancelRepository->keptQuotaLeaveIds($cancelled->pluck('id')->all());
+
+        if (blank($keptIds)) {
+            return 0;
+        }
+
+        $total = 0;
+
+        foreach ($cancelled as $leave) {
+            if (!in_array((int) $leave->id, $keptIds, true)) {
+                continue;
+            }
+
+            $total += $this->minutesWithin($leave, $start, $end);
+        }
+
+        return $total;
+    }
+
     private function minutesIn(User $user, Carbon $start, Carbon $end, $status)
     {
         $leaves = $this->leaveRepository->getAnnualByUserAndRange(

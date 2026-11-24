@@ -355,6 +355,20 @@ return [
         'keywords' => [
             'leave_request.apply'  => 'permission.leave_request.apply',
             'leave_request.review' => 'permission.leave_request.review',
+
+            /*
+             * 撤銷請假（需求方 2026-11-24）。
+             *
+             * ⚠⚠ **`review_cancel` 要獨立，不要併進 `review`。**
+             * 審請假與審撤假是兩種決定 —— 後者會動到特休額度
+             * （勾不勾「加回時數」），併在一起就沒辦法只給其中一種。
+             *
+             * ⚠ `cancel` 是「對自己已通過的假單申請撤銷」，
+             * 跟 `apply` 分開是因為：有人可以請假，但不一定該讓他撤
+             * 已經排進班表的假。
+             */
+            'leave_request.cancel'        => 'permission.leave_request.cancel',
+            'leave_request.review_cancel' => 'permission.leave_request.review_cancel',
         ],
     ],
 

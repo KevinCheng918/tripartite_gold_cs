@@ -56,6 +56,33 @@ return [
         'quota_not_yet'    => 'You are not yet entitled to annual leave (less than six months of service). Please apply for sick or personal leave instead.',
         'user_not_found'   => 'Applicant account not found',
         'already_reviewed' => 'This leave has already been reviewed',
+
+        // Leave cancellation. ⚠ "Cancel" (pending) and "withdraw" (approved) must read differently.
+        'cancel_pending_done'      => 'Leave request cancelled',
+        'cancel_requested'         => 'Cancellation request submitted, awaiting review',
+        'cancel_approved'          => 'Leave cancellation approved',
+        'cancel_rejected'          => 'Leave cancellation rejected',
+        'cancel_not_owner'         => 'You can only cancel your own leave',
+        'cancel_not_pending'       => 'This leave is not pending — use "Request cancellation" instead',
+        'cancel_not_approved'      => 'Only approved leave needs a cancellation request',
+        'cancel_already_started'   => 'This leave has already started or passed and cannot be cancelled',
+        'cancel_already_requested' => 'A cancellation request for this leave is already awaiting review',
+        'cancel_already_reviewed'  => 'This cancellation request has already been reviewed',
+        'cancel_status_invalid'    => 'Invalid review result',
+        'cancel_reason_max'        => 'Cancellation reason is too long (max 500 characters)',
+        'not_found'                => 'Leave request not found',
+
+        'cancel_action'          => 'Request cancellation',
+        'cancel_pending_action'  => 'Cancel request',
+        'cancel_title'           => 'Request leave cancellation',
+        'cancel_reason_label'    => 'Reason (optional)',
+        'cancel_review_title'    => 'Review leave cancellation',
+        'cancel_status_badge'    => 'Cancellation pending',
+        'cancel_cancelled_badge' => 'Cancelled',
+
+        // ⚠ TEMP-CANCEL-KEEP-QUOTA: wording follows the requester, not the implementation.
+        'cancel_restore_quota'      => 'Give back the deducted annual-leave hours',
+        'cancel_restore_quota_hint' => 'Checked by default. Leave it unchecked to cancel the leave while still counting those hours as used.',
         'on_leave_today'   => 'You are on leave today, cannot clock in',
         'leave_blocked'    => 'Approved leave exists on this date, cannot assign shift',
     ],

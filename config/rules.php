@@ -17,6 +17,14 @@ return [
      */
     'SHIFT_HANDOVER_TIME' => 'nullable|date_format:H:i',
 
+    /*
+     * 撤銷請假時填的理由。
+     *
+     * ⚠ **不強制填**：他可能就是單純不請了，硬要他編一個理由
+     * 只會得到一堆「不請了」。審核的人看日期與假別就夠判斷了。
+     */
+    'LEAVE_CANCEL_REASON' => 'nullable|string|max:500',
+
     'USER_ACCOUNT_REGEX'  => 'regex:/^[A-Za-z0-9\_]{4,20}$/',
     'USER_PASSWORD_REGEX' => 'regex:/^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{}|;:,.<>?\/?]{8,}$/',
 

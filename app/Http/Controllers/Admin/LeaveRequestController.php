@@ -3,13 +3,18 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\LeaveRequest\RespondLeaveCancelRequest;
 use App\Http\Requests\LeaveRequest\RespondLeaveRequest;
+use App\Http\Requests\LeaveRequest\StoreLeaveCancelRequest;
 use App\Http\Requests\LeaveRequest\StoreLeaveRequest;
 use App\Http\Resources\LeaveRequestResource;
+use App\Models\LeaveCancelRequest;
 use App\Models\LeaveRequest;
+use App\Services\LeaveCancelService;
 use App\Services\LeaveQuotaService;
 use App\Services\LeaveRequestService;
 use Illuminate\Http\Request;
+use App\Repositories\LeaveCancelRequestRepository;
 use App\Repositories\UserRepository;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
@@ -25,15 +30,23 @@ class LeaveRequestController extends Controller
     // 申請表單要顯示「還剩多少特休」（需求方 2026-11-05）
     private $leaveQuota;
     private $userRepository;
+    // 撤銷請假（需求方 2026-11-24）
+    private $cancelService;
+    // 清單要一次撈完撤假紀錄再配對，避免 N+1（見 withCancels()）
+    private $cancelRepository;
 
     public function __construct(
         LeaveRequestService $leaveService,
         LeaveQuotaService $leaveQuota,
-        UserRepository $userRepository
+        UserRepository $userRepository,
+        LeaveCancelService $cancelService,
+        LeaveCancelRequestRepository $cancelRepository
     ) {
         $this->leaveService = $leaveService;
         $this->leaveQuota = $leaveQuota;
         $this->userRepository = $userRepository;
+        $this->cancelService = $cancelService;
+        $this->cancelRepository = $cancelRepository;
     }
 
     /**
@@ -68,7 +81,7 @@ class LeaveRequestController extends Controller
     {
         $list = $this->leaveService->getMyList(Auth::id());
 
-        return LeaveRequestResource::collection($list);
+        return LeaveRequestResource::collection($this->withCancels($list));
     }
 
     /**
@@ -82,7 +95,36 @@ class LeaveRequestController extends Controller
         $params = $request->only(['user_id', 'status']);
         $list = $this->leaveService->getAll($params);
 
-        return LeaveRequestResource::collection($list);
+        return LeaveRequestResource::collection($this->withCancels($list));
+    }
+
+    /**
+     * 把每張假單最後一筆撤假紀錄掛上去
+     *
+     * ⚠⚠ **一次撈完再在記憶體裡配對，不要在 Resource 裡逐張查** ——
+     * 請假清單一頁十幾張，逐張查就是十幾次查詢（這個專案在
+     * `withMore()` 踩過同一類問題）。
+     *
+     * ⚠ 掛的是一個**自訂屬性**（`latest_cancel`）而不是 Eloquent 關聯：
+     * 關聯會讓每個呼叫端都要記得 `with()`，忘了就靜靜變成 N+1。
+     *
+     * @param \Illuminate\Support\Collection|\Illuminate\Database\Eloquent\Collection $list
+     * @return mixed 原樣回傳（已就地掛上屬性）
+     */
+    private function withCancels($list)
+    {
+        // 短路：空清單不必碰 DB
+        if (blank($list)) {
+            return $list;
+        }
+
+        $cancels = $this->cancelRepository->latestByLeaveIds($list->pluck('id')->all());
+
+        foreach ($list as $leave) {
+            $leave->latest_cancel = $cancels->get((int) $leave->id);
+        }
+
+        return $list;
     }
 
     /**
@@ -155,6 +197,106 @@ class LeaveRequestController extends Controller
             throw $e;
         } catch (\Exception $e) {
             Log::error('請假審核失敗', ['error' => $e->getMessage(), 'leave_id' => $leaveRequest->id]);
+
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * Ajax 取消一張**還在等審**的假單
+     *
+     * ⚠ 不走審核（需求方 2026-11-24）：還沒生效，撤掉不影響任何人。
+     * 跟「撤銷已通過的假」是兩支，不要合併 —— 合併的話「我剛剛按錯了」
+     * 也要等人審才撤得掉。
+     *
+     * @param LeaveRequest $leaveRequest
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxCancelPending(LeaveRequest $leaveRequest)
+    {
+        try {
+            $leave = $this->cancelService->cancelPending($leaveRequest, Auth::id());
+
+            return response()->json([
+                'message' => trans('leave.msg.cancel_pending_done'),
+                'data'    => new LeaveRequestResource($leave->load(['user', 'reviewer'])),
+            ]);
+        } catch (ValidationException $e) {
+            // 同 ajaxRespond()：業務訊息要原樣帶到前端
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('取消請假失敗', ['error' => $e->getMessage(), 'leave_id' => $leaveRequest->id]);
+
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * Ajax 對一張**已通過**的假單申請撤銷
+     *
+     * @param StoreLeaveCancelRequest $request
+     * @param LeaveRequest            $leaveRequest
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxRequestCancel(StoreLeaveCancelRequest $request, LeaveRequest $leaveRequest)
+    {
+        $params = $request->validated();
+
+        try {
+            $this->cancelService->requestCancel(
+                $leaveRequest,
+                Auth::id(),
+                Arr::get($params, 'reason')
+            );
+
+            return response()->json(['message' => trans('leave.msg.cancel_requested')]);
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('撤假申請失敗', ['error' => $e->getMessage(), 'leave_id' => $leaveRequest->id]);
+
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * Ajax 審核一筆撤假申請
+     *
+     * @param RespondLeaveCancelRequest $request
+     * @param LeaveCancelRequest        $leaveCancelRequest
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxRespondCancel(RespondLeaveCancelRequest $request, LeaveCancelRequest $leaveCancelRequest)
+    {
+        $params = $request->validated();
+
+        try {
+            $cancel = $this->cancelService->respond(
+                $leaveCancelRequest,
+                (int) Arr::get($params, 'status'),
+                Auth::id(),
+                [
+                    'note' => Arr::get($params, 'review_note'),
+                    /*
+                     * ⚠⚠ **TEMP-CANCEL-KEEP-QUOTA**：沒帶就是 true（還額度）。
+                     * 那是刻意的預設 —— 絕大多數撤假都該把額度還回去。
+                     */
+                    'restore_quota' => (bool) Arr::get($params, 'restore_quota', true),
+                ]
+            );
+
+            $msg = (int) Arr::get($params, 'status') === LeaveCancelRequest::STATUS_APPROVED
+                ? trans('leave.msg.cancel_approved')
+                : trans('leave.msg.cancel_rejected');
+
+            return response()->json(['message' => $msg, 'data' => ['id' => $cancel->id]]);
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('撤假審核失敗', [
+                'error'     => $e->getMessage(),
+                'cancel_id' => $leaveCancelRequest->id,
+            ]);
 
             return response()->json(['message' => $e->getMessage()], 422);
         }

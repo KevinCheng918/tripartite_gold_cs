@@ -150,6 +150,19 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-list', [LeaveRequestController::class, 'ajaxList'])->middleware('can:leave_request.review')->name('ajax-list');
         Route::post('/ajax-store', [LeaveRequestController::class, 'ajaxStore'])->middleware('can:leave_request.apply')->name('ajax-store');
         Route::put('/ajax-respond/{leaveRequest}', [LeaveRequestController::class, 'ajaxRespond'])->middleware('can:leave_request.review')->name('ajax-respond');
+        /*
+         * 撤銷請假（需求方 2026-11-24）。
+         *
+         * ⚠ **取消與撤銷分成兩支**：待審核的單按了就掉（不走審核），
+         * 已通過的要經過同意 —— 合併的話「我剛剛按錯了」也要等人審。
+         *
+         * ⚠ `review_cancel` 是**獨立的權限**，不能用 `leave_request.review`
+         * —— 審撤假會動到特休額度。
+         */
+        Route::put('/ajax-cancel-pending/{leaveRequest}', [LeaveRequestController::class, 'ajaxCancelPending'])->middleware('can:leave_request.cancel')->name('ajax-cancel-pending');
+        Route::post('/ajax-request-cancel/{leaveRequest}', [LeaveRequestController::class, 'ajaxRequestCancel'])->middleware('can:leave_request.cancel')->name('ajax-request-cancel');
+        Route::put('/ajax-respond-cancel/{leaveCancelRequest}', [LeaveRequestController::class, 'ajaxRespondCancel'])->middleware('can:leave_request.review_cancel')->name('ajax-respond-cancel');
+
         Route::get('/ajax-check', [LeaveRequestController::class, 'ajaxCheck'])->middleware('can:shift.view')->name('ajax-check');
         // 申請表單上的「還剩多少特休」（需求方 2026-11-05）
         Route::get('/ajax-quota', [LeaveRequestController::class, 'ajaxQuota'])->middleware('can:leave_request.apply')->name('ajax-quota');

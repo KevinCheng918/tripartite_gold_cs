@@ -140,6 +140,9 @@ return [
     'leave_request' => [
         'apply'  => '申请请假',
         'review' => '审核请假',
+        // ⚠ 审撤假会动到特休额度，所以跟「审核请假」是两个权限
+        'cancel'        => '申请撤销请假',
+        'review_cancel' => '审核撤销请假',
     ],
     'daily_rate' => [
         'view'   => '查看每日汇率',

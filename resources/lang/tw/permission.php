@@ -148,6 +148,9 @@ return [
     'leave_request' => [
         'apply'  => '申請請假',
         'review' => '審核請假',
+        // ⚠ 審撤假會動到特休額度，所以跟「審核請假」是兩個權限
+        'cancel'        => '申請撤銷請假',
+        'review_cancel' => '審核撤銷請假',
     ],
     'daily_rate' => [
         'view'   => '檢視每日匯率',

@@ -56,6 +56,33 @@ return [
         'quota_not_yet'    => '您目前尚未取得特休（受雇未满六个月），这段期间可改申请病假或事假',
         'user_not_found'   => '找不到申请人的账号',
         'already_reviewed' => '此请假已审核过',
+
+        // 撤销请假。⚠「取消」与「撤销」的讯息要分开
+        'cancel_pending_done'      => '已取消这笔请假申请',
+        'cancel_requested'         => '已送出撤销申请，请等候审核',
+        'cancel_approved'          => '撤销请假已通过',
+        'cancel_rejected'          => '撤销请假已拒绝',
+        'cancel_not_owner'         => '只能撤销自己的请假',
+        'cancel_not_pending'       => '这笔请假不是待审核状态，请改用「申请撤销」',
+        'cancel_not_approved'      => '只有已通过的请假才需要申请撤销',
+        'cancel_already_started'   => '这段假已经开始或已经过去了，没办法撤销',
+        'cancel_already_requested' => '这笔请假已经有一笔撤销申请在等候审核',
+        'cancel_already_reviewed'  => '这笔撤销申请已经审核过了',
+        'cancel_status_invalid'    => '审核结果不正确',
+        'cancel_reason_max'        => '撤销原因过长（上限 500 字）',
+        'not_found'                => '找不到这笔请假',
+
+        'cancel_action'          => '申请撤销',
+        'cancel_pending_action'  => '取消申请',
+        'cancel_title'           => '申请撤销请假',
+        'cancel_reason_label'    => '撤销原因（可不填）',
+        'cancel_review_title'    => '审核撤销请假',
+        'cancel_status_badge'    => '撤销审核中',
+        'cancel_cancelled_badge' => '已撤销',
+
+        // ⚠ TEMP-CANCEL-KEEP-QUOTA：文案用需求方的说法，不要写成实作语言
+        'cancel_restore_quota'      => '加回被扣的特休时数',
+        'cancel_restore_quota_hint' => '预设打勾。不打勾就只是单纯销假，这段特休仍然算已经用掉。',
         'on_leave_today'   => '今日已请假，无法打卡上班',
         'leave_blocked'    => '该日有已通过的请假，无法排班',
     ],

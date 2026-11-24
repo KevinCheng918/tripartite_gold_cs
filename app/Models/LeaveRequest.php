@@ -36,6 +36,16 @@ class LeaveRequest extends Model
     /** @var int 拒絕 */
     public const STATUS_REJECTED = 2;
 
+    /**
+     * @var int 已撤銷（撤假通過之後）
+     *
+     * ⚠⚠ **這個狀態不等於「不算數」。** 撤假審核時那個勾選框若沒打勾
+     * （`leave_cancel_request.restore_quota = false`），這張單**仍然計入
+     * 已用特休** —— 所以凡是算額度的地方都不能只看 `status`。
+     * 見 `LeaveQuotaService` 與 .claude/knowledge/features/leave-cancel.md
+     */
+    public const STATUS_CANCELLED = 3;
+
     /** @var string 特休（會扣額度）*/
     public const TYPE_ANNUAL = 'annual';
     /** @var string 病假 */

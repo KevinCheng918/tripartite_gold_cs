@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ClockAmendment;
+use App\Models\LeaveCancelRequest;
 use App\Models\LeaveRequest;
 use App\Models\ShiftCover;
 use Illuminate\Support\Arr;
@@ -85,6 +86,69 @@ class ApprovalNoticeService
             '{result}'   => $this->resultText(self::FLOW_LEAVE, $status, LeaveRequest::STATUS_APPROVED),
             '{period}'   => $this->leavePeriod($leave),
             '{note}'     => $this->noteLine($leave->review_note),
+        ]);
+    }
+
+    /**
+     * 有人申請撤銷請假
+     *
+     * ⚠ 收件人是**管理者名單**（同其他申請通知）—— 要有人去審。
+     *
+     * @param LeaveCancelRequest $cancel
+     * @param LeaveRequest       $leave
+     * @return void
+     */
+    public function leaveCancelApplied(LeaveCancelRequest $cancel, LeaveRequest $leave)
+    {
+        $this->push('LEAVE_CANCEL_APPLIED', [
+            '{name}'   => $this->nameOf($cancel->requested_by),
+            '{period}' => $this->leavePeriod($leave),
+            '{reason}' => $this->reasonLine($cancel->reason),
+        ]);
+    }
+
+    /**
+     * 撤假審核完 —— **發給申請人**
+     *
+     * ⚠⚠ **收件人跟其他審核通知不一樣**（需求方 2026-11-24：
+     * 「要，而且要單獨發一則」）：其他幾支都是發給管理者名單，
+     * 這一支是發給**提出撤假的那個人**。
+     *
+     * 理由：撤假被拒絕時，他如果不知道，就會以為那天已經不用上班了 ——
+     * 那是會真的出事的誤會。
+     *
+     * ⚠ 額度有沒有還回去也要寫進去。沒寫的話他看到「撤假通過」
+     * 會理所當然地以為特休回來了，而那不一定。
+     *
+     * @param LeaveCancelRequest $cancel
+     * @param LeaveRequest       $leave
+     * @param int                $status
+     * @param bool               $restoreQuota
+     * @return void
+     */
+    public function leaveCancelReviewed(LeaveCancelRequest $cancel, LeaveRequest $leave, $status, $restoreQuota)
+    {
+        $approved = (int) $status === LeaveCancelRequest::STATUS_APPROVED;
+
+        /*
+         * ⚠ 只有「通過」才講額度 —— 被拒絕的時候假單根本沒動，
+         * 提額度只會讓人更困惑。
+         * ⚠ 也只有**特休**才講：病假與事假本來就不扣額度。
+         */
+        $quotaLine = '';
+
+        if ($approved && (string) $leave->type === LeaveRequest::TYPE_ANNUAL) {
+            $quotaLine = (string) config(
+                'constants.APPROVAL_NOTICE.' . ($restoreQuota ? 'LEAVE_CANCEL_QUOTA_BACK' : 'LEAVE_CANCEL_QUOTA_KEPT')
+            );
+        }
+
+        $this->pushToUsers([(int) $cancel->requested_by], 'LEAVE_CANCEL_REVIEWED', [
+            '{result}'   => $this->resultText(self::FLOW_LEAVE, $status, LeaveCancelRequest::STATUS_APPROVED),
+            '{reviewer}' => $this->nameOf($cancel->reviewed_by),
+            '{period}'   => $this->leavePeriod($leave),
+            '{quota}'    => $quotaLine,
+            '{note}'     => $this->noteLine($cancel->review_note),
         ]);
     }
 
@@ -196,12 +260,40 @@ class ApprovalNoticeService
      * @param array<string, string> $replace
      * @return void
      */
+    /**
+     * 發給指定的人（不是管理者名單）
+     *
+     * ⚠ 撤假審核結果要發給**申請人**（需求方 2026-11-24），
+     * 那是這個類別裡唯一一個收件人不是管理者名單的情況 ——
+     * 所以獨立一支，不要把 `push()` 改成「有時候發給 A、有時候發給 B」。
+     *
+     * @param array<int> $userIds
+     * @param string     $templateKey
+     * @param array      $replace
+     * @return void
+     */
+    private function pushToUsers(array $userIds, $templateKey, array $replace)
+    {
+        $this->send($userIds, $templateKey, $replace);
+    }
+
     private function push($templateKey, array $replace)
     {
-        try {
-            $userIds = $this->recipients();
+        $this->send($this->recipients(), $templateKey, $replace);
+    }
 
-            // 短路：沒設定收件人就不必查暱稱也不必組訊息
+    /**
+     * 真正送出去的那一步（`push()` 與 `pushToUsers()` 共用）
+     *
+     * @param array<int>|mixed $userIds
+     * @param string           $templateKey
+     * @param array            $replace
+     * @return void
+     */
+    private function send($userIds, $templateKey, array $replace)
+    {
+        try {
+            // 短路：沒有收件人就不必查暱稱也不必組訊息
             if (blank($userIds)) {
                 return;
             }

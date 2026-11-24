@@ -219,6 +219,59 @@
         </div>
     </div>
 
+    {{-- 申請撤銷請假 Modal（需求方 2026-11-24）--}}
+    @component('components.modal', ['id' => 'modal-leave-cancel', 'title' => trans('leave.msg.cancel_title')])
+        <form id="form-leave-cancel">
+            <input type="hidden" id="leave-cancel-leave-id">
+            <div id="leave-cancel-summary" class="mb-3"></div>
+            <div class="mb-3">
+                <label class="form-label" for="leave-cancel-reason">{{ trans('leave.msg.cancel_reason_label') }}</label>
+                <textarea id="leave-cancel-reason" class="form-control" rows="3" maxlength="500"></textarea>
+            </div>
+            <div class="text-end mt-3">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('shift.modal_cancel') }}</button>
+                <button type="submit" class="btn btn-primary">{{ trans('shift.modal_confirm') }}</button>
+            </div>
+        </form>
+    @endcomponent
+
+    {{-- 審核撤銷請假 Modal --}}
+    <div class="modal fade" id="modal-leave-cancel-review" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header justify-content-center">
+                    <h4 class="modal-title text-center fw-bold">{{ trans('leave.msg.cancel_review_title') }}</h4>
+                    <button type="button" class="btn-close position-absolute end-0 me-3" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="leave-cancel-review-body" class="text-center"></div>
+                    <input type="hidden" id="leave-cancel-review-id">
+                    <input type="hidden" id="leave-cancel-review-status">
+
+                    {{--
+                        ⚠⚠ TEMP-CANCEL-KEEP-QUOTA
+                        需求方 2026-11-24 指定：預設打勾，打勾＝加回被扣的時數。
+                        正式站那一筆舊資料手動處理完之後，這一整塊可以拿掉
+                        （搜尋 TEMP-CANCEL-KEEP-QUOTA 找得齊三處）。
+                        ⚠ 只有「通過」才有意義，拒絕時 JS 會把它藏起來。
+                    --}}
+                    <div class="form-check text-start mt-3" id="leave-cancel-quota-block">
+                        <input class="form-check-input" type="checkbox" id="leave-cancel-restore-quota" checked>
+                        <label class="form-check-label" for="leave-cancel-restore-quota">
+                            {{ trans('leave.msg.cancel_restore_quota') }}
+                        </label>
+                        <small class="form-text text-muted d-block">{{ trans('leave.msg.cancel_restore_quota_hint') }}</small>
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-3">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ trans('shift.modal_cancel') }}</button>
+                        <button type="button" class="btn btn-primary" id="btn-leave-cancel-review-ok">{{ trans('shift.modal_confirm') }}</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- 編輯班別 Modal (Admin) --}}
     @component('components.modal', ['id' => 'modal-edit-shift', 'title' => trans('shift.modal_edit_shift_title')])
         <form id="form-edit-shift">

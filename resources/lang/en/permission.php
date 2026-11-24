@@ -140,6 +140,9 @@ return [
     'leave_request' => [
         'apply'  => 'Apply for leave',
         'review' => 'Review leave requests',
+        // ⚠ Reviewing a cancellation touches the annual-leave quota, so it is a separate permission
+        'cancel'        => 'Request leave cancellation',
+        'review_cancel' => 'Review leave cancellations',
     ],
     'daily_rate' => [
         'view'   => 'View daily rate',

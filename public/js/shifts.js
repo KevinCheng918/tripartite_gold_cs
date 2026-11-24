@@ -1924,16 +1924,92 @@
         }
     });
 
+    // 申請撤銷請假送出
+    document.addEventListener('submit', function (e) {
+        if (!e.target || e.target.id !== 'form-leave-cancel') {
+            return;
+        }
+
+        e.preventDefault();
+        var btn = e.target.querySelector('button[type="submit"]');
+        var id = document.getElementById('leave-cancel-leave-id').value;
+        btn.disabled = true;
+
+        apiFetch('/admin/leave-request/ajax-request-cancel/' + id, {
+            method: 'POST',
+            body: JSON.stringify({ reason: document.getElementById('leave-cancel-reason').value || null })
+        })
+            .then(function (body) {
+                hideBsModal(document.getElementById('modal-leave-cancel'));
+                setTimeout(function () { showMessage(body.message || '操作成功'); loadLeave(); }, 400);
+            })
+            .catch(function (err) {
+                setTimeout(function () { showMessage(err.message || '操作失敗'); }, 100);
+            })
+            .then(function () { btn.disabled = false; });
+    });
+
+    // 審核撤銷請假送出
+    document.addEventListener('click', function (e) {
+        if (!e.target || e.target.id !== 'btn-leave-cancel-review-ok') {
+            return;
+        }
+
+        var cancelId = document.getElementById('leave-cancel-review-id').value;
+        var status = parseInt(document.getElementById('leave-cancel-review-status').value, 10);
+
+        /*
+         * ⚠ 沒先選「通過／拒絕」就按確認 —— 要擋下來並說清楚。
+         * 不擋的話會送出一個 status 是 NaN 的請求，使用者只會看到 422。
+         */
+        if (status !== 1 && status !== 2) {
+            showMessage('請先選擇「通過撤銷」或「拒絕撤銷」');
+
+            return;
+        }
+
+        e.target.disabled = true;
+
+        apiFetch('/admin/leave-request/ajax-respond-cancel/' + cancelId, {
+            method: 'PUT',
+            body: JSON.stringify({
+                status: status,
+                // ⚠ TEMP-CANCEL-KEEP-QUOTA：拒絕時這個值沒有意義，但照送（後端會存起來備查）
+                restore_quota: document.getElementById('leave-cancel-restore-quota').checked
+            })
+        })
+            .then(function (body) {
+                hideBsModal(document.getElementById('modal-leave-cancel-review'));
+                setTimeout(function () { showMessage(body.message || '操作成功'); loadLeave(); }, 400);
+            })
+            .catch(function (err) {
+                setTimeout(function () { showMessage(err.message || '操作失敗'); }, 100);
+            })
+            .then(function () { e.target.disabled = false; });
+    });
+
     // 請假審核確認送出
     document.addEventListener('click', function (e) {
         if (e.target && e.target.id === 'btn-leave-confirm-ok') {
             var id = document.getElementById('leave-confirm-id').value;
-            var status = parseInt(document.getElementById('leave-confirm-status').value, 10);
+            var raw = document.getElementById('leave-confirm-status').value;
             e.target.disabled = true;
 
-            apiFetch('/admin/leave-request/ajax-respond/' + id, {
+            /*
+             * ⚠ 這個 Modal 現在有**兩種用途**：請假審核（status 是 1/2）
+             * 與取消待審核的申請（status 是 `cancel-pending`）。
+             * 不分開的話 `parseInt('cancel-pending')` 會是 NaN，
+             * 然後送出一個 status 不合法的審核請求。
+             */
+            var isCancelPending = raw === 'cancel-pending';
+            var url = isCancelPending
+                ? '/admin/leave-request/ajax-cancel-pending/' + id
+                : '/admin/leave-request/ajax-respond/' + id;
+            var payload = isCancelPending ? {} : { status: parseInt(raw, 10) };
+
+            apiFetch(url, {
                 method: 'PUT',
-                body: JSON.stringify({ status: status })
+                body: JSON.stringify(payload)
             })
                 .then(function (body) {
                     hideBsModal(document.getElementById('modal-leave-confirm'));
@@ -2016,6 +2092,201 @@
         return map[type] || type || '-';
     }
 
+    /**
+     * 審核那一側的操作按鈕
+     *
+     * ⚠ 三種狀態要畫三種東西，不要只分「待審核／其他」：
+     *
+     * | 這張單 | 畫什麼 |
+     * |---|---|
+     * | 待審核 | 通過／拒絕 |
+     * | 已通過 ＋ **有撤假在等審** | **審核撤銷**（需求方 2026-11-24） |
+     * | 其他 | `-` |
+     *
+     * 少了中間那一列，撤假申請送出去之後就沒有任何地方按得到它。
+     *
+     * @param {Object} item
+     * @returns {string}
+     */
+    function reviewActions(item) {
+        if (item.status === 0) {
+            return '<button class="btn btn-sm btn-outline-secondary js-leave-respond" data-id="' + item.id + '" data-status="1"><i class="fas fa-check text-success me-1"></i>通過</button> ' +
+                '<button class="btn btn-sm btn-outline-secondary js-leave-respond" data-id="' + item.id + '" data-status="2"><i class="fas fa-times text-danger me-1"></i>拒絕</button>';
+        }
+
+        if (item.cancel_pending && hasPerm('leave_request.review_cancel')) {
+            return '<button class="btn btn-sm btn-outline-warning js-leave-cancel-review" data-cancel-id="' + item.cancel_id + '" data-id="' + item.id + '">' +
+                '<i class="fas fa-undo me-1"></i>' + (leaveI18n.msg && leaveI18n.msg.cancel_review_title ? leaveI18n.msg.cancel_review_title : '審核撤銷請假') + '</button>';
+        }
+
+        // 已審核且沒有撤假在等 —— 審核者與時間已經在狀態欄底下
+        return '-';
+    }
+
+    /**
+     * 申請人那一側的操作按鈕（「我的請假」清單）
+     *
+     * ⚠ **取消與撤銷是兩顆不同的按鈕**（需求方 2026-11-24 拍板）：
+     * 待審核的按了就掉，已通過的要送出申請等人審。
+     * 共用一顆會讓人以為「我按了就撤掉了」。
+     *
+     * @param {Object} item
+     * @returns {string}
+     */
+    function myLeaveActions(item) {
+        if (!hasPerm('leave_request.cancel')) {
+            return '';
+        }
+
+        if (item.status === 0) {
+            return '<button class="btn btn-sm btn-outline-secondary js-leave-cancel-pending" data-id="' + item.id + '">' +
+                '<i class="fas fa-times me-1"></i>' + (leaveI18n.msg && leaveI18n.msg.cancel_pending_action ? leaveI18n.msg.cancel_pending_action : '取消申請') + '</button>';
+        }
+
+        // 已經送出撤銷、還在等審 —— 不要再給一顆按鈕，要讓他知道在等什麼
+        if (item.cancel_pending) {
+            return '<span class="badge bg-warning text-dark">' +
+                (leaveI18n.msg && leaveI18n.msg.cancel_status_badge ? leaveI18n.msg.cancel_status_badge : '撤銷審核中') + '</span>';
+        }
+
+        if (item.can_cancel) {
+            return '<button class="btn btn-sm btn-outline-secondary js-leave-cancel" data-id="' + item.id + '">' +
+                '<i class="fas fa-undo me-1"></i>' + (leaveI18n.msg && leaveI18n.msg.cancel_action ? leaveI18n.msg.cancel_action : '申請撤銷') + '</button>';
+        }
+
+        return '';
+    }
+
+    /**
+     * 綁撤假相關的三顆按鈕
+     *
+     * ⚠ 每次重畫清單都要重綁 —— `innerHTML` 一換，舊的 listener 跟著
+     * 元素一起沒了。
+     *
+     * @param {HTMLElement} container
+     * @param {Array} list
+     * @returns {void}
+     */
+    function bindLeaveCancelButtons(container, list) {
+        var find = function (id) {
+            return list.filter(function (l) { return l.id === parseInt(id, 10); })[0];
+        };
+
+        // ① 取消還在等審的申請 —— 不走審核，但仍然要二次確認
+        container.querySelectorAll('.js-leave-cancel-pending').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var item = find(btn.dataset.id);
+                if (!item) { return; }
+
+                /*
+                 * ⚠ 沿用既有的「請假審核確認」那個 Modal 來做二次確認 ——
+                 * 這個專案沒有通用的 confirm，而需求方明訂不准用 `alert`。
+                 * 借用時要把 `status` 清掉，按下確認時才分得出是哪一種動作。
+                 */
+                document.getElementById('leave-confirm-id').value = item.id;
+                document.getElementById('leave-confirm-status').value = 'cancel-pending';
+                document.getElementById('leave-confirm-body').innerHTML =
+                    '<p>確定要取消這筆請假申請嗎？</p>' +
+                    '<table class="table table-sm text-start mt-2"><tbody>' +
+                    '<tr><th style="width:80px">' + (leaveI18n.field_date || '日期') + '</th><td><strong>' + leaveDateText(item) + '</strong></td></tr>' +
+                    '<tr><th>' + (leaveI18n.field_leave_type || '假別') + '</th><td>' + leaveTypeText(item.type) + '</td></tr>' +
+                    '</tbody></table>';
+                showBsModal('modal-leave-confirm');
+            });
+        });
+
+        // ② 對已通過的假單申請撤銷 —— 開 Modal 填原因
+        container.querySelectorAll('.js-leave-cancel').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var item = find(btn.dataset.id);
+                if (!item) { return; }
+
+                document.getElementById('leave-cancel-leave-id').value = item.id;
+                document.getElementById('leave-cancel-reason').value = '';
+                document.getElementById('leave-cancel-summary').innerHTML =
+                    '<div class="alert alert-light border mb-0 text-start">' +
+                    '<div>' + (leaveI18n.field_date || '日期') + '：<strong>' + leaveDateText(item) + '</strong></div>' +
+                    '<div>' + (leaveI18n.field_leave_type || '假別') + '：<strong>' + leaveTypeText(item.type) + '</strong></div>' +
+                    '</div>';
+                showBsModal('modal-leave-cancel');
+            });
+        });
+
+        // ③ 審核撤假 —— 這裡有那顆 TEMP-CANCEL-KEEP-QUOTA 勾選框
+        container.querySelectorAll('.js-leave-cancel-review').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var item = find(btn.dataset.id);
+                if (!item) { return; }
+
+                openCancelReview(item, btn.dataset.cancelId);
+            });
+        });
+    }
+
+    /**
+     * 開「審核撤銷請假」視窗
+     *
+     * @param {Object} item 原假單
+     * @param {string} cancelId 撤假申請 id
+     * @returns {void}
+     */
+    function openCancelReview(item, cancelId) {
+        document.getElementById('leave-cancel-review-id').value = cancelId;
+        document.getElementById('leave-cancel-review-status').value = '';
+
+        /*
+         * ⚠ 每次開都要把勾選框**重設成打勾**（預設值，需求方指定）——
+         * 上一次審核時取消過勾選的話，不重設就會沿用到下一筆，
+         * 而那會讓某個人的特休莫名其妙沒還回去。
+         */
+        document.getElementById('leave-cancel-restore-quota').checked = true;
+
+        /*
+         * ⚠ 只有**特休**才顯示那個勾選框：病假與事假本來就不扣額度，
+         * 給他一個勾了也沒作用的選項只會讓人困惑。
+         */
+        var isAnnual = item.type === 'annual';
+        document.getElementById('leave-cancel-quota-block').style.display = isAnnual ? '' : 'none';
+
+        document.getElementById('leave-cancel-review-body').innerHTML =
+            '<table class="table table-sm text-start mt-2"><tbody>' +
+            '<tr><th style="width:80px">' + (leaveI18n.field_user || '申請人') + '</th><td><strong>' + item.user + '</strong></td></tr>' +
+            '<tr><th>' + (leaveI18n.field_date || '日期') + '</th><td>' + leaveDateText(item) + '</td></tr>' +
+            '<tr><th>' + (leaveI18n.field_leave_type || '假別') + '</th><td><strong>' + leaveTypeText(item.type) + '</strong></td></tr>' +
+            '</tbody></table>' +
+            '<div class="d-flex justify-content-center gap-2 mt-2">' +
+            '<button type="button" class="btn btn-success btn-sm js-cancel-review-pick" data-status="1">通過撤銷</button>' +
+            '<button type="button" class="btn btn-danger btn-sm js-cancel-review-pick" data-status="2">拒絕撤銷</button>' +
+            '</div>' +
+            '<div class="text-muted mt-2" style="font-size:0.8125rem" id="leave-cancel-review-picked"></div>';
+
+        // 選了「拒絕」就把勾選框藏起來 —— 假單根本沒動，額度無從談起
+        document.querySelectorAll('.js-cancel-review-pick').forEach(function (b) {
+            b.addEventListener('click', function () {
+                var status = b.dataset.status;
+                document.getElementById('leave-cancel-review-status').value = status;
+                document.getElementById('leave-cancel-review-picked').textContent =
+                    status === '1' ? '已選擇：通過撤銷' : '已選擇：拒絕撤銷';
+                document.getElementById('leave-cancel-quota-block').style.display =
+                    (isAnnual && status === '1') ? '' : 'none';
+            });
+        });
+
+        showBsModal('modal-leave-cancel-review');
+    }
+
+    /**
+     * 假單的日期文字（單日就只印一天）
+     *
+     * @param {Object} item
+     * @returns {string}
+     */
+    function leaveDateText(item) {
+        return item.start_date === item.end_date
+            ? item.start_date
+            : item.start_date + ' ~ ' + item.end_date;
+    }
+
     function renderLeaveList(containerId, list, showActions) {
         var container = document.getElementById(containerId);
         if (!container) { return; }
@@ -2049,7 +2320,12 @@
         html += '<th>' + (leaveI18n.field_time || '時段') + '</th>';
         html += '<th>' + (leaveI18n.field_reason || '原因') + '</th>';
         html += '<th>' + (leaveI18n.field_status || '狀態') + '</th>';
-        if (showActions) { html += '<th>操作</th>'; }
+        /*
+         * ⚠ 「我的請假」那一側（`showActions=false`）**現在也要有操作欄** ——
+         * 取消／申請撤銷都是申請人自己按的（需求方 2026-11-24）。
+         * 原本那一側完全沒有操作欄，所以兩邊都要加。
+         */
+        html += '<th>操作</th>';
         html += '</tr></thead><tbody>';
 
         items.forEach(function (d) {
@@ -2069,15 +2345,7 @@
             }
             html += '</td>';
 
-            if (showActions && item.status === 0) {
-                html += '<td>';
-                html += '<button class="btn btn-sm btn-outline-secondary js-leave-respond" data-id="' + item.id + '" data-status="1"><i class="fas fa-check text-success me-1"></i>通過</button> ';
-                html += '<button class="btn btn-sm btn-outline-secondary js-leave-respond" data-id="' + item.id + '" data-status="2"><i class="fas fa-times text-danger me-1"></i>拒絕</button>';
-                html += '</td>';
-            } else if (showActions) {
-                // 已審核的沒有可按的動作；審核者與時間已經在狀態欄底下
-                html += '<td>-</td>';
-            }
+            html += '<td>' + (showActions ? reviewActions(item) : myLeaveActions(item)) + '</td>';
 
             html += '</tr>';
         });
@@ -2105,16 +2373,18 @@
             if (d.reviewText) {
                 html += '<div class="text-muted" style="font-size:0.75rem">' + d.reviewText + '</div>';
             }
-            if (showActions && item.status === 0) {
-                html += '<div class="d-flex gap-1">';
-                html += '<button class="btn btn-sm btn-outline-secondary js-leave-respond" data-id="' + item.id + '" data-status="1"><i class="fas fa-check text-success me-1"></i>通過</button>';
-                html += '<button class="btn btn-sm btn-outline-secondary js-leave-respond" data-id="' + item.id + '" data-status="2"><i class="fas fa-times text-danger me-1"></i>拒絕</button>';
-                html += '</div>';
+            // 手機卡片的操作：跟桌機表格用同一組函式，兩邊才不會分岔
+            var actions = showActions ? reviewActions(item) : myLeaveActions(item);
+
+            if (actions && actions !== '-') {
+                html += '<div class="d-flex gap-1 flex-wrap mt-2">' + actions + '</div>';
             }
             html += '</div></div>';
         });
         html += '</div>';
         container.innerHTML = html;
+
+        bindLeaveCancelButtons(container, list);
 
         // 綁定審核按鈕 → 開二次確認 Modal
         container.querySelectorAll('.js-leave-respond').forEach(function (btn) {
