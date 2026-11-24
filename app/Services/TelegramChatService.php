@@ -15,7 +15,6 @@ use App\Repositories\UserRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -538,12 +537,14 @@ class TelegramChatService
         /*
          * 客人引用的那一則**是不是我方發的**。
          *
-         * ⚠ 人工回覆與自動回覆都是透過同一支 Bot 送出去的，所以
-         * 「`from.id` ＝ 目前這支 Bot」就代表客人指著的是我方的話。
+         * 人工回覆與自動回覆都是透過 Bot 送出去的，但**不只有 Bot** ——
+         * 同仁本人也可能在群組裡用自己的 Telegram 帳號講話，客人引用的
+         * 是那一則時，他一樣是在回我們。所以兩種都要算
+         *（`repliesToOurSide()` 比 Bot 的 username，再比我方名單）。
          *
-         * ⚠ 要用 `getBotId()` 而不是設定檔裡的預設 token —— 上面
-         * `switchBotToken()` 已經切到這個群組所屬的 Bot 了，拿預設的比
-         * 會讓非預設 Bot 的群組全部判成「不是我方的」。
+         * ⚠ 這個旗標會送進模型（`$quote['ours']`），判「他是在回答我們」
+         * 還是「他在跟自己人講話」時是很強的訊號 —— 漏掉同仁那一半，
+         * 客人引用同仁的話回「好」就可能被當成跟我們無關。
          */
         $replyToOurs = false;
 
@@ -551,13 +552,26 @@ class TelegramChatService
             $replyMsg = $message['reply_to_message'];
             $replyToSender = $this->buildSenderName($replyMsg['from'] ?? []);
             $replyToText = $replyMsg['text'] ?? ($replyMsg['caption'] ?? '');
-            $replyToOurs = filled($this->botService->getBotId())
-                && (string) Arr::get($replyMsg, 'from.id') === (string) $this->botService->getBotId();
+            $replyToOurs = $this->repliesToOurSide($message);
             // 截取前 200 字元
             if (mb_strlen($replyToText) > 200) {
                 $replyToText = mb_substr($replyToText, 0, 200) . '...';
             }
         }
+
+        /*
+         * ⚠ **這則 tag 了誰，一定要在這一刻算完並存下來。**
+         *
+         * tag 是 Telegram 用 `entities` 表示的，沒有 username 的人
+         *（`text_mention`）文字裡根本沒有 `@` —— 「龍 所以改好了嗎？」
+         * 存成 content 之後，誰都看不出「龍」是在叫人。
+         *
+         * 存下來是為了**對話脈絡**：對方主管常常先發一則只有「Amy 2.0」的
+         * 訊息、下一則才講話，而真正要判的是下一則。模型要看得到前一則
+         * 是在叫人，才分得出後面那句是講給同事還是講給我們聽的
+         *（實測：脈絡沒有標注時判 unclear，有標注才判 not_for_us）。
+         */
+        $mentions = $this->describeMentions($message, $rawText);
 
         // 存入訊息
         $msg = $this->telegramRepository->createMessage([
@@ -566,6 +580,9 @@ class TelegramChatService
             'telegram_message_id' => $telegramMessageId,
             'sender_name'        => $senderName,
             'content'            => $text,
+            // 沒 tag 任何人時存 null，不要存 `[]` —— 欄位的語意是
+            // 「有沒有叫人」，空陣列讀起來像「叫了但名單是空的」
+            'mentions'           => filled($mentions) ? $mentions : null,
             'media_type'         => $mediaType,
             'media_url'          => $mediaUrl,
             'media_name'         => $mediaName,
@@ -632,16 +649,19 @@ class TelegramChatService
          * 2. isStaff()        後台帳號名單，**所有對話共用同一個快取 key**；
          *                     認出是同事後才會去讀該對話的放行例外
          * 3. isIgnored()      每個對話一個 key，命中 2 就不必再去碰它
-         * 4. isTalkingToOutsiders()
-         *                     擺最後是因為**只有它可能打 Telegram API**
-         *                     （查 Bot 自己的 username，快取一天）。前三道
-         *                     先把不必判斷的訊息擋掉，真正會走到這裡的只有
-         *                     「整則都是 tag」那種，一天最多一次外部呼叫。
+         *
+         * ⚠ **以前這裡還有第四道「他是在跟外人講話」**（整則都是 tag 外人，
+         * 以及 tag 完之後的 60 秒靜默）。2026-11-24 拿掉了 —— 那是寫死的
+         * 規則，而這件事規則判不出來：對方主管 tag 自己人說「這個你跟客服
+         * 講」時，那一則**反而是要我們接手的**，硬規則會把它一起吃掉。
+         *
+         * 現在改成把「tag 了誰、是不是我們的人」當成**事實**送進模型，
+         * 由它看上下文判斷這句在等誰回答（`intent = not_for_us`）。
+         * 詳見 .claude/knowledge/bugfix/2026-11-24-tag-with-words-same-message.md
          */
         if ($group->isAutoReplyOn() && filled($autoReplyText)
             && !$this->staffIgnoreService->isStaff($from, $group->id)
-            && !$this->memberService->isIgnored($group->id, $from)
-            && !$this->isTalkingToOutsiders($message, $rawText, $group->id, $from)) {
+            && !$this->memberService->isIgnored($group->id, $from)) {
             /*
              * 壓一段延遲再處理，讓客人把話講完。
              *
@@ -670,11 +690,21 @@ class TelegramChatService
              * 沒有引用）—— 那一案是脈絡寫死 15 分鐘造成的，
              * 修在 `AutoReplyService::buildHistory()`。
              */
+            /*
+             * ⚠ **「他 tag 了誰」也要跟著送進去**（2026-11-24）。
+             *
+             * 模型光看「龍 所以改好了嗎？」不知道「龍」是人名還是東西，
+             * 更不知道他是我們的人還是對方的人 —— 而那正是判斷「這句在等誰
+             * 回答」的關鍵事實。
+             *
+             * 用上面存訊息時算好的那一份，不要再算一次：`isOurSideMention()`
+             * 會查 Bot 自己的 username（可能打 Telegram API）。
+             */
             $job = AutoReplyJob::dispatch($group->id, $autoReplyText, $msg->id, [
                 'text'   => (string) $replyToText,
                 'sender' => (string) $replyToSender,
                 'ours'   => $replyToOurs,
-            ]);
+            ], $mentions);
 
             if ($delay > 0) {
                 $job->delay(now()->addSeconds($delay));
@@ -1330,121 +1360,10 @@ class TelegramChatService
     }
 
     /**
-     * 這個人現在是在跟外人講話 —— 不必自動回覆
-     *
-     * 兩種都算，而且是同一件事的前後兩段：
-     *
-     * 1. **這一則整則都是在 tag 外人**（`isTagToOutsidersOnly()`）
-     * 2. **他剛剛才 tag 過外人，這一則是接著講的話**
-     *
-     * ⚠ 需求方 2026-11-13 回報：客人群組裡，對方的主管先發一則只有
-     * `Amy 2.0`（沒有 username，所以是 `text_mention`）的訊息把同事叫進來，
-     * 緊接著同一分鐘再發「所有人給你嗎？」—— **那句是問他同事的**，
-     * 小幫手卻回了「老闆，Amy 2.0 的開通範圍已經請專員為您確認」。
-     *
-     * 第 1 段（2026-10-27 上線）只看得懂「整則都是 tag」那一則，而人幾乎
-     * 不會把話塞進同一則：**先 tag、再講話**才是常態，所以真正要擋的是
-     * 後面那幾句。擋法是第 1 段命中時記一個短期標記，同群組、同一個人在
-     * 標記還在的期間講的話一律不自動回覆。
-     *
-     * ⚠ 標記**不續約**，而且他只要轉頭叫我們就當場失效（見
-     * `inTagOutsiderSilence()`）—— 客人 tag 完同事之後回頭問我們是很常見的，
-     * 靜默不能一路蓋下去，不然就變成沒有回覆也沒有求助單的黑洞
-     * （見 [[2026-11-08-silent-black-hole]]）。
-     *
-     * @param array  $message Telegram 原始訊息
-     * @param string $rawText 客人真正打的字（不含媒體替代文字）
-     * @param int    $groupId
-     * @param array  $from    Telegram 的 from 物件
-     * @return bool
-     */
-    private function isTalkingToOutsiders(array $message, $rawText, $groupId, array $from)
-    {
-        if ($this->isTagToOutsidersOnly($message, $rawText, $groupId)) {
-            $this->markTagToOutsiders($groupId, $from);
-
-            return true;
-        }
-
-        return $this->inTagOutsiderSilence($message, $rawText, $groupId, $from);
-    }
-
-    /**
-     * 記下「這個人剛剛把人叫進來了」
-     *
-     * ⚠ 標記是**逐對話、逐發話者**的：同一個群組裡另一位客人問的問題
-     * 跟這件事無關，不該被一起靜音。
-     *
-     * ⚠ 拿不到 Telegram user id 時不記 —— 用 0 當 key 會把整個群組的人
-     * 混在一起，寧可漏擋也不要擋錯人。
-     *
-     * @param int   $groupId
-     * @param array $from
-     * @return void
-     */
-    private function markTagToOutsiders($groupId, array $from)
-    {
-        $seconds = (int) config('auto_reply.tag_outsider_silence');
-        $userId = (int) Arr::get($from, 'id', 0);
-
-        if ($seconds <= 0 || $userId <= 0) {
-            return;
-        }
-
-        Cache::put($this->tagOutsiderKey($groupId, $userId), true, $seconds);
-    }
-
-    /**
-     * 他還在跟剛才叫進來的那個人講話嗎
-     *
-     * ⚠ **先看快取再看 tag**：快取沒命中就直接結束，絕大多數訊息都是這個
-     * 情況，不會走到可能打 Telegram API 的 `tagsOurSide()`。
-     *
-     * ⚠ 兩種情形要當場解除靜默，因為那代表他在叫我們：
-     *
-     * - 這一則 tag 了我方的人或機器人
-     * - 這一則**引用回覆**我方發出去的訊息
-     *
-     * 解除之後這一則照常走自動回覆（回傳 false）。
-     *
-     * @param array  $message
-     * @param string $rawText
-     * @param int    $groupId
-     * @param array  $from
-     * @return bool
-     */
-    private function inTagOutsiderSilence(array $message, $rawText, $groupId, array $from)
-    {
-        $seconds = (int) config('auto_reply.tag_outsider_silence');
-        $userId = (int) Arr::get($from, 'id', 0);
-
-        if ($seconds <= 0 || $userId <= 0) {
-            return false;
-        }
-
-        $key = $this->tagOutsiderKey($groupId, $userId);
-
-        if (!Cache::has($key)) {
-            return false;
-        }
-
-        if ($this->tagsOurSide($this->parseMentions($message, $rawText)) || $this->repliesToOurSide($message)) {
-            Cache::forget($key);
-
-            return false;
-        }
-
-        Log::info('剛 tag 過別人，這句話也是講給對方聽的，不自動回覆', [
-            'group_id'         => $groupId,
-            'telegram_user_id' => $userId,
-            'text'             => mb_substr((string) $rawText, 0, 50),
-        ]);
-
-        return true;
-    }
-
-    /**
      * 這則是不是在引用回覆我們發出去的訊息
+     *
+     * 結果會隨 `$quote['ours']` 送進模型 —— 「他指著我們的話在講」是判斷
+     * 這句講給誰聽的強訊號。
      *
      * ⚠ 機器人自己要**比 username 而不是比 user id** —— 我方同事的 id 才在
      * `user` 表裡，機器人不是後台帳號，查不到。
@@ -1473,82 +1392,58 @@ class TelegramChatService
     }
 
     /**
-     * 靜默標記的快取 key
+     * 這則 tag 了誰，以及每個人是不是我們的人
      *
-     * @param int $groupId
-     * @param int $telegramUserId
-     * @return string
-     */
-    private function tagOutsiderKey($groupId, $telegramUserId)
-    {
-        return "auto_reply.tag_outsider.{$groupId}.{$telegramUserId}";
-    }
-
-    /**
-     * 這則整則都是在 tag 別人（不是我們）—— 不必自動回覆
+     * 這是送進模型的**事實**，不是判斷（需求方 2026-11-24：
+     * 「要 AI 判斷一下上下文吧，不能寫死的」）。
      *
-     * ⚠ 需求方 2026-10-27 回報：我們主動發餘點告警之後，客人回了一則
-     * 只有 `@sl0168888` 的訊息（把他自己的同事叫進來看），小幫手卻回了
-     * 「老闆，這個帳號的部分已經請專員為您確認，再麻煩您稍等一下」——
-     * **客人根本沒問我們問題**，這句是憑空生出來的，還讓同仁以為有待辦。
-     *
-     * 三道都成立才擋：
-     *
-     * 1. **整則都是 tag** —— `@sl0168888 這個帳號不能登入` 還是要回。
-     *    判斷方式是把 tag 挖掉，看剩下的還有沒有實質內容。
-     * 2. **tag 的不是我們的人** —— 需求方補充「如果是 tag 我們自己人含
-     *    機器人的話，要轉」。客人 `@我們的客服` 就是在叫我們，哪怕一個字
-     *    都沒寫也要轉確認；`@他家同事` 才是我們不該插話的場合。
-     * 3. 上面兩道都過了才擋。
+     * ⚠ **這支不下任何結論。** 「tag 到對方的人」跟「這句不是問我們的」
+     * 是兩回事 —— 對方主管 tag 自己人說「這個你跟客服講」時，那一則
+     * 反而是要我們接手的。要不要回由模型看上下文決定
+     *（`intent = not_for_us`，見 `ClaudeCodeMatcher` 的 prompt）。
      *
      * ⚠ 用 Telegram 的 `entities` 判斷，不要自己拆 `@` —— `text_mention`
-     * （對方沒有 username 時）文字裡根本沒有 `@`，而 `user@example.com`
+     *（對方沒有 username 時）文字裡根本沒有 `@`，而 `user@example.com`
      * 這種反而會被 `@` 的正則誤判。
      *
-     * ⚠ 這支**只管這一則**。人通常是「先 tag、下一則才講話」，後面那幾句
-     * 由 `isTalkingToOutsiders()` 的靜默窗接手，不要把它塞進這裡 ——
-     * 這支的語意（整則都是 tag）是乾淨的，混進狀態會變得很難推理。
+     * ⚠ 沒有 tag 就**直接回空陣列**：`isOurSideMention()` 會查 Bot 自己的
+     * username（可能打 Telegram API，快取一天），絕大多數訊息不該碰到它。
      *
      * @param array  $message Telegram 原始訊息
      * @param string $rawText 客人真正打的字（不含媒體替代文字）
-     * @param int    $groupId 只用來寫 log
-     * @return bool
+     * @return array<int, array{label: string, ours: bool}>
      */
-    private function isTagToOutsidersOnly(array $message, $rawText, $groupId)
+    private function describeMentions(array $message, $rawText)
     {
         $mentions = $this->parseMentions($message, $rawText);
 
         if (blank($mentions)) {
-            return false;
+            return [];
         }
 
-        // 挖掉 tag 之後還有話 —— 那是真的有事要問，照常走自動回覆
-        if ($this->hasWords($this->stripMentions($rawText, $mentions))) {
-            return false;
+        $described = [];
+
+        foreach ($mentions as $mention) {
+            $described[] = [
+                'label' => (string) Arr::get($mention, 'label'),
+                'ours'  => $this->isOurSideMention($mention),
+            ];
         }
 
-        // tag 到我們自己人（或機器人）—— 客人是在叫我們，要轉確認
-        if ($this->tagsOurSide($mentions)) {
-            return false;
-        }
-
-        Log::info('整則都是在 tag 別人，不自動回覆', [
-            'group_id' => $groupId,
-            'text'     => mb_substr($rawText, 0, 50),
-        ]);
-
-        return true;
+        return $described;
     }
 
     /**
      * 取出這則訊息裡所有的 tag
      *
-     * ⚠ 回傳的 `offset`／`length` 單位跟 Telegram 一致，是 **UTF-16 code
-     * unit**（emoji 算兩個），不是位元組也不是 mb 字元。
+     * ⚠ `label` 是**客人眼睛看到的那幾個字**（`@mei72163` 或「龍」），
+     * 送給模型的就是它 —— 模型要認得客人在叫誰，`username` 那種內部識別
+     * 它對不上。沒有 username 的人（`text_mention`）只有名字，所以
+     * `username` 會是 null 而 `label` 有值，兩個欄位不能互相取代。
      *
      * @param array  $message
      * @param string $rawText
-     * @return array<int, array{offset: int, length: int, username: string|null, user_id: int|null}>
+     * @return array<int, array{label: string, username: string|null, user_id: int}>
      */
     private function parseMentions(array $message, $rawText)
     {
@@ -1563,14 +1458,24 @@ class TelegramChatService
                 continue;
             }
 
+            /*
+             * entity 只給位置，顯示的字要自己從原文切出來。
+             *
+             * ⚠ `offset`／`length` 的單位跟 Telegram 一致，是 **UTF-16 code
+             * unit**（emoji 算兩個），不是位元組也不是 mb 字元 ——
+             * 所以要用 `sliceUtf16()`，`mb_substr` 會整段偏掉。
+             */
+            $label = $this->sliceUtf16(
+                $rawText,
+                (int) Arr::get($entity, 'offset'),
+                (int) Arr::get($entity, 'length')
+            );
+
             $mentions[] = [
-                'offset'   => (int) Arr::get($entity, 'offset'),
-                'length'   => (int) Arr::get($entity, 'length'),
-                // mention 的 username 要自己從原文切出來（entity 只給位置）；
-                // text_mention 沒有 @，但附了整個 user 物件
-                'username' => $type === 'mention'
-                    ? $this->sliceUtf16($rawText, (int) Arr::get($entity, 'offset'), (int) Arr::get($entity, 'length'))
-                    : Arr::get($entity, 'user.username'),
+                'label'    => $label,
+                // `mention` 的 username 就是原文那段（含 @）；
+                // `text_mention` 沒有 @，但附了整個 user 物件
+                'username' => $type === 'mention' ? $label : Arr::get($entity, 'user.username'),
                 'user_id'  => (int) Arr::get($entity, 'user.id'),
             ];
         }
@@ -1588,8 +1493,13 @@ class TelegramChatService
      * ⚠ 這條**只認得 `@username`**，認不出 `text_mention`（那種文字裡沒有
      * `@`，拆不出來）。所以只是退路，有 entities 時一律以 entities 為準。
      *
+     * ⚠ **`@` 前面要是行首或空白**（跟輸入框那支 `mention.js` 同一條規則）：
+     * `service@example.com` 裡的 `@example` 不是在叫人。以前這條的輸出
+     * 只拿來算「挖掉 tag 還有沒有字」，多抓一個無害；現在它會變成一行
+     * 「@example（不是我們的人）」送進模型 —— 那是在餵假情報。
+     *
      * @param string $rawText
-     * @return array
+     * @return array<int, array{label: string, username: string, user_id: int}>
      */
     private function parseMentionsByPattern($rawText)
     {
@@ -1597,20 +1507,20 @@ class TelegramChatService
             return [];
         }
 
-        if (!preg_match_all('/@[A-Za-z0-9_]+/u', $rawText, $matches, PREG_OFFSET_CAPTURE)) {
+        // 取 group 1：PCRE 的 lookbehind 不吃「行首或空白」這種變長條件，
+        // 所以前綴要真的吃掉再從括號裡拿
+        if (!preg_match_all('/(?:^|\s)(@[A-Za-z0-9_]+)/u', $rawText, $matches)) {
             return [];
         }
 
         $mentions = [];
 
-        foreach ($matches[0] as $match) {
-            [$token, $byteOffset] = $match;
-
+        foreach ($matches[1] as $token) {
             $mentions[] = [
-                // preg 給的是位元組位置，要換算成 UTF-16 才跟 stripMentions 對得上
-                'offset'   => $this->utf16Length(substr($rawText, 0, $byteOffset)),
-                'length'   => $this->utf16Length($token),
+                'label'    => $token,
                 'username' => $token,
+                // 退路拆不出 id：文字裡只有名字。查不到就當外人，
+                // 模型還是看得到他 tag 了誰
                 'user_id'  => 0,
             ];
         }
@@ -1619,58 +1529,29 @@ class TelegramChatService
     }
 
     /**
-     * 這些 tag 裡有沒有我們自己人（含機器人）
-     *
-     * ⚠ 需求方 2026-10-27：「如果是 tag 我們自己人含機器人的話，要轉。」
+     * 這個 tag 叫的是我們的人嗎（含機器人）
      *
      * ⚠ 機器人的 username 要用**目前這支 Bot** 的（上面已經
      * `switchBotToken()` 過）—— 多 Bot 環境下拿錯會認不出自己。
      *
-     * @param array $mentions
+     * ⚠ 不能改用 `isStaff()`：那支問的是「他講的話要不要自動回覆」，會看
+     * 對話的放行例外；這裡問的是「被 tag 的這個人是不是我們的人」。
+     * 套錯會讓「客人 tag 到一位被放行的同事」被標成外人 —— 方向正好相反。
+     *
+     * @param array $mention label／username／user_id
      * @return bool
      */
-    private function tagsOurSide(array $mentions)
+    private function isOurSideMention(array $mention)
     {
+        $username = TelegramUsernamePresenter::normalize(Arr::get($mention, 'username'));
         $botUsername = TelegramUsernamePresenter::normalize($this->botService->getMyUsername());
 
-        foreach ($mentions as $mention) {
-            $username = TelegramUsernamePresenter::normalize(Arr::get($mention, 'username'));
-
-            // 查不到 Bot 自己的名字時 $botUsername 是 null，不能拿來比
-            if (filled($botUsername) && $username === $botUsername) {
-                return true;
-            }
-
-            if ($this->staffIgnoreService->isOurSide(Arr::get($mention, 'user_id'), $username)) {
-                return true;
-            }
+        // 查不到 Bot 自己的名字時 $botUsername 是 null，不能拿來比
+        if (filled($botUsername) && $username === $botUsername) {
+            return true;
         }
 
-        return false;
-    }
-
-    /**
-     * 照 entity 的位置把 tag 從原文挖掉
-     *
-     * ⚠ **由後往前剪**，不然剪掉前面那段之後，後面每個 offset 都位移了。
-     *
-     * @param string $rawText
-     * @param array  $mentions 每個元素有 offset／length（UTF-16 單位）
-     * @return string
-     */
-    private function stripMentions($rawText, array $mentions)
-    {
-        usort($mentions, function ($a, $b) {
-            return $b['offset'] - $a['offset'];
-        });
-
-        $utf16 = mb_convert_encoding($rawText, 'UTF-16LE', 'UTF-8');
-
-        foreach ($mentions as $mention) {
-            $utf16 = substr_replace($utf16, '', $mention['offset'] * 2, $mention['length'] * 2);
-        }
-
-        return mb_convert_encoding($utf16, 'UTF-8', 'UTF-16LE');
+        return $this->staffIgnoreService->isOurSide(Arr::get($mention, 'user_id'), $username);
     }
 
     /**
@@ -1689,31 +1570,6 @@ class TelegramChatService
         $utf16 = mb_convert_encoding($text, 'UTF-16LE', 'UTF-8');
 
         return mb_convert_encoding(substr($utf16, $offset * 2, $length * 2), 'UTF-8', 'UTF-16LE');
-    }
-
-    /**
-     * 這段文字有幾個 UTF-16 code unit
-     *
-     * @param string $text
-     * @return int
-     */
-    private function utf16Length($text)
-    {
-        return (int) (strlen(mb_convert_encoding($text, 'UTF-16LE', 'UTF-8')) / 2);
-    }
-
-    /**
-     * 這段文字裡還有沒有「話」
-     *
-     * ⚠ 標點、空白、emoji 都**不算話** —— `@sl0168888 🙏` 是把人叫進來拜託
-     * 一下，不是在問我們問題。只有文字或數字才算。
-     *
-     * @param string $text
-     * @return bool
-     */
-    private function hasWords($text)
-    {
-        return (bool) preg_match('/[\p{L}\p{N}]/u', $text);
     }
 
     /**

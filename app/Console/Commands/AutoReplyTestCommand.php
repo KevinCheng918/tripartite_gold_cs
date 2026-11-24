@@ -17,10 +17,22 @@ use Illuminate\Support\Arr;
  * @example php artisan auto-reply:test "虛擬機連不上怎麼辦"
  * @example php artisan auto-reply:test "我想再加一台機器"
  * @example php artisan auto-reply:test "好，謝謝"
+ * @example php artisan auto-reply:test "所以改好了嗎？" --tag=龍
+ * @example php artisan auto-reply:test "這個帳號不能登入" --tag=@sl0168888
+ * @example php artisan auto-reply:test "麻煩看一下" --our-tag=@cs_mei
  */
 class AutoReplyTestCommand extends Command
 {
-    protected $signature = 'auto-reply:test {question : 客人說的話}';
+    /*
+     * ⚠ `--tag`／`--our-tag` 是用來測「這句是講給誰聽的」（`not_for_us`）。
+     * 線上這份名單是 webhook 從 Telegram 的 `entities` 算出來的，
+     * 終端沒有那個東西，所以要讓人手動指定 —— 不然這條路徑只能真的
+     * 跑去客戶群組裡 tag 人才測得到。
+     */
+    protected $signature = 'auto-reply:test
+        {question : 客人說的話}
+        {--tag=* : 這則 tag 到的「對方的人」（可重複）}
+        {--our-tag=* : 這則 tag 到的「我們的人」（可重複）}';
 
     protected $description = '試跑自動回覆比對，顯示決策與會送出的訊息';
 
@@ -31,12 +43,18 @@ class AutoReplyTestCommand extends Command
     public function handle(AutoReplyService $autoReplyService)
     {
         $question = $this->argument('question');
+        $mentions = $this->buildMentions();
 
         $this->line("客人：{$question}");
+
+        if (filled($mentions)) {
+            $this->line('　（這則 tag 了：' . implode('、', array_column($mentions, 'label')) . '）');
+        }
+
         $this->line('');
 
         $startedAt = microtime(true);
-        $preview = $autoReplyService->preview($question);
+        $preview = $autoReplyService->preview($question, $mentions);
         $duration = round((microtime(true) - $startedAt) * 1000);
 
         $this->showResult($preview, $duration);
@@ -101,6 +119,26 @@ class AutoReplyTestCommand extends Command
     }
 
     /**
+     * 把 `--tag`／`--our-tag` 組成跟線上一樣的 tag 名單
+     *
+     * @return array<int, array{label: string, ours: bool}>
+     */
+    private function buildMentions()
+    {
+        $mentions = [];
+
+        foreach ((array) $this->option('tag') as $label) {
+            $mentions[] = ['label' => (string) $label, 'ours' => false];
+        }
+
+        foreach ((array) $this->option('our-tag') as $label) {
+            $mentions[] = ['label' => (string) $label, 'ours' => true];
+        }
+
+        return $mentions;
+    }
+
+    /**
      * @param array $result
      * @return string
      */
@@ -108,9 +146,11 @@ class AutoReplyTestCommand extends Command
     {
         $intents = config('constants.AUTO_REPLY.INTENT');
         $labels = [
-            $intents['QUESTION'] => 'question（在問事情）',
-            $intents['REQUEST']  => 'request（提需求）',
-            $intents['CHAT']     => 'chat（寒暄）',
+            $intents['QUESTION']   => 'question（在問事情）',
+            $intents['REQUEST']    => 'request（提需求）',
+            $intents['CHAT']       => 'chat（寒暄）',
+            $intents['UNCLEAR']    => 'unclear（判斷不出來，轉人工）',
+            $intents['NOT_FOR_US'] => 'not_for_us（他在跟自己人講話，完全不回）',
         ];
 
         $intent = Arr::get($result, 'intent');

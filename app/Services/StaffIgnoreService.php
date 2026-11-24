@@ -75,7 +75,7 @@ class StaffIgnoreService
      * - `isStaff()` 問的是「**他講的話**要不要自動回覆」，所以會看這個對話
      *   的放行例外，而且會回填 ID。
      * - 這一支問的是「**被 tag 到的這個人**是不是我們的人」（見
-     *   `TelegramChatService::tagsOurSide()`）。放行例外是前者的設定，
+     *   `TelegramChatService::isOurSideMention()`）。放行例外是前者的設定，
      *   套到這裡會讓「客人 tag 到一位被放行的同事」被誤判成外人。
      *
      * ⚠ 也**不回填 ID** —— 被 tag 不等於本人在場發言，`mention` 這種

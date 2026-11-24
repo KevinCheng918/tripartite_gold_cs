@@ -28,8 +28,11 @@ interface AutoReplyMatcher
      *                        history  array<int, string>  近期對話，一行一則、舊的在前。
      *                                                     客人說「這是什麼錯誤呢」時，
      *                                                     他指的東西在前一則裡
+     *                        mentions array<int, array{label: string, ours: bool}>
+     *                                                     這一則 tag 到誰、那個人是不是我方。
+     *                                                     判斷「這句是講給誰聽的」用的事實
      * @return array|null 比對結果，失敗（逾時、額度用盡、格式錯誤）時回 null：
-     *                    intent     string      question / request / chat
+     *                    intent     string      question / request / chat / unclear / not_for_us
      *                    item_id    int|null    命中的題庫 id；非 question 時為 null
      *                    confidence string      high / low
      *                    opening    string|null 承接句；純寒暄不需回應時為 null

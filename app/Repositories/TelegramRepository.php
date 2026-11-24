@@ -428,7 +428,9 @@ class TelegramRepository
     public function getRecentMessages($groupId, $excludeId, $limit, $hours)
     {
         $query = TelegramMessage::query()
-            ->select(['id', 'direction', 'sender_name', 'content', 'media_type', 'created_at'])
+            // mentions：這則 tag 了誰。脈絡要帶這份標注，模型才分得出
+            // 「他上一則是在叫同事」（見 AutoReplyService::buildHistory()）
+            ->select(['id', 'direction', 'sender_name', 'content', 'mentions', 'media_type', 'created_at'])
             ->where('telegram_group_id', $groupId)
             /*
              * ⚠ 這條線**不是拿來判斷「還相不相關」的**，只是擋住

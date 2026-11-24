@@ -100,9 +100,10 @@ class AutoReplyService
      * @param string   $text      客人的話
      * @param int|null $messageId 客人那則訊息的後台 id（開求助單用）
      * @param array    $quote     他引用的那一則 {text: string, sender: string, ours: bool}
+     * @param array    $mentions  這一則 tag 到的人 [{label: string, ours: bool}]
      * @return void
      */
-    public function handle($groupId, $text, $messageId = null, array $quote = [])
+    public function handle($groupId, $text, $messageId = null, array $quote = [], array $mentions = [])
     {
         $group = $this->telegramRepository->findGroup($groupId);
 
@@ -153,9 +154,20 @@ class AutoReplyService
             return;
         }
 
+        /*
+         * ⚠ `mentions` 是**事實，不是判斷**：這一則 tag 到誰、那個人是不是
+         * 我方。模型光看「龍 所以改好了嗎？」不知道「龍」是人名還是東西，
+         * 更不知道他是我們的人還是對方的人 —— 那是只有 webhook 那一刻
+         * 比得出來的（entities ＋ 我方名單），`telegram_message` 沒有存。
+         *
+         * ⚠ 只描述**最後這一則**。連發合併（`mergeRun()`）時前面幾則的 tag
+         * 拿不到，entities 沒有落地。影響有限：真正要判「這句講給誰聽」的
+         * 是最後這一則，前面幾則的內容本來就在脈絡裡。
+         */
         $result = $this->matcher->resolve($question, [
             'group_id' => $group->id,
             'history'  => $history,
+            'mentions' => $mentions,
         ]);
 
         /*
@@ -369,12 +381,61 @@ class AutoReplyService
              */
             $when = $this->agoLabel($message->created_at);
 
+            /*
+             * ⚠⚠ **前面那幾則 tag 了誰也要標出來。**
+             *
+             * 人幾乎不會把「叫人」跟「要講的話」塞進同一則：對方主管先發
+             * 一則只有「Amy 2.0」的訊息、下一則才問「所有人給你嗎？」——
+             * 而真正要判的是下一則。光看文字那兩則都只是普通句子，
+             * 模型看不出前一則是在叫自己人。
+             *
+             * 實測（2026-11-24，用線上那份 prompt 打真的模型）：
+             * 脈絡沒有這段標注時判 `unclear`（會回一句稍等並開求助單），
+             * 加上之後判 `not_for_us`（完全不回）。
+             */
+            $tagged = $this->mentionNote($message->mentions);
+
             $lines[] = $message->direction === $inbound
-                ? "（{$when}）客人 {$message->sender_name}：{$content}"
+                ? "（{$when}）客人 {$message->sender_name}：{$content}{$tagged}"
                 : "（{$when}）客服：{$content}";
         }
 
         return $this->trimHistory($lines);
+    }
+
+    /**
+     * 脈絡那一行後面要補的「這則 tag 了誰」
+     *
+     * ⚠ 只寫事實（叫了誰、是不是我們的人），不要下結論 ——
+     * 「所以他在跟自己人講話」是模型要判的，不是我們寫死的。
+     *
+     * ⚠ 舊訊息沒有這個欄位（2026-11-24 之前存的）會是 null，
+     * 那就什麼都不加，脈絡照常可用。
+     *
+     * @param array|null $mentions [{label: string, ours: bool}]
+     * @return string 沒有 tag 時回空字串
+     */
+    private function mentionNote($mentions)
+    {
+        if (blank($mentions)) {
+            return '';
+        }
+
+        $parts = [];
+
+        foreach ((array) $mentions as $mention) {
+            $label = trim((string) Arr::get($mention, 'label'));
+
+            if (blank($label)) {
+                continue;
+            }
+
+            $parts[] = Arr::get($mention, 'ours') === true
+                ? "{$label}（我們的人）"
+                : "{$label}（不是我們的人）";
+        }
+
+        return filled($parts) ? '　〔這則 tag 了：' . implode('、', $parts) . '〕' : '';
     }
 
     /**
@@ -592,11 +653,23 @@ class AutoReplyService
         $decision = $this->decide($result, $group);
         $actions = config('constants.AUTO_REPLY.DECISION');
 
-        // 客人只說了「好」「收到」——再回一句才是打擾。
-        // 刻意不標記已回覆：萬一這是誤判（客人其實有問事情），
-        // 既有的未回覆告警仍會響，客服就會接手
+        /*
+         * 完全不回的兩種：客人只說了「好」「收到」（再回一句才是打擾），
+         * 以及他根本不是在跟我們講話（`not_for_us`）。
+         *
+         * 刻意不標記已回覆：萬一這是誤判（客人其實有問事情），
+         * 既有的未回覆告警仍會響，客服就會接手。
+         *
+         * ⚠ `intent` 要一起記 —— 兩種原因的誤判方向完全不同
+         *（「把提問當寒暄」vs「把問我們的話當成他在跟同事講」），
+         * log 裡分不出來的話，回報「為什麼沒回」時查不下去。
+         */
         if ($decision['action'] === $actions['SILENT']) {
-            Log::info('自動回覆判定不需回應', ['group_id' => $group->id, 'text' => $text]);
+            Log::info('自動回覆判定不需回應', [
+                'group_id' => $group->id,
+                'intent'   => Arr::get($result, 'intent'),
+                'text'     => $text,
+            ]);
 
             return;
         }
@@ -659,6 +732,26 @@ class AutoReplyService
         $intents = (array) config('constants.AUTO_REPLY.INTENT');
         $intent = Arr::get($result, 'intent');
         $opening = $this->sanitizeOpening(Arr::get($result, 'opening'));
+
+        /*
+         * 他不是在跟我們講話 —— 完全不回（需求方 2026-11-24）。
+         *
+         * 客人群組裡對方的人彼此對話（把同事叫進來、交代同事去辦、
+         * 問同事好了沒），我們聽得到但不該插話。
+         *
+         * ⚠ **這一條要擺在最前面**：這種訊息常常長得就像一個問題
+         *（「所以改好了嗎？」），任何一條後面的分支接到它都會回出去。
+         *
+         * ⚠ **不開求助單**。判斷是模型做的，一定會有判錯的時候 ——
+         * 對方同事之間的每一句話都開一張單，支援群組會被淹掉，
+         * 而淹掉之後連真的單也沒人看。
+         *
+         * ⚠ 不標記已回覆（SILENT 那條路共用的性質）：判錯時那則還掛在
+         * 未回覆上，既有的未回覆告警照樣會響，客服會接手。
+         */
+        if ($intent === Arr::get($intents, 'NOT_FOR_US')) {
+            return ['action' => Arr::get($actions, 'SILENT'), 'item' => null, 'opening' => null];
+        }
 
         /*
          * 判斷不出來 —— 轉人工（需求方 2026-11-08）。
@@ -832,11 +925,14 @@ class AutoReplyService
      * 供 auto-reply:test 調 prompt 與話術用。
      *
      * @param string $text
+     * @param array  $mentions 這則 tag 到的人 [{label: string, ours: bool}]。
+     *                         終端沒有 Telegram 的 entities，由 `--tag` 手動指定 ——
+     *                         不然「這句是講給誰聽的」那條路徑只能跑去群組裡試
      * @return array action／content／hint／result
      */
-    public function preview($text)
+    public function preview($text, array $mentions = [])
     {
-        $result = $this->matcher->resolve($text);
+        $result = $this->matcher->resolve($text, ['mentions' => $mentions]);
         $actions = config('constants.AUTO_REPLY.DECISION');
 
         if (blank($result)) {

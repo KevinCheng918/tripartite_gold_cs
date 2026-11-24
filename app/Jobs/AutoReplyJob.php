@@ -53,17 +53,33 @@ class AutoReplyJob implements ShouldQueue
     protected $quote;
 
     /**
+     * 這一則 tag 到的人，以及每個人是不是我方
+     *
+     * ⚠ 理由同 `$quote`：**只有 webhook 那一刻算得出來**。Telegram 的
+     * `entities` 沒有存進 `telegram_message`，而且沒有 username 的人
+     * （`text_mention`）文字裡根本沒有 `@`，事後從文字拆不回來。
+     *
+     * 這是給模型判斷「這句是講給誰聽的」用的**事實**，不是開關 ——
+     * tag 到對方的人不等於這句不是在問我們。
+     *
+     * @var array<int, array{label: string, ours: bool}>
+     */
+    protected $mentions;
+
+    /**
      * @param int      $groupId
      * @param string   $text
      * @param int|null $messageId
-     * @param array    $quote text / sender / ours
+     * @param array    $quote    text / sender / ours
+     * @param array    $mentions label / ours
      */
-    public function __construct($groupId, $text, $messageId = null, array $quote = [])
+    public function __construct($groupId, $text, $messageId = null, array $quote = [], array $mentions = [])
     {
         $this->groupId = $groupId;
         $this->text = $text;
         $this->messageId = $messageId;
         $this->quote = $quote;
+        $this->mentions = $mentions;
     }
 
     /**
@@ -103,7 +119,9 @@ class AutoReplyJob implements ShouldQueue
                  * 升版的那一刻佇列裡還有在飛的 Job，不轉成陣列會丟
                  * 「Argument must be of type array, null given」。
                  */
-                (array) $this->quote
+                (array) $this->quote,
+                // 同上：升版那一刻還在飛的 Job 沒有這個屬性
+                (array) $this->mentions
             );
         } finally {
             // 不管成功、失敗、丟例外都要收掉 —— 少了 finally，
