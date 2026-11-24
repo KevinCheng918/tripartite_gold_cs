@@ -291,3 +291,28 @@ status 不合法的審核請求。
 2. `php artisan optimize`（`permissionMap` 加了兩個 keyword）
 3. **到權限設定頁指派** `leave_request.cancel` 與
    `leave_request.review_cancel` —— 不指派的話那兩顆按鈕沒有人看得到
+
+### 稽核修掉的（v4.11，按 PROMPTS.md 逐項對照）
+
+**兩支死碼**：`LeaveCancelRequestRepository` 的 `find()` 與 `getPending()`
+寫了但沒有任何人呼叫 ——
+
+- 審核走的是**路由模型綁定**（`{leaveCancelRequest}`），不需要 `find()`
+- 撤假的入口掛在**請假清單那一列**上（`latestByLeaveIds()`），
+  沒有獨立的待審清單
+
+⚠ **repository 的方法不同於 model 的關聯**：前者暗示「系統裡有人這樣查」，
+後者只是在描述資料長什麼樣。所以兩支方法砍掉，
+而 `leaveRequest`／`requester`／`reviewer` 三個關聯留著。
+
+⚠ 已在原處留下註解說明為什麼「刻意沒有」這兩支 ——
+不然下一個人會以為是漏寫的。
+
+其餘逐條都過：PHPDoc 齊、Controller 沒有商業邏輯、沒有未使用的 import、
+無 `SELECT *`／N+1／`isset`／`??`／`empty`／`!filled`／`fn`、
+多表寫入在 `DB::transaction` 內、三語系同步、前端讀得到所有新文案。
+
+⚠ **已知的小瑕疵（沒有改）**：撤假的 UI 標籤（`cancel_action`、
+`cancel_title` 等）放在語系檔的 `msg` 陣列底下，而那一區原本是放
+「訊息」的。blade 與 JS 兩邊都一致地用 `leave.msg.*`，所以功能正常 ——
+但位置語意上不精確。要搬的話兩邊都得改，這次沒動。

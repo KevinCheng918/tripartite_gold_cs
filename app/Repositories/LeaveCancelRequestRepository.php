@@ -47,19 +47,14 @@ class LeaveCancelRequestRepository
         return $cancel;
     }
 
-    /**
-     * 用 id 取一筆
+    /*
+     * ⚠ **這裡刻意沒有 `find()` 與「待審清單」那兩支。**
      *
-     * @param int $id
-     * @return LeaveCancelRequest|null
+     * 審核是走**路由模型綁定**（`{leaveCancelRequest}`），
+     * 清單則是掛在請假清單那一列上（`latestByLeaveIds()`）——
+     * 兩支都用不到，寫了只會變成看起來有人用的死碼。
+     * 之後真的需要獨立的撤假清單時再加。
      */
-    public function find($id)
-    {
-        return LeaveCancelRequest::query()
-            ->select(self::COLUMNS)
-            ->with(['leaveRequest', 'requester', 'reviewer'])
-            ->find($id);
-    }
 
     /**
      * 這張假單有沒有還在等審的撤假申請
@@ -77,21 +72,6 @@ class LeaveCancelRequestRepository
             ->where('leave_request_id', (int) $leaveRequestId)
             ->where('status', LeaveCancelRequest::STATUS_PENDING)
             ->exists();
-    }
-
-    /**
-     * 待審核的撤假申請（審核清單用）
-     *
-     * @return Collection
-     */
-    public function getPending()
-    {
-        return LeaveCancelRequest::query()
-            ->select(self::COLUMNS)
-            ->with(['leaveRequest.user', 'requester'])
-            ->where('status', LeaveCancelRequest::STATUS_PENDING)
-            ->orderBy('created_at')
-            ->get();
     }
 
     /**
