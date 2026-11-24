@@ -25,6 +25,7 @@ class ShiftHandoverGapRepository
         'id', 'shift_handover_id', 'source_type', 'source_id',
         'title', 'detail', 'covered', 'status', 'seq',
         'ask_message_id', 'filled_note', 'filled_at', 'remind_count', 'last_reminded_at',
+        'remind_message_id',
     ];
 
     /**
@@ -101,7 +102,20 @@ class ShiftHandoverGapRepository
 
         return ShiftHandoverGap::query()
             ->select(self::COLUMNS)
-            ->where('ask_message_id', (int) $messageId)
+            /*
+             * ⚠⚠ **催補那一則也要認得。**
+             *
+             * 線上出事了（2026-11-24）：同仁引用催補訊息回「完成」，
+             * 系統完全沒反應，一路催到第 23 次 —— 因為當時只比
+             * `ask_message_id`，而催補是每次新發一則。
+             *
+             * ⚠ 那則催補訊息自己就寫著「麻煩引用這一則」——
+             * 不認得它等於叫人去做一件做不到的事。
+             */
+            ->where(function ($query) use ($messageId) {
+                $query->where('ask_message_id', (int) $messageId)
+                    ->orWhere('remind_message_id', (int) $messageId);
+            })
             ->first();
     }
 
@@ -191,12 +205,22 @@ class ShiftHandoverGapRepository
      * @param int              $seq
      * @return bool
      */
-    public function markReminded(ShiftHandoverGap $gap, $seq)
+    public function markReminded(ShiftHandoverGap $gap, $seq, $messageId = null)
     {
-        return $gap->update([
+        $attributes = [
             'remind_count'     => (int) $seq,
             'last_reminded_at' => now(),
-        ]);
+        ];
+
+        /*
+         * ⚠ **送不出去時不要把舊的 id 蓋成 null**：上一則催補仍然躺在
+         * 話題裡、仍然引用得到。蓋掉的話那一則就突然變成認不得的訊息。
+         */
+        if ((int) $messageId > 0) {
+            $attributes['remind_message_id'] = (int) $messageId;
+        }
+
+        return $gap->update($attributes);
     }
 
     /**

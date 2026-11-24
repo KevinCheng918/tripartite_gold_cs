@@ -442,14 +442,43 @@ class ShiftHandoverReviewService
          * 符合「config／cache 判斷先於 DB 查詢」。
          */
         $threadId = (int) Arr::get($message, 'message_thread_id', 0);
+        $topicIds = $this->supportGroup->topicIdsFor(self::NOTICE_TYPE);
 
-        if ($threadId < 1 || !in_array($threadId, $this->supportGroup->topicIdsFor(self::NOTICE_TYPE), true)) {
+        if ($threadId < 1 || !in_array($threadId, $topicIds, true)) {
+            /*
+             * ⚠⚠ **這一道要記 log。**
+             *
+             * 2026-11-24 線上補不上去、而且「有沒有引用都一樣」，
+             * 查了半天才發現根本不知道是哪一關擋的 —— 每一道都靜靜回 false，
+             * 什麼都查不到。
+             *
+             * ⚠ 這裡是 `debug` 等級：支援群組裡**每一則帶引用的訊息**都會
+             * 走到這裡（話題群組的每一則都帶 `reply_to_message`），
+             * 用 info 會把 log 洗掉。
+             */
+            Log::debug('交接漏項：這則不在交接話題，略過', [
+                'thread_id' => $threadId,
+                'topic_ids' => $topicIds,
+            ]);
+
             return false;
         }
 
         $gap = $this->gapFor($quotedId);
 
         if (blank($gap)) {
+            /*
+             * ⚠ 這一條是 2026-11-24 那次事故的正中心：他**有**引用、
+             * 而且引用的就是催補那一則，但那時我們沒存它的 id ⇒ 認不得。
+             *
+             * ⚠ 用 `info` 不是 `debug`：走到這裡代表「人在交接話題裡
+             * 引用了某一則」，那是有意義的動作，認不得就值得被看到。
+             */
+            Log::info('交接漏項：認不得被引用的那一則，略過', [
+                'quoted_message_id' => $quotedId,
+                'thread_id'         => $threadId,
+            ]);
+
             return false;
         }
 
@@ -670,13 +699,15 @@ class ShiftHandoverReviewService
             }
         }
 
-        $this->supportGroup->send(
+        $result = $this->supportGroup->send(
             strtr($this->text('FILL_REMIND'), [
                 '{mention}' => $mention,
                 '{from}'    => $this->shiftName($handover),
                 '{seq}'     => (int) $gap->seq,
                 '{title}'   => $this->gapLabel($gap),
                 '{times}'   => $seq,
+                // ⚠ 跟其他幾處用同一句 —— 這一則就是出事的那一則
+                '{howto}'   => $this->text('HOW_TO_FILL'),
             ]),
             null,
             (int) $gap->ask_message_id > 0
@@ -685,7 +716,17 @@ class ShiftHandoverReviewService
             self::NOTICE_TYPE
         );
 
-        $this->gapRepository->markReminded($gap, $seq);
+        /*
+         * ⚠⚠ **催補那一則的 id 一定要存下來。**
+         *
+         * 它自己寫著「麻煩引用這一則把內容補上來」—— 不存的話，
+         * 同仁照做之後系統認不得，會繼續催（線上真的催到第 23 次）。
+         */
+        $this->gapRepository->markReminded(
+            $gap,
+            $seq,
+            (int) Arr::get((array) $result, 'result.message_id')
+        );
 
         Log::info('交接漏項催補已送出', [
             'handover_id' => $handover->id,
@@ -1489,6 +1530,14 @@ class ShiftHandoverReviewService
             . $this->text('ANSWERED_SEP')
             . strtr($this->text($this->answerKey($gap, $filled)), [
                 '{mention}' => $this->mentionOf($handover),
+                /*
+                 * ⚠ 「要怎麼補」每一處都接同一句（`HOW_TO_FILL`）——
+                 * 改版前各處寫法不一致，三處還寫成「直接在話題打字」，
+                 * 而系統只收引用。見 constants 裡 `HOW_TO_FILL` 的註解。
+                 *
+                 * ⚠ 「不用補」那兩句沒有 `{howto}`，strtr 不會動它們。
+                 */
+                '{howto}' => $this->text('HOW_TO_FILL'),
             ]);
     }
 
