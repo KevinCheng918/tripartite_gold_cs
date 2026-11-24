@@ -705,6 +705,27 @@ a:hover { color: #85640a; }
 
 /* 版本紀錄 Modal */
 .changelog-latest { background: rgba(212,175,55,0.06); }
+
+/*
+ * 每一版收合（需求方 2026-11-24：「modal 現在非常的長」）。
+ *
+ * ⚠⚠ **`list-style: none` 不夠，Safari 還要 `::-webkit-details-marker`**
+ * —— 只寫前者的話 Safari 仍然會畫它自己的那個三角形，
+ * 變成畫面上有兩個箭頭（而且一個轉、一個不轉）。
+ */
+#modal-changelog summary { list-style: none; }
+#modal-changelog summary::-webkit-details-marker { display: none; }
+#modal-changelog summary::marker { content: ''; }
+
+/* 展開時箭頭轉 90 度 —— 不用換圖，也不會有圖還沒載入的空窗 */
+#modal-changelog details[open] > summary .changelog-caret { transform: rotate(90deg); }
+
+/*
+ * ⚠ 整列都要有 hover 回饋：可以點的範圍是整個 summary，
+ * 只讓箭頭變色的話，使用者會以為只有箭頭能點。
+ */
+#modal-changelog summary:hover { background: rgba(212,175,55,0.08); }
+[data-theme="dark"] #modal-changelog summary:hover { background: rgba(212,175,55,0.14); }
 [data-theme="dark"] #modal-changelog .modal-content { background: #1e1e1e; color: #e0e0e0; }
 [data-theme="dark"] #modal-changelog .changelog-item { border-color: rgba(255,255,255,0.06) !important; }
 [data-theme="dark"] #modal-changelog .changelog-latest { background: rgba(212,175,55,0.1); }

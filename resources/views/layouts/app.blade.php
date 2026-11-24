@@ -556,16 +556,31 @@
                     <h5 class="modal-title"><i class="fas fa-clipboard-list me-2"></i>版本紀錄</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
+                {{--
+                    ⚠ 每一版**預設收合**，只露版號／標題／日期，點了才展開
+                    （需求方 2026-11-24：「我版本紀錄的 modal 現在非常的長」）。
+
+                    ⚠ **最新那一版預設展開** —— 開啟這個視窗最常見的目的
+                    就是看「這次更新了什麼」，讓他還要再點一下是多餘的。
+
+                    ⚠ 用 `<details>` 而不是 Bootstrap 的 collapse：
+                    不需要 JS、鍵盤與搜尋（Ctrl+F）都原生可用，
+                    而且沒有「JS 還沒載入時整段展開」的閃爍。
+                --}}
                 <div class="modal-body p-0">
                     @foreach(config('changelog', []) as $idx => $log)
-                    <div class="changelog-item border-bottom px-4 py-3{{ $idx === 0 ? ' changelog-latest' : '' }}">
-                        <div class="d-flex align-items-center mb-1">
+                    <details class="changelog-item border-bottom{{ $idx === 0 ? ' changelog-latest' : '' }}" @if($idx === 0) open @endif>
+                        {{-- ⚠ list-style 要關掉：預設的三角形在 Safari 與 Chrome 長得不一樣，
+                             自己畫一個才會兩邊一致（也才轉得動） --}}
+                        <summary class="d-flex align-items-center px-4 py-3" style="cursor:pointer;list-style:none;user-select:none">
+                            <i class="fas fa-chevron-right changelog-caret me-2 text-muted" style="font-size:0.75rem;transition:transform 0.15s"></i>
                             <span class="badge me-2" style="background:#d4af37;color:#fff;font-size:0.75rem">{{ $log['version'] }}</span>
-                            <span class="fw-bold" style="font-size:1rem">{{ $log['title'] }}</span>
-                            <span class="ms-auto text-muted" style="font-size:0.8125rem">{{ $log['date'] }}</span>
-                        </div>
-                        <div class="changelog-content text-muted" style="font-size:0.875rem;white-space:pre-line;line-height:1.8">{{ $log['content'] }}</div>
-                    </div>
+                            {{-- ⚠ 標題要能縮：版號與日期是固定寬度，手機上標題太長會把日期擠出畫面 --}}
+                            <span class="fw-bold text-truncate" style="font-size:1rem">{{ $log['title'] }}</span>
+                            <span class="ms-auto ps-2 text-muted text-nowrap" style="font-size:0.8125rem">{{ $log['date'] }}</span>
+                        </summary>
+                        <div class="changelog-content text-muted px-4 pb-3" style="font-size:0.875rem;white-space:pre-line;line-height:1.8">{{ $log['content'] }}</div>
+                    </details>
                     @endforeach
                 </div>
             </div>
