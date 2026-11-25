@@ -237,6 +237,43 @@ Telegram 會標「已編輯」，所以不算騙人。但他可能**已經照舊
 
 ---
 
+## ⚠⚠ 稽核時才發現：插方法會把上一支的 PHPDoc 孤立掉
+
+按 PROMPTS.md 回頭稽核 v4.16 時抓到的，**這是會重複發生的一類**：
+
+在兩支方法之間插一支新的時，如果插點落在
+**上一支的 PHPDoc 與它的 `function` 之間**，就會變成
+
+```php
+/** 原本那支的說明 @return void */
+/** 新插進來這支的說明 @return TelegramMessage */
+public function 新方法() { … }
+
+public function 原本那支() { … }   // ← 註解被偷走了
+```
+
+⚠ **`php -l` 過、StyleCI 過、功能也完全正常** —— 壞掉的只有文件：
+原本那支變成沒註解，而新那支頭上頂著一段講別人的說明。
+
+這次掃出 **4 處**，其中 2 處是這個功能造成的
+（`findQuoted()`、`broadcastEdited()` 的註解被偷走），
+另外 2 處是更早以前留下的 **stale 重複**
+（`handleIncomingMessage()`、`downloadTelegramFile()` 下面都已經有
+更完整的一份，上面那份是舊的殘留）—— 那兩份直接刪掉。
+
+### 怎麼掃
+
+```php
+// 連續兩個 docblock 中間沒有東西 ＝ 有孤兒
+trim($lines[$i]) === '*/' && strpos(trim($lines[$i + 1]), '/**') === 0
+```
+
+⚠ 修的時候要先分清楚是**哪一種**：
+- 下面那支**沒有**自己的註解 → 把孤兒**搬下去**（`hasNewerInbound()` 就是）
+- 下面那支**已經有**而且更完整 → 孤兒是殘留，**刪掉**（不要兩份並存）
+
+---
+
 ## 已驗證（2026-11-25）
 
 後端 10 種情況（全程 `beginTransaction` → `rollBack`，沒有寫進正式資料）：

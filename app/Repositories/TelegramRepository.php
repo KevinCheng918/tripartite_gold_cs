@@ -341,16 +341,6 @@ class TelegramRepository
     }
 
     /**
-     * 取被引用的訊息（客服引用回覆用）
-     *
-     * 前端傳的是後台的訊息 id，要換成 Telegram 那邊的 message_id 才送得出去；
-     * 同時取回發送者與內容，寫進新訊息的 reply_to_* 供後台顯示。
-     *
-     * @param int $groupId
-     * @param int $messageId 後台的訊息 id
-     * @return TelegramMessage|null
-     */
-    /**
      * 取一則我方送出的訊息，供「改掉／撤回」判斷與執行
      *
      * ⚠ 欄位要夠 `TelegramMessage::canEdit()`／`canRecall()` 判斷用：
@@ -359,6 +349,12 @@ class TelegramRepository
      * 而且是**算成「不能改」**（欄位讀回 null），使用者只會看到按鈕消失。
      *
      * ⚠ 帶 `group:id,chat_id`：送 API 要 chat_id，不帶就是每次多一趟查詢。
+     *
+     * ⚠ **群組只撈兩欄就夠，不要「順手補齊」。** `switchBotToken()` 要走
+     * `$group->station->system->bot_token`，看起來像是少撈了欄位，
+     * 但 `station()` 是掛在 `station.telegram_group_id` 上的 `hasOne` ——
+     * 只要有群組的 `id` 就查得到。已實測兩條路徑（這支與 `findGroup()`）
+     * 挑到同一支 token。
      *
      * @param int $id 後台訊息 id
      * @return TelegramMessage|null
@@ -375,6 +371,16 @@ class TelegramRepository
             ->find($id);
     }
 
+    /**
+     * 取被引用的訊息（客服引用回覆用）
+     *
+     * 前端傳的是後台的訊息 id，要換成 Telegram 那邊的 message_id 才送得出去；
+     * 同時取回發送者與內容，寫進新訊息的 reply_to_* 供後台顯示。
+     *
+     * @param int $groupId
+     * @param int $messageId 後台的訊息 id
+     * @return TelegramMessage|null
+     */
     public function findQuoted($groupId, $messageId)
     {
         return TelegramMessage::query()
@@ -510,22 +516,6 @@ class TelegramRepository
     }
 
     /**
-     * 這則之後，客人還有沒有再說話
-     *
-     * 給自動回覆判斷「我是不是最後一則」用 —— 客人連著傳好幾句講同一件事時，
-     * 只有最後一則該回覆，前面幾則白回會變成同一個問題被答好幾次。
-     *
-     * **只看 inbound**：客服或 AI 自己發的訊息不算「客人又說話了」，
-     * 不然 AI 一回覆就會把自己判定成過期。
-     *
-     * ⚠ 比 `id` 不比 `created_at` —— 同一秒內進來的多則訊息時間會一樣，
-     * 用時間比會漏掉。id 是遞增的，照寫入順序。
-     *
-     * @param int      $groupId
-     * @param int|null $messageId 空的話一律回 false（沒有基準點可比）
-     * @return bool
-     */
-    /**
      * 客人這一輪連著說的話（含這一則）
      *
      * 「一輪」＝ 從上一次我方發言之後，到這一則為止的所有客人訊息。
@@ -574,6 +564,22 @@ class TelegramRepository
         return (new Collection($run))->reverse()->values();
     }
 
+    /**
+     * 這則之後，客人還有沒有再說話
+     *
+     * 給自動回覆判斷「我是不是最後一則」用 —— 客人連著傳好幾句講同一件事時，
+     * 只有最後一則該回覆，前面幾則白回會變成同一個問題被答好幾次。
+     *
+     * **只看 inbound**：客服或 AI 自己發的訊息不算「客人又說話了」，
+     * 不然 AI 一回覆就會把自己判定成過期。
+     *
+     * ⚠ 比 `id` 不比 `created_at` —— 同一秒內進來的多則訊息時間會一樣，
+     * 用時間比會漏掉。id 是遞增的，照寫入順序。
+     *
+     * @param int      $groupId
+     * @param int|null $messageId 空的話一律回 false（沒有基準點可比）
+     * @return bool
+     */
     public function hasNewerInbound($groupId, $messageId)
     {
         if (blank($messageId)) {

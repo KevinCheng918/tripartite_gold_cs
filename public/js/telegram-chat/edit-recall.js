@@ -24,7 +24,8 @@
      * 建一個共用的小視窗（第一次用到才建）
      *
      * ⚠ **不用 `confirm()`／`alert()`** —— 需求方明訂所有回饋走 modal。
-     * 這個模組裡既有的 `alert()` 是舊程式碼，不要照抄。
+     * `layout.js` 與 `input.js` 裡還留著幾個 `alert()`，那是舊程式碼，
+     * 不要照抄。
      *
      * @returns {HTMLElement}
      */

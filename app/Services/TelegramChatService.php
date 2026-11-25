@@ -196,12 +196,6 @@ class TelegramChatService
     // ---------------------------------------------------------------
 
     /**
-     * 處理 Telegram Webhook 收到的訊息
-     *
-     * @param array $payload Telegram Update 物件
-     * @return void
-     */
-    /**
      * 處理 Telegram 的 edited_message 事件
      *
      * 客人改了訊息內容，後台不同步的話客服會照舊內容回覆。
@@ -247,14 +241,6 @@ class TelegramChatService
         $this->broadcastEdited($message->telegram_group_id, $message->id, $newText);
     }
 
-    /**
-     * 廣播編輯事件，讓正在看該對話的客服即時看到新內容
-     *
-     * @param int    $groupId
-     * @param int    $messageId
-     * @param string $content
-     * @return void
-     */
     /**
      * 改掉一則我方已經送出去的訊息
      *
@@ -420,6 +406,14 @@ class TelegramChatService
         return trans('telegram_chat.msg.edit_failed_reason', ['reason' => $reason]);
     }
 
+    /**
+     * 廣播編輯事件，讓正在看該對話的客服即時看到新內容
+     *
+     * @param int    $groupId
+     * @param int    $messageId
+     * @param string $content
+     * @return void
+     */
     private function broadcastEdited($groupId, $messageId, $content)
     {
         try {
@@ -1286,13 +1280,6 @@ class TelegramChatService
         return (int) Arr::get($parts, 0) * 60 + (int) Arr::get($parts, 1);
     }
 
-    /**
-     * 從 Telegram 下載檔案到本地
-     *
-     * @param string $fileId Telegram file_id
-     * @param string $prefix 檔名前綴（photo / sticker）
-     * @return string|null 本地公開 URL
-     */
     /**
      * 解析訊息中的媒體，只取出 file_id 不下載
      *
