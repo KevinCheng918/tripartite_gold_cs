@@ -513,8 +513,8 @@
                                     <th class="col-tight">{{ trans('login_log.field_created_at') }}</th>
                                     <th class="col-tight">{{ trans('login_log.field_ip') }}</th>
                                     <th class="col-tight text-center">{{ trans('login_log.field_is_success') }}</th>
-                                    <th>{{ trans('login_log.field_device') }}</th>
-                                    <th>{{ trans('login_log.field_fail_reason') }}</th>
+                                    <th class="col-login-device">{{ trans('login_log.field_device') }}</th>
+                                    <th class="col-login-reason">{{ trans('login_log.field_fail_reason') }}</th>
                                 </tr>
                             </thead>
                             <tbody id="login-log-tbody">
@@ -922,12 +922,24 @@ $(function () {
                         var badge = log.is_success
                             ? '<span class="badge bg-success">{{ trans("login_log.status_success") }}</span>'
                             : '<span class="badge bg-danger">{{ trans("login_log.status_failed") }}</span>';
+                        /*
+                         * ⚠⚠ **前三格要掛 `col-tight`，後兩格要掛各自的 class。**
+                         *
+                         * 2026-11-25 跑版：`col-tight` 原本只掛在 `<th>` 上，
+                         * 而欄寬是看**整欄**的內容算的 —— 所以那三欄沒有被縮到
+                         * 內容寬，反而吃掉 630px，「登入裝置」只剩 86px，
+                         * 「作業系統：」被逐字斷成三行（整格高 263px）。
+                         *
+                         * ⚠ 裝置與原因用 `min-width` 而不是 `nowrap`：
+                         * `fail_reason` 是資料庫字串、長度不保證，禁止換行
+                         * 會讓長訊息把表格撐到橫向捲動。
+                         */
                         rows += '<tr>'
-                            + '<td class="text-nowrap">' + log.created_at + '</td>'
-                            + '<td><code>' + log.ip + '</code></td>'
-                            + '<td class="text-center">' + badge + '</td>'
-                            + '<td style="font-size:0.8125rem">' + renderLoginDevice(log) + '</td>'
-                            + '<td>' + escapeHtml(log.fail_reason || '-') + '</td>'
+                            + '<td class="col-tight">' + log.created_at + '</td>'
+                            + '<td class="col-tight"><code>' + log.ip + '</code></td>'
+                            + '<td class="col-tight text-center">' + badge + '</td>'
+                            + '<td class="col-login-device" style="font-size:0.8125rem">' + renderLoginDevice(log) + '</td>'
+                            + '<td class="col-login-reason">' + escapeHtml(log.fail_reason || '-') + '</td>'
                             + '</tr>';
                     }
                 }

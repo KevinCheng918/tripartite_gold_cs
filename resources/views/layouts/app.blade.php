@@ -535,8 +535,10 @@
                                     <th class="col-tight">{{ trans('login_log.field_created_at') }}</th>
                                     <th class="col-tight">{{ trans('login_log.field_ip') }}</th>
                                     <th class="col-tight text-center">{{ trans('login_log.field_is_success') }}</th>
-                                    <th>{{ trans('login_log.field_device') }}</th>
-                                    <th>{{ trans('login_log.field_fail_reason') }}</th>
+                                    {{-- ⚠ 這兩欄的 class 與 CSS 見 public/css/custom.css
+                                         —— 不掛的話會被前三欄擠扁（2026-11-25 跑版） --}}
+                                    <th class="col-login-device">{{ trans('login_log.field_device') }}</th>
+                                    <th class="col-login-reason">{{ trans('login_log.field_fail_reason') }}</th>
                                 </tr>
                             </thead>
                             <tbody id="my-login-log-tbody"></tbody>
@@ -862,11 +864,12 @@
                                 ? '<span class="badge bg-success">成功</span>'
                                 : '<span class="badge bg-danger">失敗</span>';
                             rows += '<tr>'
-                                + '<td class="text-nowrap">' + log.created_at + '</td>'
-                                + '<td><code>' + log.ip + '</code></td>'
-                                + '<td class="text-center">' + badge + '</td>'
-                                + '<td style="font-size:0.8125rem">' + myLoginLogDevice(log) + '</td>'
-                                + '<td>' + myLoginLogEscape(log.fail_reason || '-') + '</td>'
+                                // ⚠ 前三格要掛 col-tight（只掛 th 沒用，欄寬是看整欄算的）
+                                + '<td class="col-tight">' + log.created_at + '</td>'
+                                + '<td class="col-tight"><code>' + log.ip + '</code></td>'
+                                + '<td class="col-tight text-center">' + badge + '</td>'
+                                + '<td class="col-login-device" style="font-size:0.8125rem">' + myLoginLogDevice(log) + '</td>'
+                                + '<td class="col-login-reason">' + myLoginLogEscape(log.fail_reason || '-') + '</td>'
                                 + '</tr>';
                         }
                     }
