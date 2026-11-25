@@ -17,6 +17,13 @@ window.TgChat = (function () {
         canReply: root.dataset.canReply === '1',
         canDelete: root.dataset.canDelete === '1',
         canIgnore: root.dataset.canIgnore === '1',
+        /*
+         * 改掉／撤回**別人**送出的訊息（2026-11-25）。
+         *
+         * ⚠ 自己送的不需要這個 —— 有 `canReply` 就能改自己說過的話。
+         * 這一條管的是「動別人跟客人說過的話」。
+         */
+        canEditOthers: root.dataset.canEditOthers === '1',
 
         // 被設為不自動回覆的成員顯示名稱，跟著訊息一起回來。
         // 訊息本身沒有存發話者 id（不動大表），標籤只能用名字比對 ——
@@ -75,6 +82,22 @@ window.TgChat = (function () {
             var div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        },
+
+        /**
+         * 跟 escapeHtml 一樣，但**連雙引號一起換掉** ——
+         * 要塞進 HTML 屬性（`data-xxx="…"`）的值一律用這個。
+         *
+         * ⚠⚠ escapeHtml 走的是 textContent → innerHTML，而瀏覽器
+         * **不會**把 `"` 轉成 `&quot;`（在文字節點裡它不危險）。
+         * 直接塞進屬性的話，客人只要說過一句帶半角引號的話，
+         * 那個屬性就被提早收掉、後面整串 HTML 跟著歪掉。
+         *
+         * @param {string} text
+         * @returns {string}
+         */
+        escapeAttr: function (text) {
+            return this.escapeHtml(text).replace(/"/g, '&quot;');
         }
     };
 })();

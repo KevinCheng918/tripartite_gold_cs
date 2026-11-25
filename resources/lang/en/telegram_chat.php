@@ -24,6 +24,26 @@ return [
     'send_image_title'   => 'Send photo',
     'send_file_caption'  => 'Caption (optional)',
     'btn_add_more'       => 'Add',
+    'btn_save'           => 'Save',
+
+    /*
+     * Editing / recalling a message we already sent (2026-11-25).
+     *
+     * ⚠ Both hints must spell out the consequence, not just ask "are you
+     * sure" — an edit leaves an "edited" mark on the customer's side, while a
+     * recall removes the message for good. The agent should know which one
+     * they are about to do.
+     */
+    'action_edit_sent'   => 'Edit message',
+    'edit_hint'          => 'The customer will see an "edited" mark, so this is not a way to hide something you said by mistake — recall it and send a new one instead.',
+    'action_recall_sent' => 'Recall message',
+    'recall_confirm'     => 'Recall this message from the customer\'s chat?',
+    'recall_hint'        => 'It disappears from their side for good; the record stays here and remains visible to managers.',
+    // ⚠ This is a bubble **label** (same family as ignore_badge) — keep it out
+    //    of `msg`, or the frontend has to say `i18n.msg.recalled_badge`, which
+    //    is exactly what the first pass got wrong.
+    'recalled_badge'     => 'Recalled',
+    'recalled_badge_by'  => 'Recalled by :name',
 
     /*
      * Typing `@` to mention someone.
@@ -67,7 +87,13 @@ return [
     'btn_remove_image'   => 'Remove',
     'drop_hint'          => 'Drop to attach',
     'download_file'      => 'Download file',
+    /*
+     * ⚠ Keep both: when the customer edits their own message in Telegram we
+     * only learn that it changed, never who changed it (it is their account),
+     * so that case can only use the nameless version.
+     */
     'message_edited'     => 'edited',
+    'message_edited_by'  => 'edited by :name',
     'action_quote'       => 'Reply with quote',
     'action_cancel_quote' => 'Cancel quote',
     'media_photo'        => '[Photo]',
@@ -158,6 +184,21 @@ return [
         'group_not_found'  => 'Group not found',
         'content_too_long' => 'Message too long',
         'reply_failed'     => 'Failed to send reply',
+
+        // Editing / recalling a sent message. Each failure means a different next step.
+        'edit_not_allowed'     => 'This message can no longer be edited (only your own plain-text messages, within 12 hours)',
+        'edit_not_owner'       => 'This message was sent by someone else and you do not have permission to change it',
+        'edit_content_required' => 'Content cannot be empty — use "Recall" to take the whole message back',
+        'edit_content_max'     => 'Content is too long (Telegram allows 4096 characters)',
+        'edit_too_old'         => 'Telegram will not let this message be edited any more. Recall it and send a new one instead.',
+        'edit_gone'            => 'That message no longer exists on Telegram (it may have been deleted)',
+        'edit_failed'          => 'Could not edit this message',
+        'edit_failed_reason'   => 'Could not edit this message: :reason',
+        'edit_done'            => 'Updated. The customer will see an "edited" marker.',
+
+        'recall_not_allowed'   => 'This message can no longer be recalled (only our own messages, within 48 hours)',
+        'recall_failed'        => 'Could not recall this message',
+        'recall_done'          => 'Recalled. The customer can no longer see it.',
         'reply_success'    => 'Reply sent',
         'assign_failed'    => 'Failed to assign',
         'assign_success'   => 'Assigned successfully',

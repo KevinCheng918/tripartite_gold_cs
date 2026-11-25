@@ -24,6 +24,24 @@ return [
     'send_image_title'   => '传送图片',
     'send_file_caption'  => '说明文字（选填）',
     'btn_add_more'       => '新增',
+    'btn_save'           => '保存',
+
+    /*
+     * 改掉／撤回已经送出去的讯息（需求方 2026-11-25）。
+     *
+     * ⚠ 两段提示文字要讲清楚后果，不要只写「确定吗」——
+     * 编辑客人那边会留下「已编辑」的痕迹，撤回则是整则消失、拿不回来，
+     * 客服要先知道自己按下去会发生什么事。
+     */
+    'action_edit_sent'   => '编辑讯息',
+    'edit_hint'          => '改完客人那边会显示「已编辑」，所以不适合用来掩盖说错的话；说错请撤回再重发一则。',
+    'action_recall_sent' => '撤回讯息',
+    'recall_confirm'     => '确定要把这一则从客人的对话里收回吗？',
+    'recall_hint'        => '客人那边会整则消失、而且收不回来；后台仍然留着纪录，主管查得到。',
+    // ⚠ 这是气泡上的**标签**（跟 ignore_badge 同一类），不要放进 `msg` ——
+    //    放进去前端就得写 `i18n.msg.recalled_badge`，第一版就是这样漏掉的
+    'recalled_badge'     => '已撤回',
+    'recalled_badge_by'  => '已由 :name 撤回',
 
     /*
      * 打 `@` 叫人。
@@ -65,7 +83,13 @@ return [
     'btn_remove_image'   => '移除',
     'drop_hint'          => '放开以加入附件',
     'download_file'      => '下载档案',
+    /*
+     * ⚠ 两个版本都要留着：客人自己在 Telegram 改自己那句话时，
+     * 我们只知道「被改过」、不知道是谁（那是他家的帐号），
+     * 这时只能用没有名字的那一版。
+     */
     'message_edited'     => '已编辑',
+    'message_edited_by'  => '已由 :name 编辑',
     'action_quote'       => '引用回覆',
     'action_cancel_quote' => '取消引用',
     'media_photo'        => '[图片]',
@@ -154,6 +178,21 @@ return [
         'group_not_found'  => '群组不存在',
         'content_too_long' => '消息内容过长',
         'reply_failed'     => '回复发送失败',
+
+        // 改掉／撤回已送出的讯息。⚠ 失败原因要分开讲，因为下一步完全不同
+        'edit_not_allowed'     => '这一则现在改不动了（只有自己人工送出的纯文字、12 小时内可以改）',
+        'edit_not_owner'       => '这是别人送出的讯息，您没有权限改动',
+        'edit_content_required' => '内容不能是空的；要整则收回请改用「撤回」',
+        'edit_content_max'     => '内容太长（Telegram 上限 4096 字）',
+        'edit_too_old'         => 'Telegram 不让改这么旧的讯息了，请改用「撤回」再重发一则',
+        'edit_gone'            => '那一则讯息在 Telegram 上已经不存在了（可能已经被删掉）',
+        'edit_failed'          => '改不动这一则讯息',
+        'edit_failed_reason'   => '改不动这一则讯息：:reason',
+        'edit_done'            => '已经改好了，客人那边会显示「已编辑」',
+
+        'recall_not_allowed'   => '这一则现在撤不回了（只有我方送出、48 小时内可以撤）',
+        'recall_failed'        => '撤回失败',
+        'recall_done'          => '已经撤回，客人那边看不到这一则了',
         'reply_success'    => '回复已发送',
         'assign_failed'    => '指派失败',
         'assign_success'   => '指派成功',

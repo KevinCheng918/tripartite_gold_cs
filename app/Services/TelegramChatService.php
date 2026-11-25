@@ -255,6 +255,171 @@ class TelegramChatService
      * @param string $content
      * @return void
      */
+    /**
+     * 改掉一則我方已經送出去的訊息
+     *
+     * > 需求方 2026-11-25：「我客服打出去的話……這個我能改對話內容嗎」
+     *
+     * ⚠⚠ **只改錯字用。** 內容講錯了（金額、時間、承諾）應該用
+     * `recallSent()` 撤回重發 —— 客人很可能已經讀了並照舊的做，
+     * 默默改掉比留著更危險。限制條件見 `TelegramMessage::canEdit()`。
+     *
+     * ⚠ **先送 Telegram、成功才寫 DB**：反過來的話會出現
+     * 「後台寫 A、客人看到 B」，比改不動更糟。
+     *
+     * @param int    $messageId 後台訊息 id
+     * @param string $content   新內容
+     * @param int    $userId    操作者
+     * @return TelegramMessage
+     * @throws \RuntimeException
+     */
+    public function editSent($messageId, $content, $userId)
+    {
+        $message = $this->telegramRepository->findOutboundForEdit($messageId);
+
+        if (blank($message) || !$message->canEdit()) {
+            throw new \RuntimeException(trans('telegram_chat.msg.edit_not_allowed'));
+        }
+
+        $group = $message->group;
+
+        if (blank($group)) {
+            throw new \RuntimeException(trans('telegram_chat.msg.edit_not_allowed'));
+        }
+
+        $this->switchBotToken($group);
+
+        /*
+         * ⚠⚠ **不要在這裡再加一次署名。** `sendReply()` 是先把署名接上去
+         * 才送出、也才寫進 `content` 的（見那支的「署名在送出前加上」），
+         * 所以資料庫裡那段本來就含署名，編輯框帶出來的全文也含署名 ——
+         * 這裡再 `appendSignature()` 一次，客人就會看到兩個署名。
+         */
+        $result = $this->botService->editMessageText(
+            $group->chat_id,
+            (int) $message->telegram_message_id,
+            $content
+        );
+
+        if (!Arr::get((array) $result, 'ok')) {
+            $reason = (string) Arr::get((array) $result, 'description');
+
+            Log::warning('改掉已送出訊息失敗', [
+                'message_id'  => $messageId,
+                'user_id'     => $userId,
+                'description' => $reason,
+            ]);
+
+            /*
+             * ⚠ **內容沒變不是錯誤。** Telegram 對「新舊完全一樣」會回
+             * `message is not modified` —— 那時什麼都不用做，
+             * 但也不要跟使用者說「失敗」。
+             */
+            if (mb_strpos($reason, 'message is not modified') !== false) {
+                return $message;
+            }
+
+            throw new \RuntimeException($this->editFailMessage($reason));
+        }
+
+        $this->telegramRepository->updateMessage($message, [
+            'content'   => $content,
+            'edited_at' => now(),
+            // ⚠ 需求方選了「不留原文」，但至少要知道是誰改的
+            'edited_by' => (int) $userId,
+        ]);
+
+        $this->broadcastEdited($message->telegram_group_id, $message->id, $content);
+
+        return $message;
+    }
+
+    /**
+     * 撤回一則我方已經送出去的訊息
+     *
+     * ⚠ **條件比編輯寬很多**：圖片、檔案、自動回覆都撤得掉 ——
+     * `deleteMessage` 不分訊息類型（需求方 2026-11-25 確認過圖片要能刪）。
+     *
+     * ⚠⚠ **不刪後台那一列。** 客人那邊看不到了，但「我們曾經送過這句話」
+     * 仍然是事實 —— 刪掉的話，事後連「為什麼客人會那樣以為」都查不出來。
+     *
+     * @param int $messageId 後台訊息 id
+     * @param int $userId    操作者
+     * @return TelegramMessage
+     * @throws \RuntimeException
+     */
+    public function recallSent($messageId, $userId)
+    {
+        $message = $this->telegramRepository->findOutboundForEdit($messageId);
+
+        if (blank($message) || !$message->canRecall()) {
+            throw new \RuntimeException(trans('telegram_chat.msg.recall_not_allowed'));
+        }
+
+        $group = $message->group;
+
+        if (blank($group)) {
+            throw new \RuntimeException(trans('telegram_chat.msg.recall_not_allowed'));
+        }
+
+        $this->switchBotToken($group);
+
+        $result = $this->botService->deleteMessages(
+            $group->chat_id,
+            [(int) $message->telegram_message_id]
+        );
+
+        if (!Arr::get((array) $result, 'ok')) {
+            $reason = (string) Arr::get((array) $result, 'description');
+
+            Log::warning('撤回已送出訊息失敗', [
+                'message_id'  => $messageId,
+                'user_id'     => $userId,
+                'description' => $reason,
+            ]);
+
+            throw new \RuntimeException($this->editFailMessage($reason));
+        }
+
+        $this->telegramRepository->updateMessage($message, [
+            'recalled_at' => now(),
+            'recalled_by' => (int) $userId,
+        ]);
+
+        $this->broadcastEdited($message->telegram_group_id, $message->id, (string) $message->content);
+
+        return $message;
+    }
+
+    /**
+     * 把 Telegram 的失敗原因換成人看得懂的話
+     *
+     * ⚠ **原文也要附上**（括號裡）：翻譯只蓋得住已知的幾種，
+     * 遇到沒見過的原因時，操作者至少還拿得到可以回報的字串。
+     *
+     * @param string $reason Telegram 的 description
+     * @return string
+     */
+    private function editFailMessage($reason)
+    {
+        if (blank($reason)) {
+            return trans('telegram_chat.msg.edit_failed');
+        }
+
+        // 訊息已經被刪掉了（可能是群組裡有人手動刪的）
+        if (mb_strpos($reason, 'message to edit not found') !== false
+            || mb_strpos($reason, 'message to delete not found') !== false) {
+            return trans('telegram_chat.msg.edit_gone');
+        }
+
+        // 超過 Telegram 自己的時限
+        if (mb_strpos($reason, 'too old') !== false) {
+            return trans('telegram_chat.msg.edit_too_old');
+        }
+
+        return trans('telegram_chat.msg.edit_failed_reason', ['reason' => $reason]);
+    }
+
     private function broadcastEdited($groupId, $messageId, $content)
     {
         try {

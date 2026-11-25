@@ -22,6 +22,8 @@
          data-can-reply="{{ Auth::user()->hasPermission('telegram_chat.reply') ? '1' : '0' }}"
          data-can-delete="{{ Auth::user()->hasPermission('telegram_chat.delete') ? '1' : '0' }}"
          data-can-ignore="{{ Auth::user()->hasPermission('telegram_chat.ignore_manage') ? '1' : '0' }}"
+         {{-- ⚠ 只管「動別人送出的訊息」；改自己的有 can-reply 就夠 --}}
+         data-can-edit-others="{{ Auth::user()->hasPermission('telegram_chat.edit_others') ? '1' : '0' }}"
          data-auto-reply-available="{{ $autoReplyAvailable ? '1' : '0' }}"
          {{--
              取消勾選時那個 modal 的設定。
@@ -59,5 +61,7 @@
     <script src="{{ asset('js/telegram-chat/quick-reply.js') }}?v={{ filemtime(public_path('js/telegram-chat/quick-reply.js')) }}"></script>
     {{-- 必須排在 main.js 之前：renderHeader 實際執行時要看得到 T.openIgnorePanel --}}
     <script src="{{ asset('js/telegram-chat/ignore-member.js') }}?v={{ filemtime(public_path('js/telegram-chat/ignore-member.js')) }}"></script>
+    {{-- 改掉／撤回已送出的訊息（2026-11-25）。⚠ 要排在 messages.js 之後 --}}
+    <script src="{{ asset('js/telegram-chat/edit-recall.js') }}?v={{ filemtime(public_path('js/telegram-chat/edit-recall.js')) }}"></script>
     <script src="{{ asset('js/telegram-chat/main.js') }}?v={{ filemtime(public_path('js/telegram-chat/main.js')) }}"></script>
 @endsection

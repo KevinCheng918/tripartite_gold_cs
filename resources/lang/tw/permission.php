@@ -95,6 +95,8 @@ return [
         'assign'          => '指派值班',
         'delete'          => '刪除對話紀錄',
         'ignore_manage'   => '設定不自動回覆的成員',
+        // ⚠ 自己送的不需要這個權限（有 reply 就能改自己說過的話）
+        'edit_others'     => '改掉／撤回別人送出的訊息',
         'broadcast_template' => '建檔／修改公告範本',
         'station_credit'  => '用指令查站台餘點',
         'vm_query'        => '用指令查虛擬機',

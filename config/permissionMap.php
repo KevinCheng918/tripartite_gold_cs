@@ -161,6 +161,14 @@ return [
             'telegram_chat.ignore_manage' => 'permission.telegram_chat.ignore_manage',
 
             /*
+             * 改掉／撤回**別人**送出去的訊息（2026-11-25）。
+             *
+             * ⚠ **自己送的不需要這個權限** —— 有 `reply` 就能改自己說過的話。
+             * 這一條管的是「動別人跟客人說過的話」，那是另一個層級的事。
+             */
+            'telegram_chat.edit_others' => 'permission.telegram_chat.edit_others',
+
+            /*
              * 建檔／修改公告範本。跟 `broadcast` 分開（需求方 2026-10-13）：
              * 「能發公告」與「能改公版內容」是兩件事 —— 改了公版會影響
              * 之後每一個人發出去的內容，而發送只影響這一次。

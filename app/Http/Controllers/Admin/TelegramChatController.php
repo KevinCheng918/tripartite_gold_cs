@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Events\TelegramTyping;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\TelegramChat\EditSentRequest;
 use App\Http\Requests\TelegramChat\MentionCandidateRequest;
 use App\Http\Requests\TelegramChat\ReplyRequest;
 use App\Http\Requests\TelegramChat\SendFileRequest;
 use App\Http\Requests\TelegramChat\ToggleAutoReplyRequest;
 use App\Http\Requests\TelegramChat\ToggleIgnoreMemberRequest;
+use App\Models\TelegramMessage;
 use App\Http\Resources\GroupMemberResource;
 use App\Http\Resources\MentionCandidateResource;
 use App\Http\Resources\StaffIgnoreResource;
@@ -339,6 +341,115 @@ class TelegramChatController extends Controller
 
             return response()->json(['message' => trans('telegram_chat.msg.reply_failed')], 500);
         }
+    }
+
+    /**
+     * Ajax 改掉一則已經送出去的訊息
+     *
+     * ⚠⚠ **只有自己送的不用額外權限**（有 `reply` 就能改自己說過的話）；
+     * 動別人的那一則要 `telegram_chat.edit_others` ——
+     * 「改掉別人跟客人說過的話」是另一個層級的事。
+     *
+     * ⚠ 路由上只能掛 `can:telegram_chat.reply`（那是進得來的門檻），
+     * 「是不是自己的」要在這裡判 —— 路由中介層看不到那一則是誰送的。
+     *
+     * @param EditSentRequest $request
+     * @param TelegramMessage $telegramMessage
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxEditSent(EditSentRequest $request, TelegramMessage $telegramMessage)
+    {
+        $params = $request->validated();
+
+        if (!$this->canTouchSent($telegramMessage)) {
+            return response()->json(['message' => trans('telegram_chat.msg.edit_not_owner')], 403);
+        }
+
+        try {
+            $this->chatService->editSent(
+                (int) $telegramMessage->id,
+                (string) Arr::get($params, 'content'),
+                Auth::id()
+            );
+
+            /*
+             * ⚠⚠ **不要回 `TelegramMessageResource`。** Service 那邊是用
+             * `findOutboundForEdit()` 取的，select 只有判斷所需的那幾欄 ——
+             * 包成 Resource 的話 `sender_name`、`media_url`、`reactions`、
+             * `edited_at` 全都會變成 **null**（Laravel 對沒 select 的欄位
+             * 不會報錯，就是給你 null），前端拿去用就是一則空殼訊息。
+             *
+             * 前端成功後本來就會整份重載（而且廣播也會叫所有人重載），
+             * 這裡只要給一句話就夠。
+             */
+            return response()->json(['message' => trans('telegram_chat.msg.edit_done')]);
+        } catch (\RuntimeException $e) {
+            /*
+             * ⚠ `RuntimeException` 帶的是**給人看的原因**（超過時限、
+             * 訊息已被刪、Telegram 拒收）—— 原樣回去，不要吃掉換成
+             * 「操作失敗」。那正是操作者唯一能據以判斷下一步的資訊。
+             */
+            return response()->json(['message' => $e->getMessage()], 422);
+        } catch (\Exception $e) {
+            Log::error('改掉已送出訊息失敗', [
+                'message_id' => $telegramMessage->id,
+                'user_id'    => Auth::id(),
+                'error'      => $e->getMessage(),
+            ]);
+
+            return response()->json(['message' => trans('telegram_chat.msg.edit_failed')], 500);
+        }
+    }
+
+    /**
+     * Ajax 撤回一則已經送出去的訊息
+     *
+     * ⚠ 條件比編輯寬：圖片、檔案、自動回覆都撤得掉。
+     *
+     * @param TelegramMessage $telegramMessage
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function ajaxRecallSent(TelegramMessage $telegramMessage)
+    {
+        if (!$this->canTouchSent($telegramMessage)) {
+            return response()->json(['message' => trans('telegram_chat.msg.edit_not_owner')], 403);
+        }
+
+        try {
+            $this->chatService->recallSent((int) $telegramMessage->id, Auth::id());
+
+            // ⚠ 同樣不回 Resource，理由見 `ajaxEditSent()`
+            return response()->json(['message' => trans('telegram_chat.msg.recall_done')]);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        } catch (\Exception $e) {
+            Log::error('撤回已送出訊息失敗', [
+                'message_id' => $telegramMessage->id,
+                'user_id'    => Auth::id(),
+                'error'      => $e->getMessage(),
+            ]);
+
+            return response()->json(['message' => trans('telegram_chat.msg.recall_failed')], 500);
+        }
+    }
+
+    /**
+     * 這個人動得了這一則嗎
+     *
+     * ⚠ 自己送的隨時可以（有 `reply` 才進得來這支）；
+     * 別人送的、以及**自動回覆送的**（`sender_user_id` 是 null）
+     * 都要 `telegram_chat.edit_others`。
+     *
+     * @param TelegramMessage $message
+     * @return bool
+     */
+    private function canTouchSent(TelegramMessage $message)
+    {
+        if ((int) $message->sender_user_id === (int) Auth::id()) {
+            return true;
+        }
+
+        return Auth::user()->can('telegram_chat.edit_others');
     }
 
     /**

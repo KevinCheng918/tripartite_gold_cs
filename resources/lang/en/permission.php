@@ -98,6 +98,8 @@ return [
     ],
     'telegram_chat' => [
         'ignore_manage'   => 'Manage auto-reply exclusions',
+        // ⚠ Editing your own messages only needs `reply`; this covers other people's.
+        'edit_others'     => "Edit or recall other people's sent messages",
         'broadcast_template' => 'Manage announcement templates',
         'station_credit' => 'Query station credits by command',
         'vm_query' => 'Query virtual machines by command',

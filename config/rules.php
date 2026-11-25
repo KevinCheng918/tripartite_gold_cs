@@ -25,6 +25,17 @@ return [
      */
     'LEAVE_CANCEL_REASON' => 'nullable|string|max:500',
 
+    /*
+     * 改掉已送出訊息時的新內容。
+     *
+     * ⚠ **必填**：要清空那一則的話該用「撤回」，不是把它改成空白 ——
+     * Telegram 本來就不接受空訊息，而留一則空的在對話裡更難看。
+     *
+     * ⚠ 上限用 Telegram 的 4096（那是 `sendMessage` 的硬限制），
+     * 超過的話 API 會直接拒收。
+     */
+    'TELEGRAM_EDIT_CONTENT' => 'required|string|max:4096',
+
     'USER_ACCOUNT_REGEX'  => 'regex:/^[A-Za-z0-9\_]{4,20}$/',
     'USER_PASSWORD_REGEX' => 'regex:/^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{}|;:,.<>?\/?]{8,}$/',
 

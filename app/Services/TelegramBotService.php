@@ -223,7 +223,7 @@ class TelegramBotService
      * @param int        $messageId
      * @param string     $text
      * @param array|null $keyboard 傳 null 代表移除按鈕
-     * @return array|null
+     * @return array{ok: bool, description: string|null}
      */
     public function editMessageText($chatId, $messageId, $text, $keyboard = null)
     {
@@ -243,15 +243,41 @@ class TelegramBotService
                 'json' => $params,
             ]);
 
-            return json_decode($response->getBody()->getContents(), true);
+            $body = json_decode($response->getBody()->getContents(), true);
+
+            /*
+             * ⚠ 回傳形狀對齊 `deleteMessages()`（`ok` ＋ `description`）——
+             * 呼叫端要能一致地判斷成敗與原因。
+             *
+             * ⚠ 既有的唯一呼叫端（`SupportGroupService::editMessage()`）
+             * 不看回傳值，所以改形狀不會影響它。
+             */
+            return [
+                'ok'          => (bool) Arr::get((array) $body, 'ok'),
+                'description' => Arr::get((array) $body, 'description'),
+            ];
         } catch (\Exception $e) {
+            /*
+             * ⚠⚠ **要挖出 Telegram 給的 `description`。**
+             *
+             * 客服自己編輯送出去的訊息時（2026-11-25 的功能），
+             * 「為什麼改不動」只有這個字串說得出來 —— 訊息太舊、被刪掉了、
+             * bot 被踢出群組。只記 `getMessage()` 的話畫面上只能顯示
+             * 「失敗」，操作者完全不知道要怎麼辦。
+             *
+             * ⚠ 這裡**沿用 `deleteMessages()` 的 `errorDescription()`**，
+             * 不要另寫一份解析。
+             */
+            $description = $this->errorDescription($e);
+
             Log::error('Telegram editMessageText 失敗', [
-                'chat_id'    => $chatId,
-                'message_id' => $messageId,
-                'error'      => $e->getMessage(),
+                'chat_id'     => $chatId,
+                'message_id'  => $messageId,
+                'description' => $description,
+                'error'       => $e->getMessage(),
             ]);
 
-            return null;
+            return ['ok' => false, 'description' => $description];
         }
     }
 

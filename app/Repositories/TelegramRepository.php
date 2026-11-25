@@ -229,8 +229,32 @@ class TelegramRepository
     public function getMessagesByGroup($groupId, $perPage = 50)
     {
         return TelegramMessage::query()
-            // reply_to_* 漏掉會讓引用回覆永遠顯示不出來（欄位有值也讀不到）
-            ->select(['id', 'telegram_group_id', 'direction', 'telegram_message_id', 'sender_name', 'sender_user_id', 'content', 'edited_at', 'reply_to_sender', 'reply_to_text', 'media_type', 'media_url', 'media_name', 'reactions', 'replied', 'created_at'])
+            /*
+             * ⚠⚠ 新增欄位時這裡一定要跟著加，漏掉**不會報錯**，
+             * 只會讓那一欄永遠是 null。這個專案已經踩過五次
+             * （`ask_chat_id`／`close_action`／`session_timeout`／
+             * `handover_time`／`remind_message_id`）。
+             *
+             * ⚠ `reply_to_*` 漏掉會讓引用回覆永遠顯示不出來；
+             * `is_auto`／`recalled_at` 漏掉會讓前端算不出「這則能不能改」。
+             */
+            ->select([
+                'id', 'telegram_group_id', 'direction', 'telegram_message_id',
+                'sender_name', 'sender_user_id', 'is_auto', 'content',
+                'edited_at', 'edited_by', 'recalled_at', 'recalled_by',
+                'reply_to_sender', 'reply_to_text',
+                'media_type', 'media_url', 'media_name',
+                'reactions', 'replied', 'created_at',
+            ])
+            /*
+             * ⚠ 「誰改的／誰撤的」要 eager load —— 一頁 50 則，
+             * 在 Resource 裡逐則 `$this->editedByUser->nickname`
+             * 就是 100 次查詢。
+             *
+             * ⚠ 關聯本身已經 `select(['id', 'nickname'])`，
+             * 這裡不用再寫 `:id,nickname`（寫了會疊成兩次 select）。
+             */
+            ->with(['editedByUser', 'recalledByUser'])
             ->where('telegram_group_id', $groupId)
             ->orderByDesc('created_at')
             ->paginate($perPage);
@@ -326,6 +350,31 @@ class TelegramRepository
      * @param int $messageId 後台的訊息 id
      * @return TelegramMessage|null
      */
+    /**
+     * 取一則我方送出的訊息，供「改掉／撤回」判斷與執行
+     *
+     * ⚠ 欄位要夠 `TelegramMessage::canEdit()`／`canRecall()` 判斷用：
+     * `direction`／`telegram_message_id`／`is_auto`／`media_type`／
+     * `recalled_at`／`created_at` 缺一個，那兩支就會算錯 ——
+     * 而且是**算成「不能改」**（欄位讀回 null），使用者只會看到按鈕消失。
+     *
+     * ⚠ 帶 `group:id,chat_id`：送 API 要 chat_id，不帶就是每次多一趟查詢。
+     *
+     * @param int $id 後台訊息 id
+     * @return TelegramMessage|null
+     */
+    public function findOutboundForEdit($id)
+    {
+        return TelegramMessage::query()
+            ->select([
+                'id', 'telegram_group_id', 'telegram_message_id', 'direction',
+                'sender_user_id', 'is_auto', 'content', 'media_type',
+                'recalled_at', 'created_at',
+            ])
+            ->with(['group:id,chat_id'])
+            ->find($id);
+    }
+
     public function findQuoted($groupId, $messageId)
     {
         return TelegramMessage::query()

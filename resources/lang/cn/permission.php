@@ -102,6 +102,8 @@ return [
         'broadcast'       => '群发公告',
         'delete'          => '删除对话记录',
         'ignore_manage'   => '设定不自动回覆的成员',
+        // ⚠ 自己送的不需要这个权限（有 reply 就能改自己说过的话）
+        'edit_others'     => '改掉／撤回别人送出的讯息',
         'broadcast_template' => '建档／修改公告范本',
         'station_credit'  => '用指令查站台余点',
         'vm_query'        => '用指令查虚拟机',

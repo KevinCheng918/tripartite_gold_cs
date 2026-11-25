@@ -25,6 +25,24 @@ return [
     'send_image_title'   => '傳送圖片',
     'send_file_caption'  => '說明文字（選填）',
     'btn_add_more'       => '新增',
+    'btn_save'           => '儲存',
+
+    /*
+     * 改掉／撤回已經送出去的訊息（需求方 2026-11-25）。
+     *
+     * ⚠ 兩段提示文字要講清楚後果，不要只寫「確定嗎」——
+     * 編輯客人那邊會留下「已編輯」的痕跡，撤回則是整則消失、拿不回來，
+     * 客服要先知道自己按下去會發生什麼事。
+     */
+    'action_edit_sent'   => '編輯訊息',
+    'edit_hint'          => '改完客人那邊會顯示「已編輯」，所以不適合用來掩蓋說錯的話；說錯請撤回再重發一則。',
+    'action_recall_sent' => '撤回訊息',
+    'recall_confirm'     => '確定要把這一則從客人的對話裡收回嗎？',
+    'recall_hint'        => '客人那邊會整則消失、而且收不回來；後台仍然留著紀錄，主管查得到。',
+    // ⚠ 這是氣泡上的**標籤**（跟 ignore_badge 同一類），不要放進 `msg` ——
+    //    放進去前端就得寫 `i18n.msg.recalled_badge`，第一版就是這樣漏掉的
+    'recalled_badge'     => '已撤回',
+    'recalled_badge_by'  => '已由 :name 撤回',
 
     /*
      * 打 `@` 叫人。
@@ -67,7 +85,13 @@ return [
     'btn_remove_image'   => '移除',
     'drop_hint'          => '放開以加入附件',
     'download_file'      => '下載檔案',
+    /*
+     * ⚠ 兩個版本都要留著：客人自己在 Telegram 改自己那句話時，
+     * 我們只知道「被改過」、不知道是誰（那是他家的帳號），
+     * 這時只能用沒有名字的那一版。
+     */
     'message_edited'     => '已編輯',
+    'message_edited_by'  => '已由 :name 編輯',
     'action_quote'       => '引用回覆',
     'action_cancel_quote' => '取消引用',
     'media_photo'        => '[圖片]',
@@ -156,6 +180,27 @@ return [
         'group_not_found'  => '群組不存在',
         'content_too_long' => '訊息內容過長',
         'reply_failed'     => '回覆發送失敗',
+
+        /*
+         * 改掉／撤回已送出的訊息（需求方 2026-11-25）。
+         *
+         * ⚠ 失敗原因要分開講，因為下一步完全不同：
+         * 超過時限 → 改用撤回或補一則；訊息不見了 → 沒事可做；
+         * 其他 → 附上 Telegram 的原文讓人回報。
+         */
+        'edit_not_allowed'     => '這一則現在改不動了（只有自己人工送出的純文字、12 小時內可以改）',
+        'edit_not_owner'       => '這是別人送出的訊息，您沒有權限改動',
+        'edit_content_required' => '內容不能是空的；要整則收回請改用「撤回」',
+        'edit_content_max'     => '內容太長（Telegram 上限 4096 字）',
+        'edit_too_old'         => 'Telegram 不讓改這麼舊的訊息了，請改用「撤回」再重發一則',
+        'edit_gone'            => '那一則訊息在 Telegram 上已經不存在了（可能已經被刪掉）',
+        'edit_failed'          => '改不動這一則訊息',
+        'edit_failed_reason'   => '改不動這一則訊息：:reason',
+        'edit_done'            => '已經改好了，客人那邊會顯示「已編輯」',
+
+        'recall_not_allowed'   => '這一則現在撤不回了（只有我方送出、48 小時內可以撤）',
+        'recall_failed'        => '撤回失敗',
+        'recall_done'          => '已經撤回，客人那邊看不到這一則了',
         'reply_success'    => '回覆已發送',
         'assign_failed'    => '指派失敗',
         'assign_success'   => '指派成功',

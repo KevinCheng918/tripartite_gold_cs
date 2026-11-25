@@ -176,6 +176,16 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/ajax-unread-count', [TelegramChatController::class, 'ajaxUnreadCount'])->name('ajax-unread-count');
         Route::get('/ajax-messages', [TelegramChatController::class, 'ajaxMessages'])->name('ajax-messages');
         Route::post('/ajax-reply', [TelegramChatController::class, 'ajaxReply'])->middleware('can:telegram_chat.reply')->name('ajax-reply');
+
+        /*
+         * 改掉／撤回已經送出去的訊息（需求方 2026-11-25）。
+         *
+         * ⚠ 中介層只能擋到 `reply`（進得來的門檻）——
+         * 「這一則是不是自己送的」要在 Controller 判，
+         * 路由這一層看不到那一則是誰送的。動別人的要 `edit_others`。
+         */
+        Route::put('/ajax-edit-sent/{telegramMessage}', [TelegramChatController::class, 'ajaxEditSent'])->middleware('can:telegram_chat.reply')->name('ajax-edit-sent');
+        Route::delete('/ajax-recall-sent/{telegramMessage}', [TelegramChatController::class, 'ajaxRecallSent'])->middleware('can:telegram_chat.reply')->name('ajax-recall-sent');
         Route::post('/ajax-send-image', [TelegramChatController::class, 'ajaxSendImage'])->middleware('can:telegram_chat.reply')->name('ajax-send-image');
         Route::post('/ajax-send-file', [TelegramChatController::class, 'ajaxSendFile'])->middleware('can:telegram_chat.reply')->name('ajax-send-file');
         Route::post('/ajax-react', [TelegramChatController::class, 'ajaxReact'])->middleware('can:telegram_chat.reply')->name('ajax-react');

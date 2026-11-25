@@ -93,10 +93,40 @@
                 T.escapeHtml(T.i18n.badge_auto || '自動') + '</span>' + textHtml;
         }
 
-        // 客人改過內容就標示出來，提醒客服現在看到的不是最初那句
+        /*
+         * 改過就標示出來，提醒現在看到的不是最初那一句。
+         *
+         * ⚠ **有名字就要把名字寫出來**（需求方 2026-11-25）——
+         * 「某人改過我們跟客人說的話」要追得到是誰，光寫「已編輯」
+         * 事後查不出責任歸屬。
+         *
+         * ⚠ 客人自己在 Telegram 改他自己那句話時沒有名字（那是他家的
+         * 帳號），那種就只顯示「已編輯」。
+         */
         if (m.is_edited) {
+            var editedLabel = m.edited_by_name
+                ? T.i18n.message_edited_by.replace(':name', m.edited_by_name)
+                : T.i18n.message_edited;
+
             textHtml += '<span class="text-muted ms-1" style="font-size:0.75rem">（' +
-                T.escapeHtml(T.i18n.message_edited) + '）</span>';
+                T.escapeHtml(editedLabel) + '）</span>';
+        }
+
+        /*
+         * ⚠⚠ **撤回的訊息要留在畫面上，只是標出來。**
+         *
+         * 客人那邊已經看不到了，但「我們曾經送過這句話」仍然是事實 ——
+         * 從畫面上抹掉的話，事後連「為什麼客人會那樣以為」都查不出來
+         * （需求方 2026-11-25 的設計，後端也是同一個原則：不刪那一列）。
+         */
+        if (m.is_recalled) {
+            // ⚠ 同編輯：撤回也要標出是誰撤的
+            var recalledLabel = m.recalled_by_name
+                ? T.i18n.recalled_badge_by.replace(':name', m.recalled_by_name)
+                : T.i18n.recalled_badge;
+
+            textHtml = '<span class="badge bg-secondary me-1" style="font-size:0.6875rem;vertical-align:middle">' +
+                T.escapeHtml(recalledLabel) + '</span>' + textHtml;
         }
 
         var reactHtml = '';
@@ -116,10 +146,44 @@
         // 修正前送出的舊訊息都沒存這個 id
         var quoteBtn = (T.canReply && m.telegram_message_id)
             ? '<button class="tg-quote-btn js-quote-msg" data-id="' + m.id +
-              '" data-sender="' + T.escapeHtml(m.sender_name || '') +
-              '" data-text="' + T.escapeHtml(quotePreview(m)) +
+              // ⚠ 屬性值要用 escapeAttr，escapeHtml 不會處理半角引號
+              '" data-sender="' + T.escapeAttr(m.sender_name || '') +
+              '" data-text="' + T.escapeAttr(quotePreview(m)) +
               '" title="' + T.escapeHtml(T.i18n.action_quote) + '">' +
               '<i class="fas fa-reply"></i></button>'
+            : '';
+
+        /*
+         * 改掉／撤回自己送出的那一則（需求方 2026-11-25）。
+         *
+         * ⚠⚠ **能不能動是後端算的**（`can_edit`／`can_recall`），
+         * 前端只負責畫不畫 —— 兩邊各算一份條件，遲早會出現
+         * 「看得到卻按不動」的按鈕。
+         *
+         * ⚠ 這裡**還要再加一層「是不是自己送的」**：後端那兩個旗標只看
+         * 訊息本身（類型、時限），看不到登入者是誰。動別人的要有
+         * `telegram_chat.edit_others`。
+         */
+        // ⚠ 欄位名是 `currentUserId`（state.js），不是 `userId`
+        var mine = T.currentUserId && m.sender_user_id
+            && Number(m.sender_user_id) === Number(T.currentUserId);
+        var mayTouch = mine || T.canEditOthers;
+
+        var editBtn = (mayTouch && m.can_edit)
+            ? '<button class="tg-quote-btn js-edit-msg" data-id="' + m.id +
+              '" title="' + T.escapeHtml(T.i18n.action_edit_sent) + '">' +
+              '<i class="fas fa-pen"></i></button>'
+            : '';
+
+        var recallBtn = (mayTouch && m.can_recall)
+            ? '<button class="tg-quote-btn js-recall-msg" data-id="' + m.id +
+              '" title="' + T.escapeHtml(T.i18n.action_recall_sent) + '">' +
+              /*
+               * ⚠ 這套後台帶的是 **FontAwesome 5**，沒有 `fa-rotate-left`
+               * （那是 6 才有的名字）—— 寫錯不會報錯，只會畫出一個
+               * **空白方塊**，第一版就是這樣。FA5 的名字是 `fa-undo`。
+               */
+              '<i class="fas fa-undo"></i></button>'
             : '';
 
         var reactBtn = '';
@@ -144,10 +208,18 @@
 
         if (isOutbound) {
             return (
-                '<div class="chat-box-wrapper" data-msg-id="' + m.id + '" style="display:flex;justify-content:flex-end">' +
+                /*
+                 * ⚠ `data-raw-content` 是給編輯框用的**原始內容**。
+                 * 不能從氣泡的 innerText 反推 —— 那裡面混了「自動」
+                 * 「已撤回」「已編輯」那幾個標籤，抓出來會把它們
+                 * 一起送回 Telegram。
+                 */
+                '<div class="chat-box-wrapper" data-msg-id="' + m.id +
+                '" data-raw-content="' + T.escapeAttr(m.content || '') +
+                '" style="display:flex;justify-content:flex-end">' +
                 '<div style="text-align:right">' +
                 senderLabel +
-                '<div class="chat-box ' + darkBubbleBg + '" style="' + bubbleBg + ';display:inline-block">' + replyHtml + mediaHtml + textHtml + reactBtn + quoteBtn + '</div>' +
+                '<div class="chat-box ' + darkBubbleBg + '" style="' + bubbleBg + ';display:inline-block">' + replyHtml + mediaHtml + textHtml + reactBtn + quoteBtn + editBtn + recallBtn + '</div>' +
                 reactHtml +
                 timeHtml +
                 '</div>' +
