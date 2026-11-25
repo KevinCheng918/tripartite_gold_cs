@@ -70,6 +70,24 @@ btn btn-success btn-sm   → 白底 ＋ 白字 ＝ 整顆消失
 沒有顏色變體的按鈕，正是靠那段白底樣式在長。拔掉會波及它們。
 把有顏色的那幾個補齊，是影響面最小的做法。
 
+### ⚠ 順手補：`btn-success` 不在「所有 btn 大小統一」那組裡
+
+稽核時發現的，跟顏色無關但同一個檔案：
+
+```css
+/* 原本只有三個，漏了 success */
+.btn.btn-primary, .btn.btn-secondary, .btn.btn-danger { font-size: 0.875rem !important; }
+```
+
+漏掉的那個會沿用佈景原本的尺寸 —— 實測 modal **外面**
+`btn-success` 是 **15px**，同一排的 `btn-danger` 是 **14px**。
+
+⚠ **為什麼一直沒被發現**：`btn-success` 目前只用在兩個地方，
+兩個都在 modal 裡，而 `.modal .btn` 有 `!important` 會把大小壓成一樣。
+是潛伏的，不是現在看得到的。
+
+⚠ **新增顏色變體時，那兩組（一般 ／ `btn-sm`）都要跟著加。**
+
 ---
 
 ## ⚠⚠ 教訓：實心底配白字，深色模式不需要另一組顏色

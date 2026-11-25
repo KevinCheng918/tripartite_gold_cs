@@ -495,15 +495,22 @@ h6, .h6 { font-size: 1rem; font-weight: 600; color: #212529; }
     border-color: transparent;
     box-shadow: none;
 }
-/* 所有 btn 大小統一 */
+/* 所有 btn 大小統一
+   ⚠ **新增顏色變體時這兩組都要跟著加。** 漏掉的那個會沿用佈景原本的
+   尺寸：`btn-success` 原本就漏了，實測在 modal 外面是 15px，
+   而同一排的 `btn-danger` 是 14px —— 差 1px，並排時看得出來。
+   （modal 裡剛好被 `.modal .btn` 的 `!important` 壓成一樣，
+   所以一直沒被發現。） */
 .btn.btn-primary,
 .btn.btn-secondary,
+.btn.btn-success,
 .btn.btn-danger {
     padding: 0.375rem 0.75rem !important;
     font-size: 0.875rem !important;
 }
 .btn-sm.btn-primary,
 .btn-sm.btn-secondary,
+.btn-sm.btn-success,
 .btn-sm.btn-danger {
     padding: 0.25rem 0.5rem !important;
     font-size: 0.8125rem !important;
