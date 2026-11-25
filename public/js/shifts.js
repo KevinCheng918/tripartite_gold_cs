@@ -1715,6 +1715,15 @@
     leaveStatusMap[0] = { text: leaveI18n.status_pending || '待審核', css: 'bg-warning text-dark' };
     leaveStatusMap[1] = { text: leaveI18n.status_approved || '已通過', css: 'bg-success' };
     leaveStatusMap[2] = { text: leaveI18n.status_rejected || '已拒絕', css: 'bg-danger' };
+    /*
+     * ⚠ 撤假通過之後原單會變成 `STATUS_CANCELLED`（3，見 LeaveRequest）。
+     * 漏了這一格的話整欄會印成 `-`（第 2301 行的 fallback）——
+     * 看起來像資料壞掉，而不是「這張單被撤掉了」。
+     *
+     * ⚠ 用灰色不用紅色：撤銷是**申請人自己要收回**，跟「被主管拒絕」
+     * 是兩回事，同樣染紅會讓人以為他被打回票。
+     */
+    leaveStatusMap[3] = { text: leaveI18n.status_cancelled || '已撤銷', css: 'bg-secondary' };
 
     function loadLeave() {
         var container = getShiftTabPane();

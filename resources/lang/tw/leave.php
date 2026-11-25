@@ -54,6 +54,8 @@ return [
     'status_pending'  => '待審核',
     'status_approved' => '已通過',
     'status_rejected' => '已拒絕',
+    // 撤假通過之後原單的狀態（⚠ 不是「被拒絕」，是申請人自己收回的）
+    'status_cancelled' => '已撤銷',
 
     'msg' => [
         'submitted'        => '請假申請已送出',

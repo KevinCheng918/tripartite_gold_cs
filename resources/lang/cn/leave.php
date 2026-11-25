@@ -45,6 +45,8 @@ return [
     'status_pending'  => '待审核',
     'status_approved' => '已通过',
     'status_rejected' => '已拒绝',
+    // 撤假通过之后原单的状态（⚠ 不是「被拒绝」，是申请人自己收回的）
+    'status_cancelled' => '已撤销',
 
     'msg' => [
         'submitted'        => '请假申请已送出',

@@ -45,6 +45,9 @@ return [
     'status_pending'  => 'Pending',
     'status_approved' => 'Approved',
     'status_rejected' => 'Rejected',
+    // Status of the original request once its cancellation is approved
+    // (⚠ not "rejected" — the applicant withdrew it themselves)
+    'status_cancelled' => 'Cancelled',
 
     'msg' => [
         'submitted'        => 'Leave request submitted',
