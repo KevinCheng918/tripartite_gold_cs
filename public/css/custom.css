@@ -520,6 +520,52 @@ h6, .h6 { font-size: 1rem; font-weight: 600; color: #212529; }
     color: #fff !important;
 }
 
+/* ================================================================
+   btn-success / btn-danger
+   ----------------------------------------------------------------
+   ⚠⚠ **`.btn-sm` 在 app.css 裡把顏色也一起定義了**
+   （`background: #fff; color: #495057;`，第 61 行）—— 它是「尺寸」
+   class 卻帶著配色，所以任何「`btn-sm` ＋ 顏色變體」都會被洗成白底：
+
+       btn btn-danger          → 紅底白字（正常）
+       btn btn-danger btn-sm   → **白底灰字**
+       btn btn-success btn-sm  → **白底白字 ＝ 整顆看不見**
+
+   2026-11-25 需求方回報「審核撤銷請假」那兩顆按鈕就是這樣
+   （`通過撤銷` 整顆空白）。
+
+   ⚠ **為什麼要寫 `.btn.btn-success` 而不是 `.btn-success`**：
+   app.css 掛在 custom.css **後面**（見 layouts/app.blade.php），
+   單一 class 的特異性一樣時後載入的贏 —— 要嘛加一層 class、
+   要嘛 `!important`，這裡比照上面 `.btn.btn-secondary` 兩個都用。
+
+   ⚠ **不去動 app.css 的 `.btn-sm`**：全站有一批「只有 `btn-sm`、
+   沒有顏色變體」的按鈕正是靠那段白底樣式在長，拔掉會波及它們。
+   把有顏色的那幾個補齊是影響面最小的做法。
+   ================================================================ */
+.btn.btn-success {
+    /* ⚠ 不用佈景原本的 #3ac47d —— 那個亮度配白字對比只有 2.1，
+       遠低於可讀門檻。壓深到 #198754 之後實測 4.53。 */
+    background-color: #198754 !important;
+    border-color: #198754 !important;
+    color: #fff !important;
+}
+.btn.btn-success:hover {
+    background-color: #157347 !important;
+    border-color: #146c43 !important;
+    color: #fff !important;
+}
+.btn.btn-danger {
+    background-color: #d92550 !important;
+    border-color: #d92550 !important;
+    color: #fff !important;
+}
+.btn.btn-danger:hover {
+    background-color: #bc1f45 !important;
+    border-color: #bc1f45 !important;
+    color: #fff !important;
+}
+
 /* Page title */
 .page-title-heading > div { font-size: 1.25rem; font-weight: 600; color: #212529; }
 .page-title-subheading { font-size: 0.875rem; color: #495057; }
@@ -1012,6 +1058,23 @@ a:hover { color: #85640a; }
 [data-theme="dark"] .modal .modal-footer { background: #1a1a1a !important; border-color: rgba(255,255,255,0.08) !important; }
 [data-theme="dark"] .modal .btn.btn-secondary { background-color: #4b5563 !important; border-color: #4b5563 !important; color: #fff !important; }
 [data-theme="dark"] .modal .btn.btn-secondary:hover { background-color: #6b7280 !important; border-color: #6b7280 !important; }
+
+/*
+ * ⚠⚠ **success／danger 刻意沒有 `[data-theme="dark"]` 版本，不是漏寫。**
+ *
+ * 需求方 2026-11-25 回報「深色模式的按鈕也不對」，但深色壞掉的原因
+ * 跟淺色是**同一個**（`.btn-sm` 把底色洗成白的，見上面那段）——
+ * 上面那組 `.btn.btn-success` / `.btn.btn-danger` 是 `!important`
+ * 且不綁主題，所以兩個模式一起修好了。
+ *
+ * ⚠ 第一版真的補了一組「深色模式調亮一階」，**那是錯的**：
+ * 這兩顆是**實心底 ＋ 白字**，字的可讀性只跟底色有關、
+ * 跟頁面背景無關。調亮底色只會讓白字更難看 ——
+ * 實測 success 的對比從 4.53 掉到 **3.20**（低於 4.5 門檻），
+ * danger 從 4.85 掉到 4.25。已經移除。
+ *
+ * 現在兩個模式都是：success 4.53、danger 4.85，都過門檻。
+ */
 [data-theme="dark"] .form-control[disabled], [data-theme="dark"] .form-control[readonly] { background: rgba(255,255,255,0.03) !important; color: rgba(255,255,255,0.5) !important; }
 
 /* 出勤統計卡片 dark mode */
